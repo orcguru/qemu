@@ -48,6 +48,23 @@ typedef enum DisasJumpType {
     DISAS_TARGET_11,
 } DisasJumpType;
 
+#ifdef AOT_IR
+typedef enum control_transfer_type {
+    INVALID_TYPE = 0,
+    TR_IS_CALL,
+    TR_IS_JMP,
+    TR_IS_RET,
+    TR_IS_IRET,
+    TR_IS_LCALL,
+    TR_IS_LJMP,
+    TR_IS_LRET,
+} control_transfer_type_t;
+
+// For debug
+control_transfer_type_t get_jmp(void);
+control_transfer_type_t get_call(void);
+#endif
+
 /**
  * DisasContextBase:
  * @tb: Translation block for this disassembly.
@@ -88,6 +105,10 @@ struct DisasContextBase {
     int record_start;
     int record_len;
     uint8_t record[32];
+#ifdef AOT_IR
+    vaddr pc_acc;
+    control_transfer_type_t jmp_type;
+#endif
 };
 
 /**

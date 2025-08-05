@@ -286,6 +286,9 @@ TranslationBlock *tb_gen_code(CPUState *cpu, TCGTBCPUState s)
 
  buffer_overflow:
     assert_no_pages_locked();
+#ifdef AOT_IR
+    void *code_gen_ptr_orig = tcg_ctx->code_gen_ptr;
+#endif
     tb = tcg_tb_alloc(tcg_ctx);
     if (unlikely(!tb)) {
         /* flush must be done */
@@ -512,6 +515,9 @@ TranslationBlock *tb_gen_code(CPUState *cpu, TCGTBCPUState s)
      */
     if (tb_page_addr0(tb) == -1) {
         assert_no_pages_locked();
+#ifdef AOT_IR
+        qatomic_set(&tcg_ctx->code_gen_ptr, code_gen_ptr_orig);
+#endif
         return tb;
     }
 
@@ -531,6 +537,9 @@ TranslationBlock *tb_gen_code(CPUState *cpu, TCGTBCPUState s)
         tcg_tb_remove(tb);
         return existing_tb;
     }
+#ifdef AOT_IR
+    qatomic_set(&tcg_ctx->code_gen_ptr, code_gen_ptr_orig);
+#endif
     return tb;
 }
 

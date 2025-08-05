@@ -142,3 +142,12 @@ target_ulong HELPER(rdpid)(CPUX86State *env)
     return 0;
 #endif
 }
+
+#ifdef AOT_IR
+void helper_jmp_ind(CPUX86State *env, target_ulong t0) {}
+void helper_call_ind(CPUX86State *env, target_ulong t0) {}
+void helper_ret_ind(CPUX86State *env, target_ulong t0) {}
+void helper_iret_ind(CPUX86State *env) {}
+void helper_dump_load(CPUX86State *env, target_ulong t0, target_ulong t1) {}
+void helper_dump_store(CPUX86State *env, target_ulong t0, target_ulong t1) {}
+#endif

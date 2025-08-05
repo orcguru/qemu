@@ -141,6 +141,15 @@ typedef struct DisasContext {
     sigjmp_buf jmpbuf;
     TCGOp *prev_insn_start;
     TCGOp *prev_insn_end;
+#ifdef AOT_IR
+    target_ulong rip_at_exit;
+    bool last_rip_add;
+    bool last_rip_mov;
+    TCGv last_rip_mov_src;
+    bool eip_next_tl_set;
+    TCGv eip_next_tl_val;
+    target_ulong eip_next_pc;
+#endif
 } DisasContext;
 
 /*
@@ -287,6 +296,10 @@ enum {
     USES_CC_SRC2 = 4,
     USES_CC_SRCT = 8,
 };
+
+#ifdef AOT_IR
+extern uintptr_t x_load_addr;
+#endif
 
 /* Bit set if the global variable is live after setting CC_OP to X.  */
 static const uint8_t cc_op_live_[] = {
@@ -499,8 +512,15 @@ static void gen_add_A0_im(DisasContext *s, int val)
 
 static inline void gen_op_jmp_v(DisasContext *s, TCGv dest)
 {
+#ifdef AOT_IR
+    s->pc_save = -1;
+    s->last_rip_add = false;
+    s->last_rip_mov = true;
+    s->last_rip_mov_src = dest;
+#else
     tcg_gen_mov_tl(cpu_eip, dest);
     s->pc_save = -1;
+#endif
 }
 
 static inline void gen_op_add_reg(DisasContext *s, MemOp size, int reg, TCGv val)
@@ -537,7 +557,14 @@ static void gen_update_eip_next(DisasContext *s)
 {
     assert(s->pc_save != -1);
     if (tb_cflags(s->base.tb) & CF_PCREL) {
+#ifndef AOT_IR
         tcg_gen_addi_tl(cpu_eip, cpu_eip, s->pc - s->pc_save);
+#else
+        s->rip_at_exit += (s->base.pc_next - s->pc_save);
+        s->base.pc_acc += (s->pc - s->pc_save);
+        s->last_rip_add = true;
+        s->last_rip_mov = false;
+#endif
     } else if (CODE64(s)) {
         tcg_gen_movi_tl(cpu_eip, s->pc);
     } else {
@@ -550,7 +577,14 @@ static void gen_update_eip_cur(DisasContext *s)
 {
     assert(s->pc_save != -1);
     if (tb_cflags(s->base.tb) & CF_PCREL) {
+#ifndef AOT_IR
         tcg_gen_addi_tl(cpu_eip, cpu_eip, s->base.pc_next - s->pc_save);
+#else
+        s->rip_at_exit += (s->base.pc_next - s->pc_save);
+        s->base.pc_acc += (s->base.pc_next - s->pc_save);
+        s->last_rip_add = true;
+        s->last_rip_mov = false;
+#endif
     } else if (CODE64(s)) {
         tcg_gen_movi_tl(cpu_eip, s->base.pc_next);
     } else {
@@ -597,8 +631,17 @@ static TCGv eip_next_tl(DisasContext *s)
 {
     assert(s->pc_save != -1);
     if (tb_cflags(s->base.tb) & CF_PCREL) {
+#ifndef AOT_IR
         TCGv ret = tcg_temp_new();
         tcg_gen_addi_tl(ret, cpu_eip, s->pc - s->pc_save);
+#else
+        TCGv ret = tcg_temp_new();
+        tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->pc - s->pc_save)), 0);
+        tcg_gen_addi_tl(ret, cpu_eip, 0);
+        s->eip_next_tl_set = true;
+        s->eip_next_tl_val = ret;
+        s->eip_next_pc = s->pc;
+#endif
         return ret;
     } else if (CODE64(s)) {
         return tcg_constant_tl(s->pc);
@@ -612,7 +655,12 @@ static TCGv eip_cur_tl(DisasContext *s)
     assert(s->pc_save != -1);
     if (tb_cflags(s->base.tb) & CF_PCREL) {
         TCGv ret = tcg_temp_new();
+#ifdef AOT_IR
+        tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->base.pc_next - s->pc_save)), 0);
+        tcg_gen_addi_tl(ret, cpu_eip, 0);
+#else
         tcg_gen_addi_tl(ret, cpu_eip, s->base.pc_next - s->pc_save);
+#endif
         return ret;
     } else if (CODE64(s)) {
         return tcg_constant_tl(s->base.pc_next);
@@ -1445,6 +1493,9 @@ static void do_gen_rep(DisasContext *s, MemOp ot, TCGv dshift,
     }
 
     /* Go to the main loop but reenter the same instruction.  */
+#ifdef AOT_IR
+    s->base.jmp_type = get_jmp();
+#endif
     gen_jmp_rel_csize(s, -cur_insn_len(s), 0);
 
     if (can_loop) {
@@ -1465,6 +1516,9 @@ static void do_gen_rep(DisasContext *s, MemOp ot, TCGv dshift,
     if (had_rf) {
         gen_reset_eflags(s, RF_MASK);
     }
+#ifdef AOT_IR
+    s->base.jmp_type = get_jmp();
+#endif
     gen_jmp_rel_csize(s, 0, 1);
 }
 
@@ -1856,7 +1910,12 @@ static TCGv gen_lea_modrm_1(DisasContext *s, AddressParts a, bool is_vsib)
     if (!ea) {
         if (tb_cflags(s->base.tb) & CF_PCREL && a.base == -2) {
             /* With cpu_eip ~= pc_save, the expression is pc-relative. */
+#ifdef AOT_IR
+            tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (a.disp - s->pc_save)), 0);
+            tcg_gen_addi_tl(s->A0, cpu_eip, 0);
+#else
             tcg_gen_addi_tl(s->A0, cpu_eip, a.disp - s->pc_save);
+#endif
         } else {
             tcg_gen_movi_tl(s->A0, a.disp);
         }
@@ -1997,6 +2056,9 @@ static void gen_conditional_jump_labels(DisasContext *s, target_long diff,
     if (not_taken) {
         gen_set_label(not_taken);
     }
+#ifdef AOT_IR
+    s->base.jmp_type = get_jmp();
+#endif
     gen_jmp_rel_csize(s, 0, 1);
 
     gen_set_label(taken);
@@ -2077,6 +2139,10 @@ static void gen_far_call(DisasContext *s)
                               eip_next_i32(s));
     }
     s->base.is_jmp = DISAS_JUMP;
+#ifdef AOT_IR
+    // FIXME: support far_call
+    s->base.jmp_type = TR_IS_LCALL;
+#endif
 }
 
 static void gen_far_jmp(DisasContext *s)
@@ -2091,6 +2157,10 @@ static void gen_far_jmp(DisasContext *s)
         gen_op_jmp_v(s, s->T0);
     }
     s->base.is_jmp = DISAS_JUMP;
+#ifdef AOT_IR
+    // FIXME: support far_jmp
+    s->base.jmp_type = TR_IS_LJMP;
+#endif
 }
 
 static void gen_svm_check_intercept(DisasContext *s, uint32_t type)
@@ -2306,16 +2376,68 @@ gen_eob(DisasContext *s, int mode)
         gen_reset_eflags(s, RF_MASK);
     }
     if (mode == DISAS_EOB_RECHECK_TF) {
+#ifdef AOT_IR
+        // FIXME: need helper_rechecking_single_step???
+        assert(s->base.jmp_type != TR_IS_RET && s->base.jmp_type != INVALID_TYPE);
+        if (s->base.jmp_type == TR_IS_JMP) {
+            tcg_gen_jmp_direct(s->rip_at_exit);
+        } else if (s->base.jmp_type == TR_IS_CALL) {
+            assert(s->eip_next_tl_set);
+            tcg_gen_call_direct(s->rip_at_exit, s->eip_next_tl_val, s->eip_next_pc);
+        } else {
+            assert(0);
+        }
+#else
         gen_helper_rechecking_single_step(tcg_env);
         tcg_gen_exit_tb(NULL, 0);
+#endif
     } else if (s->flags & HF_TF_MASK) {
         gen_helper_single_step(tcg_env);
     } else if (mode == DISAS_JUMP &&
                /* give irqs a chance to happen */
                !inhibit_reset) {
+#ifdef AOT_IR
+        assert(s->base.jmp_type != INVALID_TYPE);
+        if (s->base.jmp_type == TR_IS_JMP) {
+            gen_helper_jmp_ind(tcg_env, s->last_rip_mov_src);
+        } else if (s->base.jmp_type == TR_IS_CALL) {
+            assert(s->eip_next_tl_set);
+            tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
+            gen_helper_call_ind(tcg_env, s->last_rip_mov_src);
+        } else if (s->base.jmp_type == TR_IS_RET) {
+            assert(s->last_rip_mov);
+            tcg_gen_ret(s->last_rip_mov_src);
+        } else if (s->base.jmp_type == TR_IS_IRET) {
+            gen_helper_iret_ind(tcg_env);
+        } else if (s->base.jmp_type == TR_IS_LCALL || s->base.jmp_type == TR_IS_LJMP || s->base.jmp_type == TR_IS_LRET) {
+        } else {
+            assert(0);
+        }
+#else
         tcg_gen_lookup_and_goto_ptr();
+#endif
     } else {
+#ifdef AOT_IR
+        assert(s->base.jmp_type != INVALID_TYPE);
+        if (s->base.jmp_type == TR_IS_JMP) {
+            tcg_gen_jmp_direct(s->rip_at_exit);
+        } else if (s->base.jmp_type == TR_IS_RET) {
+            assert(s->last_rip_mov);
+            tcg_gen_ret(s->last_rip_mov_src);
+        } else if (s->base.jmp_type == TR_IS_CALL) {
+            assert(s->eip_next_tl_set);
+            tcg_gen_call_direct(s->rip_at_exit, s->eip_next_tl_val, s->eip_next_pc);
+        } else if (s->base.jmp_type == TR_IS_IRET) {
+            // FIXME
+            gen_helper_iret_ind(tcg_env);
+        } else if (s->base.jmp_type == TR_IS_LRET) {
+            // FIXME
+        } else {
+            assert(0);
+        }
+#else
         tcg_gen_exit_tb(NULL, 0);
+#endif
     }
 
     s->base.is_jmp = DISAS_NORETURN;
@@ -2343,16 +2465,27 @@ static void gen_jmp_rel(DisasContext *s, MemOp ot, int diff, int tb_num)
         }
     }
     new_eip &= mask;
+#ifdef AOT_IR
+    target_ulong rip_at_exit_backup = s->rip_at_exit;
+#endif
 
     if (tb_cflags(s->base.tb) & CF_PCREL) {
+#ifndef AOT_IR
         tcg_gen_addi_tl(cpu_eip, cpu_eip, new_pc - s->pc_save);
+#else
+        s->rip_at_exit += (new_pc - s->pc_save);
+        s->last_rip_add = true;
+        s->last_rip_mov = false;
+#endif
         /*
          * If we can prove the branch does not leave the page and we have
          * no extra masking to apply (data16 branch in code32, see above),
          * then we have also proven that the addition does not wrap.
          */
         if (!use_goto_tb || !translator_is_same_page(&s->base, new_pc)) {
+#ifndef AOT_IR
             tcg_gen_andi_tl(cpu_eip, cpu_eip, mask);
+#endif
             use_goto_tb = false;
         }
     } else if (!CODE64(s)) {
@@ -2363,13 +2496,17 @@ static void gen_jmp_rel(DisasContext *s, MemOp ot, int diff, int tb_num)
         /* jump to same page: we can use a direct jump */
         tcg_gen_goto_tb(tb_num);
         if (!(tb_cflags(s->base.tb) & CF_PCREL)) {
+#ifndef AOT_IR
             tcg_gen_movi_tl(cpu_eip, new_eip);
+#endif
         }
         tcg_gen_exit_tb(s->base.tb, tb_num);
         s->base.is_jmp = DISAS_NORETURN;
     } else {
         if (!(tb_cflags(s->base.tb) & CF_PCREL)) {
+#ifndef AOT_IR
             tcg_gen_movi_tl(cpu_eip, new_eip);
+#endif
         }
         if (s->jmp_opt) {
             gen_eob(s, DISAS_JUMP);   /* jump to another page */
@@ -2377,6 +2514,9 @@ static void gen_jmp_rel(DisasContext *s, MemOp ot, int diff, int tb_num)
             gen_eob(s, DISAS_EOB_ONLY);  /* exit to main loop */
         }
     }
+#ifdef AOT_IR
+    s->rip_at_exit = rip_at_exit_backup;
+#endif
 }
 
 /* Jump to eip+diff, truncating to the current code size. */
@@ -3811,9 +3951,13 @@ static void i386_tr_insn_start(DisasContextBase *dcbase, CPUState *cpu)
 
     dc->prev_insn_start = dc->base.insn_start;
     dc->prev_insn_end = tcg_last_op();
+#ifndef AOT_IR
     if (tb_cflags(dcbase->tb) & CF_PCREL) {
         pc_arg &= ~TARGET_PAGE_MASK;
     }
+#else
+    pc_arg -= x_load_addr;
+#endif
     tcg_gen_insn_start(pc_arg, dc->cc_op);
 }
 
@@ -3898,8 +4042,29 @@ static void i386_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
         break;
     case DISAS_TOO_MANY:
         gen_update_cc_op(dc);
+#ifdef AOT_IR
+        dc->base.jmp_type = get_jmp();
+#endif
         gen_jmp_rel_csize(dc, 0, 0);
         break;
+#ifdef AOT_IR
+    case DISAS_EOB_NEXT:
+    case DISAS_EOB_INHIBIT_IRQ:
+        assert(dc->base.pc_next == dc->pc);
+        gen_update_eip_cur(dc);
+        dc->base.jmp_type = get_jmp();
+        gen_eob(dc, dc->base.is_jmp);
+        break;
+    case DISAS_EOB_ONLY:
+        assert(dc->base.jmp_type != INVALID_TYPE);
+        gen_eob(dc, dc->base.is_jmp);
+        break;
+    case DISAS_EOB_RECHECK_TF:
+    case DISAS_JUMP:
+        assert(dc->base.jmp_type != INVALID_TYPE);
+        gen_eob(dc, dc->base.is_jmp);
+        break;
+#else
     case DISAS_EOB_NEXT:
     case DISAS_EOB_INHIBIT_IRQ:
         assert(dc->base.pc_next == dc->pc);
@@ -3910,6 +4075,7 @@ static void i386_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
     case DISAS_JUMP:
         gen_eob(dc, dc->base.is_jmp);
         break;
+#endif
     default:
         g_assert_not_reached();
     }
@@ -3928,5 +4094,24 @@ void x86_translate_code(CPUState *cpu, TranslationBlock *tb,
 {
     DisasContext dc;
 
+#ifdef AOT_IR
+    memset(&dc, 0, sizeof(dc));
+    dc.rip_at_exit = pc;
+#endif
     translator_loop(cpu, tb, max_insns, pc, host_pc, &i386_tr_ops, &dc.base);
 }
+
+#ifdef AOT_IR
+void gen_helper_dump_load_wrapper(TCGv_env env, TCGv_i64 a, TCGv_i64 v);
+void gen_helper_dump_store_wrapper(TCGv_env env, TCGv_i64 a, TCGv_i64 v);
+
+void gen_helper_dump_load_wrapper(TCGv_env env, TCGv_i64 a, TCGv_i64 v)
+{
+    gen_helper_dump_load(env, a, v);
+}
+
+void gen_helper_dump_store_wrapper(TCGv_env env, TCGv_i64 a, TCGv_i64 v)
+{
+    gen_helper_dump_store(env, a, v);
+}
+#endif

@@ -2291,6 +2291,9 @@ static int elf_core_dump(int, const CPUArchState *);
 #endif /* USE_ELF_CORE_DUMP */
 static void load_symbols(struct elfhdr *hdr, const ImageSource *src,
                          abi_ulong load_bias);
+#ifdef AOT_IR
+void fill_section_gap_with_nop(struct image_info *info, struct elfhdr *hdr, const ImageSource *src);
+#endif
 
 /* Verify the portions of EHDR within E_IDENT for the target.
    This can be performed before bswapping the entire header.  */
@@ -3328,6 +3331,10 @@ static void load_elf_image(const char *image_name, const ImageSource *src,
     loaddr = -1, hiaddr = 0;
     align = 0;
     info->exec_stack = EXSTACK_DEFAULT;
+#ifdef AOT_IR
+    void *mprotect_ptr = (void *)-1UL;
+    size_t mprotect_len = 0;
+#endif
     for (i = 0; i < ehdr->e_phnum; ++i) {
         struct elf_phdr *eppnt = phdr + i;
         if (eppnt->p_type == PT_LOAD) {
@@ -3538,6 +3545,13 @@ static void load_elf_image(const char *image_name, const ImageSource *src,
                 if (error == -1) {
                     goto exit_mmap;
                 }
+#ifdef AOT_IR
+                if (eppnt->p_flags & PF_X) {
+                    info->code_mmap_start = vaddr_ps;
+                    info->code_mmap_len = eppnt->p_filesz + vaddr_po;
+                    info->code_mmap_prot = elf_prot;
+                }
+#endif
             }
 
             /* If the load segment requests extra zeros (e.g. bss), map it. */
@@ -3585,6 +3599,10 @@ static void load_elf_image(const char *image_name, const ImageSource *src,
     if (qemu_log_enabled()) {
         load_symbols(ehdr, src, load_bias);
     }
+
+#ifdef AOT_IR
+    fill_section_gap_with_nop(info, ehdr, src);
+#endif
 
     debuginfo_report_elf(image_name, src->fd, load_bias);
 
@@ -3838,6 +3856,50 @@ static void load_symbols(struct elfhdr *hdr, const ImageSource *src,
     g_free(strings);
     g_free(syms);
 }
+
+#ifdef AOT_IR
+void fill_section_gap_with_nop(struct image_info *info, struct elfhdr *hdr, const ImageSource *src)
+{
+    int i, shnum;
+    g_autofree struct elf_shdr *shdr = NULL;
+    Error *err = NULL;
+
+    shnum = hdr->e_shnum;
+    shdr = imgsrc_read_alloc(hdr->e_shoff, shnum * sizeof(struct elf_shdr),
+                             src, NULL);
+    if (shdr == NULL) {
+        return;
+    }
+    if (!info->code_mmap_start) {
+        return;
+    }
+
+    if (target_mprotect(info->code_mmap_start, info->code_mmap_len, (info->code_mmap_prot | PROT_WRITE)) == -1) {
+        error_setg_errno(&err, errno, "Failed mprotect %lx %lx %x", info->code_mmap_start, info->code_mmap_len, (info->code_mmap_prot | PROT_WRITE));
+        error_reportf_err(err, "%s", "");
+        exit(-1);
+    }
+    bswap_shdr(shdr, shnum);
+    for (i = 0; i < shnum; ++i) {
+        if (shdr[i].sh_type == SHT_PROGBITS && ((i + 1) < shnum) && shdr[i + 1].sh_type == SHT_PROGBITS) {
+            if ((shdr[i].sh_addr + shdr[i].sh_size) < shdr[i + 1].sh_addr) {
+                abi_long begin = (shdr[i].sh_addr + shdr[i].sh_size);
+                abi_long size = shdr[i + 1].sh_addr - (shdr[i].sh_addr + shdr[i].sh_size);
+                if (info->code_mmap_start <= begin && (begin + size) <= (info->code_mmap_start + info->code_mmap_len)) {
+                    memset((void *)begin, 0x90, size);
+                }
+            }
+        }
+    }
+    if (target_mprotect(info->code_mmap_start, info->code_mmap_len, info->code_mmap_prot) == -1) {
+        error_setg_errno(&err, errno, "Failed mprotect");
+        error_reportf_err(err, "%s", "");
+        exit(-1);
+    }
+
+    return;
+}
+#endif
 
 uint32_t get_elf_eflags(int fd)
 {
@@ -4575,3 +4637,28 @@ void do_init_thread(struct target_pt_regs *regs, struct image_info *infop)
 {
     init_thread(regs, infop);
 }
+
+#ifdef AOT_IR
+abi_ulong get_image_start_code(CPUState *cpu);
+abi_ulong get_image_start_code(CPUState *cpu)
+{
+    TaskState *ts = (TaskState *)cpu->opaque;
+    struct image_info *info = ts->info;
+    return info->start_code;
+}
+
+abi_ulong get_image_end_code(CPUState *cpu);
+abi_ulong get_image_end_code(CPUState *cpu)
+{
+    TaskState *ts = (TaskState *)cpu->opaque;
+    struct image_info *info = ts->info;
+    return info->end_code;
+}
+
+uint32_t get_hflags_for_codegen(CPUState *cpu);
+uint32_t get_hflags_for_codegen(CPUState *cpu)
+{
+    CPUArchState *env = cpu_env(cpu);
+    return env->hflags | HF_CS64_MASK | HF_OSFXSR_MASK;
+}
+#endif

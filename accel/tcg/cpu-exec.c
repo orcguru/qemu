@@ -989,6 +989,66 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
     return ret;
 }
 
+#ifdef AOT_IR
+uintptr_t branch_left = -1UL;
+uintptr_t branch_right = -1UL;
+extern uintptr_t x_load_addr;
+extern unsigned long get_image_start_code(CPUState *cpu);
+extern unsigned long get_image_end_code(CPUState *cpu);
+extern uint32_t get_hflags_for_codegen(CPUState *cpu);
+
+static void gen_tcg_ir(CPUState *cpu)
+{
+    uint32_t flags = get_hflags_for_codegen(cpu);
+    uint64_t cs_base = 0;
+    int cflags = 0xff030201/*cflags: CF_CLUSTER_MASK | CF_PCREL | CF_NOIRQ | CF_NO_GOTO_TB | one-shot TB with 1 insn in it*/;
+    unsigned long start_code = get_image_start_code(cpu);
+    unsigned long end_code = get_image_end_code(cpu);
+    vaddr pc = start_code;
+    x_load_addr = start_code;
+
+    // for jump to lock prefixed insn
+    uintptr_t last_branch_left = -1;
+    uintptr_t last_branch_right = -1;
+    uintptr_t pc_before = -1;
+    uintptr_t pc_after = -1;
+
+    while (1) {
+        last_branch_left = branch_left;
+        last_branch_right = branch_right;
+        branch_left = -1;
+        branch_right = -1;
+        pc_before = (pc - x_load_addr);
+        TCGTBCPUState s;
+        s.pc = pc;
+        s.flags = flags;
+        s.cflags = cflags;
+        s.cs_base = cs_base;
+        TranslationBlock *tb = tb_gen_code(cpu, s);
+        pc += tb->size;
+        if (pc >= end_code) {
+            break;
+        }
+        pc_after = (pc - x_load_addr);
+        if (last_branch_left != -1 && last_branch_right != -1) {
+            if (last_branch_left == pc_before && (last_branch_right > pc_before && last_branch_right < pc_after)) {
+                printf("Update1 pc before:%lx ", pc);
+                pc -= (pc_after - last_branch_right);
+                printf("after:%lx\n", pc);
+                branch_left = -1;
+                branch_right = -1;
+            } else if (last_branch_right == pc_before && (last_branch_left > pc_before && last_branch_left < pc_after)) {
+                printf("Update2 pc before:%lx ", pc);
+                pc -= (pc_after - last_branch_left);
+                printf("after:%lx\n", pc);
+                branch_left = -1;
+                branch_right = -1;
+            }
+        }
+    }
+}
+#endif
+
 static int cpu_exec_setjmp(CPUState *cpu, SyncClocks *sc)
 {
     /* Prepare setjmp context for exception handling. */
@@ -996,7 +1056,13 @@ static int cpu_exec_setjmp(CPUState *cpu, SyncClocks *sc)
         cpu_exec_longjmp_cleanup(cpu);
     }
 
+#ifdef AOT_IR
+    mmap_lock();
+    gen_tcg_ir(cpu);
+    exit(0);
+#else
     return cpu_exec_loop(cpu, sc);
+#endif
 }
 
 int cpu_exec(CPUState *cpu)

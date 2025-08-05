@@ -34,6 +34,11 @@
 #include "tcg-has.h"
 #include "tcg-target-mo.h"
 
+#ifdef AOT_IR
+extern void gen_helper_dump_load_wrapper(TCGv_env env, TCGv_i64 a, TCGv_i64 v);
+extern void gen_helper_dump_store_wrapper(TCGv_env env, TCGv_i64 a, TCGv_i64 v);
+#endif
+
 static void check_max_alignment(unsigned a_bits)
 {
     /*
@@ -269,12 +274,30 @@ static void tcg_gen_qemu_ld_i32_int(TCGv_i32 val, TCGTemp *addr,
     }
 }
 
+#ifdef AOT_IR
+void tcg_gen_qemu_ld_i32_chk(TCGv_i32 val, TCGTemp *addr, TCGArg idx,
+                             MemOp memop, TCGType addr_type, TCGv_i64 a)
+#else
 void tcg_gen_qemu_ld_i32_chk(TCGv_i32 val, TCGTemp *addr, TCGArg idx,
                              MemOp memop, TCGType addr_type)
+#endif
 {
     tcg_debug_assert(addr_type == tcg_ctx->addr_type);
     tcg_debug_assert((memop & MO_SIZE) <= MO_32);
+#ifdef AOT_IR
+#ifdef DUMP_LOAD_STORE
+    TCGv_i64 addr_before = tcg_temp_ebb_new_i64();
+    tcg_gen_mov_i64(addr_before, temp_tcgv_i64(addr));
+#endif
+#endif
     tcg_gen_qemu_ld_i32_int(val, addr, idx, memop);
+#ifdef AOT_IR
+#ifdef DUMP_LOAD_STORE
+    TCGv_i64 t1 = tcg_temp_ebb_new_i64();
+    tcg_gen_extu_i32_i64(t1, val);
+    gen_helper_dump_load_wrapper(tcg_env, addr_before, val);
+#endif
+#endif
 }
 
 static void tcg_gen_qemu_st_i32_int(TCGv_i32 val, TCGTemp *addr,
@@ -312,12 +335,24 @@ static void tcg_gen_qemu_st_i32_int(TCGv_i32 val, TCGTemp *addr,
     }
 }
 
+#ifdef AOT_IR
+void tcg_gen_qemu_st_i32_chk(TCGv_i32 val, TCGTemp *addr, TCGArg idx,
+                             MemOp memop, TCGType addr_type, TCGv_i64 a)
+#else
 void tcg_gen_qemu_st_i32_chk(TCGv_i32 val, TCGTemp *addr, TCGArg idx,
                              MemOp memop, TCGType addr_type)
+#endif
 {
     tcg_debug_assert(addr_type == tcg_ctx->addr_type);
     tcg_debug_assert((memop & MO_SIZE) <= MO_32);
     tcg_gen_qemu_st_i32_int(val, addr, idx, memop);
+#ifdef AOT_IR
+#ifdef DUMP_LOAD_STORE
+    TCGv_i64 t1 = tcg_temp_ebb_new_i64();
+    tcg_gen_extu_i32_i64(t1, val);
+    gen_helper_dump_store_wrapper(tcg_env, a, val);
+#endif
+#endif
 }
 
 static void tcg_gen_qemu_ld_i64_int(TCGv_i64 val, TCGTemp *addr,
@@ -375,12 +410,28 @@ static void tcg_gen_qemu_ld_i64_int(TCGv_i64 val, TCGTemp *addr,
     }
 }
 
+#ifdef AOT_IR
+void tcg_gen_qemu_ld_i64_chk(TCGv_i64 val, TCGTemp *addr, TCGArg idx,
+                             MemOp memop, TCGType addr_type, TCGv_i64 a)
+#else
 void tcg_gen_qemu_ld_i64_chk(TCGv_i64 val, TCGTemp *addr, TCGArg idx,
                              MemOp memop, TCGType addr_type)
+#endif
 {
     tcg_debug_assert(addr_type == tcg_ctx->addr_type);
     tcg_debug_assert((memop & MO_SIZE) <= MO_64);
+#ifdef AOT_IR
+#ifdef DUMP_LOAD_STORE
+    TCGv_i64 addr_before = tcg_temp_ebb_new_i64();
+    tcg_gen_mov_i64(addr_before, temp_tcgv_i64(addr));
+#endif
+#endif
     tcg_gen_qemu_ld_i64_int(val, addr, idx, memop);
+#ifdef AOT_IR
+#ifdef DUMP_LOAD_STORE
+    gen_helper_dump_load_wrapper(tcg_env, addr_before, val);
+#endif
+#endif
 }
 
 static void tcg_gen_qemu_st_i64_int(TCGv_i64 val, TCGTemp *addr,
@@ -426,12 +477,22 @@ static void tcg_gen_qemu_st_i64_int(TCGv_i64 val, TCGTemp *addr,
     }
 }
 
+#ifdef AOT_IR
+void tcg_gen_qemu_st_i64_chk(TCGv_i64 val, TCGTemp *addr, TCGArg idx,
+                             MemOp memop, TCGType addr_type, TCGv_i64 a)
+#else
 void tcg_gen_qemu_st_i64_chk(TCGv_i64 val, TCGTemp *addr, TCGArg idx,
                              MemOp memop, TCGType addr_type)
+#endif
 {
     tcg_debug_assert(addr_type == tcg_ctx->addr_type);
     tcg_debug_assert((memop & MO_SIZE) <= MO_64);
     tcg_gen_qemu_st_i64_int(val, addr, idx, memop);
+#ifdef AOT_IR
+#ifdef DUMP_LOAD_STORE
+    gen_helper_dump_store_wrapper(tcg_env, a, val);
+#endif
+#endif
 }
 
 /*
@@ -622,13 +683,35 @@ static void tcg_gen_qemu_ld_i128_int(TCGv_i128 val, TCGTemp *addr,
                                   QEMU_PLUGIN_MEM_R);
 }
 
+#ifdef AOT_IR
+void tcg_gen_qemu_ld_i128_chk(TCGv_i128 val, TCGTemp *addr, TCGArg idx,
+                              MemOp memop, TCGType addr_type, TCGv_i64 a)
+#else
 void tcg_gen_qemu_ld_i128_chk(TCGv_i128 val, TCGTemp *addr, TCGArg idx,
                               MemOp memop, TCGType addr_type)
+#endif
 {
     tcg_debug_assert(addr_type == tcg_ctx->addr_type);
     tcg_debug_assert((memop & MO_SIZE) == MO_128);
     tcg_debug_assert((memop & MO_SIGN) == 0);
+#ifdef AOT_IR
+#ifdef DUMP_LOAD_STORE
+    TCGv_i64 addr_before = tcg_temp_ebb_new_i64();
+    tcg_gen_mov_i64(addr_before, temp_tcgv_i64(addr));
+    TCGv_i64 a_hi = tcg_temp_ebb_new_i64();
+    tcg_gen_addi_i64(a_hi, a, 8);
+#endif
+#endif
     tcg_gen_qemu_ld_i128_int(val, addr, idx, memop);
+#ifdef AOT_IR
+#ifdef DUMP_LOAD_STORE
+    TCGv_i64 lo = tcg_temp_ebb_new_i64();
+    TCGv_i64 hi = tcg_temp_ebb_new_i64();
+    tcg_gen_extr_i128_i64(lo, hi, val);
+    gen_helper_dump_load_wrapper(tcg_env, addr_before, lo);
+    gen_helper_dump_load_wrapper(tcg_env, a_hi, hi);
+#endif
+#endif
 }
 
 static void tcg_gen_qemu_st_i128_int(TCGv_i128 val, TCGTemp *addr,
@@ -728,13 +811,29 @@ static void tcg_gen_qemu_st_i128_int(TCGv_i128 val, TCGTemp *addr,
                                   QEMU_PLUGIN_MEM_W);
 }
 
+#ifdef AOT_IR
+void tcg_gen_qemu_st_i128_chk(TCGv_i128 val, TCGTemp *addr, TCGArg idx,
+                              MemOp memop, TCGType addr_type, TCGv_i64 a)
+#else
 void tcg_gen_qemu_st_i128_chk(TCGv_i128 val, TCGTemp *addr, TCGArg idx,
                               MemOp memop, TCGType addr_type)
+#endif
 {
     tcg_debug_assert(addr_type == tcg_ctx->addr_type);
     tcg_debug_assert((memop & MO_SIZE) == MO_128);
     tcg_debug_assert((memop & MO_SIGN) == 0);
     tcg_gen_qemu_st_i128_int(val, addr, idx, memop);
+#ifdef AOT_IR
+#ifdef DUMP_LOAD_STORE
+    TCGv_i64 lo = tcg_temp_ebb_new_i64();
+    TCGv_i64 hi = tcg_temp_ebb_new_i64();
+    tcg_gen_extr_i128_i64(lo, hi, val);
+    gen_helper_dump_store_wrapper(tcg_env, a, lo);
+    TCGv_i64 a_hi = tcg_temp_ebb_new_i64();
+    tcg_gen_addi_i64(a_hi, a, 8);
+    gen_helper_dump_store_wrapper(tcg_env, a_hi, hi);
+#endif
+#endif
 }
 
 void tcg_gen_ext_i32(TCGv_i32 ret, TCGv_i32 val, MemOp opc)

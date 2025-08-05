@@ -2928,8 +2928,13 @@ static inline TCGReg tcg_regset_first(TCGRegSet d)
 }
 
 /* Return only the number of characters output -- no error return. */
+#ifdef AOT_IR
+#define ne_fprintf(...) \
+    ({ int ret_ = fprintf(__VA_ARGS__); fflush(f); ret_ >= 0 ? ret_ : 0; })
+#else
 #define ne_fprintf(...) \
     ({ int ret_ = fprintf(__VA_ARGS__); ret_ >= 0 ? ret_ : 0; })
+#endif
 
 void tcg_dump_ops(TCGContext *s, FILE *f, bool have_prefs)
 {
@@ -6942,6 +6947,14 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
         TCGOpcode opc = op->opc;
 
         switch (opc) {
+#ifdef AOT_IR
+        case INDEX_op_mov_i64_const:
+        case INDEX_op_call_direct:
+        case INDEX_op_jmp_direct:
+        case INDEX_op_push_ret_addr:
+        case INDEX_op_ret:
+            break;
+#endif
         case INDEX_op_extrl_i64_i32:
             assert(TCG_TARGET_REG_BITS == 64);
             /*
@@ -7334,5 +7347,18 @@ void tcg_register_jit(const void *buf, size_t buf_size)
 void tcg_expand_vec_op(TCGOpcode o, TCGType t, unsigned e, TCGArg a0, ...)
 {
     g_assert_not_reached();
+}
+#endif
+
+#ifdef AOT_IR
+#include "exec/translator.h"
+control_transfer_type_t get_jmp(void)
+{
+    return TR_IS_JMP;
+}
+
+control_transfer_type_t get_call(void)
+{
+    return TR_IS_CALL;
 }
 #endif

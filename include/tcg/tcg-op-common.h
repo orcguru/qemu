@@ -317,12 +317,21 @@ void tcg_gen_st_i128(TCGv_i128 val, TCGv_ptr base, tcg_target_long offset);
 
 /* Local load/store bit ops */
 
+#ifdef AOT_IR
+void tcg_gen_qemu_ld_i32_chk(TCGv_i32, TCGTemp *, TCGArg, MemOp, TCGType, TCGv_i64 a);
+void tcg_gen_qemu_st_i32_chk(TCGv_i32, TCGTemp *, TCGArg, MemOp, TCGType, TCGv_i64 a);
+void tcg_gen_qemu_ld_i64_chk(TCGv_i64, TCGTemp *, TCGArg, MemOp, TCGType, TCGv_i64 a);
+void tcg_gen_qemu_st_i64_chk(TCGv_i64, TCGTemp *, TCGArg, MemOp, TCGType, TCGv_i64 a);
+void tcg_gen_qemu_ld_i128_chk(TCGv_i128, TCGTemp *, TCGArg, MemOp, TCGType, TCGv_i64 a);
+void tcg_gen_qemu_st_i128_chk(TCGv_i128, TCGTemp *, TCGArg, MemOp, TCGType, TCGv_i64 a);
+#else
 void tcg_gen_qemu_ld_i32_chk(TCGv_i32, TCGTemp *, TCGArg, MemOp, TCGType);
 void tcg_gen_qemu_st_i32_chk(TCGv_i32, TCGTemp *, TCGArg, MemOp, TCGType);
 void tcg_gen_qemu_ld_i64_chk(TCGv_i64, TCGTemp *, TCGArg, MemOp, TCGType);
 void tcg_gen_qemu_st_i64_chk(TCGv_i64, TCGTemp *, TCGArg, MemOp, TCGType);
 void tcg_gen_qemu_ld_i128_chk(TCGv_i128, TCGTemp *, TCGArg, MemOp, TCGType);
 void tcg_gen_qemu_st_i128_chk(TCGv_i128, TCGTemp *, TCGArg, MemOp, TCGType);
+#endif
 
 /* Atomic ops */
 
@@ -559,6 +568,14 @@ static inline void tcg_gen_trunc_ptr_i32(TCGv_i32 r, TCGv_ptr a)
     tcg_gen_extrl_i64_i32(r, (NAT)a);
 #endif
 }
+
+#ifdef AOT_IR
+void tcg_gen_mov_i64_const(TCGv_i64 ret, tcg_target_long val, tcg_target_long idx);
+void tcg_gen_call_direct(unsigned long call_tgt, TCGv_i64 ret, unsigned long ret_tgt);
+void tcg_gen_jmp_direct(unsigned long tgt);
+void tcg_gen_push_ret_addr(TCGv_i64 x64_next_eip, unsigned long tgt);
+void tcg_gen_ret(TCGv_i64 ret_x64_addr);
+#endif
 
 #undef PTR
 #undef NAT

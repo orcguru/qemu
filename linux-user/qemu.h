@@ -67,6 +67,12 @@ struct image_info {
         int             fp_abi;
         int             interp_fp_abi;
 #endif
+
+#ifdef AOT_IR
+        abi_ulong       code_mmap_start;
+        abi_ulong       code_mmap_len;
+        int             code_mmap_prot;
+#endif
 };
 
 #ifdef TARGET_I386
