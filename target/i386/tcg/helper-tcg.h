@@ -22,6 +22,16 @@
 
 #include "qemu/host-utils.h"
 
+#ifdef AOT
+#define REG_EXT(R, E)  ((R & 0xffffffff00000000UL) | (E & 0x00000000ffffffffUL))
+
+extern void __attribute__((qemuaot)) helper_A_return_implicit_lr(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op);
+extern void __attribute__((qemuaot)) helper_A_return(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr);
+extern unsigned long __attribute__((qemuaot)) helper_A_return_one(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, unsigned long one);
+extern __attribute__((qemuaot)) r2_t helper_A_return_two(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, unsigned long one, unsigned long two);
+extern void __attribute__((qemuaot)) raise_exception_ra_A(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, int exception_index, uintptr_t retaddr);
+#endif
+
 /* Maximum instruction code size */
 #define TARGET_MAX_INSN_SIZE 16
 

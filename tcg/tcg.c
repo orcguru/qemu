@@ -66,6 +66,10 @@
    used here. */
 static void tcg_target_init(TCGContext *s);
 static void tcg_target_qemu_prologue(TCGContext *s);
+#ifdef AOT
+static void tcg_target_qemu_aot_prologue(TCGContext *s);
+static void tcg_setup_syscall_trampoline(uint64_t trampoline_addr, uint64_t helper);
+#endif
 static bool patch_reloc(tcg_insn_unit *code_ptr, int type,
                         intptr_t value, intptr_t addend);
 static void tcg_out_nop_fill(tcg_insn_unit *p, int count);
@@ -256,6 +260,10 @@ uintptr_t tcg_splitwx_diff;
 
 #ifndef CONFIG_TCG_INTERPRETER
 tcg_prologue_fn *tcg_qemu_tb_exec;
+#endif
+
+#ifdef AOT
+tcg_prologue_fn *tcg_qemu_aot_exec;
 #endif
 
 static TCGRegSet tcg_target_available_regs[TCG_TYPE_COUNT];
@@ -1855,10 +1863,28 @@ static void tcg_context_init(unsigned max_threads)
     tcg_env = temp_tcgv_ptr(ts);
 }
 
+#ifdef AOT
+#define HELPER_BASE_ADDR    0x600010000UL
+#define SINGLE_HELPER_SIZE  280
+#define HELPER_SIZE         (16 * SINGLE_HELPER_SIZE)
+
+extern void helper_J_syscall(void);
+
+static void tcg_aot_trampoline_init()
+{
+    uint64_t helper_trampoline_root = (uintptr_t)mmap((void *)HELPER_BASE_ADDR, HELPER_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANONYMOUS|MAP_FIXED|MAP_PRIVATE, -1, 0);
+    assert(helper_trampoline_root == HELPER_BASE_ADDR);
+    tcg_setup_syscall_trampoline(helper_trampoline_root, (uint64_t)helper_J_syscall);
+}
+#endif
+
 void tcg_init(size_t tb_size, int splitwx, unsigned max_threads)
 {
     tcg_context_init(max_threads);
     tcg_region_init(tb_size, splitwx, max_threads);
+#ifdef AOT
+    tcg_aot_trampoline_init();
+#endif
 }
 
 /*
@@ -1909,6 +1935,11 @@ void tcg_prologue_init(void)
         int result = tcg_out_pool_finalize(s);
         tcg_debug_assert(result == 0);
     }
+
+#ifdef AOT
+    tcg_qemu_aot_exec = (tcg_prologue_fn *)tcg_splitwx_to_rx(s->code_ptr);
+    tcg_target_qemu_aot_prologue(s);
+#endif
 
     prologue_size = tcg_current_code_size(s);
     perf_report_prologue(s->code_gen_ptr, prologue_size);
@@ -7058,7 +7089,8 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
     return tcg_current_code_size(s);
 }
 
-#ifdef ELF_HOST_MACHINE
+//#ifdef ELF_HOST_MACHINE
+#if 0
 /* In order to use this feature, the backend needs to do three things:
 
    (1) Define ELF_HOST_MACHINE to indicate both what value to
@@ -7325,14 +7357,110 @@ static void tcg_register_jit_int(const void *buf, size_t size,
 {
 }
 
+#if 0
 void tcg_register_jit(const void *buf, size_t buf_size)
 {
 }
+#endif
 #endif /* ELF_HOST_MACHINE */
 
 #if !TCG_TARGET_MAYBE_vec
 void tcg_expand_vec_op(TCGOpcode o, TCGType t, unsigned e, TCGArg a0, ...)
 {
     g_assert_not_reached();
+}
+#endif
+
+#ifdef AOT
+// FIXME: remove the declarations
+extern void __attribute__((qemuaot)) helper_A_dump_registers();
+extern void __attribute__((qemuaot)) helper_A_dump_load();
+extern void __attribute__((qemuaot)) helper_A_dump_store();
+extern unsigned long __attribute__((qemuaot)) helper_A_cc_compute_all();
+extern unsigned long __attribute__((qemuaot)) helper_A_cc_compute_c();
+extern unsigned long __attribute__((qemuaot)) helper_A_cc_compute_nz();
+extern __attribute__((qemuaot)) CodeFragment *helper_A_jmp_ind_entry();
+extern __attribute__((qemuaot)) void helper_A_jmp_ind_resume();
+extern void __attribute__((qemuaot)) helper_A_rdtsc();
+extern void __attribute__((qemuaot)) helper_A_divl_EAX();
+extern void __attribute__((qemuaot)) helper_A_divq_EAX();
+extern void __attribute__((qemuaot)) helper_A_idivl_EAX();
+extern void __attribute__((qemuaot)) helper_A_idivq_EAX();
+extern void __attribute__((qemuaot)) helper_A_cpuid();
+extern void __attribute__((qemuaot)) helper_A_divb_AL();
+extern void __attribute__((qemuaot)) helper_A_idivb_AL();
+extern void __attribute__((qemuaot)) helper_A_punpckldq_xmm();
+extern void __attribute__((qemuaot)) helper_A_punpcklqdq_xmm();
+extern void __attribute__((qemuaot)) helper_A_punpcklbw_xmm();
+extern void __attribute__((qemuaot)) helper_A_punpcklwd_xmm();
+extern void __attribute__((qemuaot)) helper_A_shufps_xmm();
+extern void __attribute__((qemuaot)) helper_A_shufpd_xmm();
+extern void __attribute__((qemuaot)) helper_A_pshufd_xmm();
+extern void __attribute__((qemuaot)) helper_A_pshuflw_xmm();
+extern void __attribute__((qemuaot)) helper_A_pshufhw_xmm();
+extern void __attribute__((qemuaot)) helper_A_pslldq_xmm();
+extern void __attribute__((qemuaot)) helper_A_psrldq_xmm();
+extern void __attribute__((qemuaot)) helper_A_punpckhdq_xmm();
+
+helper_func_t helper_funcs[] = {
+  { .name = "helper_A_dump_registers", .addr = (uint64_t)helper_A_dump_registers },
+  { .name = "helper_A_dump_load", .addr = (uint64_t)helper_A_dump_load },
+  { .name = "helper_A_dump_store", .addr = (uint64_t)helper_A_dump_store },
+  { .name = "helper_A_cc_compute_all", .addr = (uint64_t)helper_A_cc_compute_all },
+  { .name = "helper_A_cc_compute_c", .addr = (uint64_t)helper_A_cc_compute_c },
+  { .name = "helper_A_cc_compute_nz", .addr = (uint64_t)helper_A_cc_compute_nz },
+  { .name = "helper_A_jmp_ind_entry", .addr = (uint64_t)helper_A_jmp_ind_entry },
+  { .name = "helper_A_jmp_ind_resume", .addr = (uint64_t)helper_A_jmp_ind_resume },
+  { .name = "helper_A_call_ind_entry", .addr = (uint64_t)helper_A_jmp_ind_entry },
+  { .name = "helper_A_call_ind_resume", .addr = (uint64_t)helper_A_jmp_ind_resume },
+  { .name = "helper_A_rdtsc", .addr = (uint64_t)helper_A_rdtsc },
+  { .name = "helper_A_divl_EAX", .addr = (uint64_t)helper_A_divl_EAX },
+  { .name = "helper_A_divq_EAX", .addr = (uint64_t)helper_A_divq_EAX },
+  { .name = "helper_A_idivl_EAX", .addr = (uint64_t)helper_A_idivl_EAX },
+  { .name = "helper_A_idivq_EAX", .addr = (uint64_t)helper_A_idivq_EAX },
+  { .name = "helper_A_cpuid", .addr = (uint64_t)helper_A_cpuid },
+  { .name = "helper_A_divb_AL", .addr = (uint64_t)helper_A_divb_AL },
+  { .name = "helper_A_idivb_AL", .addr = (uint64_t)helper_A_idivb_AL },
+  { .name = "helper_A_punpckldq_xmm", .addr = (uint64_t)helper_A_punpckldq_xmm },
+  { .name = "helper_A_punpcklqdq_xmm", .addr = (uint64_t)helper_A_punpcklqdq_xmm },
+  { .name = "helper_A_syscall", .addr = (uint64_t)HELPER_BASE_ADDR },
+  { .name = "helper_A_punpcklbw_xmm", .addr = (uint64_t)helper_A_punpcklbw_xmm },
+  { .name = "helper_A_punpcklwd_xmm", .addr = (uint64_t)helper_A_punpcklwd_xmm },
+  { .name = "helper_A_shufps_xmm", .addr = (uint64_t)helper_A_shufps_xmm },
+  { .name = "helper_A_shufpd_xmm", .addr = (uint64_t)helper_A_shufpd_xmm },
+  { .name = "helper_A_pshufd_xmm", .addr = (uint64_t)helper_A_pshufd_xmm },
+  { .name = "helper_A_pshuflw_xmm", .addr = (uint64_t)helper_A_pshuflw_xmm },
+  { .name = "helper_A_pshufhw_xmm", .addr = (uint64_t)helper_A_pshufhw_xmm },
+  { .name = "helper_A_pslldq_xmm", .addr = (uint64_t)helper_A_pslldq_xmm },
+  { .name = "helper_A_psrldq_xmm", .addr = (uint64_t)helper_A_psrldq_xmm },
+  { .name = "helper_A_punpckhdq_xmm", .addr = (uint64_t)helper_A_punpckhdq_xmm },
+};
+size_t helper_funcs_size = sizeof(helper_funcs);
+
+typedef __attribute__((qemuaot)) void (*FuncPtrType0)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr);
+typedef __attribute__((qemuaot)) unsigned long (*FuncPtrType1)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, unsigned long one);
+typedef __attribute__((qemuaot)) r2_t (*FuncPtrType2)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, unsigned long one, unsigned long two);
+
+void __attribute__((qemuaot)) helper_A_return_implicit_lr(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op)
+{
+    return;
+}
+
+void __attribute__((qemuaot)) helper_A_return(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr)
+{
+    FuncPtrType0 func_ptr = (FuncPtrType0)(lr);
+    return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
+}
+
+__attribute__((qemuaot)) unsigned long helper_A_return_one(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, unsigned long one)
+{
+    FuncPtrType1 func_ptr = (FuncPtrType1)(lr);
+    return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr, one);
+}
+
+__attribute__((qemuaot)) r2_t helper_A_return_two(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, unsigned long one, unsigned long two)
+{
+    FuncPtrType2 func_ptr = (FuncPtrType2)(lr);
+    return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr, one, two);
 }
 #endif

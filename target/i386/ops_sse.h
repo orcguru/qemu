@@ -206,6 +206,48 @@ void glue(helper_pslldq, SUFFIX)(CPUX86State *env, Reg *d, Reg *s, Reg *c)
         }
     }
 }
+
+#ifdef AOT
+void __attribute__((qemuaot)) glue(helper_A_psrldq, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr,
+                                                                    Reg *d, Reg *s, Reg *c)
+{
+    int shift, i, j;
+
+    shift = c->L(0);
+    if (shift > 16) {
+        shift = 16;
+    }
+    for (j = 0; j < 8 << SHIFT; j += LANE_WIDTH) {
+        for (i = 0; i < 16 - shift; i++) {
+            d->B(j + i) = s->B(j + i + shift);
+        }
+        for (i = 16 - shift; i < 16; i++) {
+            d->B(j + i) = 0;
+        }
+    }
+    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
+}
+
+void __attribute__((qemuaot)) glue(helper_A_pslldq, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr,
+                                                                    Reg *d, Reg *s, Reg *c)
+{
+    int shift, i, j;
+
+    shift = c->L(0);
+    if (shift > 16) {
+        shift = 16;
+    }
+    for (j = 0; j < 8 << SHIFT; j += LANE_WIDTH) {
+        for (i = 15; i >= shift; i--) {
+            d->B(j + i) = s->B(j + i - shift);
+        }
+        for (i = 0; i < shift; i++) {
+            d->B(j + i) = 0;
+        }
+    }
+    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
+}
+#endif
 #endif
 
 #define SSE_HELPER_1(name, elem, num, F)                        \
@@ -457,6 +499,74 @@ void glue(helper_pshufhw, SUFFIX)(Reg *d, Reg *s, int order)
         SHUFFLE4(W, s, s, i);
     }
 }
+
+#ifdef AOT
+void __attribute__((qemuaot)) glue(helper_A_shufps, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr,
+        Reg *d, Reg *v, Reg *s, int order)
+{
+    uint32_t r0, r1, r2, r3;
+    int i;
+
+    for (i = 0; i < 2 << SHIFT; i += 4) {
+        SHUFFLE4(L, v, s, i);
+    }
+    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
+}
+
+void __attribute__((qemuaot)) glue(helper_A_shufpd, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr,
+                                           Reg *d, Reg *v, Reg *s, int order)
+{
+    uint64_t r0, r1;
+    int i;
+
+    for (i = 0; i < 1 << SHIFT; i += 2) {
+        r0 = v->Q(((order & 1) & 1) + i);
+        r1 = s->Q(((order >> 1) & 1) + i);
+        d->Q(i) = r0;
+        d->Q(i + 1) = r1;
+        order >>= 2;
+    }
+    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
+}
+
+void __attribute__((qemuaot)) glue(helper_A_pshufd, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr,
+                                                                    Reg *d, Reg *s, int order)
+{
+    uint32_t r0, r1, r2, r3;
+    int i;
+
+    for (i = 0; i < 2 << SHIFT; i += 4) {
+        SHUFFLE4(L, s, s, i);
+    }
+    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
+}
+
+void __attribute__((qemuaot)) glue(helper_A_pshuflw, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr,
+                                                                     Reg *d, Reg *s, int order)
+{
+    uint16_t r0, r1, r2, r3;
+    int i, j;
+
+    for (i = 0, j = 1; j < 1 << SHIFT; i += 8, j += 2) {
+        SHUFFLE4(W, s, s, i);
+        d->Q(j) = s->Q(j);
+    }
+    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
+}
+
+void __attribute__((qemuaot)) glue(helper_A_pshufhw, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr,
+                                                                     Reg *d, Reg *s, int order)
+{
+    uint16_t r0, r1, r2, r3;
+    int i, j;
+
+    for (i = 4, j = 0; j < 1 << SHIFT; i += 8, j += 2) {
+        d->Q(j) = s->Q(j);
+        SHUFFLE4(W, s, s, i);
+    }
+    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
+}
+#endif
 #endif
 
 #if SHIFT >= 1
@@ -1237,6 +1347,25 @@ void glue(helper_packssdw, SUFFIX)(CPUX86State *env, Reg *d, Reg *v, Reg *s)
         }                                                               \
     }                                                                   \
                                                                         \
+    void __attribute__((qemuaot)) glue(helper_A_punpck ## base_name ## bw, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr,\
+                                                Reg *d, Reg *v, Reg *s) \
+    {                                                                   \
+        uint8_t r[PACK_WIDTH * 2];                                      \
+        int j, i;                                                       \
+                                                                        \
+        for (j = 0; j < 8 << SHIFT; ) {                                 \
+            int k = j + base * PACK_WIDTH;                              \
+            for (i = 0; i < PACK_WIDTH; i++) {                          \
+                r[2 * i] = v->B(k + i);                                 \
+                r[2 * i + 1] = s->B(k + i);                             \
+            }                                                           \
+            for (i = 0; i < PACK_WIDTH * 2; i++, j++) {                 \
+                d->B(j) = r[i];                                         \
+            }                                                           \
+        }                                                               \
+        return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr); \
+    }                                                                   \
+                                                                        \
     void glue(helper_punpck ## base_name ## wd, SUFFIX)(CPUX86State *env,\
                                                 Reg *d, Reg *v, Reg *s) \
     {                                                                   \
@@ -1253,6 +1382,25 @@ void glue(helper_packssdw, SUFFIX)(CPUX86State *env, Reg *d, Reg *v, Reg *s)
                 d->W(j) = r[i];                                         \
             }                                                           \
         }                                                               \
+    }                                                                   \
+                                                                        \
+    void __attribute__((qemuaot)) glue(helper_A_punpck ## base_name ## wd, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr,\
+                                                Reg *d, Reg *v, Reg *s) \
+    {                                                                   \
+        uint16_t r[PACK_WIDTH];                                         \
+        int j, i;                                                       \
+                                                                        \
+        for (j = 0; j < 4 << SHIFT; ) {                                 \
+            int k = j + base * PACK_WIDTH / 2;                          \
+            for (i = 0; i < PACK_WIDTH / 2; i++) {                      \
+                r[2 * i] = v->W(k + i);                                 \
+                r[2 * i + 1] = s->W(k + i);                             \
+            }                                                           \
+            for (i = 0; i < PACK_WIDTH; i++, j++) {                     \
+                d->W(j) = r[i];                                         \
+            }                                                           \
+        }                                                               \
+        return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr); \
     }                                                                   \
                                                                         \
     void glue(helper_punpck ## base_name ## dq, SUFFIX)(CPUX86State *env,\
@@ -1273,6 +1421,25 @@ void glue(helper_packssdw, SUFFIX)(CPUX86State *env, Reg *d, Reg *v, Reg *s)
         }                                                               \
     }                                                                   \
                                                                         \
+    void __attribute__((qemuaot)) glue(helper_A_punpck ## base_name ## dq, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr,\
+                                                Reg *d, Reg *v, Reg *s) \
+    {                                                                   \
+        uint32_t r[PACK_WIDTH / 2];                                     \
+        int j, i;                                                       \
+                                                                        \
+        for (j = 0; j < 2 << SHIFT; ) {                                 \
+            int k = j + base * PACK_WIDTH / 4;                          \
+            for (i = 0; i < PACK_WIDTH / 4; i++) {                      \
+                r[2 * i] = v->L(k + i);                                 \
+                r[2 * i + 1] = s->L(k + i);                             \
+            }                                                           \
+            for (i = 0; i < PACK_WIDTH / 2; i++, j++) {                 \
+                d->L(j) = r[i];                                         \
+            }                                                           \
+        }                                                               \
+        return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr); \
+    }                                                                   \
+                                                                        \
     XMM_ONLY(                                                           \
              void glue(helper_punpck ## base_name ## qdq, SUFFIX)(      \
                         CPUX86State *env, Reg *d, Reg *v, Reg *s)       \
@@ -1286,6 +1453,21 @@ void glue(helper_packssdw, SUFFIX)(CPUX86State *env, Reg *d, Reg *v, Reg *s)
                      d->Q(i) = r[0];                                    \
                      d->Q(i + 1) = r[1];                                \
                  }                                                      \
+             }                                                          \
+                                                                        \
+             void __attribute__((qemuaot)) glue(helper_A_punpck ## base_name ## qdq, SUFFIX)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, \
+                        Reg *d, Reg *v, Reg *s)       \
+             {                                                          \
+                 uint64_t r[2];                                         \
+                 int i;                                                 \
+                                                                        \
+                 for (i = 0; i < 1 << SHIFT; i += 2) {                  \
+                     r[0] = v->Q(base + i);                             \
+                     r[1] = s->Q(base + i);                             \
+                     d->Q(i) = r[0];                                    \
+                     d->Q(i + 1) = r[1];                                \
+                 }                                                      \
+                 return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr); \
              }                                                          \
                                                                         )
 

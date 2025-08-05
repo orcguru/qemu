@@ -3509,6 +3509,183 @@ static void tcg_target_qemu_prologue(TCGContext *s)
     tcg_out_insn(s, 3207, RET, TCG_REG_LR);
 }
 
+#ifdef AOT
+#define CONTEXT_RAX       TCG_REG_X6
+#define CONTEXT_RCX       TCG_REG_X7
+#define CONTEXT_RDX       TCG_REG_X8
+#define CONTEXT_RBX       TCG_REG_X9
+#define CONTEXT_RSP       TCG_REG_X10
+#define CONTEXT_RBP       TCG_REG_X11
+#define CONTEXT_RSI       TCG_REG_X12
+#define CONTEXT_RDI       TCG_REG_X13
+#define CONTEXT_R8        TCG_REG_X20
+#define CONTEXT_R9        TCG_REG_X21
+#define CONTEXT_R10       TCG_REG_X22
+#define CONTEXT_R11       TCG_REG_X23
+#define CONTEXT_R12       TCG_REG_X24
+#define CONTEXT_R13       TCG_REG_X26
+#define CONTEXT_R14       TCG_REG_X27
+#define CONTEXT_R15       TCG_REG_X28
+#define CONTEXT_CC_SRC    TCG_REG_X0
+#define CONTEXT_CC_DST    TCG_REG_X1
+#define CONTEXT_CC_OP     TCG_REG_X2
+#define CONTEXT_PARAM0    TCG_REG_X3
+
+#define CALL_KERNEL_NO_RET                                                         \
+    tcg_out_insn(&s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, helper >> 0, 0);      \
+    tcg_out_insn(&s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, helper >> 16, 16);    \
+    tcg_out_insn(&s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, helper >> 32, 32);    \
+    tcg_out_insn(&s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, helper >> 48, 48);    \
+    tcg_out_insn(&s, 3207, BR, TCG_REG_TMP0);                                      \
+    inst_count += 5;
+
+#define PAD_TAIL_BLOCK                        \
+    for (; inst_count < 70; ++inst_count) {   \
+      tcg_out32(&s, 0xd4200000);               \
+    }
+
+static void tcg_target_qemu_aot_prologue(TCGContext *s)
+{
+    TCGReg r;
+
+    tcg_out_bti(s, BTI_C);
+
+    /* Push (FP, LR) and allocate space for all saved registers.  */
+    tcg_out_insn(s, 3314, STP, TCG_REG_FP, TCG_REG_LR,
+                 TCG_REG_SP, -PUSH_SIZE, 1, 1);
+
+    /* Set up frame pointer for canonical unwinding.  */
+    tcg_out_movr_sp(s, TCG_TYPE_I64, TCG_REG_FP, TCG_REG_SP);
+
+    /* Store callee-preserved regs x19..x28.  */
+    for (r = TCG_REG_X19; r <= TCG_REG_X27; r += 2) {
+        int ofs = (r - TCG_REG_X19 + 2) * 8;
+        tcg_out_insn(s, 3314, STP, r, r + 1, TCG_REG_SP, ofs, 1, 0);
+    }
+
+    /* Make stack space for TCG locals.  */
+    tcg_out_insn(s, 3401, SUBI, TCG_TYPE_I64, TCG_REG_SP, TCG_REG_SP,
+                 FRAME_SIZE - PUSH_SIZE);
+
+#if 0
+    // Save TCG_REG_SP to BACKUP_SP_BASE_ADDR
+    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 0), 0);
+    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 16), 16);
+    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 32), 32);
+    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 48), 48);
+    tcg_out32(s, 0x910003f1/*mov x17, sp*/);
+    tcg_out32(s, 0xf9000211/*str x17, [x16]*/);
+#endif
+
+    /* Inform TCG about how to find TCG locals with register, offset, size.  */
+    tcg_set_frame(s, TCG_REG_SP, TCG_STATIC_CALL_ARGS_SIZE,
+                  CPU_TEMP_BUF_NLONGS * sizeof(long));
+
+    if (!tcg_use_softmmu) {
+        /*
+         * Note that XZR cannot be encoded in the address base register slot,
+         * as that actually encodes SP.  Depending on the guest, we may need
+         * to zero-extend the guest address via the address index register slot,
+         * therefore we need to load even a zero guest base into a register.
+         */
+        tcg_out_movi(s, TCG_TYPE_PTR, TCG_REG_GUEST_BASE, guest_base);
+        tcg_regset_set_reg(s->reserved_regs, TCG_REG_GUEST_BASE);
+    }
+
+    tcg_out_mov(s, TCG_TYPE_PTR, TCG_AREG0, tcg_target_call_iarg_regs[0]);
+    tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_TMP0, tcg_target_call_iarg_regs[1]);
+
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RAX, TCG_AREG0, 0);  // rax
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RCX, TCG_AREG0, 1 * 8);   // rcx
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RDX, TCG_AREG0, 2 * 8);   // rdx
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RBX, TCG_AREG0, 3 * 8);   // rbx
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RSP, TCG_AREG0, 4 * 8);   // rsp
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RBP, TCG_AREG0, 5 * 8);   // rbp
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RSI, TCG_AREG0, 6 * 8);   // rsi
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RDI, TCG_AREG0, 7 * 8);   // rdi
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R8, TCG_AREG0, 8 * 8);   // r8
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R9, TCG_AREG0, 9 * 8);  // r9
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R10, TCG_AREG0, 10 * 8);  // r10
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R11, TCG_AREG0, 11 * 8);  // r11
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R12, TCG_AREG0, 12 * 8);  // r12
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R13, TCG_AREG0, 13 * 8);  // r13
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R14, TCG_AREG0, 14 * 8);  // r14
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R15, TCG_AREG0, 15 * 8);  // r15
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_SRC, TCG_AREG0, 19 * 8);  // cc_src
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_DST, TCG_AREG0, 18 * 8);  // cc_dst
+    tcg_out_ld(s, TCG_TYPE_I32, CONTEXT_CC_OP, TCG_AREG0, 21 * 8);  // cc_op
+
+    tcg_out_insn(s, 3207, BR, TCG_REG_TMP0);
+
+    /*
+     * Return path for goto_ptr. Set return value to 0, a-la exit_tb,
+     * and fall through to the rest of the epilogue.
+     */
+    tcg_code_gen_epilogue = tcg_splitwx_to_rx(s->code_ptr);
+    tcg_out_bti(s, BTI_J);
+    tcg_out_movi(s, TCG_TYPE_REG, TCG_REG_X0, 0);
+
+    /* TB epilogue */
+    tb_ret_addr = tcg_splitwx_to_rx(s->code_ptr);
+    tcg_out_bti(s, BTI_J);
+
+#if 0
+    // Restore TCG_REG_SP from BACKUP_SP_BASE_ADDR
+    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 0), 0);
+    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 16), 16);
+    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 32), 32);
+    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 48), 48);
+    tcg_out32(s, 0xf9400211/*ldr x17, [x16]*/);
+    tcg_out32(s, 0x9100023f/*mov sp, x17*/);
+#endif
+
+    /* Remove TCG locals stack space.  */
+    tcg_out_insn(s, 3401, ADDI, TCG_TYPE_I64, TCG_REG_SP, TCG_REG_SP,
+                 FRAME_SIZE - PUSH_SIZE);
+
+    /* Restore registers x19..x28.  */
+    for (r = TCG_REG_X19; r <= TCG_REG_X27; r += 2) {
+        int ofs = (r - TCG_REG_X19 + 2) * 8;
+        tcg_out_insn(s, 3314, LDP, r, r + 1, TCG_REG_SP, ofs, 1, 0);
+    }
+
+    /* Pop (FP, LR), restore SP to previous frame.  */
+    tcg_out_insn(s, 3314, LDP, TCG_REG_FP, TCG_REG_LR,
+                 TCG_REG_SP, PUSH_SIZE, 0, 1);
+    tcg_out_insn(s, 3207, RET, TCG_REG_LR);
+}
+
+static void tcg_setup_syscall_trampoline(uint64_t trampoline_addr, uint64_t helper)
+{
+    TCGContext s;
+    s.code_ptr = (tcg_insn_unit *)trampoline_addr;
+    int inst_count = 0;
+
+    tcg_out_insn(&s, 3314, STP, CONTEXT_RAX, CONTEXT_RCX, TCG_AREG0, 0, 0, 0);
+    tcg_out_insn(&s, 3314, STP, CONTEXT_RDX, CONTEXT_RBX, TCG_AREG0, 16, 0, 0);
+    tcg_out_insn(&s, 3314, STP, CONTEXT_RSP, CONTEXT_RBP, TCG_AREG0, 32, 0, 0);
+    tcg_out_insn(&s, 3314, STP, CONTEXT_RSI, CONTEXT_RDI, TCG_AREG0, 48, 0, 0);
+    tcg_out_insn(&s, 3314, STP, CONTEXT_R8, CONTEXT_R9, TCG_AREG0, 64, 0, 0);
+    tcg_out_insn(&s, 3314, STP, CONTEXT_R10, CONTEXT_R11, TCG_AREG0, 80, 0, 0);
+    tcg_out_insn(&s, 3314, STP, CONTEXT_R12, CONTEXT_R13, TCG_AREG0, 96, 0, 0);
+    tcg_out_insn(&s, 3314, STP, CONTEXT_R14, CONTEXT_R15, TCG_AREG0, 112, 0, 0);
+    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_CC_SRC, TCG_AREG0, (16*8 + 24));
+    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_CC_DST, TCG_AREG0, (16*8 + 16));
+    tcg_out_st(&s, TCG_TYPE_I32, CONTEXT_CC_OP, TCG_AREG0, (16*8 + 40));
+    tcg_out_st(&s, TCG_TYPE_I64, TCG_REG_X5, TCG_AREG0, (16*8));
+    inst_count += 12;
+
+    tcg_out_mov(&s, TCG_TYPE_REG, TCG_REG_X0, TCG_AREG0);
+    tcg_out_mov(&s, TCG_TYPE_REG, TCG_REG_LR, TCG_REG_X3);
+    tcg_out_mov(&s, TCG_TYPE_REG, TCG_REG_X1, TCG_REG_X4);
+    inst_count += 3;
+
+    CALL_KERNEL_NO_RET
+
+    PAD_TAIL_BLOCK
+}
+#endif
+
 static void tcg_out_tb_start(TCGContext *s)
 {
     tcg_out_bti(s, BTI_J);

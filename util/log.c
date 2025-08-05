@@ -523,6 +523,10 @@ const QEMULogItem qemu_log_items[] = {
       "include VPU registers in the 'cpu' logging" },
     { LOG_INVALID_MEM, "invalid_mem",
       "log invalid memory accesses" },
+#ifdef AOT
+    { LOG_AOT, "aot",
+      "log aot" },
+#endif
     { 0, NULL, NULL },
 };
 

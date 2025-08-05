@@ -372,6 +372,12 @@ typedef struct CPUNegativeOffsetState {
 #endif
     IcountDecr icount_decr;
     bool can_do_io;
+#ifdef AOT
+    uint64_t pad;
+    uint64_t shadow_stack_pointer_upper_bound;
+    uint64_t shadow_stack_pointer_lower_bound;
+    uint64_t shadow_stack_pointer;
+#endif
 } CPUNegativeOffsetState;
 
 struct KVMState;

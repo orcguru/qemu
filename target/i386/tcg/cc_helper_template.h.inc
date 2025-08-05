@@ -44,7 +44,7 @@
 
 /* dynamic flags computation */
 
-static uint32_t glue(compute_all_cout, SUFFIX)(DATA_TYPE dst, DATA_TYPE carries)
+static __attribute__((always_inline)) uint32_t glue(compute_all_cout, SUFFIX)(DATA_TYPE dst, DATA_TYPE carries)
 {
     uint32_t af_cf, pf, zf, sf, of;
 
@@ -151,7 +151,7 @@ static uint32_t glue(compute_all_inc, SUFFIX)(DATA_TYPE dst, DATA_TYPE src1)
 {
     uint32_t cf, pf, af, zf, sf, of;
 
-    cf = src1;
+    cf = src1 & CC_C;
     pf = compute_pf(dst);
     af = (dst ^ (dst - 1)) & CC_A; /* bits 0..3 are all clear */
     zf = (dst == 0) * CC_Z;
@@ -164,7 +164,7 @@ static uint32_t glue(compute_all_dec, SUFFIX)(DATA_TYPE dst, DATA_TYPE src1)
 {
     uint32_t cf, pf, af, zf, sf, of;
 
-    cf = src1;
+    cf = src1 & CC_C;
     pf = compute_pf(dst);
     af = (dst ^ (dst + 1)) & CC_A; /* bits 0..3 are all set */
     zf = (dst == 0) * CC_Z;

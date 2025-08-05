@@ -268,6 +268,12 @@ CPUArchState *cpu_copy(CPUArchState *env)
     return new_env;
 }
 
+int enable_llvm_debug = 0;
+static void handle_arg_llvm_debug(const char *arg)
+{
+    enable_llvm_debug = 1;
+}
+
 static void handle_arg_help(const char *arg)
 {
     usage(EXIT_SUCCESS);
@@ -489,6 +495,8 @@ struct qemu_argument {
 };
 
 static const struct qemu_argument arg_table[] = {
+    {"a",          "",                 false, handle_arg_llvm_debug,
+     "",           "enable LLVM-JITLINK debug"},
     {"h",          "",                 false, handle_arg_help,
      "",           "print this help"},
     {"help",       "",                 false, handle_arg_help,

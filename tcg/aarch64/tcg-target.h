@@ -42,7 +42,7 @@ typedef enum {
     /* Aliases.  */
     TCG_REG_FP = TCG_REG_X29,
     TCG_REG_LR = TCG_REG_X30,
-    TCG_AREG0  = TCG_REG_X19,
+    TCG_AREG0  = TCG_REG_X25,
 } TCGReg;
 
 #define TCG_REG_ZERO TCG_REG_XZR

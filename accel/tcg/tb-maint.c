@@ -38,7 +38,6 @@
 #include "user/page-protection.h"
 #endif
 
-
 /* List iterators for lists of tagged pointers in TranslationBlock. */
 #define TB_FOR_EACH_TAGGED(head, tb, n, field)                          \
     for (n = (head) & 1, tb = (TranslationBlock *)((head) & ~1);        \
@@ -66,6 +65,10 @@ void tb_htable_init(void)
     unsigned int mode = QHT_MODE_AUTO_RESIZE;
 
     qht_init(&tb_ctx.htable, tb_cmp, CODE_GEN_HTABLE_SIZE, mode);
+#ifdef AOT
+    qemu_mutex_init(&tb_ctx.aot_lock);
+    tb_ctx.aot_htable = g_hash_table_new(NULL, NULL);
+#endif
 }
 
 typedef struct PageDesc PageDesc;
@@ -964,6 +967,55 @@ void tb_phys_invalidate(TranslationBlock *tb, tb_page_addr_t page_addr)
         do_tb_phys_invalidate(tb, false);
     }
 }
+
+#ifdef AOT
+uint64_t tb_aot_lookup_host_addr(uint64_t target_addr)
+{
+    CodeFragment *frag = g_hash_table_lookup(tb_ctx.aot_htable, (gconstpointer)target_addr);
+    if (!frag) {
+        return 0;
+    }
+    while (frag) {
+        if (frag->target_addr == target_addr) {
+            return frag->host_addr;
+        }
+        frag = frag->next;
+    }
+    return 0;
+}
+
+void tb_aot_insert(uint64_t target_addr, uint64_t host_addr)
+{
+    qemu_log_mask(LOG_AOT, "%s %lx %016lx\n", __FUNCTION__, target_addr, host_addr);
+    // First check (lock-free)
+    if (!g_hash_table_contains(tb_ctx.aot_htable, (gconstpointer)target_addr) || !tb_aot_lookup_host_addr(target_addr)) {
+        qemu_mutex_lock(&tb_ctx.aot_lock);
+        // Second check (under lock)
+        if (!g_hash_table_contains(tb_ctx.aot_htable, (gconstpointer)target_addr)) {
+            CodeFragment *frag = g_malloc(sizeof(CodeFragment));
+            frag->target_addr = target_addr;
+            frag->host_addr = host_addr;
+            frag->next = NULL;
+            g_hash_table_insert(tb_ctx.aot_htable, (gpointer)target_addr, (gpointer)frag);
+        } else if (!tb_aot_lookup_host_addr(target_addr)) {
+            CodeFragment *frag = g_hash_table_lookup(tb_ctx.aot_htable, (gconstpointer)target_addr);
+            assert(frag);
+            CodeFragment *prev_frag = NULL;
+            while (frag) {
+                assert(frag->target_addr != target_addr);
+                prev_frag = frag;
+                frag = frag->next;
+            }
+            CodeFragment *new_frag = g_malloc(sizeof(CodeFragment));
+            new_frag->target_addr = target_addr;
+            new_frag->host_addr = host_addr;
+            new_frag->next = NULL;
+            qatomic_set_mb(&prev_frag->next, new_frag);
+        }
+        qemu_mutex_unlock(&tb_ctx.aot_lock);
+    }
+}
+#endif
 
 /*
  * Add a new TB and link it to the physical page tables.

@@ -50,7 +50,7 @@ typedef enum {
     TCG_REG_V28,  TCG_REG_V29, TCG_REG_V30, TCG_REG_V31,
 
     /* aliases */
-    TCG_AREG0          = TCG_REG_S0,
+    TCG_AREG0          = TCG_REG_S9,
     TCG_GUEST_BASE_REG = TCG_REG_S1,
     TCG_REG_TMP0       = TCG_REG_T6,
     TCG_REG_TMP1       = TCG_REG_T5,

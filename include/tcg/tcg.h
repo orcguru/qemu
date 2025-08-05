@@ -970,6 +970,10 @@ typedef uintptr_t tcg_prologue_fn(CPUArchState *env, const void *tb_ptr);
 extern tcg_prologue_fn *tcg_qemu_tb_exec;
 #endif
 
+#ifdef AOT
+extern tcg_prologue_fn *tcg_qemu_aot_exec;
+#endif
+
 void tcg_register_jit(const void *buf, size_t buf_size);
 
 /* Return zero if the tuple (opc, type, vece) is unsupportable;

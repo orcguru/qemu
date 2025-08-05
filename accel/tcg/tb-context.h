@@ -35,6 +35,10 @@ struct TBContext {
     /* statistics */
     unsigned tb_flush_count;
     unsigned tb_phys_invalidate_count;
+#ifdef AOT
+    QemuMutex aot_lock;
+    GHashTable *aot_htable;
+#endif
 };
 
 extern TBContext tb_ctx;

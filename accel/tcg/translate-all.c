@@ -257,6 +257,15 @@ static int setjmp_gen_code(CPUArchState *env, TranslationBlock *tb,
     return tcg_gen_code(tcg_ctx, tb, pc);
 }
 
+#ifdef AOT
+void tb_register_aot_code(CPUState *cpu,
+                            vaddr target_pc, uint32_t target_size,
+                            vaddr host_aot_start, uint32_t host_aot_size)
+{
+    tb_aot_insert(target_pc, host_aot_start);
+}
+#endif
+
 /* Called with mmap_lock held for user mode emulation.  */
 TranslationBlock *tb_gen_code(CPUState *cpu, TCGTBCPUState s)
 {
