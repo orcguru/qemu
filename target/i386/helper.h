@@ -215,10 +215,10 @@ DEF_HELPER_1(emms, void, env)
 
 DEF_HELPER_1(rdrand, tl, env)
 #ifdef AOT_IR
-DEF_HELPER_2(jmp_ind, void, env, tl)
-DEF_HELPER_2(call_ind, void, env, tl)
+DEF_HELPER_FLAGS_2(jmp_ind, TCG_CALL_NO_RWG, void, env, tl)
+DEF_HELPER_FLAGS_2(call_ind, TCG_CALL_NO_RWG, void, env, tl)
+DEF_HELPER_FLAGS_3(dump_load, TCG_CALL_NO_RWG, void, env, tl, tl)
+DEF_HELPER_FLAGS_3(dump_store, TCG_CALL_NO_RWG, void, env, tl, tl)
 DEF_HELPER_2(ret_ind, void, env, tl)
 DEF_HELPER_1(iret_ind, void, env)
-DEF_HELPER_3(dump_load, void, env, tl, tl)
-DEF_HELPER_3(dump_store, void, env, tl, tl)
 #endif
