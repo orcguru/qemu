@@ -351,6 +351,15 @@ typedef union IcountDecr {
     } u16;
 } IcountDecr;
 
+#ifdef AOT
+typedef struct __attribute__((packed)) PackedShadowStackInfo {
+    uint64_t pad;
+    uint64_t shadow_stack_pointer_upper_bound;
+    uint64_t shadow_stack_pointer_lower_bound;
+    uint64_t shadow_stack_pointer;
+} PackedShadowStackInfo;
+#endif
+
 /**
  * CPUNegativeOffsetState: Elements of CPUState most efficiently accessed
  *                         from CPUArchState, via small negative offsets.
@@ -373,10 +382,7 @@ typedef struct CPUNegativeOffsetState {
     IcountDecr icount_decr;
     bool can_do_io;
 #ifdef AOT
-    uint64_t pad;
-    uint64_t shadow_stack_pointer_upper_bound;
-    uint64_t shadow_stack_pointer_lower_bound;
-    uint64_t shadow_stack_pointer;
+    PackedShadowStackInfo ssi __attribute__((aligned(16)));
 #endif
 } CPUNegativeOffsetState;
 
