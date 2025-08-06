@@ -945,7 +945,7 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
             }
 
 #ifdef AOT
-            uint64_t entry = tb_aot_lookup_host_addr(pc);
+            uint64_t entry = tb_aot_lookup_host_addr(s.pc);
             assert(entry);
             tcg_qemu_aot_exec(cpu_env(cpu), (void *)entry);
 #else

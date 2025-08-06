@@ -969,6 +969,7 @@ void tb_phys_invalidate(TranslationBlock *tb, tb_page_addr_t page_addr)
 }
 
 #ifdef AOT
+#include "tcg/tcg-aot.h"
 uint64_t tb_aot_lookup_host_addr(uint64_t target_addr)
 {
     CodeFragment *frag = g_hash_table_lookup(tb_ctx.aot_htable, (gconstpointer)target_addr);

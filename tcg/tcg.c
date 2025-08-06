@@ -1868,13 +1868,13 @@ static void tcg_context_init(unsigned max_threads)
 #define SINGLE_HELPER_SIZE  280
 #define HELPER_SIZE         (16 * SINGLE_HELPER_SIZE)
 
-extern void helper_J_syscall(void);
+extern void helper_syscall(void);
 
 static void tcg_aot_trampoline_init()
 {
     uint64_t helper_trampoline_root = (uintptr_t)mmap((void *)HELPER_BASE_ADDR, HELPER_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANONYMOUS|MAP_FIXED|MAP_PRIVATE, -1, 0);
     assert(helper_trampoline_root == HELPER_BASE_ADDR);
-    tcg_setup_syscall_trampoline(helper_trampoline_root, (uint64_t)helper_J_syscall);
+    tcg_setup_syscall_trampoline(helper_trampoline_root, (uint64_t)helper_syscall);
 }
 #endif
 
@@ -7372,6 +7372,7 @@ void tcg_expand_vec_op(TCGOpcode o, TCGType t, unsigned e, TCGArg a0, ...)
 #endif
 
 #ifdef AOT
+#include "tcg/tcg-aot.h"
 // FIXME: remove the declarations
 extern void __attribute__((qemuaot)) helper_A_dump_registers();
 extern void __attribute__((qemuaot)) helper_A_dump_load();
@@ -7379,7 +7380,7 @@ extern void __attribute__((qemuaot)) helper_A_dump_store();
 extern unsigned long __attribute__((qemuaot)) helper_A_cc_compute_all();
 extern unsigned long __attribute__((qemuaot)) helper_A_cc_compute_c();
 extern unsigned long __attribute__((qemuaot)) helper_A_cc_compute_nz();
-extern __attribute__((qemuaot)) CodeFragment *helper_A_jmp_ind_entry();
+extern __attribute__((qemuaot)) void helper_A_jmp_ind_entry();
 extern __attribute__((qemuaot)) void helper_A_jmp_ind_resume();
 extern void __attribute__((qemuaot)) helper_A_rdtsc();
 extern void __attribute__((qemuaot)) helper_A_divl_EAX();

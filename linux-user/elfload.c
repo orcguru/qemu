@@ -3334,6 +3334,7 @@ static bool parse_elf_properties(const ImageSource *src,
 }
 
 #ifdef AOT
+#include "tcg/tcg-aot.h"
 extern void *invoke_jitlink(const char *, uint64_t, uint64_t, void (*)(uint64_t, uint64_t), void *, size_t, int);
 extern helper_func_t helper_funcs[];
 extern size_t helper_funcs_size;
