@@ -2952,12 +2952,15 @@ void tcg_dump_ops(TCGContext *s, FILE *f, bool have_prefs)
 
         if (c == INDEX_op_insn_start) {
             nb_oargs = 0;
+            /*
             col += ne_fprintf(f, "\n ----");
 
             for (i = 0, k = INSN_START_WORDS; i < k; ++i) {
                 col += ne_fprintf(f, " %016" PRIx64,
                                   tcg_get_insn_start_param(op, i));
             }
+            */
+            col += ne_fprintf(f, " $0x%lx:", tcg_get_insn_start_param(op, 0));
         } else if (c == INDEX_op_call) {
             const TCGHelperInfo *info = tcg_call_info(op);
             void *func = tcg_call_func(op);
@@ -6853,7 +6856,7 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
                  && qemu_log_in_addr_range(pc_start))) {
         FILE *logfile = qemu_log_trylock();
         if (logfile) {
-            fprintf(logfile, "OP:\n");
+            //fprintf(logfile, "OP:\n");
             tcg_dump_ops(s, logfile, false);
             fprintf(logfile, "\n");
             qemu_log_unlock(logfile);
