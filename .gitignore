@@ -20,3 +20,8 @@ GTAGS
 *.swp
 *.patch
 *.gcov
+ir-translator/lex.yy.*
+ir-translator/tcg_ast.o
+ir-translator/tcg_parser
+ir-translator/tcg_parser.tab.*
+
