@@ -4170,7 +4170,7 @@ static void gen_SYSCALL(DisasContext *s, X86DecodedInsn *decode)
     gen_update_cc_op(s);
     gen_update_eip_cur(s);
 #ifdef AOT_IR
-    tcg_gen_mov_i64_const(cpu_eip, (s->base.pc_first - x_load_addr + s->base.pc_acc), 0);
+    tcg_gen_mov_i64_const(cpu_eip, (s->base.pc_first - x_load_addr + s->base.pc_acc));
 #endif
     gen_helper_syscall(tcg_env, cur_insn_len_i32(s), cpu_eip);
     if (LMA(s)) {

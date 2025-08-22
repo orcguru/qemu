@@ -3440,9 +3440,9 @@ static void DNI tcg_gen_op3i_i64_2(TCGOpcode opc, TCGv_i64 a1, TCGArg a2, TCGArg
     tcg_gen_op3(opc, TCG_TYPE_I64, tcgv_i64_arg(a1), a2, a3);
 }
 
-void tcg_gen_mov_i64_const(TCGv_i64 ret, tcg_target_long val, tcg_target_long idx)
+void tcg_gen_mov_i64_const(TCGv_i64 ret, tcg_target_long val)
 {
-    tcg_gen_op3i_i64_2(INDEX_op_mov_i64_const, ret, val, idx);
+    tcg_gen_op2i_i64(INDEX_op_mov_i64_const, ret, val);
 }
 
 uintptr_t x_load_addr = 0;

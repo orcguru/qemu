@@ -636,7 +636,7 @@ static TCGv eip_next_tl(DisasContext *s)
         tcg_gen_addi_tl(ret, cpu_eip, s->pc - s->pc_save);
 #else
         TCGv ret = tcg_temp_new();
-        tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->pc - s->pc_save)), 0);
+        tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->pc - s->pc_save)));
         tcg_gen_addi_tl(ret, cpu_eip, 0);
         s->eip_next_tl_set = true;
         s->eip_next_tl_val = ret;
@@ -656,7 +656,7 @@ static TCGv eip_cur_tl(DisasContext *s)
     if (tb_cflags(s->base.tb) & CF_PCREL) {
         TCGv ret = tcg_temp_new();
 #ifdef AOT_IR
-        tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->base.pc_next - s->pc_save)), 0);
+        tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->base.pc_next - s->pc_save)));
         tcg_gen_addi_tl(ret, cpu_eip, 0);
 #else
         tcg_gen_addi_tl(ret, cpu_eip, s->base.pc_next - s->pc_save);
@@ -1911,7 +1911,7 @@ static TCGv gen_lea_modrm_1(DisasContext *s, AddressParts a, bool is_vsib)
         if (tb_cflags(s->base.tb) & CF_PCREL && a.base == -2) {
             /* With cpu_eip ~= pc_save, the expression is pc-relative. */
 #ifdef AOT_IR
-            tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (a.disp - s->pc_save)), 0);
+            tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (a.disp - s->pc_save)));
             tcg_gen_addi_tl(s->A0, cpu_eip, 0);
 #else
             tcg_gen_addi_tl(s->A0, cpu_eip, a.disp - s->pc_save);
