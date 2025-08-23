@@ -1,6 +1,7 @@
 %union {
   char* str;
   TcgAst* ast;
+  long long val;
 }
 
 %{
@@ -35,16 +36,18 @@ extern char *lineptr;
 #define YYERROR_VERBOSE 1
 %}
 
-%token <str> ENVVAR XREG TMPVAR IMMX IMMD NUM LABEL RELOP TSTREL MEMATTR OPCODE
+%token <str> ENVVAR XREG TMPVAR NUM LABEL RELOP TSTREL MEMATTR OPCODE
+%token <val> IMMX IMMD
 %token BRCOND CALL SETLABL JMPDIR CALLDIR COMMA COLON PLUS DISCARD ENV V128 E8 E16 E32 E64 OZ IZ BSWAP64
 
 %type <ast> instruction instruction_list func func_list
 %type <str> label discard_operand attribute info
 
 %%
-program: func_list { ctx->root = $1; };
+program: func_list { create_program($1); };
 
-func_list: func | func_list func;
+func_list: func                   { $$ = $1; }
+| func_list func                  { $$ = merge_func($1, $2); };
 
 func: IMMX COLON instruction_list { $$ = create_func($1, $3); };
 

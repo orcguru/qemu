@@ -20,38 +20,39 @@ size_t available = 0;
 int eof_reached = 0;
 
 size_t min(size_t a, size_t b);
-#define YY_INPUT(buf, result, max_size)                     \
-    {                                                        \
-        if (eof_reached) {                                   \
-            result = 0; /* 明确返回 EOF 信号 */              \
-        } else if (available <= 0) {                         \
-            consumed = 0;                                    \
+#define YY_INPUT(buf, result, max_size)                       \
+    {                                                         \
+        if (eof_reached) {                                    \
+            result = 0;                                       \
+            number_to_move = YY_MORE_ADJ;                     \
+        } else if (available <= 0) {                          \
+            consumed = 0;                                     \
             ssize_t bytes_read = getline(&lineptr, &n, yyin); \
-            if (bytes_read < 0) {                            \
+            if (bytes_read < 0) {                             \
                 if (ferror(yyin)) {                           \
-                    perror("read error:");                   \
-                    exit(EXIT_FAILURE);                      \
-                } else {                                     \
-                    printf("EOF reached\n");                 \
-                    eof_reached = 1; /* 标记 EOF 状态 */     \
-                    result = 0;                              \
-                    exit(0);                                 \
-                }                                            \
-            } else {                                         \
-                available = bytes_read;                      \
-                result = min(available, max_size);           \
-                if (result > 0) {                            \
+                    perror("read error:");                    \
+                    exit(EXIT_FAILURE);                       \
+                } else {                                      \
+                    printf("EOF reached\n");                  \
+                    eof_reached = 1;                          \
+                    result = 0;                               \
+                    number_to_move = YY_MORE_ADJ;             \
+                }                                             \
+            } else {                                          \
+                available = bytes_read;                       \
+                result = min(available, max_size);            \
+                if (result > 0) {                             \
                     strncpy(buf, lineptr + consumed, result); \
-                    consumed += result;                      \
-                    available -= result;                     \
-                }                                            \
-            }                                                \
-        } else {                                             \
-            result = min(available, max_size);               \
+                    consumed += result;                       \
+                    available -= result;                      \
+                }                                             \
+            }                                                 \
+        } else {                                              \
+            result = min(available, max_size);                \
             strncpy(buf, lineptr + consumed, result);         \
-            consumed += result;                              \
-            available -= result;                             \
-        }                                                    \
+            consumed += result;                               \
+            available -= result;                              \
+        }                                                     \
     }
 %}
 
@@ -91,8 +92,8 @@ BSWAP64 bswap64_i64
 {ENVVAR}    { HANDLE_COLUMN; yylval->str = strdup(yytext); return ENVVAR; }
 {XREG}      { HANDLE_COLUMN; yylval->str = strdup(yytext); return XREG; }
 {TMPVAR}    { HANDLE_COLUMN; yylval->str = strdup(yytext); return TMPVAR; }
-{IMMX}      { HANDLE_COLUMN; yylval->str = strdup(yytext); return IMMX; }
-{IMMD}      { HANDLE_COLUMN; yylval->str = strdup(yytext); return IMMD; }
+{IMMX}      { HANDLE_COLUMN; yylval->val = strtoll(yytext + 1, NULL, 16); return IMMX; }
+{IMMD}      { HANDLE_COLUMN; yylval->val = strtoll(yytext + 1, NULL, 10); return IMMD; }
 {NUM}       { HANDLE_COLUMN; yylval->str = strdup(yytext); return NUM; }
 {LABEL}     { HANDLE_COLUMN; yylval->str = strdup(yytext); return LABEL; }
 {RELOP}     { HANDLE_COLUMN; yylval->str = strdup(yytext); return RELOP; }

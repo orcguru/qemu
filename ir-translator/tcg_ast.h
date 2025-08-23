@@ -8,7 +8,7 @@ typedef enum {
   OP_JMP_DIRECT,
   OP_DISCARD,
   OP_SUB,
-  OP_BLOCK
+  OP_FUNC
 } TcgOpType;
 
 typedef struct {
@@ -34,31 +34,33 @@ typedef struct TcgAst {
     TcgOpType type;
     union {
         struct {
-            char* label;
-            struct TcgAst* instructions;
+            unsigned long label;
+            struct TcgAst *instructions;
         } func;
         struct {
-            char* dest;
-            char* imm;
+            char *dest;
+            char *imm;
         } mov_imm;
         struct {
-            char* reg;
+            char *reg;
         } discard;
         struct {
-            char* dest;
-            char* src;
+            char *dest;
+            char *src;
         } mov_reg;
         struct {
             TcgOpType op;
-            char* dest, *src1, *src2;
+            char *dest, *src1, *src2;
         } bin_op;
         struct {
-            char* target;
+            char *target;
         } jmp;
     } data;
-    struct TcgAst* next;
+  struct TcgAst *next;
 } TcgAst;
 
-TcgAst* create_func(char* label, TcgAst* instructions);
+TcgAst *merge_func(TcgAst *funcs, TcgAst *func);
+TcgAst *create_func(long long val, TcgAst *instructions);
+void create_program(TcgAst *funcs);
 
 #endif
