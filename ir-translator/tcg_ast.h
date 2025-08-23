@@ -34,27 +34,13 @@ typedef struct TcgAst {
     TcgOpType type;
     union {
         struct {
-            unsigned long label;
             struct TcgAst *instructions;
+            unsigned int label;
+            unsigned int gpr_bits;
+            unsigned int vec_bits;
+            unsigned int loc_bits;
+            unsigned int tmp_bits;
         } func;
-        struct {
-            char *dest;
-            char *imm;
-        } mov_imm;
-        struct {
-            char *reg;
-        } discard;
-        struct {
-            char *dest;
-            char *src;
-        } mov_reg;
-        struct {
-            TcgOpType op;
-            char *dest, *src1, *src2;
-        } bin_op;
-        struct {
-            char *target;
-        } jmp;
     } data;
   struct TcgAst *next;
 } TcgAst;

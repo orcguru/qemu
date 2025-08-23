@@ -28,7 +28,7 @@ TcgAst *merge_func(TcgAst *funcs, TcgAst *func) {
 TcgAst *create_func(long long val, TcgAst *instructions) {
     TcgAst *func = calloc(1, sizeof(TcgAst));
     func->type = OP_FUNC;
-    func->data.func.label = val;
+    func->data.func.label = (unsigned int)val;
     func->data.func.instructions = instructions;
     return func;
 }
@@ -80,7 +80,7 @@ void create_program(TcgAst *funcs) {
     for (int i = func_count - 1; i >= 0; i--) {
         TcgAst *func = func_array[i];
         char func_name[64];
-        sprintf(func_name, "func_%lx", (unsigned long)func->data.func.label);
+        sprintf(func_name, "func_%x", func->data.func.label);
         LLVMValueRef llvm_func = LLVMAddFunction(module, func_name,
             LLVMFunctionType(LLVMVoidType(), param_types, total_param_count, 0));
         for (int j = 0; j < total_param_count; j++) {
@@ -95,7 +95,7 @@ void create_program(TcgAst *funcs) {
     }
     free(func_array);
 
-    LLVMDumpModule(module);
+    //LLVMDumpModule(module);
     LLVMDisposeModule(module);
 }
 
