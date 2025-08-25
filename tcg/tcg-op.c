@@ -3453,9 +3453,10 @@ void tcg_gen_call_direct(unsigned long call_tgt, TCGv_i64 ret, unsigned long ret
 
 extern uintptr_t branch_left;
 extern uintptr_t branch_right;
+extern uintptr_t pc_before;
 void tcg_gen_jmp_direct(unsigned long tgt)
 {
-    tcg_gen_op1i(INDEX_op_jmp_direct, TCG_TYPE_PTR, (tgt - x_load_addr));
+    tcg_gen_op1i(INDEX_op_jmp_direct, TCG_TYPE_PTR, (tgt - x_load_addr) - pc_before);
     if (branch_left == -1) {
         branch_left = (tgt - x_load_addr);
     } else if (branch_right == -1) {

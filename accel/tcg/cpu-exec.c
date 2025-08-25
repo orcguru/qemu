@@ -992,6 +992,7 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
 #ifdef AOT_IR
 uintptr_t branch_left = -1UL;
 uintptr_t branch_right = -1UL;
+uintptr_t pc_before = -1;
 extern uintptr_t x_load_addr;
 extern unsigned long get_image_start_code(CPUState *cpu);
 extern unsigned long get_image_end_code(CPUState *cpu);
@@ -1010,7 +1011,6 @@ static void gen_tcg_ir(CPUState *cpu)
     // for jump to lock prefixed insn
     uintptr_t last_branch_left = -1;
     uintptr_t last_branch_right = -1;
-    uintptr_t pc_before = -1;
     uintptr_t pc_after = -1;
 
     while (1) {
