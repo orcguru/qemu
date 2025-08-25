@@ -65,7 +65,6 @@ IMMX            \$0x[0-9a-fA-F]+
 IMMD            \$[0-9]+
 NUM             [0-9]+
 LABEL           \$L[0-9]+
-MEMATTR         (al|leq|lesl|lesw|leul|leuw|noat|sb|ub|un|al16|leo|al32)
 HELPER          [a-z][0-9a-zA-Z_]+
 COMMA           ,
 PLUS            +
@@ -111,6 +110,19 @@ gt              gt
 lt              lt
 tsteq           tsteq
 tstne           tstne
+al              al
+leq             leq
+lesl            lesl
+lesw            lesw
+leul            leul
+leuw            leuw
+noat            noat
+sb              sb
+ub              ub
+un              un
+al16            al16
+leo             leo
+al32            al32
 BRCOND          brcond_i64
 CALL            call
 SETLABL         set_label
@@ -202,8 +214,20 @@ xor_vec         xor_vec
 {IMMX}            { HANDLE_COLUMN; yylval->val = strtoll(yytext + 1, NULL, 16); return IMMX; }
 {IMMD}            { HANDLE_COLUMN; yylval->val = strtoll(yytext + 1, NULL, 10); return IMMD; }
 {NUM}             { HANDLE_COLUMN; yylval->val = atoi(yytext); return NUM; }
-{LABEL}           { HANDLE_COLUMN; yylval->str = strdup(yytext); return LABEL; }
-{MEMATTR}         { HANDLE_COLUMN; yylval->str = strdup(yytext); return MEMATTR; }
+{LABEL}           { HANDLE_COLUMN; yylval->val = atoi(yytext + 2); return LABEL; }
+{al}              { HANDLE_COLUMN; yylval->val = 1; return MEMATTR; }
+{leq}             { HANDLE_COLUMN; yylval->val = 2; return MEMATTR; }
+{lesl}            { HANDLE_COLUMN; yylval->val = 3; return MEMATTR; }
+{lesw}            { HANDLE_COLUMN; yylval->val = 4; return MEMATTR; }
+{leul}            { HANDLE_COLUMN; yylval->val = 5; return MEMATTR; }
+{leuw}            { HANDLE_COLUMN; yylval->val = 6; return MEMATTR; }
+{noat}            { HANDLE_COLUMN; yylval->val = 7; return MEMATTR; }
+{sb}              { HANDLE_COLUMN; yylval->val = 8; return MEMATTR; }
+{ub}              { HANDLE_COLUMN; yylval->val = 9; return MEMATTR; }
+{un}              { HANDLE_COLUMN; yylval->val = 10; return MEMATTR; }
+{al16}            { HANDLE_COLUMN; yylval->val = 11; return MEMATTR; }
+{leo}             { HANDLE_COLUMN; yylval->val = 12; return MEMATTR; }
+{al32}            { HANDLE_COLUMN; yylval->val = 13; return MEMATTR; }
 {cc_src2}         { HANDLE_COLUMN; yylval->val = 1; return ENVVAR; }
 {es_base}         { HANDLE_COLUMN; yylval->val = 2; return ENVVAR; }
 {cs_base}         { HANDLE_COLUMN; yylval->val = 3; return ENVVAR; }
@@ -254,13 +278,12 @@ xor_vec         xor_vec
 {DISCARD}         { HANDLE_COLUMN; return DISCARD; }
 {ENV}             { HANDLE_COLUMN; return ENV; }
 {V128}            { HANDLE_COLUMN; return V128; }
-{E8}              { HANDLE_COLUMN; return E8; }
-{E16}             { HANDLE_COLUMN; return E16; }
-{E32}             { HANDLE_COLUMN; return E32; }
-{E64}             { HANDLE_COLUMN; return E64; }
-{OZ}              { HANDLE_COLUMN; return OZ; }
-{IZ}              { HANDLE_COLUMN; return IZ; }
-{BSWAP64}         { HANDLE_COLUMN; return BSWAP64; }
+{E8}              { HANDLE_COLUMN; yylval->val = 8; return E8; }
+{E16}             { HANDLE_COLUMN; yylval->val = 16; return E16; }
+{E32}             { HANDLE_COLUMN; yylval->val = 32; return E32; }
+{E64}             { HANDLE_COLUMN; yylval->val = 64; return E64; }
+{OZ}              { HANDLE_COLUMN; yylval->val = 1; return OZ; }
+{IZ}              { HANDLE_COLUMN; yylval->val = 2; return IZ; }
 {add_i64}         { HANDLE_COLUMN; yylval->val = 1; return OPCODE; }
 {add_vec}         { HANDLE_COLUMN; yylval->val = 2; return OPCODE; }
 {andc_i64}        { HANDLE_COLUMN; yylval->val = 3; return OPCODE; }
@@ -329,6 +352,7 @@ xor_vec         xor_vec
 {umin_vec}        { HANDLE_COLUMN; yylval->val = 66; return OPCODE; }
 {xor_i64}         { HANDLE_COLUMN; yylval->val = 67; return OPCODE; }
 {xor_vec}         { HANDLE_COLUMN; yylval->val = 68; return OPCODE; }
+{BSWAP64}         { HANDLE_COLUMN; yylval->val = 69; return BSWAP64; }
 {HELPER}          { HANDLE_COLUMN; yylval->str = strdup(yytext); return HELPER; }
 ","               { HANDLE_COLUMN; return COMMA; }
 ":"               { HANDLE_COLUMN; return COLON; }

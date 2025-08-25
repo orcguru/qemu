@@ -36,100 +36,116 @@ extern char *lineptr;
 #define YYERROR_VERBOSE 1
 %}
 
-%token <str> LABEL MEMATTR OPCODE HELPER
-%token <val> ENVVAR XREG NUM IMMX IMMD TMPLVAR TMPTVAR RELOP TSTREL
-%token BRCOND CALL SETLABL JMPDIR CALLDIR COMMA COLON PLUS DISCARD ENV V128 E8 E16 E32 E64 OZ IZ BSWAP64
-
-%type <ast> instruction instruction_list func func_list
-%type <str> label discard_operand attribute info
+%token <str> HELPER
+%token <val> ENVVAR XREG TMPLVAR TMPTVAR NUM IMMX IMMD RELOP TSTREL E8 E16 E32 E64 LABEL OPCODE BSWAP64 OZ IZ MEMATTR
+%token BRCOND CALL SETLABL JMPDIR CALLDIR COMMA COLON PLUS DISCARD ENV V128
+%type <ast> instruction instruction_list func func_list scalar vector call_helper branch slot info element_size bswap_attribute attribute discard_operand
 
 %%
 program: func_list { create_program($1); };
 
 func_list: func                   { $$ = $1; }
-| func_list func                  { $$ = merge_func($1, $2); };
+| func_list func                  { $$ = merge_ast($1, $2); };
 
 func: IMMX COLON instruction_list { $$ = create_func($1, $3); };
 
-instruction_list: instruction | instruction_list instruction;
+instruction_list: instruction     { $$ = $1; }
+| instruction_list instruction    { $$ = merge_ast($1, $2); };
 
 instruction:
-OPCODE slot
-| OPCODE slot COMMA slot
-| BSWAP64 slot COMMA slot COMMA
-| OPCODE slot COMMA slot COMMA OZ
-| OPCODE slot COMMA slot COMMA IZ COMMA OZ
-| OPCODE slot COMMA IMMX
-| OPCODE slot COMMA IMMX COMMA slot
-| OPCODE slot COMMA ENV COMMA IMMX
-| OPCODE slot COMMA slot COMMA attribute COMMA NUM
-| OPCODE slot COMMA slot COMMA info COMMA attribute COMMA NUM
-| OPCODE slot COMMA slot COMMA info
-| OPCODE slot COMMA slot COMMA info COMMA RELOP
-| OPCODE slot COMMA slot COMMA info COMMA TSTREL
-| OPCODE slot COMMA slot COMMA info COMMA info
-| OPCODE slot COMMA slot COMMA info COMMA info COMMA info
-| OPCODE slot COMMA slot COMMA info COMMA info COMMA info COMMA RELOP
-| OPCODE slot COMMA slot COMMA info COMMA info COMMA info COMMA TSTREL
-| OPCODE V128 COMMA element_size COMMA slot COMMA slot
-| OPCODE V128 COMMA element_size COMMA slot COMMA slot COMMA slot
-| OPCODE V128 COMMA element_size COMMA slot COMMA slot COMMA slot COMMA RELOP
-| OPCODE V128 COMMA element_size COMMA slot COMMA V128 IMMX
-| OPCODE V128 COMMA element_size COMMA slot COMMA slot COMMA IMMX
-| OPCODE V128 COMMA element_size COMMA slot COMMA slot COMMA V128 IMMX
-| OPCODE V128 COMMA element_size COMMA slot COMMA ENV COMMA IMMX
-| OPCODE IMMX COMMA ENV COMMA IMMX
-| OPCODE IMMX COMMA slot COMMA IMMX
-| JMPDIR IMMX
-| DISCARD discard_operand
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA slot
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA IMMX
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA slot COMMA slot
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA slot COMMA slot COMMA slot
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA slot COMMA IMMX
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA IMMX COMMA IMMX
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot COMMA slot COMMA slot COMMA IMMX
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA IMMX COMMA IMMX
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA ENV COMMA slot
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA ENV
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot COMMA slot
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot COMMA IMMX
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot COMMA slot COMMA slot
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot COMMA slot COMMA IMMX
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA IMMX
-| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA IMMX COMMA slot
-| BRCOND slot COMMA IMMX COMMA RELOP COMMA LABEL
-| BRCOND slot COMMA IMMX COMMA TSTREL COMMA LABEL
-| SETLABL LABEL
-| CALLDIR slot COMMA IMMX COMMA IMMX
+scalar          { $$ = $1; }
+| vector        { $$ = $1; }
+| call_helper   { $$ = $1; }
+| branch        { $$ = $1; }
+
+scalar:
+OPCODE slot                                                             { $$ = create_scalar_slot($1, $2); }
+| OPCODE slot COMMA slot                                                { $$ = create_scalar_slot2($1, $2, $4); }
+| BSWAP64 slot COMMA slot COMMA                                         { $$ = create_scalar_slot2($1, $2, $4); }
+| OPCODE slot COMMA slot COMMA bswap_attribute                                       { $$ = create_scalar_slot2_attr($1, $2, $4, $6); }
+| OPCODE slot COMMA slot COMMA bswap_attribute COMMA bswap_attribute                              { $$ = create_scalar_slot2_attr2($1, $2, $4, $6, $8); }
+| OPCODE slot COMMA IMMX                                                { $$ = create_scalar_slot_imm($1, $2, $4); }
+| OPCODE slot COMMA IMMX COMMA slot                                     { $$ = create_scalar_slot_imm_slot($1, $2, $4, $6); }
+| OPCODE slot COMMA ENV COMMA IMMX                                      { $$ = create_scalar_slot_env_imm($1, $2, $6); }
+| OPCODE slot COMMA slot COMMA attribute COMMA NUM                      { $$ = create_scalar_slot2_attr_num($1, $2, $4, $6, $8); }
+| OPCODE slot COMMA slot COMMA info COMMA attribute COMMA NUM           { $$ = create_scalar_slot2_info_attr_num($1, $2, $4, $6, $8, $10); }
+| OPCODE slot COMMA slot COMMA info                                     { $$ = create_scalar_slot2_info($1, $2, $4, $6); }
+| OPCODE slot COMMA slot COMMA info COMMA RELOP                         { $$ = create_scalar_slot2_info_relop($1, $2, $4, $6, $8); }
+| OPCODE slot COMMA slot COMMA info COMMA TSTREL                        { $$ = expand_scalar_slot2_info_relop($1, $2, $4, $6, $8); }
+| OPCODE slot COMMA slot COMMA info COMMA info                          { $$ = create_scalar_slot2_info2($1, $2, $4, $6, $8); }
+| OPCODE slot COMMA slot COMMA info COMMA info COMMA info               { $$ = create_scalar_slot2_info3($1, $2, $4, $6, $8, $10); }
+| OPCODE slot COMMA slot COMMA info COMMA info COMMA info COMMA RELOP   { $$ = create_scalar_slot2_info3_relop($1, $2, $4, $6, $8, $10, $12); }
+| OPCODE slot COMMA slot COMMA info COMMA info COMMA info COMMA TSTREL  { $$ = expand_scalar_slot2_info3_relop($1, $2, $4, $6, $8, $10, $12); }
+| OPCODE IMMX COMMA ENV COMMA IMMX                                      { $$ = create_scalar_imm_env_imm($1, $2, $6); }
+| OPCODE IMMX COMMA slot COMMA IMMX                                     { $$ = create_scalar_imm_slot_imm($1, $2, $4, $6); }
+| DISCARD discard_operand                                               { $$ = create_discard($2); };
+
+vector:
+OPCODE V128 COMMA element_size COMMA slot COMMA slot                            { $$ = create_vector_slot2($1, $4, $6, $8); }
+| OPCODE V128 COMMA element_size COMMA slot COMMA slot COMMA slot               { $$ = create_vector_slot3($1, $4, $6, $8, $10); }
+| OPCODE V128 COMMA element_size COMMA slot COMMA slot COMMA slot COMMA RELOP   { $$ = create_vector_slot3_relop($1, $4, $6, $8, $10, $12); }
+| OPCODE V128 COMMA element_size COMMA slot COMMA V128 IMMX                     { $$ = create_vector_slot_vimm($1, $4, $6, $9); }
+| OPCODE V128 COMMA element_size COMMA slot COMMA slot COMMA IMMX               { $$ = create_vector_slot2_imm($1, $4, $6, $8, $10); }
+| OPCODE V128 COMMA element_size COMMA slot COMMA slot COMMA V128 IMMX          { $$ = create_vector_slot2_vimm($1, $4, $6, $8, $11); }
+| OPCODE V128 COMMA element_size COMMA slot COMMA ENV COMMA IMMX                { $$ = create_vector_slot_env_imm($1, $4, $6, $10); };
+
+call_helper:
+CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA slot                          { $$ = create_helper_slot3($2, $4, $6, $8, $10, $12); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA IMMX                        { $$ = create_helper_slot2_imm($2, $4, $6, $8, $10, $12); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA slot COMMA slot             { $$ = create_helper_slot4($2, $4, $6, $8, $10, $12, $14); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA slot COMMA slot COMMA slot  { $$ = create_helper_slot5($2, $4, $6, $8, $10, $12, $14, $16); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA slot COMMA IMMX             { $$ = create_helper_slot3_imm($2, $4, $6, $8, $10, $12, $14); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA IMMX COMMA IMMX                         { $$ = create_helper_env_imm2($2, $4, $6, $10, $12); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot COMMA slot COMMA slot COMMA IMMX   { $$ = create_helper_env_slot3_imm($2, $4, $6, $10, $12, $14, $16); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA slot COMMA IMMX COMMA IMMX             { $$ = create_helper_slot2_imm2($2, $4, $6, $8, $10, $12, $14); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA ENV COMMA slot                         { $$ = create_helper_slot_env_slot($2, $4, $6, $8, $12); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA slot COMMA ENV                                    { $$ = create_helper_slot_env($2, $4, $6, $8); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV                                               { $$ = create_helper_env($2, $4, $6); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot                                    { $$ = create_helper_env_slot($2, $4, $6, $10); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot COMMA slot                         { $$ = create_helper_env_slot2($2, $4, $6, $10, $12); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot COMMA IMMX                         { $$ = create_helper_env_slot_imm($2, $4, $6, $10, $12); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot COMMA slot COMMA slot              { $$ = create_helper_env_slot3($2, $4, $6, $10, $12, $14); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA slot COMMA slot COMMA IMMX              { $$ = create_helper_env_slot2_imm($2, $4, $6, $10, $12, $14); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA IMMX                                    { $$ = create_helper_env_imm($2, $4, $6, $10); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA IMMX COMMA slot                         { $$ = create_helper_env_imm_slot($2, $4, $6, $10, $12); };
+
+branch:
+BRCOND slot COMMA IMMX COMMA RELOP COMMA LABEL      { $$ = create_branch_condition($2, $4, $6, $8); }
+| BRCOND slot COMMA IMMX COMMA TSTREL COMMA LABEL   { $$ = expand_branch_condition($2, $4, $6, $8); }
+| CALLDIR slot COMMA IMMX COMMA IMMX                { $$ = create_calldirect($2, $4, $6); }
+| JMPDIR IMMX                                       { $$ = create_jmpdirect($2); }
+| SETLABL LABEL                                     { $$ = create_setlabel($2); };
 
 element_size:
-E8
-| E16
-| E32
-| E64
+E8            { $$ = create_attr_elementsize($1); }
+| E16         { $$ = create_attr_elementsize($1); }
+| E32         { $$ = create_attr_elementsize($1); }
+| E64         { $$ = create_attr_elementsize($1); };
 
 slot:
-TMPLVAR
-| TMPTVAR
-| XREG
-| ENVVAR
+TMPLVAR       { $$ = create_slot_tmpl($1); }
+| TMPTVAR     { $$ = create_slot_tmpt($1); }
+| XREG        { $$ = create_slot_xreg($1); }
+| ENVVAR      { $$ = create_slot_envvar($1); };
 
 info:
-TMPLVAR
-| TMPTVAR
-| XREG
-| ENVVAR
-| IMMX
+TMPLVAR       { $$ = create_slot_tmpl($1); }
+| TMPTVAR     { $$ = create_slot_tmpt($1); }
+| XREG        { $$ = create_slot_xreg($1); }
+| ENVVAR      { $$ = create_slot_envvar($1); }
+| IMMX        { $$ = create_imm($1); };
 
 discard_operand:
-XREG
-| ENVVAR
+XREG          { $$ = create_slot_xreg($1); }
+| ENVVAR      { $$ = create_slot_envvar($1); };
 
 attribute:
-MEMATTR PLUS MEMATTR PLUS MEMATTR
+MEMATTR PLUS MEMATTR PLUS MEMATTR   { $$ = create_storage_attr($1, $3, $5); };
+
+bswap_attribute:
+OZ            { $$ = create_bswap_attr($1); }
+| IZ          { $$ = create_bswap_attr($1); };
+
 %%
 void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s) {
     int line = yyget_lineno(scanner);

@@ -11,6 +11,234 @@
 
 extern char *lineptr;
 
+TcgAst *create_attr_elementsize(uint32_t es) {
+    return NULL;
+}
+
+TcgAst *create_branch_condition(TcgAst *s0, uint64_t i0, uint8_t relop, uint8_t label) {
+    return NULL;
+}
+
+TcgAst *create_bswap_attr(uint8_t val) {
+    return NULL;
+}
+
+TcgAst *create_calldirect(TcgAst *s0, uint64_t i0, uint64_t i1) {
+    return NULL;
+}
+
+TcgAst *create_discard(TcgAst *s0) {
+    return NULL;
+}
+
+TcgAst *create_helper_env(const char *h, uint16_t cflags, uint8_t noargs) {
+    return NULL;
+}
+
+TcgAst *create_helper_env_imm(const char *h, uint16_t cflags, uint8_t noargs, uint64_t i0) {
+    return NULL;
+}
+
+TcgAst *create_helper_env_imm2(const char *h, uint16_t cflags, uint8_t noargs, uint64_t i0, uint64_t i1) {
+    return NULL;
+}
+
+TcgAst *create_helper_env_imm_slot(const char *h, uint16_t cflags, uint8_t noargs, uint64_t i0, TcgAst *s0) {
+    return NULL;
+}
+
+TcgAst *create_helper_env_slot(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0) {
+    return NULL;
+}
+
+TcgAst *create_helper_env_slot2(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1) {
+    return NULL;
+}
+
+TcgAst *create_helper_env_slot2_imm(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1, uint64_t i0) {
+    return NULL;
+}
+
+TcgAst *create_helper_env_slot3(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1, TcgAst *s2) {
+    return NULL;
+}
+
+TcgAst *create_helper_env_slot3_imm(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1, TcgAst *s2, uint64_t i0) {
+    return NULL;
+}
+
+TcgAst *create_helper_env_slot_imm(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, uint64_t i0) {
+    return NULL;
+}
+
+TcgAst *create_helper_slot2_imm(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1, uint64_t i0) {
+    return NULL;
+}
+
+TcgAst *create_helper_slot2_imm2(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1, uint64_t i0, uint64_t i1) {
+    return NULL;
+}
+
+TcgAst *create_helper_slot3(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1, TcgAst *s2) {
+    return NULL;
+}
+
+TcgAst *create_helper_slot3_imm(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1, TcgAst *s2, uint64_t i0) {
+    return NULL;
+}
+
+TcgAst *create_helper_slot4(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1, TcgAst *s2, TcgAst *s3) {
+    return NULL;
+}
+
+TcgAst *create_helper_slot5(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1, TcgAst *s2, TcgAst *s3, TcgAst *s4) {
+    return NULL;
+}
+
+TcgAst *create_helper_slot_env(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0) {
+    return NULL;
+}
+
+TcgAst *create_helper_slot_env_slot(const char *h, uint16_t cflags, uint8_t noargs, TcgAst *s0, TcgAst *s1) {
+    return NULL;
+}
+
+TcgAst *create_imm(uint64_t val) {
+    return NULL;
+}
+
+TcgAst *create_jmpdirect(uint64_t val) {
+    return NULL;
+}
+
+TcgAst *create_scalar_imm_env_imm(uint8_t opc, uint64_t i0, uint64_t i1) {
+    return NULL;
+}
+
+TcgAst *create_scalar_imm_slot_imm(uint8_t opc, uint64_t i0, TcgAst *s0, uint64_t i1) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot(uint8_t opc, TcgAst *s0) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot2(uint8_t opc, TcgAst *s0, TcgAst *s1) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot2_attr(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *a0) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot2_attr2(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *a0, TcgAst *a1) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot2_attr_num(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *a0, uint64_t n0) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot2_info(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *s2) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot2_info2(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *s2, TcgAst *s3) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot2_info3(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *s2, TcgAst *s3, TcgAst *s4) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot2_info3_relop(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *s2, TcgAst *s3, TcgAst *s4, uint8_t relop) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot2_info_attr_num(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *s2, TcgAst *a0, uint64_t n0) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot2_info_relop(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *s2, uint8_t relop) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot_env_imm(uint8_t opc, TcgAst *s0, uint64_t i0) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot_imm(uint8_t opc, TcgAst *s0, uint64_t i0) {
+    return NULL;
+}
+
+TcgAst *create_scalar_slot_imm_slot(uint8_t opc, TcgAst *s0, uint64_t i0, TcgAst *s1) {
+    return NULL;
+}
+
+TcgAst *create_setlabel(uint8_t label) {
+    return NULL;
+}
+
+TcgAst *create_slot_envvar(uint8_t ei) {
+    return NULL;
+}
+
+TcgAst *create_slot_tmpl(uint8_t ti) {
+    return NULL;
+}
+
+TcgAst *create_slot_tmpt(uint8_t ti) {
+    return NULL;
+}
+
+TcgAst *create_slot_xreg(uint8_t ri) {
+    return NULL;
+}
+
+TcgAst *create_storage_attr(uint8_t ai0, uint8_t ai1, uint8_t ai2) {
+    return NULL;
+}
+
+TcgAst *create_vector_slot2(uint8_t opc, TcgAst *es, TcgAst *s0, TcgAst *s1) {
+    return NULL;
+}
+
+TcgAst *create_vector_slot2_imm(uint8_t opc, TcgAst *es, TcgAst *s0, TcgAst *s1, uint64_t i0) {
+    return NULL;
+}
+
+TcgAst *create_vector_slot2_vimm(uint8_t opc, TcgAst *es, TcgAst *s0, TcgAst *s1, uint64_t vi0) {
+    return NULL;
+}
+
+TcgAst *create_vector_slot3(uint8_t opc, TcgAst *es, TcgAst *s0, TcgAst *s1, TcgAst *s2) {
+    return NULL;
+}
+
+TcgAst *create_vector_slot3_relop(uint8_t opc, TcgAst *es, TcgAst *s0, TcgAst *s1, TcgAst *s2, uint8_t relop) {
+    return NULL;
+}
+
+TcgAst *create_vector_slot_env_imm(uint8_t opc, TcgAst *es, TcgAst *s0, uint64_t i0) {
+    return NULL;
+}
+
+TcgAst *create_vector_slot_vimm(uint8_t opc, TcgAst *es, TcgAst *s0, uint64_t vi0) {
+    return NULL;
+}
+
+TcgAst *expand_branch_condition(TcgAst *s0, uint64_t i0, uint8_t relop, uint8_t label) {
+    return NULL;
+}
+
+TcgAst *expand_scalar_slot2_info3_relop(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *s2, TcgAst *s3, TcgAst *s4, uint8_t relop) {
+    return NULL;
+}
+
+TcgAst *expand_scalar_slot2_info_relop(uint8_t opc, TcgAst *s0, TcgAst *s1, TcgAst *s2, uint8_t relop) {
+    return NULL;
+}
+
 static LLVMModuleRef create_module(const char *module_name) {
     LLVMContextRef context = LLVMGetGlobalContext();
     LLVMModuleRef module = LLVMModuleCreateWithNameInContext(module_name, context);
@@ -19,13 +247,13 @@ static LLVMModuleRef create_module(const char *module_name) {
     return module;
 }
 
-TcgAst *merge_func(TcgAst *funcs, TcgAst *func) {
-    assert(func);
-    func->next = funcs;
-    return func;
+TcgAst *merge_ast(TcgAst *list, TcgAst *elem) {
+    assert(elem);
+    elem->next = list;
+    return elem;
 }
 
-TcgAst *create_func(long long val, TcgAst *instructions) {
+TcgAst *create_func(uint64_t val, TcgAst *instructions) {
     TcgAst *func = calloc(1, sizeof(TcgAst));
     func->type = OP_FUNC;
     func->data.func.label = (unsigned int)val;
