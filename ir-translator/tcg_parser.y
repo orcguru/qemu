@@ -1,7 +1,13 @@
+
+
 %union {
   char* str;
   TcgAst* ast;
-  long long val;
+  uint64_t val;
+  AttrInfo ai;
+  SlotInfo si;
+  RelopType r;
+  OpCodeType op;
 }
 
 %{
@@ -37,8 +43,12 @@ extern char *lineptr;
 %}
 
 %token <str> HELPER
-%token <val> ENVVAR XREG TMPLVAR TMPTVAR NUM IMMX IMMD RELOP TSTREL E8 E16 E32 E64 LABEL OPCODE BSWAP64 OZ IZ MEMATTR
-%token BRCOND CALL SETLABL JMPDIR CALLDIR COMMA COLON PLUS DISCARD ENV V128
+%token <val> NUM IMMX IMMD E8 E16 E32 E64 LABEL
+%token <ai> MEMATTR SwapAttr
+%token <si> ENVVAR XREG TMPLVAR TMPTVAR
+%token <r> RELOP TSTREL
+%token <op> OPCODE BSWAP64 SETLABL BRCOND CALL JMPDIR CALLDIR DISCARD
+%token COMMA COLON PLUS ENV V128
 %type <ast> instruction instruction_list func func_list scalar vector call_helper branch slot info element_size bswap_attribute attribute discard_operand
 
 %%
@@ -114,7 +124,7 @@ BRCOND slot COMMA IMMX COMMA RELOP COMMA LABEL      { $$ = create_branch_conditi
 | BRCOND slot COMMA IMMX COMMA TSTREL COMMA LABEL   { $$ = expand_branch_condition($2, $4, $6, $8); }
 | CALLDIR slot COMMA IMMX COMMA IMMX                { $$ = create_calldirect($2, $4, $6); }
 | JMPDIR IMMX                                       { $$ = create_jmpdirect($2); }
-| SETLABL LABEL                                     { $$ = create_setlabel($2); };
+| SETLABL LABEL                                     { $$ = create_setlabel($1, $2); };
 
 element_size:
 E8            { $$ = create_attr_elementsize($1); }
@@ -143,8 +153,7 @@ attribute:
 MEMATTR PLUS MEMATTR PLUS MEMATTR   { $$ = create_storage_attr($1, $3, $5); };
 
 bswap_attribute:
-OZ            { $$ = create_bswap_attr($1); }
-| IZ          { $$ = create_bswap_attr($1); };
+SwapAttr          { $$ = create_bswap_attr($1); };
 
 %%
 void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s) {
