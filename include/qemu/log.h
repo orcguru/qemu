@@ -38,6 +38,8 @@ bool qemu_log_separate(void);
 #define CPU_LOG_TB_VPU     (1 << 21)
 #define LOG_TB_OP_PLUGIN   (1 << 22)
 #define LOG_INVALID_MEM    (1 << 23)
+// FIXME
+#define LOG_XMMOFFSET_INFO (1 << 24)
 
 /* Lock/unlock output. */
 

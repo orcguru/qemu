@@ -4098,6 +4098,24 @@ void x86_translate_code(CPUState *cpu, TranslationBlock *tb,
     memset(&dc, 0, sizeof(dc));
     dc.rip_at_exit = pc;
 #endif
+
+#ifdef AOT_IR
+    if (qemu_loglevel_mask(LOG_XMMOFFSET_INFO)) {
+        static int dump_done = 0;
+        if (!dump_done) {
+            dump_done = 1;
+            FILE *logfile = qemu_log_trylock();
+            if (logfile) {
+                for (int i = 0; i < 16; ++i) {
+                    fprintf(logfile, "XMM%d:$0x%x\n", i, (int)offsetof(CPUX86State, xmm_regs[i]));
+                }
+                fprintf(logfile, "XMM_t0:$0x%x\n\n", (int)offsetof(CPUX86State, xmm_t0));
+                qemu_log_unlock(logfile);
+            }
+        }
+    }
+#endif
+
     translator_loop(cpu, tb, max_insns, pc, host_pc, &i386_tr_ops, &dc.base);
 }
 
