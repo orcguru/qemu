@@ -13,7 +13,7 @@
 %{
 #ifndef YYSTYPE
 #define YYSTYPE union YYSTYPE
-#include "lex.yy.h"
+#include "tcg_lexer.yy.h"
 #endif
 %}
 
@@ -51,7 +51,7 @@ extern char *lineptr;
 %token COMMA COLON PLUS ENV V128 XMMTMP
 
 %%
-top: xmm_def_list func_list;
+top: xmm_def_list program;
 
 xmm_def_list: xmm_def
 | xmm_def_list xmm_def;

@@ -58,7 +58,6 @@ void reduce_imm_force(char *ptr);
 %}
 
 %option nounput noinput noyywrap bison-bridge reentrant yylineno
-%option header-file="lex.yy.h"
 
 XMMVAR          (XMM[0-9]+)
 XMMTMP          XMM_t0

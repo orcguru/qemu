@@ -423,50 +423,50 @@ typedef enum {
 } InstrType;
 
 #define INSTR_EXT_TYPE_LIST \
-    X(IMMI) \
-    X(SLOT_IMML) \
-    X(SLOT2_IMMI) \
-    X(SLOT2_IMMS_REL) \
-    X(SLOT3) \
-    X(SLOT_X) \
-    X(VSLOT_X) \
-    X(SLOT2_IMMB2) \
-    X(SLOT3_IMMB2) \
-    X(SLOT_E) \
-    X(SLOT_IMMS_REL_LABEL) \
-    X(SETLABEL) \
-    X(H_SLOT4) \
-    X(VSLOT3) \
-    X(VSLOT2) \
-    X(H_SLOT5) \
-    X(VSLOT_VIMMB) \
-    X(SLOT3_ATTR3) \
-    X(VSLOT2_IMMB) \
-    X(CALL_IMMB_IMMI) \
-    X(VSLOT3_REL) \
-    X(H_IMM) \
-    X(SLOT1) \
-    X(SLOT3_IMMB) \
-    X(VSLOT2_VIMML) \
-    X(SLOT2_IMMS_SLOT2) \
-    X(IMML_VSLOT) \
-    X(IMML_E) \
-    X(H_SLOT) \
-    X(SLOT2_IMMB_SLOT_IMMB_REL) \
-    X(SLOT5_REL) \
-    X(H_SLOT3_IMM) \
-    X(H_SLOT2_IMMB) \
-    X(H_EMPTY) \
-    X(H_IMM_SLOT) \
-    X(SLOT_IMMB_SLOT) \
-    X(H_SLOT3) \
-    X(SLOT2_IMMB2_SLOT_REL) \
-    X(H_SLOT2_IMMB_IMMS) \
-    X(SLOT3_REL) \
-    X(H_IMMB_IMMI) \
-    X(H_SLOT_IMMB) \
-    X(H_SLOT2) \
-    X(IMMB_SLOT_IMMB)
+    X(Instr1B14_ext) \
+    X(Instr1B28_ext) \
+    X(Instr1B44_ext) \
+    X(Instr1B4_ext) \
+    X(Instr1BV4X_ext) \
+    X(Instr1B41I2_ext) \
+    X(Instr1B4X_ext) \
+    X(Instr1B22_ext) \
+    X(Instr1B21_ext) \
+    X(Instr1B2_ext) \
+    X(Instr1BH4_ext) \
+    X(Instr1BV4_ext) \
+    X(Instr1BH141_ext) \
+    X(Instr1BV21_ext) \
+    X(Instr1B41_ext) \
+    X(Instr1BV4I_ext) \
+    X(Instr1B24_ext) \
+    X(Instr1BV4S2_ext) \
+    X(Instr1BV41_ext) \
+    X(Instr1BH24I_ext) \
+    X(Instr1B2S_ext) \
+    X(Instr1B41I_ext) \
+    X(Instr1BV48_ext) \
+    X(Instr1B422_ext) \
+    X(Instr1B411_ext) \
+    X(Instr1B142_ext) \
+    X(Instr1B142E_ext) \
+    X(Instr1BH21_ext) \
+    X(Instr1B4111_ext) \
+    X(Instr1B8_ext) \
+    X(Instr1BH4I_ext) \
+    X(Instr1B42_ext) \
+    X(Instr1BH2_ext) \
+    X(Instr1BH21S_ext) \
+    X(Instr1B281_ext) \
+    X(Instr1BH4S3_ext) \
+    X(Instr1B4112_ext) \
+    X(Instr1BH412_ext) \
+    X(Instr1BH41_ext) \
+    X(Instr1B41R_ext) \
+    X(Instr1BH24_ext) \
+    X(Instr1BH211_ext) \
+    X(Instr1B1111_ext) \
+    X(Instr1BH4S_ext)
 
 typedef enum {
     #define X(name) name,
@@ -483,28 +483,12 @@ typedef struct __attribute__((packed)) {
 } Instr2B;
 
 typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint8_t opc             :7;
-    int32_t imm;
-} Instr1B14;
-
-typedef struct __attribute__((packed)) {
     uint16_t instr_type   :2;
     uint16_t opc          :7;
     uint16_t slot0_type   :2;
     uint16_t slot0_idx    :5;
     int32_t imm;
 } Instr2B4;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t opc          :7;
-    uint16_t slot0_type   :2;
-    uint16_t slot0_idx    :5;
-    uint64_t imm;
-} Instr1B28;
 
 typedef struct __attribute__((packed)) {
     uint32_t instr_type :2;
@@ -528,501 +512,7 @@ typedef struct __attribute__((packed)) {
     uint32_t attr_val   :7;
 } Instr4B;
 
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc          :7;
-    uint32_t slot0_type   :2;
-    uint32_t slot0_idx    :5;
-    uint32_t slot1_type   :2;
-    uint32_t slot1_idx    :5;
-    int32_t imm;
-} Instr1B44;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc          :7;
-    uint32_t slot0_type   :2;
-    uint32_t slot0_idx    :5;
-    uint32_t slot1_type   :2;
-    uint32_t slot1_idx    :5;
-    uint32_t slot2_type   :2;
-    uint32_t slot2_idx    :5;
-} Instr1B4;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t xmm_idx        :6;
-    uint32_t xmm_offset     :4;
-} Instr1B4X;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t xmm_idx        :6;
-    uint32_t xmm_offset     :4;
-} Instr1BV4X;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc          :7;
-    uint32_t slot0_type   :2;
-    uint32_t slot0_idx    :5;
-    uint32_t slot1_type   :2;
-    uint32_t slot1_idx    :5;
-    uint32_t imm0         :8;
-    uint8_t imm1;
-} Instr1B41I2;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc          :7;
-    uint32_t slot0_type   :2;
-    uint32_t slot0_idx    :5;
-    uint32_t slot1_type   :2;
-    uint32_t slot1_idx    :5;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :5;
-    uint8_t imm0;
-    uint8_t imm1;
-} Instr1B411;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t opc            :7;
-    uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :5;
-    uint16_t env_offset;
-} Instr1B22;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t opc            :7;
-    uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :5;
-    uint64_t imm;
-    uint8_t relop           :6;
-    uint8_t label           :2;
-} Instr1B21;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t opc            :7;
-    uint16_t label          :2;
-} Instr1B2;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint8_t helper_l;
-    uint32_t helper_h       :3;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :5;
-    uint32_t slot3_type     :2;
-    uint32_t slot3_idx      :5;
-} Instr1BH4;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-} Instr1BV4S2;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :5;
-} Instr1BV4;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint8_t helper_l;
-    uint32_t helper_h       :3;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :5;
-    uint32_t slot3_type     :2;
-    uint32_t slot3_idx      :5;
-    uint8_t slot4_type      :2;
-    uint8_t slot4_idx       :5;
-} Instr1BH141;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t opc            :7;
-    uint16_t es             :2;
-    uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :5;
-    uint8_t imm;
-} Instr1BV21;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :5;
-    uint32_t attr_type      :2;
-    /*
-    struct {
-        uint32_t atomic :1;
-        uint32_t alignment :2;
-        uint32_t sign_ext :1;
-        uint32_t src_size :3;
-    } storage_attr;
-    */
-    uint8_t attr_val        :7;
-} Instr1B41;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint32_t imm            :8;
-} Instr1BV4I;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :5;
-    uint16_t imm0           :8;
-    uint32_t imm1;
-} Instr1B24;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :5;
-    uint8_t relop           :6;
-} Instr1BV41;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t helper         :11;
-} Instr1BH2;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t helper         :11;
-    uint32_t imm;
-} Instr1BH24I;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t opc          :7;
-    uint16_t slot0_type   :2;
-    uint16_t slot0_idx    :5;
-} Instr1B2S;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :5;
-    uint8_t imm;
-} Instr1B41I;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint64_t imm;
-} Instr1BV48;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t relop          :6;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint16_t imm;
-    uint16_t slot2_type     :2;
-    uint16_t slot2_idx      :5;
-    uint16_t slot3_type     :2;
-    uint16_t slot3_idx      :5;
-} Instr1B422;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint8_t opc             :7;
-    uint32_t imm;
-    uint16_t xmm_idx        :6;
-    uint16_t xmm_offset     :4;
-} Instr1B142;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint8_t opc             :7;
-    uint32_t imm;
-    int16_t env_offset;
-} Instr1B142E;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t helper         :11;
-    uint16_t noargs         :1;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :5;
-} Instr1BH21;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint8_t imm0;
-    uint8_t slot2_type      :2;
-    uint8_t slot2_idx       :5;
-    uint8_t imm1;
-    uint8_t relop           :6;
-} Instr1B4111;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint64_t opc            :7;
-    uint64_t slot0_type     :2;
-    uint64_t slot0_idx      :5;
-    uint64_t slot1_type     :2;
-    uint64_t slot1_idx      :5;
-    uint64_t slot2_type     :2;
-    uint64_t slot2_idx      :5;
-    uint64_t slot3_type     :2;
-    uint64_t slot3_idx      :5;
-    uint64_t slot4_type     :2;
-    uint64_t slot4_idx      :5;
-    uint64_t relop          :6;
-} Instr1B8;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint8_t helper_l;
-    uint32_t helper_h       :3;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :5;
-    uint32_t imm            :8;
-} Instr1BH4I;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint8_t helper_l;
-    uint32_t helper_h       :3;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :5;
-} Instr1BH4S3;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc          :7;
-    uint32_t slot0_type   :2;
-    uint32_t slot0_idx    :5;
-    uint32_t slot1_type   :2;
-    uint32_t slot1_idx    :5;
-    uint32_t relop        :6;
-    uint16_t imm;
-} Instr1B42;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t helper         :11;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint8_t imm;
-} Instr1BH41;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t helper         :11;
-    uint16_t noargs         :1;
-    uint16_t imm            :4;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :5;
-} Instr1BH21S;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t opc            :7;
-    uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :5;
-    uint64_t imm;
-    uint8_t slot1_type      :2;
-    uint8_t slot1_idx       :5;
-} Instr1B281;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc          :7;
-    uint32_t slot0_type   :2;
-    uint32_t slot0_idx    :5;
-    uint32_t slot1_type   :2;
-    uint32_t slot1_idx    :5;
-    uint8_t imm0;
-    uint8_t imm1;
-    uint16_t slot2_type   :2;
-    uint16_t slot2_idx    :5;
-    uint16_t relop        :6;
-} Instr1B4112;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t helper         :11;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint8_t imm0;
-    uint16_t imm1;
-} Instr1BH412;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t opc            :7;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :5;
-    uint8_t relop           :6;
-} Instr1B41R;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t helper         :11;
-    uint16_t noargs         :1;
-    uint16_t imm0           :4;
-    uint32_t imm1;
-} Instr1BH24;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint16_t helper         :11;
-    uint16_t noargs         :1;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :5;
-    uint8_t imm;
-} Instr1BH211;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint32_t helper         :11;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :5;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :5;
-} Instr1BH4S;
-
-typedef struct __attribute__((packed)) {
-    uint8_t instr_type      :2;
-    uint8_t instr_type_ext  :6;
-    uint8_t opc             :7;
-    uint8_t imm0;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :5;
-    uint8_t imm1;
-} Instr1B1111;
+#include "instr_def.h"
 
 typedef struct TcgAst {
     TcgOpType type;
