@@ -7,6 +7,7 @@
 #include "tcg_context.h"
 #include "tcg_parser.tab.h"
 #include "tcg_lexer.yy.h"
+#include "api.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 #include <stdbool.h>

@@ -3,9 +3,9 @@ BISON = bison
 CFLAGS = -O2 -g -Wall -I/home/felix/Install/llvm_riscv/include
 LDFLAGS = -L/home/felix/Install/llvm_riscv/lib -lLLVMCore -lLLVMRemarks -lLLVMBitstreamReader -lLLVMBinaryFormat -lLLVMTargetParser -lLLVMSupport -lLLVMDemangle -lffi -lz -lstdc++ -lm -ltinfo
 
-all: tcg_parser instr_def_parser
+all: tcg_parser
 
-tcg_parser: tcg_parser.tab.o tcg_lexer.yy.o tcg_ast.o
+tcg_parser: tcg_parser.tab.o tcg_lexer.yy.o tcg_ast.o api.o
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
 instr_def_parser: instr_def_parser.tab.o instr_def_lexer.yy.o instr_def_ast.o
@@ -17,6 +17,7 @@ tcg_ast.o: tcg_ast.c
 instr_def_parser.tab.o: instr_def_parser.tab.c instr_def_lexer.yy.h
 instr_def_lexer.yy.o: instr_def_lexer.yy.c instr_def_lexer.yy.h
 instr_def_ast.o: instr_def_ast.c
+api.o: api.c
 
 %.o: %.c
 	gcc $(CFLAGS) -c $< -o $@
@@ -33,5 +34,8 @@ instr_def_lexer.yy.c instr_def_lexer.yy.h: instr_def_lexer.l
 instr_def_parser.tab.c: instr_def_parser.y
 	$(BISON) -d $^
 
+api.c: instr_def.h instr_def_parser
+	./instr_def_parser instr_def.h > api.c
+
 clean:
-	rm -f *.o tcg_parser.tab.* tcg_lexer.yy.* tcg_parser instr_def_parser.tab.* instr_def_lexer.yy.* instr_def_parser
+	rm -f *.o tcg_parser.tab.* tcg_lexer.yy.* tcg_parser instr_def_parser.tab.* instr_def_lexer.yy.* instr_def_parser api.c
