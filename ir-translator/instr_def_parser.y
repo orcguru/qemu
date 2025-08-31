@@ -38,7 +38,7 @@ extern char *lineptr;
 %token TYPEDEF STRUCT ATTR LEFTPAREN RIGHTPAREN LEFTBRACKET RIGHTBRACKET SEMI COLON NUM PACKED
 
 %%
-top: instr_def_list;
+top: instr_def_list { gen_api(); };
 
 instr_def_list: instr_def
 | instr_def_list instr_def;

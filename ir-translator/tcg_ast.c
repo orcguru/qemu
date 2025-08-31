@@ -136,7 +136,7 @@ const char *instr_ext_type_str[] = {
     #undef X
 };
 
-static void get_more_size() {
+static void get_more_space() {
     tcg_instrs = realloc(tcg_instrs, tcg_next_capacity);
     assert(tcg_instrs);
     tcg_instrs_capacity = tcg_next_capacity;
@@ -145,7 +145,7 @@ static void get_more_size() {
 
 static void insert_instr(void *ptr_src, size_t sz) {
     if ((tcg_instrs_idx + sz) > tcg_instrs_capacity) {
-        get_more_size();
+        get_more_space();
     }
     void *ptr = (void *)&(tcg_instrs[tcg_instrs_idx]);
     if (sz == 2) {
@@ -878,6 +878,11 @@ static LLVMModuleRef create_module(const char *module_name) {
 
 void create_program(TcgAst *funcs) {
     printf("tcg_instrs_idx:%ld\n", tcg_instrs_idx);
+    void *ptr = (void *)tcg_instrs;
+    void *ptr_max = tcg_instrs + tcg_instrs_idx;
+    while (ptr < ptr_max) {
+        ptr = move_to_next(ptr);
+    }
 #if 0
     LLVMModuleRef module = create_module("qemuaot");
     LLVMBuilderRef builder = LLVMCreateBuilder();
