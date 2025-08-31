@@ -514,6 +514,17 @@ typedef struct __attribute__((packed)) {
 
 #include "instr_def.h"
 
+typedef struct {
+    uint8_t valid     :1;
+    uint8_t slot_type :2;
+    uint8_t slot_idx  :5;
+} SlotT;
+
+typedef union {
+    uint64_t i;
+    SlotT s;
+} OperandType;
+
 typedef struct TcgAst {
     TcgOpType type;
     union {

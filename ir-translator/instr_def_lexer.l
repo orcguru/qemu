@@ -1,10 +1,10 @@
 %{
-#include "tcg_ast.h"
+#include "instr_def_ast.h"
 #include "instr_def_parser.tab.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s);
+void yyerror(yyscan_t scanner, const char *s);
 %}
 
 %{
@@ -72,7 +72,7 @@ NUM             [0-9]+
 {STRUCT}          { HANDLE_COLUMN; return STRUCT; }
 {ATTR}            { HANDLE_COLUMN; return ATTR; }
 {PACKED}          { HANDLE_COLUMN; return PACKED; }
-{SYMBOL}          { HANDLE_COLUMN; return SYMBOL; }
+{SYMBOL}          { HANDLE_COLUMN; yylval->str = strdup(yytext); return SYMBOL; }
 {NUM}             { HANDLE_COLUMN; return NUM; }
 ";"               { HANDLE_COLUMN; return SEMI; }
 ":"               { HANDLE_COLUMN; return COLON; }
