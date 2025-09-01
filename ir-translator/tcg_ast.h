@@ -347,7 +347,9 @@ typedef struct {
     X(SUB_SLOT_ENVVAR) \
     X(SUB_SLOT_XREG) \
     X(SUB_SLOT_TMPL) \
-    X(SUB_SLOT_TMPT)
+    X(SUB_SLOT_TMPT) \
+    X(SUB_SLOT_XMM) \
+    X(SUB_SLOT_ENV)
 
 typedef enum {
     #define X(name) name,
@@ -517,15 +519,32 @@ typedef struct __attribute__((packed)) {
 #include "instr_def.h"
 
 typedef struct {
-    uint8_t valid     :1;
-    uint8_t slot_type :2;
-    uint8_t slot_idx  :5;
+    uint16_t valid     :1;
+    uint16_t slot_type :3;
+    uint16_t slot_idx  :6;
+    uint16_t offset;
 } SlotT;
 
 typedef union {
     uint64_t i;
     SlotT s;
 } OperandType;
+
+typedef struct {
+    uint8_t attr_type  :2;
+    /*
+    union {
+        struct {
+            uint32_t atomic :1;
+            uint32_t alignment :2;
+            uint32_t sign_ext :1;
+            uint32_t src_size :3;
+        } storage_attr;
+        uint32_t attr_val :7;
+    } p;
+    */
+    uint8_t attr_val   :7;
+} AttributeType;
 
 typedef struct TcgAst {
     TcgOpType type;

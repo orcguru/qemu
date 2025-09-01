@@ -216,6 +216,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
     uint8_t instr_type_ext  :6;
+    uint8_t opc             :7;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :5;
     uint16_t imm0           :8;
@@ -312,7 +313,7 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type_ext  :6;
     uint8_t opc             :7;
     uint32_t imm;
-    int16_t env_offset;
+    uint16_t env_offset;
 } Instr1B142E;
 
 typedef struct __attribute__((packed)) {
