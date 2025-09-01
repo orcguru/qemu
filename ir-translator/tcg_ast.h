@@ -1,6 +1,8 @@
 #ifndef TCG_AST_H
 #define TCG_AST_H
 
+#include <stddef.h>
+
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
@@ -543,6 +545,14 @@ typedef struct TcgAst {
     struct TcgAst *next;
 } TcgAst;
 
+#ifdef __GNUC__
+#define likely(x)    __builtin_expect(!!(x), 1)  // True with high probability
+#define unlikely(x)  __builtin_expect(!!(x), 0)  // False with high probability
+#else
+#define likely(x)    (x)  // Fallback for non-GCC compilers
+#define unlikely(x)  (x)
+#endif
+
 void register_xmm(uint64_t idx, uint64_t offset);
 void register_xmm_tmp(uint64_t offset);
 void create_program();
@@ -597,5 +607,7 @@ void create_branch_condition(SlotInfo s0, uint64_t i0, uint8_t relop, uint8_t la
 void create_calldirect(SlotInfo s0, uint64_t i0, uint64_t i1);
 void create_jmpdirect(uint64_t val);
 void create_setlabel(OpCodeType op, uint8_t label);
+void *get_instr_buffer();
+size_t get_instr_buffer_size();
 
 #endif

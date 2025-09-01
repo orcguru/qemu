@@ -5,7 +5,7 @@ LDFLAGS = -L/home/felix/Install/llvm_riscv/lib -lLLVMCore -lLLVMRemarks -lLLVMBi
 
 all: tcg_parser
 
-tcg_parser: tcg_parser.tab.o tcg_lexer.yy.o tcg_ast.o api.o
+tcg_parser: tcg_parser.tab.o tcg_lexer.yy.o tcg_ast.o api.o instr.o
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
 instr_def_parser: instr_def_parser.tab.o instr_def_lexer.yy.o instr_def_ast.o
@@ -18,6 +18,7 @@ instr_def_parser.tab.o: instr_def_parser.tab.c instr_def_lexer.yy.h
 instr_def_lexer.yy.o: instr_def_lexer.yy.c instr_def_lexer.yy.h
 instr_def_ast.o: instr_def_ast.c
 api.o: api.c
+instr.o: instr.c
 
 %.o: %.c
 	gcc $(CFLAGS) -c $< -o $@
