@@ -25,6 +25,7 @@ const char *fixed_arg_names[FIXED_PARAM_COUNT] = {NULL};
 #define FIXED_VECTOR_PARAM_COUNT   (20 + 15 * 2)
 LLVMTypeRef fixed_vector_param_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 const char *fixed_vector_arg_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
+const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 
 static LLVMModuleRef create_module(const char *module_name) {
     LLVMContextRef context = LLVMGetGlobalContext();
@@ -116,24 +117,33 @@ void handle_func(uint64_t val) {
         } while (1);
     }
 
-    reset_instr_buffer();
-
-    /*
     char func_name[64];
-    sprintf(func_name, "func_%x", func->data.func.label);
+    sprintf(func_name, "func_%lx", val);
+    int total_cnt = xmm_valid == 0 ? FIXED_PARAM_COUNT : FIXED_VECTOR_PARAM_COUNT;
     LLVMValueRef llvm_func = LLVMAddFunction(module, func_name,
-        LLVMFunctionType(LLVMVoidType(), param_types, total_param_count, 0));
-    for (int j = 0; j < total_param_count; j++) {
+        LLVMFunctionType(LLVMVoidType(), xmm_valid == 0 ? fixed_param_types : fixed_vector_param_types,
+                         total_cnt, 0));
+    for (int j = 0; j < total_cnt; j++) {
         LLVMValueRef param = LLVMGetParam(llvm_func, j);
-        LLVMSetValueName(param, arg_names[j]);
+        LLVMSetValueName(param, fixed_vector_arg_names[j]);
     }
+    // FIXME: qemuaot
     LLVMSetFunctionCallConv(llvm_func, 124);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlock(llvm_func, "entry");
     LLVMPositionBuilderAtEnd(builder, entry);
-    LLVMBuildRetVoid(builder);
-    */
 
+    for (XRegType x = 0; x < XREG_MAX; ++x) {
+        if (xreg_valid & (1 << x)) {
+            LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, fixed_vector_param_types[x], fixed_vector_stack_names[x]);
+            LLVMSetAlignment(alloca_inst, 8);
+            LLVMSetAlignment(LLVMBuildStore(builder, LLVMGetParam(llvm_func, x), alloca_inst), 8);
+        }
+    }
+
+    LLVMBuildRetVoid(builder);
+
+    reset_instr_buffer();
 }
 
 void module_prolog() {
@@ -147,7 +157,7 @@ void module_prolog() {
         "rsp", "rbp", "rsi", "rdi",
         "r8", "r9", "r10", "r11",
         "r12", "r13", "r14", "r15",
-        "cc_src", "cc_dst", "cc_op", "lr_input"
+        "cc_src", "cc_dst", "cc_op", "rip"
     };
     for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
         if (i < 16) {
@@ -164,7 +174,8 @@ void module_prolog() {
         fixed_vector_arg_names[i] = base_names[i];
     }
     static char extra_name_buf[30][16];
-    for (int i = 0; i < (FIXED_VECTOR_PARAM_COUNT - FIXED_PARAM_COUNT)/2 ; i++) {
+    static char stack_name_buf[FIXED_VECTOR_PARAM_COUNT][16];
+    for (int i = 0; i < (FIXED_VECTOR_PARAM_COUNT - FIXED_PARAM_COUNT)/2; ++i) {
         int idx = FIXED_PARAM_COUNT + i * 2;
         fixed_vector_param_types[idx] = vscale_i64;
         fixed_vector_param_types[idx + 1] = vscale_i64;
@@ -173,79 +184,15 @@ void module_prolog() {
         fixed_vector_arg_names[idx] = extra_name_buf[i * 2];
         fixed_vector_arg_names[idx + 1] = extra_name_buf[i * 2 + 1];
     }
+    for (int i = 0; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
+        snprintf(stack_name_buf[i], sizeof(stack_name_buf[i]), "%s.stack", fixed_vector_arg_names[i]);
+        fixed_vector_stack_names[i] = stack_name_buf[i];
+    }
 }
 
 void module_epilog() {
     LLVMDumpModule(module);
     LLVMDisposeModule(module);
-}
-
-void create_program(TcgAst *funcs) {
-#if 0
-    LLVMModuleRef module = create_module("qemuaot");
-    LLVMBuilderRef builder = LLVMCreateBuilder();
-
-    // Parameter setup (same for all functions)
-    LLVMTypeRef vscale_i64 = LLVMScalableVectorType(LLVMInt64Type(), 1); // <1 x i64>
-    int base_param_count = 20;
-    int extra_param_count = 15 * 2;
-    int total_param_count = base_param_count + extra_param_count;
-    LLVMTypeRef param_types[base_param_count + extra_param_count];
-    const char *base_names[20] = {
-        "rax", "rcx", "rdx", "rbx",
-        "rsp", "rbp", "rsi", "rdi",
-        "r8", "r9", "r10", "r11",
-        "r12", "r13", "r14", "r15",
-        "cc_src", "cc_dst", "cc_op", "lr_input"
-    };
-    const char *arg_names[base_param_count + extra_param_count];
-    for (int i = 0; i < base_param_count; i++) {
-        if (i < 16) param_types[i] = LLVMInt64Type();
-        else if (i == 16 || i == 17 || i == 19) param_types[i] = LLVMInt64Type();
-        else if (i == 18) param_types[i] = LLVMInt32Type();
-        arg_names[i] = base_names[i];
-    }
-    static char extra_name_buf[30][16];
-    for (int i = 0; i < 15; i++) {
-        int idx = base_param_count + i * 2;
-        param_types[idx] = vscale_i64;
-        param_types[idx + 1] = vscale_i64;
-        snprintf(extra_name_buf[i * 2], sizeof(extra_name_buf[i * 2]), "xmm%d", i);
-        snprintf(extra_name_buf[i * 2 + 1], sizeof(extra_name_buf[i * 2 + 1]), "ymm%d_h", i);
-        arg_names[idx] = extra_name_buf[i * 2];
-        arg_names[idx + 1] = extra_name_buf[i * 2 + 1];
-    }
-
-
-    // Collect the funcs into an array to reverse the order
-    int func_count = 0;
-    for (TcgAst *cur = funcs; cur != NULL; cur = cur->next) func_count++;
-    TcgAst **func_array = malloc(sizeof(TcgAst *) * func_count);
-    int idx = 0;
-    for (TcgAst *cur = funcs; cur != NULL; cur = cur->next) func_array[idx++] = cur;
-
-    // Generate functions in reverse order
-    for (int i = func_count - 1; i >= 0; i--) {
-        TcgAst *func = func_array[i];
-        char func_name[64];
-        sprintf(func_name, "func_%x", func->data.func.label);
-        LLVMValueRef llvm_func = LLVMAddFunction(module, func_name,
-            LLVMFunctionType(LLVMVoidType(), param_types, total_param_count, 0));
-        for (int j = 0; j < total_param_count; j++) {
-            LLVMValueRef param = LLVMGetParam(llvm_func, j);
-            LLVMSetValueName(param, arg_names[j]);
-        }
-        LLVMSetFunctionCallConv(llvm_func, 124);
-
-        LLVMBasicBlockRef entry = LLVMAppendBasicBlock(llvm_func, "entry");
-        LLVMPositionBuilderAtEnd(builder, entry);
-        LLVMBuildRetVoid(builder);
-    }
-    free(func_array);
-
-    //LLVMDumpModule(module);
-    LLVMDisposeModule(module);
-#endif
 }
 
 void parse_tcg_instructions(const char *filename) {

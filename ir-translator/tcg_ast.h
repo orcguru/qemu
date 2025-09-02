@@ -58,7 +58,8 @@ typedef enum {
     X(cc_src) \
     X(cc_dst) \
     X(cc_op) \
-    X(rip)
+    X(rip) \
+    X(XREG_MAX)
 
 typedef enum {
     #define X(name) name,
