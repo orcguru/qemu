@@ -129,6 +129,7 @@ void gen_api() {
     printf("OperandType get_operand(void *ptr, uint32_t idx, uint32_t *is_imm) {\n");
     printf("    OperandType ret;\n");
     printf("    ret.s.valid = 0;\n");
+    printf("    *is_imm = 0;\n");
     printf("    Instr1B2 *iptr = (Instr1B2 *)ptr;\n");
     printf("    if (iptr->instr_type == SIZE2B) {\n");
     printf("        return ret;\n");

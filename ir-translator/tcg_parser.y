@@ -60,12 +60,12 @@ xmm_def:
 XMMVAR COLON IMMX     { register_xmm($1, $3); }
 | XMMTMP COLON IMMX   { register_xmm_tmp($3); };
 
-program: func_list { create_program(); };
+program: func_list;
 
 func_list: func
 | func_list func;
 
-func: IMMX COLON instruction_list;
+func: IMMX COLON instruction_list { handle_func($1); };
 
 instruction_list: instruction
 | instruction_list instruction;

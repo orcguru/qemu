@@ -246,7 +246,8 @@ typedef enum {
     X(jmp_direct) \
     X(call_direct) \
     X(discard) \
-    X(call)
+    X(call) \
+    X(OPCODE_MAX)
 
 typedef enum {
     #define X(name) name,
@@ -574,7 +575,6 @@ typedef struct TcgAst {
 
 void register_xmm(uint64_t idx, uint64_t offset);
 void register_xmm_tmp(uint64_t offset);
-void create_program();
 
 void create_scalar_slot(OpCodeType op, SlotInfo s0);
 void create_scalar_slot2(OpCodeType op, SlotInfo s0, SlotInfo s1);
@@ -628,5 +628,9 @@ void create_jmpdirect(uint64_t val);
 void create_setlabel(OpCodeType op, uint8_t label);
 void *get_instr_buffer();
 size_t get_instr_buffer_size();
+void reset_instr_buffer(void);
+void handle_func(uint64_t val);
+void module_prolog(void);
+void module_epilog(void);
 
 #endif
