@@ -480,6 +480,24 @@ typedef enum {
     #undef X
 } InstrExtType;
 
+#define LLVM_TYPE_LIST \
+    X(LLVMInvalidType) \
+    X(LLVMInt8) \
+    X(LLVMInt16) \
+    X(LLVMInt32) \
+    X(LLVMInt64) \
+    X(LLVMVector16xi8) \
+    X(LLVMVector8xi16) \
+    X(LLVMVector4xi32) \
+    X(LLVMVector2xi64) \
+    X(LLVMMAXType)
+
+typedef enum {
+    #define X(name) name,
+    LLVM_TYPE_LIST
+    #undef X
+} LLVMType;
+
 /// NOTICE: all immediate fields with signed type are signed-ext,
 /// otherwise zero-ext.
 typedef struct __attribute__((packed)) {

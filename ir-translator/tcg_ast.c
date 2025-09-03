@@ -14,20 +14,26 @@
 
 extern char *lineptr;
 extern const char *opcode_type_str[];
-extern uint8_t opciosz[OPCODE_MAX][3];
+extern LLVMType opciosz[OPCODE_MAX][3];
 extern uint8_t opcoc[OPCODE_MAX];
 
-LLVMModuleRef module;
-LLVMBuilderRef builder;
+static LLVMModuleRef module;
+static LLVMBuilderRef builder;
 #define FIXED_PARAM_COUNT           20
-LLVMTypeRef fixed_param_types[FIXED_PARAM_COUNT] = {NULL};
-const char *fixed_arg_names[FIXED_PARAM_COUNT] = {NULL};
+static LLVMTypeRef fixed_param_types[FIXED_PARAM_COUNT] = {NULL};
+static const char *fixed_arg_names[FIXED_PARAM_COUNT] = {NULL};
 #define FIXED_VECTOR_PARAM_COUNT   (20 + 15 * 2)
-LLVMTypeRef fixed_vector_param_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
-const char *fixed_vector_arg_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
-const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
-const char *tmpl_stack_names[1<<5] = {NULL};
-const char *tmpt_stack_names[1<<5] = {NULL};
+static LLVMTypeRef fixed_vector_param_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
+static const char *fixed_vector_arg_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
+static const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
+static const char *tmpl_stack_names[1<<5] = {NULL};
+static const char *tmpt_stack_names[1<<5] = {NULL};
+static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)] = {NULL};
+static int ir_var_name_idx = 0;
+static LLVMTypeRef llvm_int_types[LLVMMAXType] = {NULL};
+static LLVMValueRef func_xreg_alloca[1 << 5] = {NULL};
+static LLVMValueRef func_tmpl_alloca[1 << 5] = {NULL};
+static LLVMValueRef func_tmpt_alloca[1 << 5] = {NULL};
 
 static LLVMModuleRef create_module(const char *module_name) {
     LLVMContextRef context = LLVMGetGlobalContext();
@@ -37,16 +43,268 @@ static LLVMModuleRef create_module(const char *module_name) {
     return module;
 }
 
+static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType operand, LLVMTypeRef type) {
+    LLVMValueRef ret;
+    if (is_imm) {
+        ret = LLVMConstInt(type, operand.i, 0);
+    } else {
+        LLVMValueRef alloca = NULL;
+        if (operand.s.slot_type == SUB_SLOT_XREG) {
+            alloca = func_xreg_alloca[operand.s.slot_idx];
+        } else if (operand.s.slot_type == SUB_SLOT_TMPL) {
+            alloca = func_tmpl_alloca[operand.s.slot_idx];
+        } else if (operand.s.slot_type == SUB_SLOT_TMPT) {
+            alloca = func_tmpt_alloca[operand.s.slot_idx];
+        }
+        ret = LLVMBuildLoad2(builder, type, alloca, ir_var_name[ir_var_name_idx]);
+        ir_var_name_idx += 1;
+    }
+    return ret;
+}
+
+static void translate_add_i64(OpCodeType opc, void *ptr) {
+    uint32_t is_imm;
+    OperandType operand;
+    uint32_t idx = opcoc[opc];
+    operand = get_operand(ptr, idx, &is_imm);
+    LLVMValueRef left = get_source_node_imm_or_stack(is_imm, operand, llvm_int_types[opciosz[opc][0]]);
+    operand = get_operand(ptr, idx + 1, &is_imm);
+    LLVMValueRef right = get_source_node_imm_or_stack(is_imm, operand, llvm_int_types[opciosz[opc][0]]);
+    LLVMBuildAdd(builder, left, right, ir_var_name[ir_var_name_idx]);
+    ir_var_name_idx += 1;
+}
+
+void translate_add_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_andc_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_andc_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_and_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_and_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_bswap32_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_clz_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_cmp_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_ctz_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_deposit_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_deposit_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_dupm_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_extract2_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_extract_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_extract_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_extrl_i64_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_extu_i32_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_ld32s_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_ld32u_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_ld8u_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_ld_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_ld_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_ld_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_movcond_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_movcond_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_mov_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_mov_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_mov_i64_const(OpCodeType opc, void *ptr) {
+}
+
+void translate_mov_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_mul_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_mul_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_mulsh_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_muluh_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_neg_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_neg_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_negsetcond_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_not_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_or_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_or_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_push_ret_addr(OpCodeType opc, void *ptr) {
+}
+
+void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
+}
+
+void translate_qemu_ld_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_qemu_ld_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
+}
+
+void translate_qemu_st_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_qemu_st_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_ret(OpCodeType opc, void *ptr) {
+}
+
+void translate_rotr_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_rotr_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_sar_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_setcond_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_sextract_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_shl_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_shli_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_shr_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_st16_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_st16_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_st32_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_st_i32(OpCodeType opc, void *ptr) {
+}
+
+void translate_st_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_st_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_sub_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_sub_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_umax_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_umin_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_xor_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_xor_vec(OpCodeType opc, void *ptr) {
+}
+
+void translate_bswap64_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_set_label(OpCodeType opc, void *ptr) {
+}
+
+void translate_brcond_i64(OpCodeType opc, void *ptr) {
+}
+
+void translate_jmp_direct(OpCodeType opc, void *ptr) {
+}
+
+void translate_call_direct(OpCodeType opc, void *ptr) {
+}
+
+void translate_discard(OpCodeType opc, void *ptr) {
+}
+
+void translate_call(OpCodeType opc, void *ptr) {
+}
+
 void handle_func(uint64_t val) {
     void *ptr_init = get_instr_buffer();
     void *ptr_max = ptr_init + get_instr_buffer_size();
     void *ptr;
+    /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     int tmpl_dirty = 0, tmpt_dirty = 0;
     uint32_t xreg_valid = 0, tmpl_valid = 0, tmpt_valid = 0, is_imm = 0;
-    uint32_t tmpl_128bit = 0, tmpl_64bit = 0, tmpl_32bit = 0, tmpl_16bit = 0, tmpl_8bit = 0;
-    uint32_t tmpt_128bit = 0, tmpt_64bit = 0, tmpt_32bit = 0, tmpt_16bit = 0, tmpt_8bit = 0;
-    uint8_t tmpl_bits_type[1<<5];
-    uint8_t tmpt_bits_type[1<<5];
+    uint8_t tmpl_bits_type[1<<5] = {0};
+    uint8_t tmpt_bits_type[1<<5] = {0};
     uint64_t xmm_valid = 0;
     int instr_idx = 0;
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), instr_idx += 1) {
@@ -63,104 +321,23 @@ void handle_func(uint64_t val) {
                     xreg_valid |= (1 << operand.s.slot_idx);
                 } else if (operand.s.slot_type == SUB_SLOT_TMPL) {
                     tmpl_dirty = 1;
-                    uint32_t slot_bit = (1 << operand.s.slot_idx);
-                    tmpl_valid |= slot_bit;
-                    if (slot_idx < opcoc[opc]) {
-                        if (opciosz[opc][2] == 64) {
-                            tmpl_64bit |= slot_bit;
-                        } else if (opciosz[opc][2] == 32) {
-                            tmpl_32bit |= slot_bit;
-                        } else if (opciosz[opc][2] == 16) {
-                            tmpl_16bit |= slot_bit;
-                        } else if (opciosz[opc][2] == 8) {
-                            tmpl_8bit |= slot_bit;
-                        } else if (opciosz[opc][2] == 128) {
-                            tmpl_128bit |= slot_bit;
-                        }
-                    } else {
-                        if (opciosz[opc][0] == 64) {
-                            tmpl_64bit |= slot_bit;
-                        } else if (opciosz[opc][0] == 32) {
-                            tmpl_32bit |= slot_bit;
-                        } else if (opciosz[opc][0] == 16) {
-                            tmpl_16bit |= slot_bit;
-                        } else if (opciosz[opc][0] == 8) {
-                            tmpl_8bit |= slot_bit;
-                        } else if (opciosz[opc][0] == 128) {
-                            tmpl_128bit |= slot_bit;
-                        }
+                    tmpl_valid |= (1 << operand.s.slot_idx);
+                    if (tmpl_bits_type[operand.s.slot_idx] < opciosz[opc][slot_idx < opcoc[opc] ? 2 : 0]) {
+                        tmpl_bits_type[operand.s.slot_idx] = opciosz[opc][slot_idx < opcoc[opc] ? 2 : 0];
                     }
                 } else if (operand.s.slot_type == SUB_SLOT_TMPT) {
                     tmpt_dirty = 1;
-                    uint32_t slot_bit = (1 << operand.s.slot_idx);
-                    tmpt_valid |= slot_bit;
-                    if (slot_idx < opcoc[opc]) {
-                        if (opciosz[opc][2] == 64) {
-                            tmpt_64bit |= slot_bit;
-                        } else if (opciosz[opc][2] == 32) {
-                            tmpt_32bit |= slot_bit;
-                        } else if (opciosz[opc][2] == 16) {
-                            tmpt_16bit |= slot_bit;
-                        } else if (opciosz[opc][2] == 8) {
-                            tmpt_8bit |= slot_bit;
-                        } else if (opciosz[opc][2] == 128) {
-                            tmpt_128bit |= slot_bit;
-                        }
-                    } else {
-                        if (opciosz[opc][0] == 64) {
-                            tmpt_64bit |= slot_bit;
-                        } else if (opciosz[opc][0] == 32) {
-                            tmpt_32bit |= slot_bit;
-                        } else if (opciosz[opc][0] == 16) {
-                            tmpt_16bit |= slot_bit;
-                        } else if (opciosz[opc][0] == 8) {
-                            tmpt_8bit |= slot_bit;
-                        } else if (opciosz[opc][0] == 128) {
-                            tmpt_128bit |= slot_bit;
-                        }
+                    tmpt_valid |= (1 << operand.s.slot_idx);
+                    if (tmpt_bits_type[operand.s.slot_idx] < opciosz[opc][slot_idx < opcoc[opc] ? 2 : 0]) {
+                        tmpt_bits_type[operand.s.slot_idx] = opciosz[opc][slot_idx < opcoc[opc] ? 2 : 0];
                     }
+                    assert(tmpt_bits_type[operand.s.slot_idx]);
                 } else if (operand.s.slot_type == SUB_SLOT_XMM) {
                     xmm_valid |= (1UL << operand.s.slot_idx);
                 }
             }
             slot_idx += 1;
         } while (1);
-    }
-    if (tmpl_dirty) {
-        for (int i = 0; i < (1<<5); ++i) {
-            uint32_t slot_bit = (1 << i);
-            if (tmpl_valid & slot_bit) {
-                if (tmpl_128bit & slot_bit) {
-                    tmpl_bits_type[i] = 4;
-                } else if (tmpl_64bit & slot_bit) {
-                    tmpl_bits_type[i] = 3;
-                } else if (tmpl_32bit & slot_bit) {
-                    tmpl_bits_type[i] = 2;
-                } else if (tmpl_16bit & slot_bit) {
-                    tmpl_bits_type[i] = 1;
-                } else if (tmpl_8bit & slot_bit) {
-                    tmpl_bits_type[i] = 0;
-                }
-            }
-        }
-    }
-    if (tmpt_dirty) {
-        for (int i = 0; i < (1<<5); ++i) {
-            uint32_t slot_bit = (1 << i);
-            if (tmpt_valid & slot_bit) {
-                if (tmpt_128bit & slot_bit) {
-                    tmpt_bits_type[i] = 4;
-                } else if (tmpt_64bit & slot_bit) {
-                    tmpt_bits_type[i] = 3;
-                } else if (tmpt_32bit & slot_bit) {
-                    tmpt_bits_type[i] = 2;
-                } else if (tmpt_16bit & slot_bit) {
-                    tmpt_bits_type[i] = 1;
-                } else if (tmpt_8bit & slot_bit) {
-                    tmpt_bits_type[i] = 0;
-                }
-            }
-        }
     }
 
     char func_name[64];
@@ -183,57 +360,263 @@ void handle_func(uint64_t val) {
         if (xreg_valid & (1 << x)) {
             LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, fixed_vector_param_types[x], fixed_vector_stack_names[x]);
             LLVMSetAlignment(alloca_inst, 8);
+            func_xreg_alloca[x] = alloca_inst;
             LLVMSetAlignment(LLVMBuildStore(builder, LLVMGetParam(llvm_func, x), alloca_inst), 8);
         }
     }
 
-    LLVMTypeRef tmp_types[5] = {NULL, NULL, NULL, NULL, NULL};
     if (tmpl_dirty) {
         for (int i = 0; i < (1<<5); ++i) {
             if (tmpl_valid & (1 << i)) {
-                int type_idx = tmpl_bits_type[i];
-                if (tmp_types[type_idx] == NULL) {
-                    if (type_idx == 0) {
-                        tmp_types[type_idx] = LLVMInt8Type();
-                    } else if (type_idx == 1) {
-                        tmp_types[type_idx] = LLVMInt16Type();
-                    } else if (type_idx == 2) {
-                        tmp_types[type_idx] = LLVMInt32Type();
-                    } else if (type_idx == 3) {
-                        tmp_types[type_idx] = LLVMInt64Type();
-                    } else if (type_idx == 4) {
-                        tmp_types[type_idx] = LLVMVectorType(LLVMInt8Type(), 16);
-                    } else {
-                        assert(0);
-                    }
-                }
-                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, tmp_types[type_idx], tmpl_stack_names[i]);
-                LLVMSetAlignment(alloca_inst, type_idx <= 3 ? 8 : 16);
+                assert(tmpl_bits_type[i]);
+                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[tmpl_bits_type[i]], tmpl_stack_names[i]);
+                func_tmpl_alloca[i] = alloca_inst;
+                LLVMSetAlignment(alloca_inst, tmpl_bits_type[i] <= LLVMInt64 ? 8 : 16);
             }
         }
     }
     if (tmpt_dirty) {
         for (int i = 0; i < (1<<5); ++i) {
             if (tmpt_valid & (1 << i)) {
-                int type_idx = tmpt_bits_type[i];
-                if (tmp_types[type_idx] == NULL) {
-                    if (type_idx == 0) {
-                        tmp_types[type_idx] = LLVMInt8Type();
-                    } else if (type_idx == 1) {
-                        tmp_types[type_idx] = LLVMInt16Type();
-                    } else if (type_idx == 2) {
-                        tmp_types[type_idx] = LLVMInt32Type();
-                    } else if (type_idx == 3) {
-                        tmp_types[type_idx] = LLVMInt64Type();
-                    } else if (type_idx == 4) {
-                        tmp_types[type_idx] = LLVMVectorType(LLVMInt8Type(), 16);
-                    } else {
-                        assert(0);
-                    }
-                }
-                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, tmp_types[type_idx], tmpt_stack_names[i]);
-                LLVMSetAlignment(alloca_inst, type_idx <= 3 ? 8 : 16);
+                assert(tmpt_bits_type[i]);
+                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[tmpt_bits_type[i]], tmpt_stack_names[i]);
+                func_tmpt_alloca[i] = alloca_inst;
+                LLVMSetAlignment(alloca_inst, tmpt_bits_type[i] <= LLVMInt64 ? 8 : 16);
             }
+        }
+    }
+
+    // Handle each IR translation
+    ir_var_name_idx = 0;
+    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), instr_idx += 1) {
+        OpCodeType opc = get_opcode(ptr);
+        switch (opc) {
+        case add_i64:
+            translate_add_i64(opc, ptr);
+            break;
+        case add_vec:
+            translate_add_vec(opc, ptr);
+            break;
+        case andc_i64:
+            translate_andc_i64(opc, ptr);
+            break;
+        case andc_vec:
+            translate_andc_vec(opc, ptr);
+            break;
+        case and_i64:
+            translate_and_i64(opc, ptr);
+            break;
+        case and_vec:
+            translate_and_vec(opc, ptr);
+            break;
+        case bswap32_i64:
+            translate_bswap32_i64(opc, ptr);
+            break;
+        case clz_i64:
+            translate_clz_i64(opc, ptr);
+            break;
+        case cmp_vec:
+            translate_cmp_vec(opc, ptr);
+            break;
+        case ctz_i64:
+            translate_ctz_i64(opc, ptr);
+            break;
+        case deposit_i32:
+            translate_deposit_i32(opc, ptr);
+            break;
+        case deposit_i64:
+            translate_deposit_i64(opc, ptr);
+            break;
+        case dupm_vec:
+            translate_dupm_vec(opc, ptr);
+            break;
+        case extract2_i64:
+            translate_extract2_i64(opc, ptr);
+            break;
+        case extract_i32:
+            translate_extract_i32(opc, ptr);
+            break;
+        case extract_i64:
+            translate_extract_i64(opc, ptr);
+            break;
+        case extrl_i64_i32:
+            translate_extrl_i64_i32(opc, ptr);
+            break;
+        case extu_i32_i64:
+            translate_extu_i32_i64(opc, ptr);
+            break;
+        case ld32s_i64:
+            translate_ld32s_i64(opc, ptr);
+            break;
+        case ld32u_i64:
+            translate_ld32u_i64(opc, ptr);
+            break;
+        case ld8u_i64:
+            translate_ld8u_i64(opc, ptr);
+            break;
+        case ld_i32:
+            translate_ld_i32(opc, ptr);
+            break;
+        case ld_i64:
+            translate_ld_i64(opc, ptr);
+            break;
+        case ld_vec:
+            translate_ld_vec(opc, ptr);
+            break;
+        case movcond_i32:
+            translate_movcond_i32(opc, ptr);
+            break;
+        case movcond_i64:
+            translate_movcond_i64(opc, ptr);
+            break;
+        case mov_i32:
+            translate_mov_i32(opc, ptr);
+            break;
+        case mov_i64:
+            translate_mov_i64(opc, ptr);
+            break;
+        case mov_i64_const:
+            translate_mov_i64_const(opc, ptr);
+            break;
+        case mov_vec:
+            translate_mov_vec(opc, ptr);
+            break;
+        case mul_i32:
+            translate_mul_i32(opc, ptr);
+            break;
+        case mul_i64:
+            translate_mul_i64(opc, ptr);
+            break;
+        case mulsh_i64:
+            translate_mulsh_i64(opc, ptr);
+            break;
+        case muluh_i64:
+            translate_muluh_i64(opc, ptr);
+            break;
+        case neg_i32:
+            translate_neg_i32(opc, ptr);
+            break;
+        case neg_i64:
+            translate_neg_i64(opc, ptr);
+            break;
+        case negsetcond_i64:
+            translate_negsetcond_i64(opc, ptr);
+            break;
+        case not_i64:
+            translate_not_i64(opc, ptr);
+            break;
+        case or_i64:
+            translate_or_i64(opc, ptr);
+            break;
+        case or_vec:
+            translate_or_vec(opc, ptr);
+            break;
+        case push_ret_addr:
+            translate_push_ret_addr(opc, ptr);
+            break;
+        case qemu_ld2_i128:
+            translate_qemu_ld2_i128(opc, ptr);
+            break;
+        case qemu_ld_i32:
+            translate_qemu_ld_i32(opc, ptr);
+            break;
+        case qemu_ld_i64:
+            translate_qemu_ld_i64(opc, ptr);
+            break;
+        case qemu_st2_i128:
+            translate_qemu_st2_i128(opc, ptr);
+            break;
+        case qemu_st_i32:
+            translate_qemu_st_i32(opc, ptr);
+            break;
+        case qemu_st_i64:
+            translate_qemu_st_i64(opc, ptr);
+            break;
+        case ret:
+            translate_ret(opc, ptr);
+            break;
+        case rotr_i32:
+            translate_rotr_i32(opc, ptr);
+            break;
+        case rotr_i64:
+            translate_rotr_i64(opc, ptr);
+            break;
+        case sar_i64:
+            translate_sar_i64(opc, ptr);
+            break;
+        case setcond_i64:
+            translate_setcond_i64(opc, ptr);
+            break;
+        case sextract_i64:
+            translate_sextract_i64(opc, ptr);
+            break;
+        case shl_i64:
+            translate_shl_i64(opc, ptr);
+            break;
+        case shli_vec:
+            translate_shli_vec(opc, ptr);
+            break;
+        case shr_i64:
+            translate_shr_i64(opc, ptr);
+            break;
+        case st16_i32:
+            translate_st16_i32(opc, ptr);
+            break;
+        case st16_i64:
+            translate_st16_i64(opc, ptr);
+            break;
+        case st32_i64:
+            translate_st32_i64(opc, ptr);
+            break;
+        case st_i32:
+            translate_st_i32(opc, ptr);
+            break;
+        case st_i64:
+            translate_st_i64(opc, ptr);
+            break;
+        case st_vec:
+            translate_st_vec(opc, ptr);
+            break;
+        case sub_i64:
+            translate_sub_i64(opc, ptr);
+            break;
+        case sub_vec:
+            translate_sub_vec(opc, ptr);
+            break;
+        case umax_vec:
+            translate_umax_vec(opc, ptr);
+            break;
+        case umin_vec:
+            translate_umin_vec(opc, ptr);
+            break;
+        case xor_i64:
+            translate_xor_i64(opc, ptr);
+            break;
+        case xor_vec:
+            translate_xor_vec(opc, ptr);
+            break;
+        case bswap64_i64:
+            translate_bswap64_i64(opc, ptr);
+            break;
+        case set_label:
+            translate_set_label(opc, ptr);
+            break;
+        case brcond_i64:
+            translate_brcond_i64(opc, ptr);
+            break;
+        case jmp_direct:
+            translate_jmp_direct(opc, ptr);
+            break;
+        case call_direct:
+            translate_call_direct(opc, ptr);
+            break;
+        case discard:
+            translate_discard(opc, ptr);
+            break;
+        case call:
+            translate_call(opc, ptr);
+            break;
+        default: assert(0);
         }
     }
 
@@ -292,10 +675,29 @@ void module_prolog() {
         snprintf(tmpt_name_buf[i], sizeof(tmpt_name_buf[i]), "tmp%d.stack", i);
         tmpt_stack_names[i] = tmpt_name_buf[i];
     }
+    static char ir_var_name_buffer[('z'-'a'+1)*('z'-'a'+1)][3];
+    for (char c1 = 'a'; c1 <= 'z'; ++c1) {
+        for (char c2 = 'a'; c2 <= 'z'; ++c2) {
+            int idx = (c1 - 'a') * ('z' - 'a' + 1) + (c2 - 'a');
+            ir_var_name_buffer[idx][0] = c1;
+            ir_var_name_buffer[idx][1] = c2;
+            ir_var_name_buffer[idx][2] = 0;
+            ir_var_name[idx] = ir_var_name_buffer[idx];
+        }
+    }
+
+    llvm_int_types[LLVMInt8] = LLVMInt8Type();
+    llvm_int_types[LLVMInt16] = LLVMInt16Type();
+    llvm_int_types[LLVMInt32] = LLVMInt32Type();
+    llvm_int_types[LLVMInt64] = LLVMInt64Type();
+    llvm_int_types[LLVMVector16xi8] = LLVMVectorType(LLVMInt8Type(), 16);
+    llvm_int_types[LLVMVector8xi16] = LLVMVectorType(LLVMInt16Type(), 8);
+    llvm_int_types[LLVMVector4xi32] = LLVMVectorType(LLVMInt32Type(), 4);
+    llvm_int_types[LLVMVector2xi64] = LLVMVectorType(LLVMInt64Type(), 2);
 }
 
 void module_epilog() {
-    LLVMDumpModule(module);
+    //LLVMDumpModule(module);
     LLVMDisposeModule(module);
 }
 
