@@ -34,6 +34,7 @@ static LLVMTypeRef llvm_int_types[LLVMMAXType] = {NULL};
 static LLVMValueRef func_xreg_alloca[1 << 5] = {NULL};
 static LLVMValueRef func_tmpl_alloca[1 << 5] = {NULL};
 static LLVMValueRef func_tmpt_alloca[1 << 5] = {NULL};
+static uint32_t env_var_offset[ENVVarMAX] = {0};
 
 static LLVMModuleRef create_module(const char *module_name) {
     LLVMContextRef context = LLVMGetGlobalContext();
@@ -47,6 +48,17 @@ static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType op
     LLVMValueRef ret;
     if (is_imm) {
         ret = LLVMConstInt(type, operand.i, 0);
+    } else if (operand.s.slot_type == SUB_SLOT_ENVVAR) {
+        LLVMTypeRef asm_return_type = LLVMInt64Type();
+        LLVMTypeRef asm_param_types[] = {};
+        LLVMTypeRef asm_function_type = LLVMFunctionType(asm_return_type, asm_param_types, 0, 0);
+        //FIXME: AArch64
+        char asm_string[128];
+        sprintf(asm_string, "ldr $0, [x25, #%d]", env_var_offset[operand.s.slot_idx]);
+        const char *constraint_string = "=r";
+        LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_function_type, asm_string, constraint_string, /* has_side_effects */ 1, /* is_align_stack */ 0);
+        ret = LLVMBuildCall2(builder, asm_function_type, inline_asm, NULL, 0, ir_var_name[ir_var_name_idx]);
+        ir_var_name_idx += 1;
     } else {
         LLVMValueRef alloca = NULL;
         if (operand.s.slot_type == SUB_SLOT_XREG) {
@@ -55,6 +67,8 @@ static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType op
             alloca = func_tmpl_alloca[operand.s.slot_idx];
         } else if (operand.s.slot_type == SUB_SLOT_TMPT) {
             alloca = func_tmpt_alloca[operand.s.slot_idx];
+        } else {
+            assert(0);
         }
         ret = LLVMBuildLoad2(builder, type, alloca, ir_var_name[ir_var_name_idx]);
         ir_var_name_idx += 1;
@@ -297,6 +311,7 @@ void translate_call(OpCodeType opc, void *ptr) {
 }
 
 void handle_func(uint64_t val) {
+    printf("func %lx\n", val);
     void *ptr_init = get_instr_buffer();
     void *ptr_max = ptr_init + get_instr_buffer_size();
     void *ptr;
@@ -694,6 +709,14 @@ void module_prolog() {
     llvm_int_types[LLVMVector8xi16] = LLVMVectorType(LLVMInt16Type(), 8);
     llvm_int_types[LLVMVector4xi32] = LLVMVectorType(LLVMInt32Type(), 4);
     llvm_int_types[LLVMVector2xi64] = LLVMVectorType(LLVMInt64Type(), 2);
+
+    env_var_offset[cc_src2] = 160;
+    env_var_offset[es_base] = 192;
+    env_var_offset[cs_base] = 216;
+    env_var_offset[ss_base] = 240;
+    env_var_offset[ds_base] = 264;
+    env_var_offset[fs_base] = 288;
+    env_var_offset[gs_base] = 312;
 }
 
 void module_epilog() {

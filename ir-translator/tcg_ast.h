@@ -30,7 +30,8 @@ typedef enum {
     X(ss_base) \
     X(ds_base) \
     X(fs_base) \
-    X(gs_base)
+    X(gs_base) \
+    X(ENVVarMAX)
 
 typedef enum {
     #define X(name) name,
