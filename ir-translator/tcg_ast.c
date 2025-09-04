@@ -133,11 +133,12 @@ void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
     output = get_operand(ptr, 0, &is_imm_out);
     operand_l = get_operand(ptr, idx, &is_imm_l);
     operand_r = get_operand(ptr, idx + 1, &is_imm_r);
-    LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, llvm_int_types[opciosz[opc][0]]);
-    LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, llvm_int_types[opciosz[opc][0]]);
-    LLVMValueRef add_val = api(builder, left, right, ir_var_name[ir_var_name_idx]);
+    uint8_t is_vec = is_vector(ptr);
+    LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, is_vec ? llvm_int_types[get_llvm_vector_type(ptr)] : llvm_int_types[opciosz[opc][0]]);
+    LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, is_vec ? llvm_int_types[get_llvm_vector_type(ptr)] : llvm_int_types[opciosz[opc][0]]);
+    LLVMValueRef out_val = api(builder, left, right, ir_var_name[ir_var_name_idx]);
     ir_var_name_idx += 1;
-    LLVMBuildStore(builder, add_val, get_stack_alloca(output));
+    LLVMBuildStore(builder, out_val, get_stack_alloca(output));
 }
 
 static void translate_add_i64(OpCodeType opc, void *ptr) {
@@ -161,6 +162,7 @@ static void translate_add_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_add_vec(OpCodeType opc, void *ptr) {
+    translate_binary(opc, ptr, LLVMBuildAdd);
 }
 
 void translate_andc_i64(OpCodeType opc, void *ptr) {
@@ -174,6 +176,7 @@ void translate_and_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_and_vec(OpCodeType opc, void *ptr) {
+    translate_binary(opc, ptr, LLVMBuildAnd);
 }
 
 void translate_bswap32_i64(OpCodeType opc, void *ptr) {
@@ -277,6 +280,7 @@ void translate_or_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_or_vec(OpCodeType opc, void *ptr) {
+    translate_binary(opc, ptr, LLVMBuildOr);
 }
 
 void translate_push_ret_addr(OpCodeType opc, void *ptr) {
@@ -324,6 +328,7 @@ void translate_shl_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_shli_vec(OpCodeType opc, void *ptr) {
+    translate_binary(opc, ptr, LLVMBuildShl);
 }
 
 void translate_shr_i64(OpCodeType opc, void *ptr) {
@@ -353,6 +358,7 @@ void translate_sub_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_sub_vec(OpCodeType opc, void *ptr) {
+    translate_binary(opc, ptr, LLVMBuildSub);
 }
 
 void translate_umax_vec(OpCodeType opc, void *ptr) {
@@ -366,6 +372,7 @@ void translate_xor_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_xor_vec(OpCodeType opc, void *ptr) {
+    translate_binary(opc, ptr, LLVMBuildXor);
 }
 
 void translate_bswap64_i64(OpCodeType opc, void *ptr) {

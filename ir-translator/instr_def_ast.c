@@ -287,7 +287,7 @@ void gen_api() {
     printf("}\n");
     /// get_vector_elem_size
     printf("\n");
-    printf("VectorElemSizeType get_vector_elem_size(void *ptr) {\n");
+    printf("LLVMType get_llvm_vector_type(void *ptr) {\n");
     printf("    Instr1B2 *iptr = (Instr1B2 *)ptr;\n");
     printf("    assert(iptr->instr_type == SIZEXB);\n");
     printf("    switch (iptr->instr_type_ext) {\n");
@@ -300,7 +300,7 @@ void gen_api() {
             printf("    return -1;\n");
         } else {
             printf("    %s *i_%s = (%s *)ptr;\n", instr, instr, instr);
-            printf("    return i_%s->es;\n", instr);
+            printf("    return (i_%s->es + LLVMVector16xi8);\n", instr);
         }
     }
 
@@ -388,6 +388,29 @@ void gen_api() {
     printf("    ret.attr_type = iptr->attr_type;\n");
     printf("    ret.attr_val = iptr->attr_val;\n");
     printf("    return ret;\n");
+    printf("}\n");
+    /// is_vector
+    printf("\n");
+    printf("uint8_t is_vector(void *ptr) {\n");
+    printf("    Instr1B2 *iptr = (Instr1B2 *)ptr;\n");
+    printf("    if (iptr->instr_type != SIZEXB) {\n");
+    printf("        return 0;\n");
+    printf("    }\n");
+    printf("    switch (iptr->instr_type_ext) {\n");
+
+    for (uint32_t j = 0; j < instr_def_idx; ++j) {
+        char *instr = instr_def[j];
+        printf("    case %s_ext:\n", instr);
+        if (instr_def_with_ves[j] == 0) {
+            printf("    return 0;\n");
+        } else {
+            printf("    return 1;\n", instr);
+        }
+    }
+
+    printf("    default: assert(0);\n");
+    printf("    }\n");
+    printf("    return -1;\n");
     printf("}\n");
 }
 
