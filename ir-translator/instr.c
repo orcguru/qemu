@@ -157,11 +157,9 @@ static void insert_instr(void *ptr_src, size_t sz) {
 }
 
 static void dump_2B(Instr2B i) {
-    printf("%s %04x\n", __FUNCTION__, i);
 }
 
 static void dump_4B(Instr4B i) {
-    printf("%s %08x\n", __FUNCTION__, i);
 }
 
 static void dump_instr() {
