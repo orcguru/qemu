@@ -16,7 +16,7 @@ static uint64_t tcg_next_capacity = (128 * 1024);
 static uint64_t tcg_instrs_capacity = 0;
 static size_t tcg_instrs_idx = 0;
 static uint8_t *tcg_instrs = NULL;
-static uint16_t xmm_offsets[17] = {0};
+static uint16_t xmm_offsets[16] = {0};
 
 void *get_instr_buffer() {
     return (void *)tcg_instrs;
@@ -31,12 +31,12 @@ void reset_instr_buffer() {
 }
 
 void register_xmm(uint64_t idx, uint64_t offset) {
-    assert(idx < 16);
+    assert(idx < 15);
     xmm_offsets[idx] = (uint16_t)offset;
 }
 
 void register_xmm_tmp(uint64_t offset) {
-    xmm_offsets[16] = (uint16_t)offset;
+    xmm_offsets[15] = (uint16_t)offset;
 }
 
 XMMReg lookup_xmm(uint64_t offset) {
@@ -44,7 +44,7 @@ XMMReg lookup_xmm(uint64_t offset) {
     XMMReg x;
     x.xmm_idx = NON_XMM;
     x.xmm_offset = 0;
-    if (xmm_offsets[0] <= off && off < (xmm_offsets[15] + 0x20)) {
+    if (xmm_offsets[0] <= off && off < (xmm_offsets[14] + 0x20)) {
         uint16_t idx = (off - xmm_offsets[0]) / 0x40;
         uint16_t delta = (off - xmm_offsets[0]) % 0x40;
         if (delta < 0x10) {
@@ -54,13 +54,13 @@ XMMReg lookup_xmm(uint64_t offset) {
             x.xmm_idx = idx * 2 + 1;
             x.xmm_offset = delta - 0x10;
         }
-    } else if (xmm_offsets[16] <= off && off < (xmm_offsets[16] + 0x20)) {
-        if ((off - xmm_offsets[16]) < 0x10) {
+    } else if (xmm_offsets[15] <= off && off < (xmm_offsets[15] + 0x20)) {
+        if ((off - xmm_offsets[15]) < 0x10) {
             x.xmm_idx = XMMT;
-            x.xmm_offset = (off - xmm_offsets[16]);
+            x.xmm_offset = (off - xmm_offsets[15]);
         } else {
             x.xmm_idx = YMMT_H;
-            x.xmm_offset = (off - (xmm_offsets[16] + 0x10));
+            x.xmm_offset = (off - (xmm_offsets[15] + 0x10));
         }
     }
     return x;
@@ -349,16 +349,26 @@ void create_scalar_slot3(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2) {
 
 void create_vector_slot_env_imm(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, uint64_t i0) {
     XMMReg x = lookup_xmm(i0);
-    assert(x.xmm_idx != NON_XMM);
-    Instr1BV4X i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BV4X_ext;
-    i.opc = op;
-    i.es = ai.p.ves;
-    SET_SLOT(0);
-    i.xmm_idx = x.xmm_idx;
-    i.xmm_offset = x.xmm_offset;
-    insert_instr((void *)&i, sizeof(i));
+    if (x.xmm_idx != NON_XMM) {
+        Instr1BV4X i;
+        i.instr_type = SIZEXB;
+        i.instr_type_ext = Instr1BV4X_ext;
+        i.opc = op;
+        i.es = ai.p.ves;
+        SET_SLOT(0);
+        i.xmm_idx = x.xmm_idx;
+        i.xmm_offset = x.xmm_offset;
+        insert_instr((void *)&i, sizeof(i));
+    } else {
+        Instr1BV4XE i;
+        i.instr_type = SIZEXB;
+        i.instr_type_ext = Instr1BV4XE_ext;
+        i.opc = op;
+        i.es = ai.p.ves;
+        SET_SLOT(0);
+        i.env_offset = i0;
+        insert_instr((void *)&i, sizeof(i));
+    }
 }
 
 void create_scalar_slot2_imm2(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, uint64_t i1) {

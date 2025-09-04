@@ -62,6 +62,16 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
     uint8_t instr_type_ext  :6;
     uint32_t opc            :7;
+    uint32_t es             :2;
+    uint32_t slot0_type     :2;
+    uint32_t slot0_idx      :5;
+    uint32_t env_offset     :16;
+} Instr1BV4XE;
+
+typedef struct __attribute__((packed)) {
+    uint8_t instr_type      :2;
+    uint8_t instr_type_ext  :6;
+    uint32_t opc            :7;
     uint32_t slot0_type     :2;
     uint32_t slot0_idx      :5;
     uint32_t slot1_type     :2;

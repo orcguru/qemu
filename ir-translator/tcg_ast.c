@@ -35,6 +35,8 @@ static LLVMValueRef func_xreg_alloca[1 << 5] = {NULL};
 static LLVMValueRef func_tmpl_alloca[1 << 5] = {NULL};
 static LLVMValueRef func_tmpt_alloca[1 << 5] = {NULL};
 static uint32_t env_var_offset[ENVVarMAX] = {0};
+static OperandType alias_tmpl[1<<5] = {0};
+static OperandType alias_tmpt[1<<5] = {0};
 
 static LLVMModuleRef create_module(const char *module_name) {
     LLVMContextRef context = LLVMGetGlobalContext();
@@ -44,8 +46,64 @@ static LLVMModuleRef create_module(const char *module_name) {
     return module;
 }
 
+static void register_alias(OperandType lval, OperandType rval) {
+    if (lval.s.slot_type == SUB_SLOT_TMPL) {
+        alias_tmpl[lval.s.slot_idx] = rval;
+    } else if (lval.s.slot_type == SUB_SLOT_TMPT) {
+        alias_tmpt[lval.s.slot_idx] = rval;
+    } else {
+        assert(0);
+    }
+}
+
+static void unregister_alias(OperandType operand) {
+    if (operand.s.slot_type == SUB_SLOT_TMPL) {
+        alias_tmpl[operand.s.slot_idx].i = 0;
+    } else if (operand.s.slot_type == SUB_SLOT_TMPT) {
+        alias_tmpt[operand.s.slot_idx].i = 0;
+    } else {
+        assert(0);
+    }
+}
+
+static OperandType get_alias(OperandType operand) {
+    if (operand.s.slot_type == SUB_SLOT_TMPL) {
+        return alias_tmpl[operand.s.slot_idx];
+    } else if (operand.s.slot_type == SUB_SLOT_TMPT) {
+        return alias_tmpt[operand.s.slot_idx];
+    } else {
+        assert(0);
+    }
+}
+
+static uint32_t has_alias(OperandType operand) {
+    if (operand.s.slot_type == SUB_SLOT_TMPL) {
+        return alias_tmpl[operand.s.slot_idx].s.valid;
+    } else if (operand.s.slot_type == SUB_SLOT_TMPT) {
+        return alias_tmpt[operand.s.slot_idx].s.valid;
+    } else {
+        assert(0);
+    }
+}
+
+static LLVMValueRef get_stack_alloca(OperandType operand) {
+    LLVMValueRef alloca = NULL;
+    if (operand.s.slot_type == SUB_SLOT_XREG) {
+        alloca = func_xreg_alloca[operand.s.slot_idx];
+    } else if (operand.s.slot_type == SUB_SLOT_TMPL) {
+        assert(has_alias(operand) == 0);
+        alloca = func_tmpl_alloca[operand.s.slot_idx];
+    } else if (operand.s.slot_type == SUB_SLOT_TMPT) {
+        assert(has_alias(operand) == 0);
+        alloca = func_tmpt_alloca[operand.s.slot_idx];
+    } else {
+        assert(0);
+    }
+    return alloca;
+}
+
 static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType operand, LLVMTypeRef type) {
-    LLVMValueRef ret;
+    LLVMValueRef ret = NULL;
     if (is_imm) {
         ret = LLVMConstInt(type, operand.i, 0);
     } else if (operand.s.slot_type == SUB_SLOT_ENVVAR) {
@@ -60,32 +118,30 @@ static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType op
         ret = LLVMBuildCall2(builder, asm_function_type, inline_asm, NULL, 0, ir_var_name[ir_var_name_idx]);
         ir_var_name_idx += 1;
     } else {
-        LLVMValueRef alloca = NULL;
-        if (operand.s.slot_type == SUB_SLOT_XREG) {
-            alloca = func_xreg_alloca[operand.s.slot_idx];
-        } else if (operand.s.slot_type == SUB_SLOT_TMPL) {
-            alloca = func_tmpl_alloca[operand.s.slot_idx];
-        } else if (operand.s.slot_type == SUB_SLOT_TMPT) {
-            alloca = func_tmpt_alloca[operand.s.slot_idx];
-        } else {
-            assert(0);
-        }
-        ret = LLVMBuildLoad2(builder, type, alloca, ir_var_name[ir_var_name_idx]);
+        ret = LLVMBuildLoad2(builder, type, get_stack_alloca(operand), ir_var_name[ir_var_name_idx]);
         ir_var_name_idx += 1;
     }
     return ret;
 }
 
 static void translate_add_i64(OpCodeType opc, void *ptr) {
-    uint32_t is_imm;
-    OperandType operand;
+    uint32_t is_imm_l, is_imm_r, is_imm_out;
+    OperandType operand_l, operand_r, output;
     uint32_t idx = opcoc[opc];
-    operand = get_operand(ptr, idx, &is_imm);
-    LLVMValueRef left = get_source_node_imm_or_stack(is_imm, operand, llvm_int_types[opciosz[opc][0]]);
-    operand = get_operand(ptr, idx + 1, &is_imm);
-    LLVMValueRef right = get_source_node_imm_or_stack(is_imm, operand, llvm_int_types[opciosz[opc][0]]);
-    LLVMBuildAdd(builder, left, right, ir_var_name[ir_var_name_idx]);
-    ir_var_name_idx += 1;
+    output = get_operand(ptr, 0, &is_imm_out);
+    operand_l = get_operand(ptr, idx, &is_imm_l);
+    operand_r = get_operand(ptr, idx + 1, &is_imm_r);
+    if (operand_r.s.valid == 0 && is_imm_r == 0) {
+        assert(operand_l.s.slot_type == SUB_SLOT_XMM ||
+               operand_l.s.slot_type == SUB_SLOT_ENV);
+        register_alias(output, operand_l);
+    } else {
+        LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, llvm_int_types[opciosz[opc][0]]);
+        LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, llvm_int_types[opciosz[opc][0]]);
+        LLVMValueRef add_val = LLVMBuildAdd(builder, left, right, ir_var_name[ir_var_name_idx]);
+        ir_var_name_idx += 1;
+        LLVMBuildStore(builder, add_val, get_stack_alloca(output));
+    }
 }
 
 void translate_add_vec(OpCodeType opc, void *ptr) {
@@ -308,6 +364,14 @@ void translate_discard(OpCodeType opc, void *ptr) {
 }
 
 void translate_call(OpCodeType opc, void *ptr) {
+}
+
+static void cleanup_func_resource() {
+    reset_instr_buffer();
+    for (int i = 0; i < (1<<5); ++i) {
+        alias_tmpl[i].i = 0;
+        alias_tmpt[i].i = 0;
+    }
 }
 
 void handle_func(uint64_t val) {
@@ -637,7 +701,7 @@ void handle_func(uint64_t val) {
 
     LLVMBuildRetVoid(builder);
 
-    reset_instr_buffer();
+    cleanup_func_resource();
 }
 
 void module_prolog() {

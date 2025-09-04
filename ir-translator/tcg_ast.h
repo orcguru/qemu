@@ -435,6 +435,7 @@ typedef enum {
     X(Instr1B44_ext) \
     X(Instr1B4_ext) \
     X(Instr1BV4X_ext) \
+    X(Instr1BV4XE_ext) \
     X(Instr1B41I2_ext) \
     X(Instr1B4X_ext) \
     X(Instr1B22_ext) \
