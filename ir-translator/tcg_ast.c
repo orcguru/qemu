@@ -31,12 +31,16 @@ static const char *tmpt_stack_names[1<<5] = {NULL};
 static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)] = {NULL};
 static int ir_var_name_idx = 0;
 static LLVMTypeRef llvm_int_types[LLVMMAXType] = {NULL};
+static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
 static LLVMValueRef func_xreg_alloca[1 << 5] = {NULL};
 static LLVMValueRef func_tmpl_alloca[1 << 5] = {NULL};
 static LLVMValueRef func_tmpt_alloca[1 << 5] = {NULL};
 static uint32_t env_var_offset[ENVVarMAX] = {0};
 static OperandType alias_tmpl[1<<5] = {0};
 static OperandType alias_tmpt[1<<5] = {0};
+
+
+void translate_xor_i64(OpCodeType opc, void *ptr);
 
 static LLVMModuleRef create_module(const char *module_name) {
     LLVMContextRef context = LLVMGetGlobalContext();
@@ -102,10 +106,28 @@ static LLVMValueRef get_stack_alloca(OperandType operand) {
     return alloca;
 }
 
-static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType operand, LLVMTypeRef type) {
+static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType operand, LLVMTypeRef type, LLVMType tidx) {
+    assert(type);
+    assert(tidx != LLVMInvalidType && tidx < LLVMMAXType);
     LLVMValueRef ret = NULL;
     if (is_imm) {
-        ret = LLVMConstInt(type, operand.i, 0);
+        if (tidx <= LLVMInt64) {
+            ret = LLVMConstInt(type, operand.i, 0);
+        } else {
+            LLVMValueRef constants[16];
+            uint64_t val = operand.i;
+            uint8_t full_cnt = llvm_vector_elem_bit_counts[tidx*2], half_cnt = llvm_vector_elem_bit_counts[tidx*2]/2;
+            uint8_t bit_cnt = llvm_vector_elem_bit_counts[tidx*2+1];
+            for (int i = 0; i < full_cnt; i++) {
+                if (i == half_cnt) {
+                    val = operand.i;
+                }
+                LLVMValueRef element_value = LLVMConstInt(llvm_int_types[tidx - 4], val & ((1UL<<bit_cnt)-1), 0);
+                constants[i] = element_value;
+                val = val >> bit_cnt;
+            }
+            ret = LLVMConstVector(constants, full_cnt);
+        }
     } else if (operand.s.slot_type == SUB_SLOT_ENVVAR) {
         LLVMTypeRef asm_return_type = LLVMInt64Type();
         LLVMTypeRef asm_param_types[] = {};
@@ -134,8 +156,8 @@ void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
     operand_l = get_operand(ptr, idx, &is_imm_l);
     operand_r = get_operand(ptr, idx + 1, &is_imm_r);
     uint8_t is_vec = is_vector(ptr);
-    LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, is_vec ? llvm_int_types[get_llvm_vector_type(ptr)] : llvm_int_types[opciosz[opc][0]]);
-    LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, is_vec ? llvm_int_types[get_llvm_vector_type(ptr)] : llvm_int_types[opciosz[opc][0]]);
+    LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, is_vec ? llvm_int_types[get_llvm_vector_type(ptr)] : llvm_int_types[opciosz[opc][0]], is_vec ? get_llvm_vector_type(ptr) : opciosz[opc][0]);
+    LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, is_vec ? llvm_int_types[get_llvm_vector_type(ptr)] : llvm_int_types[opciosz[opc][0]], is_vec ? get_llvm_vector_type(ptr) : opciosz[opc][0]);
     LLVMValueRef out_val = api(builder, left, right, ir_var_name[ir_var_name_idx]);
     ir_var_name_idx += 1;
     LLVMBuildStore(builder, out_val, get_stack_alloca(output));
@@ -153,8 +175,8 @@ static void translate_add_i64(OpCodeType opc, void *ptr) {
                operand_l.s.slot_type == SUB_SLOT_ENV);
         register_alias(output, operand_l);
     } else {
-        LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, llvm_int_types[opciosz[opc][0]]);
-        LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, llvm_int_types[opciosz[opc][0]]);
+        LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, llvm_int_types[opciosz[opc][0]], opciosz[opc][0]);
+        LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, llvm_int_types[opciosz[opc][0]], opciosz[opc][0]);
         LLVMValueRef add_val = LLVMBuildAdd(builder, left, right, ir_var_name[ir_var_name_idx]);
         ir_var_name_idx += 1;
         LLVMBuildStore(builder, add_val, get_stack_alloca(output));
@@ -273,6 +295,18 @@ void translate_negsetcond_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_not_i64(OpCodeType opc, void *ptr) {
+    Instr4B *src = (Instr4B *)ptr;
+    assert(src->instr_type == SIZE4B);
+    Instr1B44 i;
+    i.instr_type = SIZEXB;
+    i.instr_type_ext = Instr1B44_ext;
+    i.opc = xor_i64;
+    i.slot0_type = src->slot0_type;
+    i.slot0_idx = src->slot0_idx;
+    i.slot1_type = src->slot1_type;
+    i.slot1_idx = src->slot1_idx;
+    i.imm = -1;
+    translate_xor_i64(xor_i64, (void *)&i);
 }
 
 void translate_or_i64(OpCodeType opc, void *ptr) {
@@ -804,6 +838,23 @@ void module_prolog() {
     llvm_int_types[LLVMVector4xi32] = LLVMVectorType(LLVMInt32Type(), 4);
     llvm_int_types[LLVMVector2xi64] = LLVMVectorType(LLVMInt64Type(), 2);
 
+    llvm_vector_elem_bit_counts[LLVMInt8*2] = 1;
+    llvm_vector_elem_bit_counts[LLVMInt8*2+1] = 8;
+    llvm_vector_elem_bit_counts[LLVMInt16*2] = 1;
+    llvm_vector_elem_bit_counts[LLVMInt16*2+1] = 16;
+    llvm_vector_elem_bit_counts[LLVMInt32*2] = 1;
+    llvm_vector_elem_bit_counts[LLVMInt32*2+1] = 32;
+    llvm_vector_elem_bit_counts[LLVMInt64*2] = 1;
+    llvm_vector_elem_bit_counts[LLVMInt64*2+1] = 64;
+    llvm_vector_elem_bit_counts[LLVMVector16xi8*2] = 16;
+    llvm_vector_elem_bit_counts[LLVMVector16xi8*2+1] = 8;
+    llvm_vector_elem_bit_counts[LLVMVector8xi16*2] = 8;
+    llvm_vector_elem_bit_counts[LLVMVector8xi16*2+1] = 16;
+    llvm_vector_elem_bit_counts[LLVMVector4xi32*2] = 4;
+    llvm_vector_elem_bit_counts[LLVMVector4xi32*2+1] = 32;
+    llvm_vector_elem_bit_counts[LLVMVector2xi64*2] = 2;
+    llvm_vector_elem_bit_counts[LLVMVector2xi64*2+1] = 64;
+
     env_var_offset[cc_src2] = 160;
     env_var_offset[es_base] = 192;
     env_var_offset[cs_base] = 216;
@@ -814,7 +865,7 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    //LLVMDumpModule(module);
+    LLVMDumpModule(module);
     LLVMDisposeModule(module);
 }
 
