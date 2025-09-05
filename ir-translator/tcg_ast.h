@@ -212,6 +212,7 @@ typedef enum {
     X(neg_i64) \
     X(negsetcond_i64) \
     X(not_i64) \
+    X(not_vec) \
     X(or_i64) \
     X(or_vec) \
     X(push_ret_addr) \
