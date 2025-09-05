@@ -289,8 +289,8 @@ xsave               xsave
 
 {XMMVAR}          { HANDLE_COLUMN; yylval->val = atoi(yytext + 3); return XMMVAR; }
 {XMMTMP}          { HANDLE_COLUMN; return XMMTMP; }
-{TMPLVAR}         { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_TMPL; yylval->si.p.idx = atoi(yytext + 3); return SLOT; }
-{TMPTVAR}         { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_TMPT; yylval->si.p.idx = atoi(yytext + 3); return SLOT; }
+{TMPLVAR}         { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_TMPL; yylval->si.s.slot_idx = atoi(yytext + 3); return SLOT; }
+{TMPTVAR}         { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_TMPT; yylval->si.s.slot_idx = atoi(yytext + 3); return SLOT; }
 {IMMX}            { HANDLE_COLUMN; errno = 0; yylval->val = strtoll(yytext + 1, NULL, 16); if (errno == ERANGE) { reduce_imm_force(yytext + 1); yylval->val = strtoll(yytext + 1, NULL, 16); yylval->val += 0x8000000000000000UL; } return IMMX; }
 {IMMD}            { HANDLE_COLUMN; errno = 0; yylval->val = strtoll(yytext + 1, NULL, 10); assert(!errno); return IMMD; }
 {NUM}             { HANDLE_COLUMN; yylval->val = atoi(yytext); return NUM; }
@@ -308,33 +308,33 @@ xsave               xsave
 {leul}            { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_SRCSIZEEXT; yylval->ai.p.storage.attr.ext = ZERO; yylval->ai.p.storage.size = SRC4B; return MEMATTR; }
 {leq}             { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_SRCSIZEEXT; yylval->ai.p.storage.attr.ext = ZERO; yylval->ai.p.storage.size = SRC8B; return MEMATTR; }
 {leo}             { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_SRCSIZEEXT; yylval->ai.p.storage.attr.ext = ZERO; yylval->ai.p.storage.size = SRC16B; return MEMATTR; }
-{cc_src2}         { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_ENVVAR; yylval->si.p.env = cc_src2; return SLOT; }
-{es_base}         { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_ENVVAR; yylval->si.p.env = es_base; return SLOT; }
-{cs_base}         { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_ENVVAR; yylval->si.p.env = cs_base; return SLOT; }
-{ss_base}         { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_ENVVAR; yylval->si.p.env = ss_base; return SLOT; }
-{ds_base}         { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_ENVVAR; yylval->si.p.env = ds_base; return SLOT; }
-{fs_base}         { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_ENVVAR; yylval->si.p.env = fs_base; return SLOT; }
-{gs_base}         { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_ENVVAR; yylval->si.p.env = gs_base; return SLOT; }
-{rax}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = rax; return SLOT; }
-{rcx}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = rcx; return SLOT; }
-{rdx}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = rdx; return SLOT; }
-{rbx}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = rbx; return SLOT; }
-{rsp}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = rsp; return SLOT; }
-{rbp}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = rbp; return SLOT; }
-{rsi}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = rsi; return SLOT; }
-{rdi}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = rdi; return SLOT; }
-{r8}              { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = r8; return SLOT; }
-{r9}              { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = r9; return SLOT; }
-{r10}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = r10; return SLOT; }
-{r11}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = r11; return SLOT; }
-{r12}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = r12; return SLOT; }
-{r13}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = r13; return SLOT; }
-{r14}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = r14; return SLOT; }
-{r15}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = r15; return SLOT; }
-{cc_src}          { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = cc_src; return SLOT; }
-{cc_dst}          { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = cc_dst; return SLOT; }
-{cc_op}           { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = cc_op; return SLOT; }
-{rip}             { HANDLE_COLUMN; yylval->si.subt = SUB_SLOT_XREG; yylval->si.p.x = rip; return SLOT; }
+{cc_src2}         { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_ENVVAR; yylval->si.s.slot_idx = cc_src2; return SLOT; }
+{es_base}         { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_ENVVAR; yylval->si.s.slot_idx = es_base; return SLOT; }
+{cs_base}         { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_ENVVAR; yylval->si.s.slot_idx = cs_base; return SLOT; }
+{ss_base}         { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_ENVVAR; yylval->si.s.slot_idx = ss_base; return SLOT; }
+{ds_base}         { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_ENVVAR; yylval->si.s.slot_idx = ds_base; return SLOT; }
+{fs_base}         { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_ENVVAR; yylval->si.s.slot_idx = fs_base; return SLOT; }
+{gs_base}         { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_ENVVAR; yylval->si.s.slot_idx = gs_base; return SLOT; }
+{rax}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rax; return SLOT; }
+{rcx}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rcx; return SLOT; }
+{rdx}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rdx; return SLOT; }
+{rbx}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rbx; return SLOT; }
+{rsp}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rsp; return SLOT; }
+{rbp}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rbp; return SLOT; }
+{rsi}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rsi; return SLOT; }
+{rdi}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rdi; return SLOT; }
+{r8}              { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r8; return SLOT; }
+{r9}              { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r9; return SLOT; }
+{r10}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r10; return SLOT; }
+{r11}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r11; return SLOT; }
+{r12}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r12; return SLOT; }
+{r13}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r13; return SLOT; }
+{r14}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r14; return SLOT; }
+{r15}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r15; return SLOT; }
+{cc_src}          { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = cc_src; return SLOT; }
+{cc_dst}          { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = cc_dst; return SLOT; }
+{cc_op}           { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = cc_op; return SLOT; }
+{rip}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rip; return SLOT; }
 {eq}              { HANDLE_COLUMN; yylval->r = eq; return RELOP; }
 {sge}             { HANDLE_COLUMN; yylval->r = sge; return RELOP; }
 {sgt}             { HANDLE_COLUMN; yylval->r = sgt; return RELOP; }

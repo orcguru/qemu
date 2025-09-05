@@ -361,15 +361,6 @@ typedef enum {
     #undef X
 } SlotType;
 
-typedef struct {
-    SlotType subt;
-    union {
-        EnvVarType env;
-        XRegType x;
-        uint8_t idx;
-    } p;
-} SlotInfo;
-
 #define XMM_REG_LIST \
     X(XMM0) \
     X(YMM0_H) \
@@ -401,8 +392,6 @@ typedef struct {
     X(YMM13_H) \
     X(XMM14) \
     X(YMM14_H) \
-    X(XMM15) \
-    X(YMM15_H) \
     X(XMMT) \
     X(YMMT_H) \
     X(NON_XMM)
@@ -569,24 +558,6 @@ typedef struct {
     uint8_t attr_val   :7;
 } AttributeType;
 
-typedef struct TcgAst {
-    TcgOpType type;
-    union {
-        struct {
-            struct TcgAst *instructions;
-            uint32_t label;
-            uint32_t gpr_bits;
-            uint32_t vec_bits;
-            uint32_t loc_bits;
-            uint32_t tmp_bits;
-        } func;
-        SlotInfo slot;
-        RelopType relop;
-        OpCodeType op;
-    } data;
-    struct TcgAst *next;
-} TcgAst;
-
 #ifdef __GNUC__
 #define likely(x)    __builtin_expect(!!(x), 1)  // True with high probability
 #define unlikely(x)  __builtin_expect(!!(x), 0)  // False with high probability
@@ -598,61 +569,61 @@ typedef struct TcgAst {
 void register_xmm(uint64_t idx, uint64_t offset);
 void register_xmm_tmp(uint64_t offset);
 
-void create_scalar_slot(OpCodeType op, SlotInfo s0);
-void create_scalar_slot2(OpCodeType op, SlotInfo s0, SlotInfo s1);
-void create_scalar_slot2_attr(OpCodeType op, SlotInfo s0, SlotInfo s1, AttrSrcInfo a0);
-void create_scalar_slot2_attr2(OpCodeType op, SlotInfo s0, SlotInfo s1, AttrSrcInfo a0, AttrSrcInfo a1);
-void create_scalar_slot_imm(OpCodeType op, SlotInfo s0, uint64_t i0);
-void create_scalar_slot_imm_slot(OpCodeType op, SlotInfo s0, uint64_t i0, SlotInfo s1);
-void create_scalar_slot_env_imm(OpCodeType op, SlotInfo s0, uint64_t i0);
-void create_scalar_slot2_attr3_num(OpCodeType op, SlotInfo s0, SlotInfo s1, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0);
-void create_scalar_imm_env_imm(OpCodeType op, uint64_t i0, uint64_t i1);
-void create_scalar_imm_slot_imm(OpCodeType op, uint64_t i0, SlotInfo s0, uint64_t i1);
-void create_scalar_slot3_attr3_num(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0);
-void create_scalar_slot3(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2);
-void create_scalar_slot2_imm(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0);
-void create_scalar_slot2_imm_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, RelopType r);
-void create_scalar_slot3_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2, RelopType r);
-void create_scalar_slot3_imm(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2, uint64_t i0);
-void create_scalar_slot2_imm2(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, uint64_t i1);
-void create_scalar_slot3_imm2(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2, uint64_t i0, uint64_t i1);
-void create_scalar_slot5_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2, SlotInfo s3, SlotInfo s4, RelopType r);
-void create_scalar_slot2_imm_slot2_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, SlotInfo s2, SlotInfo s3, RelopType r);
-void create_scalar_slot2_imm_slot_imm_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, SlotInfo s2, uint64_t i1, RelopType r);
-void create_scalar_slot2_imm2_slot_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, uint64_t i1, SlotInfo s2, RelopType r);
-void create_discard(SlotInfo s0);
+size_t create_scalar_slot(void *ptr, OpCodeType op, OperandType s0);
+size_t create_scalar_slot2(void *ptr, OpCodeType op, OperandType s0, OperandType s1);
+size_t create_scalar_slot2_attr(void *ptr, OpCodeType op, OperandType s0, OperandType s1, AttrSrcInfo a0);
+size_t create_scalar_slot2_attr2(void *ptr, OpCodeType op, OperandType s0, OperandType s1, AttrSrcInfo a0, AttrSrcInfo a1);
+size_t create_scalar_slot_imm(void *ptr, OpCodeType op, OperandType s0, uint64_t i0);
+size_t create_scalar_slot_imm_slot(void *ptr, OpCodeType op, OperandType s0, uint64_t i0, OperandType s1);
+size_t create_scalar_slot_env_imm(void *ptr, OpCodeType op, OperandType s0, uint64_t i0);
+size_t create_scalar_slot2_attr3_num(void *ptr, OpCodeType op, OperandType s0, OperandType s1, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0);
+size_t create_scalar_imm_env_imm(void *ptr, OpCodeType op, uint64_t i0, uint64_t i1);
+size_t create_scalar_imm_slot_imm(void *ptr, OpCodeType op, uint64_t i0, OperandType s0, uint64_t i1);
+size_t create_scalar_slot3_attr3_num(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0);
+size_t create_scalar_slot3(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2);
+size_t create_scalar_slot2_imm(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0);
+size_t create_scalar_slot2_imm_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, RelopType r);
+size_t create_scalar_slot3_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, RelopType r);
+size_t create_scalar_slot3_imm(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, uint64_t i0);
+size_t create_scalar_slot2_imm2(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, uint64_t i1);
+size_t create_scalar_slot3_imm2(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, uint64_t i0, uint64_t i1);
+size_t create_scalar_slot5_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, RelopType r);
+size_t create_scalar_slot2_imm_slot2_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, OperandType s2, OperandType s3, RelopType r);
+size_t create_scalar_slot2_imm_slot_imm_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, OperandType s2, uint64_t i1, RelopType r);
+size_t create_scalar_slot2_imm2_slot_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, uint64_t i1, OperandType s2, RelopType r);
 
-void create_vector_slot2(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, SlotInfo s1);
-void create_vector_slot3(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, SlotInfo s1, SlotInfo s2);
-void create_vector_slot3_relop(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, SlotInfo s1, SlotInfo s2, uint8_t relop);
-void create_vector_slot_vimm(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, uint64_t vi0);
-void create_vector_slot2_imm(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, SlotInfo s1, uint64_t i0);
-void create_vector_slot2_vimm(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, SlotInfo s1, uint64_t vi0);
-void create_vector_slot_env_imm(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, uint64_t i0);
+size_t create_vector_slot2(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1);
+size_t create_vector_slot3(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2);
+size_t create_vector_slot3_relop(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, uint8_t relop);
+size_t create_vector_slot_vimm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, uint64_t vi0);
+size_t create_vector_slot2_imm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t i0);
+size_t create_vector_slot2_vimm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t vi0);
+size_t create_vector_slot_env_imm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, uint64_t i0);
 
-void create_helper_slot3(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, SlotInfo s2);
-void create_helper_slot2_imm(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, uint32_t i0);
-void create_helper_slot4(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, SlotInfo s2, SlotInfo s3);
-void create_helper_slot5(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, SlotInfo s2, SlotInfo s3, SlotInfo s4);
-void create_helper_env_imm2(HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0, uint32_t i1);
-void create_helper_env_slot3_imm(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, SlotInfo s2, uint32_t i0);
-void create_helper_slot2_imm2(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, uint32_t i0, uint32_t i1);
-void create_helper_env(HelperType h, uint16_t cflags, uint8_t noargs);
-void create_helper_env_slot(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0);
-void create_helper_env_slot2(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1);
-void create_helper_env_slot_imm(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, uint32_t i0);
-void create_helper_env_imm(HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0);
-void create_helper_env_imm_slot(HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0, SlotInfo s0);
+size_t create_helper_slot3(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2);
+size_t create_helper_slot2_imm(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0);
+size_t create_helper_slot4(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3);
+size_t create_helper_slot5(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4);
+size_t create_helper_env_imm2(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0, uint32_t i1);
+size_t create_helper_env_slot3_imm(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, uint32_t i0);
+size_t create_helper_slot2_imm2(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0, uint32_t i1);
+size_t create_helper_env(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs);
+size_t create_helper_env_slot(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0);
+size_t create_helper_env_slot2(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1);
+size_t create_helper_env_slot_imm(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0);
+size_t create_helper_env_imm(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0);
+size_t create_helper_env_imm_slot(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0, OperandType s0);
 
-void create_branch_condition(SlotInfo s0, uint64_t i0, uint8_t relop, uint8_t label);
-void create_calldirect(SlotInfo s0, uint64_t i0, uint64_t i1);
-void create_jmpdirect(uint64_t val);
-void create_setlabel(OpCodeType op, uint8_t label);
+size_t create_branch_condition(void *ptr, OperandType s0, uint64_t i0, uint8_t relop, uint8_t label);
+size_t create_calldirect(void *ptr, OperandType s0, uint64_t i0, uint64_t i1);
+size_t create_jmpdirect(void *ptr, uint64_t val);
+size_t create_setlabel(void *ptr, OpCodeType op, uint8_t label);
 void *get_instr_buffer();
 size_t get_instr_buffer_size();
 void reset_instr_buffer(void);
 void handle_func(uint64_t val);
 void module_prolog(void);
 void module_epilog(void);
+void insert_instr(void *ptr_src, size_t sz);
 
 #endif

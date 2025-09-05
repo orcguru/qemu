@@ -5,13 +5,14 @@
 #include <string.h>
 #include "tcg_ast.h"
 
-#define SET_SLOT(IDX)                       \
-    do {                                    \
-        i.slot##IDX##_type = s##IDX.subt;   \
-        assert(s##IDX.p.idx < (1<<5));      \
-        i.slot##IDX##_idx = s##IDX.p.idx;   \
+#define SET_SLOT(IDX)                               \
+    do {                                            \
+        assert(s##IDX.s.slot_type <= SUB_SLOT_TMPT);      \
+        i->slot##IDX##_type = s##IDX.s.slot_type;    \
+        i->slot##IDX##_idx = s##IDX.s.slot_idx;   \
     } while (0)
 
+uint8_t instr_buf[64];
 static uint64_t tcg_next_capacity = (128 * 1024);
 static uint64_t tcg_instrs_capacity = 0;
 static size_t tcg_instrs_idx = 0;
@@ -139,7 +140,7 @@ static void get_more_space() {
     tcg_next_capacity *= 2;
 }
 
-static void insert_instr(void *ptr_src, size_t sz) {
+void insert_instr(void *ptr_src, size_t sz) {
     if ((tcg_instrs_idx + sz) > tcg_instrs_capacity) {
         get_more_space();
     }
@@ -233,643 +234,639 @@ static void dump_instr() {
       5 create_helper_slot_env
       5 create_helper_slot3_imm
  */
-void create_scalar_slot2(OpCodeType op, SlotInfo s0, SlotInfo s1) {
-    Instr4B i;
-    i.instr_type = SIZE4B;
-    i.opc = op;
+size_t create_scalar_slot2(void *ptr, OpCodeType op, OperandType s0, OperandType s1) {
+    Instr4B *i = (Instr4B *)ptr;
+    i->instr_type = SIZE4B;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
-    i.attr_type = SUB_ATTR_INVALID;
-    insert_instr((void *)&i, sizeof(i));
+    i->attr_type = SUB_ATTR_INVALID;
+    return sizeof(*i);
 }
 
-void create_scalar_slot2_attr(OpCodeType op, SlotInfo s0, SlotInfo s1, AttrSrcInfo a0) {
-    Instr4B i;
-    i.instr_type = SIZE4B;
-    i.opc = op;
+size_t create_scalar_slot2_attr(void *ptr, OpCodeType op, OperandType s0, OperandType s1, AttrSrcInfo a0) {
+    Instr4B *i = (Instr4B *)ptr;
+    i->instr_type = SIZE4B;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     assert(a0.subt == SUB_ATTR_SWAP);
-    i.attr_type = a0.subt;
-    i.attr_val = a0.p.swap;
-    insert_instr((void *)&i, sizeof(i));
+    i->attr_type = a0.subt;
+    i->attr_val = a0.p.swap;
+    return sizeof(*i);
 }
 
-void create_scalar_slot2_attr2(OpCodeType op, SlotInfo s0, SlotInfo s1, AttrSrcInfo a0, AttrSrcInfo a1) {
-    Instr4B i;
-    i.instr_type = SIZE4B;
-    i.opc = op;
+size_t create_scalar_slot2_attr2(void *ptr, OpCodeType op, OperandType s0, OperandType s1, AttrSrcInfo a0, AttrSrcInfo a1) {
+    Instr4B *i = (Instr4B *)ptr;
+    i->instr_type = SIZE4B;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     assert(a0.subt == SUB_ATTR_SWAP);
     assert(a0.subt == a1.subt);
-    i.attr_type = a0.subt;
-    i.attr_val = a0.p.swap | a1.p.swap;
-    insert_instr((void *)&i, sizeof(i));
+    i->attr_type = a0.subt;
+    i->attr_val = a0.p.swap | a1.p.swap;
+    return sizeof(*i);
 }
 
-void create_jmpdirect(uint64_t val) {
+size_t create_jmpdirect(void *ptr, uint64_t val) {
     if (likely(val < (1<<5))) {
-        Instr2B i;
-        i.instr_type = SIZE2B;
-        i.opc = jmp_direct;
-        i.imm = val;
-        insert_instr((void *)&i, sizeof(i));
+        Instr2B *i = (Instr2B *)ptr;
+        i->instr_type = SIZE2B;
+        i->opc = jmp_direct;
+        i->imm = val;
+        return sizeof(*i);
     } else {
-        Instr1B14 i;
-        i.instr_type = SIZEXB;
-        i.instr_type_ext = Instr1B14_ext;
-        i.opc = jmp_direct;
+        Instr1B14 *i = (Instr1B14 *)ptr;
+        i->instr_type = SIZEXB;
+        i->instr_type_ext = Instr1B14_ext;
+        i->opc = jmp_direct;
         assert((uint64_t)((long)((int32_t)val)) == val);
-        i.imm = val;
-        insert_instr((void *)&i, sizeof(i));
+        i->imm = val;
+        return sizeof(*i);
     }
 }
 
-void create_scalar_slot_imm(OpCodeType op, SlotInfo s0, uint64_t i0) {
+size_t create_scalar_slot_imm(void *ptr, OpCodeType op, OperandType s0, uint64_t i0) {
     if (likely((uint64_t)((long)((int32_t)i0)) == i0)) {
-        Instr2B4 i;
-        i.instr_type = SIZE6B;
-        i.opc = op;
+        Instr2B4 *i = (Instr2B4 *)ptr;
+        i->instr_type = SIZE6B;
+        i->opc = op;
         SET_SLOT(0);
-        i.imm = i0;
-        insert_instr((void *)&i, sizeof(i));
+        i->imm = i0;
+        return sizeof(*i);
     } else {
-        Instr1B28 i;
-        i.instr_type = SIZEXB;
-        i.instr_type_ext = Instr1B28_ext;
-        i.opc = op;
+        Instr1B28 *i = (Instr1B28 *)ptr;
+        i->instr_type = SIZEXB;
+        i->instr_type_ext = Instr1B28_ext;
+        i->opc = op;
         SET_SLOT(0);
-        i.imm = i0;
-        insert_instr((void *)&i, sizeof(i));
+        i->imm = i0;
+        return sizeof(*i);
     }
 }
 
-void create_discard(SlotInfo s0) {
-    // FIXME
-}
-
-void create_scalar_slot2_imm(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0) {
-    Instr1B44 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B44_ext;
-    i.opc = op;
+size_t create_scalar_slot2_imm(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0) {
+    Instr1B44 *i = (Instr1B44 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B44_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     assert((uint64_t)((long)((int32_t)i0)) == i0);
-    i.imm = i0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = i0;
+    return sizeof(*i);
 }
 
 // Ignore num which is used as mmuidx for now.
-void create_scalar_slot2_attr3_num(OpCodeType op, SlotInfo s0, SlotInfo s1, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0) {
-    Instr4B i;
-    i.instr_type = SIZE4B;
-    i.opc = op;
+size_t create_scalar_slot2_attr3_num(void *ptr, OpCodeType op, OperandType s0, OperandType s1, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0) {
+    Instr4B *i = (Instr4B *)ptr;
+    i->instr_type = SIZE4B;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     assert(a0.subt == SUB_ATTR_ATOMIC && a1.subt == SUB_ATTR_ALIGNMENT && a2.subt == SUB_ATTR_SRCSIZEEXT);
-    i.attr_type = SUB_ATTR_STORAGE;
-    i.attr_val = (a0.p.storage.attr.atomic << 6) | (a1.p.storage.attr.alignment << 4) | (a2.p.storage.attr.ext << 3) | a2.p.storage.size;
-    insert_instr((void *)&i, sizeof(i));
+    i->attr_type = SUB_ATTR_STORAGE;
+    i->attr_val = (a0.p.storage.attr.atomic << 6) | (a1.p.storage.attr.alignment << 4) | (a2.p.storage.attr.ext << 3) | a2.p.storage.size;
+    return sizeof(*i);
 }
 
-void create_scalar_slot3(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2) {
-    Instr1B4 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B4_ext;
-    i.opc = op;
+size_t create_scalar_slot3(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2) {
+    Instr1B4 *i = (Instr1B4 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B4_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_vector_slot_env_imm(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, uint64_t i0) {
+size_t create_vector_slot_env_imm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, uint64_t i0) {
     XMMReg x = lookup_xmm(i0);
     if (x.xmm_idx != NON_XMM) {
-        Instr1BV4X i;
-        i.instr_type = SIZEXB;
-        i.instr_type_ext = Instr1BV4X_ext;
-        i.opc = op;
-        i.es = ai.p.ves;
+        Instr1BV4X *i = (Instr1BV4X *)ptr;
+        i->instr_type = SIZEXB;
+        i->instr_type_ext = Instr1BV4X_ext;
+        i->opc = op;
+        i->es = ai.p.ves;
         SET_SLOT(0);
-        i.xmm_idx = x.xmm_idx;
-        i.xmm_offset = x.xmm_offset;
-        insert_instr((void *)&i, sizeof(i));
+        i->xmm_idx = x.xmm_idx;
+        i->xmm_offset = x.xmm_offset;
+        return sizeof(*i);
     } else {
-        Instr1BV4XE i;
-        i.instr_type = SIZEXB;
-        i.instr_type_ext = Instr1BV4XE_ext;
-        i.opc = op;
-        i.es = ai.p.ves;
+        Instr1BV4XE *i = (Instr1BV4XE *)ptr;
+        i->instr_type = SIZEXB;
+        i->instr_type_ext = Instr1BV4XE_ext;
+        i->opc = op;
+        i->es = ai.p.ves;
         SET_SLOT(0);
-        i.env_offset = i0;
-        insert_instr((void *)&i, sizeof(i));
+        i->env_offset = i0;
+        return sizeof(*i);
     }
 }
 
-void create_scalar_slot2_imm2(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, uint64_t i1) {
-    Instr1B41I2 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B41I2_ext;
-    i.opc = op;
+size_t create_scalar_slot2_imm2(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, uint64_t i1) {
+    Instr1B41I2 *i = (Instr1B41I2 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B41I2_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     assert(i0 < (1<<8));
-    i.imm0 = i0;
+    i->imm0 = i0;
     assert(i1 < (1<<8));
-    i.imm1 = i1;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm1 = i1;
+    return sizeof(*i);
 }
 
-void create_scalar_slot_env_imm(OpCodeType op, SlotInfo s0, uint64_t i0) {
+size_t create_scalar_slot_env_imm(void *ptr, OpCodeType op, OperandType s0, uint64_t i0) {
     XMMReg x = lookup_xmm(i0);
     if (x.xmm_idx != NON_XMM) {
-        Instr1B4X i;
-        i.instr_type = SIZEXB;
-        i.instr_type_ext = Instr1B4X_ext;
-        i.opc = op;
+        Instr1B4X *i = (Instr1B4X *)ptr;
+        i->instr_type = SIZEXB;
+        i->instr_type_ext = Instr1B4X_ext;
+        i->opc = op;
         SET_SLOT(0);
-        i.xmm_idx = x.xmm_idx;
-        i.xmm_offset = x.xmm_offset;
-        insert_instr((void *)&i, sizeof(i));
+        i->xmm_idx = x.xmm_idx;
+        i->xmm_offset = x.xmm_offset;
+        return sizeof(*i);
     } else {
-        Instr1B22 i;
-        i.instr_type = SIZEXB;
-        i.instr_type_ext = Instr1B22_ext;
-        i.opc = op;
+        Instr1B22 *i = (Instr1B22 *)ptr;
+        i->instr_type = SIZEXB;
+        i->instr_type_ext = Instr1B22_ext;
+        i->opc = op;
         SET_SLOT(0);
         assert(i0 < (1<<16));
-        i.env_offset = i0;
-        insert_instr((void *)&i, sizeof(i));
+        i->env_offset = i0;
+        return sizeof(*i);
     }
 }
 
-void create_branch_condition(SlotInfo s0, uint64_t i0, uint8_t relop, uint8_t label) {
-    Instr1B21 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B21_ext;
-    i.opc = brcond_i64;
+size_t create_branch_condition(void *ptr, OperandType s0, uint64_t i0, uint8_t relop, uint8_t label) {
+    Instr1B21 *i = (Instr1B21 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B21_ext;
+    i->opc = brcond_i64;
     SET_SLOT(0);
-    i.imm = i0;
-    i.relop = relop;
+    i->imm = i0;
+    i->relop = relop;
     assert(label <= 2);
-    i.label = label;
-    insert_instr((void *)&i, sizeof(i));
+    i->label = label;
+    return sizeof(*i);
 }
 
-void create_setlabel(OpCodeType op, uint8_t label) {
-    Instr1B2 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B2_ext;
-    i.opc = brcond_i64;
+size_t create_setlabel(void *ptr, OpCodeType op, uint8_t label) {
+    Instr1B2 *i = (Instr1B2 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B2_ext;
+    i->opc = brcond_i64;
     assert(label <= 2);
-    i.label = label;
-    insert_instr((void *)&i, sizeof(i));
+    i->label = label;
+    return sizeof(*i);
 }
 
-void create_helper_slot4(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, SlotInfo s2, SlotInfo s3) {
-    Instr1BH4 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH4_ext;
-    i.helper_l = (uint8_t)h;
-    i.helper_h = h >> 8;
+size_t create_helper_slot4(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3) {
+    Instr1BH4 *i = (Instr1BH4 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH4_ext;
+    i->helper_l = (uint8_t)h;
+    i->helper_h = h >> 8;
     assert(noargs < 2);
-    i.noargs = noargs;
+    i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     SET_SLOT(3);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_vector_slot3(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, SlotInfo s1, SlotInfo s2) {
-    Instr1BV4 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BV4_ext;
-    i.opc = op;
-    i.es = ai.p.ves;
+size_t create_vector_slot3(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2) {
+    Instr1BV4 *i = (Instr1BV4 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BV4_ext;
+    i->opc = op;
+    i->es = ai.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_helper_slot5(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, SlotInfo s2, SlotInfo s3, SlotInfo s4) {
-    Instr1BH141 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH141_ext;
-    i.helper_l = (uint8_t)h;
-    i.helper_h = h >> 8;
+size_t create_helper_slot5(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4) {
+    Instr1BH141 *i = (Instr1BH141 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH141_ext;
+    i->helper_l = (uint8_t)h;
+    i->helper_h = h >> 8;
     assert(noargs < 2);
-    i.noargs = noargs;
+    i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     SET_SLOT(3);
     SET_SLOT(4);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_vector_slot_vimm(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, uint64_t vi0) {
-    Instr1BV21 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BV21_ext;
-    i.opc = op;
-    i.es = ai.p.ves;
+size_t create_vector_slot_vimm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, uint64_t vi0) {
+    Instr1BV21 *i = (Instr1BV21 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BV21_ext;
+    i->opc = op;
+    i->es = ai.p.ves;
     SET_SLOT(0);
     assert(vi0 < (1<<8));
-    i.imm = vi0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = vi0;
+    return sizeof(*i);
 }
 
 // Ignore num which is used as mmuidx for now.
-void create_scalar_slot3_attr3_num(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0) {
-    Instr1B41 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B41_ext;
-    i.opc = op;
+size_t create_scalar_slot3_attr3_num(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0) {
+    Instr1B41 *i = (Instr1B41 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B41_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     assert(a0.subt == SUB_ATTR_ATOMIC && a1.subt == SUB_ATTR_ALIGNMENT && a2.subt == SUB_ATTR_SRCSIZEEXT);
-    i.attr_type = SUB_ATTR_STORAGE;
-    i.attr_val = (a0.p.storage.attr.atomic << 6) | (a1.p.storage.attr.alignment << 4) | (a2.p.storage.attr.ext << 3) | a2.p.storage.size;
-    insert_instr((void *)&i, sizeof(i));
+    i->attr_type = SUB_ATTR_STORAGE;
+    i->attr_val = (a0.p.storage.attr.atomic << 6) | (a1.p.storage.attr.alignment << 4) | (a2.p.storage.attr.ext << 3) | a2.p.storage.size;
+    return sizeof(*i);
 }
 
-void create_vector_slot2_imm(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, SlotInfo s1, uint64_t i0) {
-    Instr1BV4I i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BV4I_ext;
-    i.opc = op;
-    i.es = ai.p.ves;
+size_t create_vector_slot2_imm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t i0) {
+    Instr1BV4I *i = (Instr1BV4I *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BV4I_ext;
+    i->opc = op;
+    i->es = ai.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
     assert(i0 < (1<<8));
-    i.imm = i0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = i0;
+    return sizeof(*i);
 }
 
-void create_calldirect(SlotInfo s0, uint64_t i0, uint64_t i1) {
-    Instr1B24 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B24_ext;
+size_t create_calldirect(void *ptr, OperandType s0, uint64_t i0, uint64_t i1) {
+    Instr1B24 *i = (Instr1B24 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B24_ext;
     SET_SLOT(0);
     assert(i0 < (1<<8));
-    i.imm0 = i0;
+    i->imm0 = i0;
     // NOTICE: those calls to negative address are illegal
-    i.imm1 = i1;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm1 = i1;
+    return sizeof(*i);
 }
 
-void create_vector_slot2(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, SlotInfo s1) {
-    Instr1BV4S2 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BV4S2_ext;
-    i.opc = op;
-    i.es = ai.p.ves;
+size_t create_vector_slot2(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1) {
+    Instr1BV4S2 *i = (Instr1BV4S2 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BV4S2_ext;
+    i->opc = op;
+    i->es = ai.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_vector_slot3_relop(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, SlotInfo s1, SlotInfo s2, uint8_t relop) {
-    Instr1BV41 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BV41_ext;
-    i.opc = op;
-    i.es = ai.p.ves;
+size_t create_vector_slot3_relop(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, uint8_t relop) {
+    Instr1BV41 *i = (Instr1BV41 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BV41_ext;
+    i->opc = op;
+    i->es = ai.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
-    i.relop = relop;
-    insert_instr((void *)&i, sizeof(i));
+    i->relop = relop;
+    return sizeof(*i);
 }
 
-void create_helper_env_imm(HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0) {
-    Instr1BH24I i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH24I_ext;
-    i.helper = h;
+size_t create_helper_env_imm(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0) {
+    Instr1BH24I *i = (Instr1BH24I *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH24I_ext;
+    i->helper = h;
     assert(noargs == 0);
-    i.imm = i0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = i0;
+    return sizeof(*i);
 }
 
-void create_scalar_slot(OpCodeType op, SlotInfo s0) {
-    Instr1B2S i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B2S_ext;
-    i.opc = op;
+size_t create_scalar_slot(void *ptr, OpCodeType op, OperandType s0) {
+    Instr1B2S *i = (Instr1B2S *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B2S_ext;
+    i->opc = op;
     SET_SLOT(0);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_scalar_slot3_imm(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2, uint64_t i0) {
-    Instr1B41I i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B41I_ext;
-    i.opc = op;
+size_t create_scalar_slot3_imm(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, uint64_t i0) {
+    Instr1B41I *i = (Instr1B41I *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B41I_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     assert(i0 < (1<<8));
-    i.imm = i0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = i0;
+    return sizeof(*i);
 }
 
-void create_vector_slot2_vimm(OpCodeType op, AttrSrcInfo ai, SlotInfo s0, SlotInfo s1, uint64_t vi0) {
-    Instr1BV48 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BV48_ext;
-    i.opc = op;
-    i.es = ai.p.ves;
+size_t create_vector_slot2_vimm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t vi0) {
+    Instr1BV48 *i = (Instr1BV48 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BV48_ext;
+    i->opc = op;
+    i->es = ai.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
-    i.imm = vi0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = vi0;
+    return sizeof(*i);
 }
 
-void create_scalar_slot2_imm_slot2_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, SlotInfo s2, SlotInfo s3, RelopType r) {
-    Instr1B422 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B422_ext;
-    i.opc = op;
-    i.relop = r;
+size_t create_scalar_slot2_imm_slot2_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, OperandType s2, OperandType s3, RelopType r) {
+    Instr1B422 *i = (Instr1B422 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B422_ext;
+    i->opc = op;
+    i->relop = r;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     SET_SLOT(3);
     assert(i0 < (1<<16));
-    i.imm = i0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = i0;
+    return sizeof(*i);
 }
 
-void create_scalar_slot3_imm2(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2, uint64_t i0, uint64_t i1) {
-    Instr1B411 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B411_ext;
-    i.opc = op;
+size_t create_scalar_slot3_imm2(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, uint64_t i0, uint64_t i1) {
+    Instr1B411 *i = (Instr1B411 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B411_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     assert(i0 < (1<<8));
-    i.imm0 = i0;
+    i->imm0 = i0;
     assert(i1 < (1<<8));
-    i.imm1 = i1;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm1 = i1;
+    return sizeof(*i);
 }
 
-void create_scalar_imm_env_imm(OpCodeType op, uint64_t i0, uint64_t i1) {
+size_t create_scalar_imm_env_imm(void *ptr, OpCodeType op, uint64_t i0, uint64_t i1) {
     XMMReg x = lookup_xmm(i1);
     if (x.xmm_idx != NON_XMM) {
-        Instr1B142 i;
-        i.instr_type = SIZEXB;
-        i.instr_type_ext = Instr1B142_ext;
-        i.opc = op;
+        Instr1B142 *i = (Instr1B142 *)ptr;
+        i->instr_type = SIZEXB;
+        i->instr_type_ext = Instr1B142_ext;
+        i->opc = op;
         assert(i0 < (1UL<<32));
-        i.imm = i0;
-        i.xmm_idx = x.xmm_idx;
-        i.xmm_offset = x.xmm_offset;
-        insert_instr((void *)&i, sizeof(i));
+        i->imm = i0;
+        i->xmm_idx = x.xmm_idx;
+        i->xmm_offset = x.xmm_offset;
+        return sizeof(*i);
     } else {
-        Instr1B142E i;
-        i.instr_type = SIZEXB;
-        i.instr_type_ext = Instr1B142E_ext;
-        i.opc = op;
+        Instr1B142E *i = (Instr1B142E *)ptr;
+        i->instr_type = SIZEXB;
+        i->instr_type_ext = Instr1B142E_ext;
+        i->opc = op;
         assert(i0 < (1UL<<32));
-        i.imm = i0;
+        i->imm = i0;
         assert((uint64_t)((long)((int16_t)i1)) == i1);
-        i.env_offset = (uint16_t)i1;
-        insert_instr((void *)&i, sizeof(i));
+        i->env_offset = (uint16_t)i1;
+        return sizeof(*i);
     }
 }
 
-void create_helper_env_slot(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0) {
-    Instr1BH21 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH21_ext;
-    i.helper = h;
+size_t create_helper_env_slot(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0) {
+    Instr1BH21 *i = (Instr1BH21 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH21_ext;
+    i->helper = h;
     assert(noargs < 2);
-    i.noargs = noargs;
+    i->noargs = noargs;
     SET_SLOT(0);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_scalar_slot2_imm_slot_imm_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, SlotInfo s2, uint64_t i1, RelopType r) {
-    Instr1B4111 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B4111_ext;
-    i.opc = op;
+size_t create_scalar_slot2_imm_slot_imm_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, OperandType s2, uint64_t i1, RelopType r) {
+    Instr1B4111 *i = (Instr1B4111 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B4111_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     assert(i0 < (1<<8));
-    i.imm0 = i0;
+    i->imm0 = i0;
     assert(i1 < (1<<8));
-    i.imm1 = i1;
-    i.relop = r;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm1 = i1;
+    i->relop = r;
+    return sizeof(*i);
 }
 
-void create_scalar_slot5_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2, SlotInfo s3, SlotInfo s4, RelopType r) {
-    Instr1B8 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B8_ext;
-    i.opc = op;
+size_t create_scalar_slot5_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, RelopType r) {
+    Instr1B8 *i = (Instr1B8 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B8_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     SET_SLOT(3);
     SET_SLOT(4);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_helper_env_slot3_imm(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, SlotInfo s2, uint32_t i0) {
-    Instr1BH4I i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH4I_ext;
-    i.helper_l = (uint8_t)h;
-    i.helper_h = h >> 8;
+size_t create_helper_env_slot3_imm(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, uint32_t i0) {
+    Instr1BH4I *i = (Instr1BH4I *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH4I_ext;
+    i->helper_l = (uint8_t)h;
+    i->helper_h = h >> 8;
     assert(noargs == 0);
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     assert(i0 < (1 << 8) || (i0 & 0xffffff80) == 0xffffff80);
-    i.imm = i0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = i0;
+    return sizeof(*i);
 }
 
-void create_scalar_slot2_imm_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, RelopType r) {
-    Instr1B42 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B42_ext;
-    i.opc = op;
+size_t create_scalar_slot2_imm_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, RelopType r) {
+    Instr1B42 *i = (Instr1B42 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B42_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     assert(i0 < (1<<16));
-    i.imm = i0;
-    i.relop = r;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = i0;
+    i->relop = r;
+    return sizeof(*i);
 }
 
-void create_helper_env(HelperType h, uint16_t cflags, uint8_t noargs) {
-    Instr1BH2 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH2_ext;
-    i.helper = h;
+size_t create_helper_env(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs) {
+    Instr1BH2 *i = (Instr1BH2 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH2_ext;
+    i->helper = h;
     assert(noargs == 0);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_helper_env_imm_slot(HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0, SlotInfo s0) {
-    Instr1BH21S i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH21S_ext;
-    i.helper = h;
+size_t create_helper_env_imm_slot(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0, OperandType s0) {
+    Instr1BH21S *i = (Instr1BH21S *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH21S_ext;
+    i->helper = h;
     assert(noargs < 2);
-    i.noargs = noargs;
+    i->noargs = noargs;
     assert(i0 < (1<<4));
-    i.imm = i0;
+    i->imm = i0;
     SET_SLOT(0);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_scalar_slot_imm_slot(OpCodeType op, SlotInfo s0, uint64_t i0, SlotInfo s1) {
-    Instr1B281 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B281_ext;
-    i.opc = op;
+size_t create_scalar_slot_imm_slot(void *ptr, OpCodeType op, OperandType s0, uint64_t i0, OperandType s1) {
+    Instr1B281 *i = (Instr1B281 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B281_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
-    i.imm = i0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = i0;
+    return sizeof(*i);
 }
 
-void create_helper_slot3(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, SlotInfo s2) {
-    Instr1BH4S3 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH4S3_ext;
-    i.helper_l = (uint8_t)h;
-    i.helper_h = h >> 8;
+size_t create_helper_slot3(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2) {
+    Instr1BH4S3 *i = (Instr1BH4S3 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH4S3_ext;
+    i->helper_l = (uint8_t)h;
+    i->helper_h = h >> 8;
     assert(noargs < 2);
-    i.noargs = noargs;
+    i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
-void create_scalar_slot2_imm2_slot_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, uint64_t i0, uint64_t i1, SlotInfo s2, RelopType r) {
-    Instr1B4112 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B4112_ext;
-    i.opc = op;
+size_t create_scalar_slot2_imm2_slot_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, uint64_t i1, OperandType s2, RelopType r) {
+    Instr1B4112 *i = (Instr1B4112 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B4112_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     assert(i0 < (1<<8));
-    i.imm0 = i0;
+    i->imm0 = i0;
     assert(i1 < (1<<8));
-    i.imm1 = i1;
-    i.relop = r;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm1 = i1;
+    i->relop = r;
+    return sizeof(*i);
 }
 
-void create_helper_slot2_imm2(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, uint32_t i0, uint32_t i1) {
-    Instr1BH412 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH412_ext;
-    i.helper = h;
+size_t create_helper_slot2_imm2(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0, uint32_t i1) {
+    Instr1BH412 *i = (Instr1BH412 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH412_ext;
+    i->helper = h;
     assert(noargs < 2);
-    i.noargs = noargs;
+    i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
     assert(i0 < (1<<8));
-    i.imm0 = i0;
+    i->imm0 = i0;
     assert(i1 < (1<<16));
-    i.imm1 = i1;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm1 = i1;
+    return sizeof(*i);
 }
 
-void create_helper_slot2_imm(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1, uint32_t i0) {
-    Instr1BH41 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH41_ext;
-    i.helper = h;
+size_t create_helper_slot2_imm(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0) {
+    Instr1BH41 *i = (Instr1BH41 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH41_ext;
+    i->helper = h;
     assert(noargs < 2);
-    i.noargs = noargs;
+    i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
     assert(i0 < (1<<8));
-    i.imm = i0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = i0;
+    return sizeof(*i);
 }
 
-void create_scalar_slot3_relop(OpCodeType op, SlotInfo s0, SlotInfo s1, SlotInfo s2, RelopType r) {
-    Instr1B41R i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B41R_ext;
-    i.opc = op;
+size_t create_scalar_slot3_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, RelopType r) {
+    Instr1B41R *i = (Instr1B41R *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B41R_ext;
+    i->opc = op;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
-    i.relop = r;
-    insert_instr((void *)&i, sizeof(i));
+    i->relop = r;
+    return sizeof(*i);
 }
 
-void create_helper_env_imm2(HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0, uint32_t i1) {
-    Instr1BH24 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH24_ext;
-    i.helper = h;
+size_t create_helper_env_imm2(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0, uint32_t i1) {
+    Instr1BH24 *i = (Instr1BH24 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH24_ext;
+    i->helper = h;
     assert(noargs < 2);
-    i.noargs = noargs;
+    i->noargs = noargs;
     assert(i0 < (1<<4));
-    i.imm0 = i0;
+    i->imm0 = i0;
     assert(i1 < (1UL<<32));
-    i.imm1 = i1;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm1 = i1;
+    return sizeof(*i);
 }
 
-void create_helper_env_slot_imm(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, uint32_t i0) {
-    Instr1BH211 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH211_ext;
-    i.helper = h;
+size_t create_helper_env_slot_imm(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0) {
+    Instr1BH211 *i = (Instr1BH211 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH211_ext;
+    i->helper = h;
     assert(noargs < 2);
-    i.noargs = noargs;
+    i->noargs = noargs;
     SET_SLOT(0);
     assert(i0 < (1<<8));
-    i.imm = i0;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm = i0;
+    return sizeof(*i);
 }
 
-void create_scalar_imm_slot_imm(OpCodeType op, uint64_t i0, SlotInfo s0, uint64_t i1) {
-    Instr1B1111 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B1111_ext;
-    i.opc = op;
+size_t create_scalar_imm_slot_imm(void *ptr, OpCodeType op, uint64_t i0, OperandType s0, uint64_t i1) {
+    Instr1B1111 *i = (Instr1B1111 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B1111_ext;
+    i->opc = op;
     assert(i0 < (1<<8));
-    i.imm0 = i0;
+    i->imm0 = i0;
     SET_SLOT(0);
     assert(i1 < (1<<8));
-    i.imm1 = i1;
-    insert_instr((void *)&i, sizeof(i));
+    i->imm1 = i1;
+    return sizeof(*i);
 }
 
-void create_helper_env_slot2(HelperType h, uint16_t cflags, uint8_t noargs, SlotInfo s0, SlotInfo s1) {
-    Instr1BH4S i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1BH4S_ext;
-    i.helper = h;
+size_t create_helper_env_slot2(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1) {
+    Instr1BH4S *i = (Instr1BH4S *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH4S_ext;
+    i->helper = h;
     assert(noargs < 2);
-    i.noargs = noargs;
+    i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
-    insert_instr((void *)&i, sizeof(i));
+    return sizeof(*i);
 }
 
 // INPUT-slot-bits, INPUT-effective-bits, OUTPUT-bits
