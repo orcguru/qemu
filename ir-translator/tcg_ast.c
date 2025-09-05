@@ -47,6 +47,13 @@ void translate_not_vec(OpCodeType opc, void *ptr);
 void translate_and_i64(OpCodeType opc, void *ptr);
 void translate_and_vec(OpCodeType opc, void *ptr);
 
+#define SETUP_TMP(tmp)                              \
+    do {                                            \
+        tmp.s.valid = 1;                            \
+        tmp.s.slot_type = SUB_SLOT_TMPT;            \
+        tmp.s.slot_idx = get_next_spare_tmp_var();  \
+    } while (0)
+
 static LLVMModuleRef create_module(const char *module_name) {
     LLVMContextRef context = LLVMGetGlobalContext();
     LLVMModuleRef module = LLVMModuleCreateWithNameInContext(module_name, context);
@@ -207,78 +214,48 @@ void translate_add_vec(OpCodeType opc, void *ptr) {
 }
 
 void translate_andc_i64(OpCodeType opc, void *ptr) {
-    uint8_t tmp_idx = get_next_spare_tmp_var();
-    LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[LLVMInt64], tmpt_stack_names[tmp_idx]);
-    func_tmpt_alloca[tmp_idx] = alloca_inst;
+    OperandType tmp;
+    SETUP_TMP(tmp);
+    LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[LLVMInt64], tmpt_stack_names[tmp.s.slot_idx]);
+    func_tmpt_alloca[tmp.s.slot_idx] = alloca_inst;
 
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     operand0 = get_operand(ptr, 0, &is_imm0);
     operand1 = get_operand(ptr, 1, &is_imm1);
     operand2 = get_operand(ptr, 2, &is_imm2);
+    assert(operand1.s.valid && operand2.s.valid);
 
-    assert(is_imm2 == 0);
-    Instr4B i_not;
-    i_not.instr_type = SIZE4B;
-    i_not.opc = not_i64;
-    i_not.slot0_type = SUB_SLOT_TMPT;
-    i_not.slot0_idx = tmp_idx;
-    i_not.slot1_type = operand2.s.slot_type;
-    i_not.slot1_idx = operand2.s.slot_idx;
-    i_not.attr_type = SUB_ATTR_INVALID;
-    translate_not_i64(not_i64, &i_not);
+    uint8_t buf[16];
+    create_scalar_slot2(buf, not_i64, tmp, operand2);
+    translate_not_i64(not_i64, buf);
 
-    assert(is_imm1 == 0);
-    Instr1B4 i_and;
-    i_and.instr_type = SIZEXB;
-    i_and.instr_type_ext = Instr1B4_ext;
-    i_and.opc = and_i64;
-    i_and.slot0_type = operand0.s.slot_type;
-    i_and.slot0_idx = operand0.s.slot_idx;
-    i_and.slot1_type = operand1.s.slot_type;
-    i_and.slot1_idx = operand1.s.slot_idx;
-    i_and.slot2_type = SUB_SLOT_TMPT;
-    i_and.slot2_idx = tmp_idx;
-    translate_and_i64(and_i64, &i_and);
+    create_scalar_slot3(buf, and_i64, operand0, operand1, tmp);
+    translate_and_i64(and_i64, buf);
 }
 
 void translate_andc_vec(OpCodeType opc, void *ptr) {
-    uint8_t tmp_idx = get_next_spare_tmp_var();
-    LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[LLVMVector16xi8], tmpt_stack_names[tmp_idx]);
-    func_tmpt_alloca[tmp_idx] = alloca_inst;
+    OperandType tmp;
+    SETUP_TMP(tmp);
+    LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[LLVMVector16xi8], tmpt_stack_names[tmp.s.slot_idx]);
+    func_tmpt_alloca[tmp.s.slot_idx] = alloca_inst;
 
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     operand0 = get_operand(ptr, 0, &is_imm0);
     operand1 = get_operand(ptr, 1, &is_imm1);
     operand2 = get_operand(ptr, 2, &is_imm2);
+    assert(operand0.s.valid && operand1.s.valid);
     LLVMType vt = get_llvm_vector_type(ptr);
+    AttrSrcInfo ai;
+    ai.p.ves = vt - LLVMVector16xi8;
 
-    assert(is_imm2 == 0);
-    Instr1BV4S2 i_not;
-    i_not.instr_type = SIZEXB;
-    i_not.instr_type_ext = Instr1BV4S2_ext;
-    i_not.opc = not_vec;
-    i_not.es = vt - LLVMVector16xi8;
-    i_not.slot0_type = SUB_SLOT_TMPT;
-    i_not.slot0_idx = tmp_idx;
-    i_not.slot1_type = operand2.s.slot_type;
-    i_not.slot1_idx = operand2.s.slot_idx;
-    translate_not_vec(not_vec, &i_not);
+    uint8_t buf[16];
+    create_vector_slot2(buf, not_vec, ai, tmp, operand2);
+    translate_not_vec(not_vec, buf);
 
-    assert(is_imm1 == 0);
-    Instr1BV4 i_and;
-    i_and.instr_type = SIZEXB;
-    i_and.instr_type_ext = Instr1BV4_ext;
-    i_and.opc = and_vec;
-    i_and.es = vt - LLVMVector16xi8;
-    i_and.slot0_type = operand0.s.slot_type;
-    i_and.slot0_idx = operand0.s.slot_idx;
-    i_and.slot1_type = operand1.s.slot_type;
-    i_and.slot1_idx = operand1.s.slot_idx;
-    i_and.slot2_type = SUB_SLOT_TMPT;
-    i_and.slot2_idx = tmp_idx;
-    translate_and_vec(and_vec, &i_and);
+    create_vector_slot3(buf, and_vec, ai, operand0, operand1, tmp);
+    translate_and_vec(and_vec, buf);
 }
 
 void translate_and_i64(OpCodeType opc, void *ptr) {
@@ -397,17 +374,11 @@ void translate_not_i64(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     operand0 = get_operand(ptr, 0, &is_imm0);
     operand1 = get_operand(ptr, 1, &is_imm1);
-    assert(is_imm1 == 0);
-    Instr1B44 i;
-    i.instr_type = SIZEXB;
-    i.instr_type_ext = Instr1B44_ext;
-    i.opc = xor_i64;
-    i.slot0_type = operand0.s.slot_type;
-    i.slot0_idx = operand0.s.slot_idx;
-    i.slot1_type = operand1.s.slot_type;
-    i.slot1_idx = operand1.s.slot_idx;
-    i.imm = -1;
-    translate_xor_i64(xor_i64, (void *)&i);
+    assert(operand1.s.valid);
+
+    uint8_t buf[16];
+    create_scalar_slot2_imm(buf, xor_i64, operand0, operand1, -1UL);
+    translate_xor_i64(xor_i64, buf);
 }
 
 void translate_not_vec(OpCodeType opc, void *ptr) {
@@ -415,20 +386,14 @@ void translate_not_vec(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     operand0 = get_operand(ptr, 0, &is_imm0);
     operand1 = get_operand(ptr, 1, &is_imm1);
+    assert(operand1.s.valid);
     LLVMType vt = get_llvm_vector_type(ptr);
+    AttrSrcInfo ai;
+    ai.p.ves = vt - LLVMVector16xi8;
 
-    assert(is_imm1 == 0);
-    Instr1BV48 i_xor;
-    i_xor.instr_type = SIZEXB;
-    i_xor.instr_type_ext = Instr1BV48_ext;
-    i_xor.opc = xor_vec;
-    i_xor.es = vt - LLVMVector16xi8;
-    i_xor.slot0_type = operand0.s.slot_type;
-    i_xor.slot0_idx = operand0.s.slot_idx;
-    i_xor.slot1_type = operand1.s.slot_type;
-    i_xor.slot1_idx = operand1.s.slot_idx;
-    i_xor.imm = -1;
-    translate_xor_vec(xor_vec, (void *)&i_xor);
+    uint8_t buf[16];
+    create_vector_slot2_vimm(buf, xor_vec, ai, operand0, operand1, -1UL);
+    translate_xor_vec(xor_vec, buf);
 }
 
 void translate_or_i64(OpCodeType opc, void *ptr) {
