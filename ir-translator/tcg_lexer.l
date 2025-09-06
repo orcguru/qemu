@@ -98,18 +98,15 @@ cc_src          cc_src
 cc_op           cc_op
 cc_dst          cc_dst
 eq              eq
-sge             sge
-sgt             sgt
-sle             sle
-slt             slt
-uge             uge
-ugt             ugt
-ule             ule
-ult             ult
-ne              ne
-leu             leu
+ge              ge
 gt              gt
+le              le
 lt              lt
+geu             geu
+gtu             gtu
+leu             leu
+ltu             ltu
+ne              ne
 tsteq           tsteq
 tstne           tstne
 al              al
@@ -336,18 +333,15 @@ xsave               xsave
 {cc_op}           { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = cc_op; return SLOT; }
 {rip}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rip; return SLOT; }
 {eq}              { HANDLE_COLUMN; yylval->r = eq; return RELOP; }
-{sge}             { HANDLE_COLUMN; yylval->r = sge; return RELOP; }
-{sgt}             { HANDLE_COLUMN; yylval->r = sgt; return RELOP; }
-{sle}             { HANDLE_COLUMN; yylval->r = sle; return RELOP; }
-{slt}             { HANDLE_COLUMN; yylval->r = slt; return RELOP; }
-{uge}             { HANDLE_COLUMN; yylval->r = uge; return RELOP; }
-{ugt}             { HANDLE_COLUMN; yylval->r = ugt; return RELOP; }
-{ule}             { HANDLE_COLUMN; yylval->r = ule; return RELOP; }
-{ult}             { HANDLE_COLUMN; yylval->r = ult; return RELOP; }
-{ne}              { HANDLE_COLUMN; yylval->r = ne; return RELOP; }
-{leu}             { HANDLE_COLUMN; yylval->r = leu; return RELOP; }
+{ge}              { HANDLE_COLUMN; yylval->r = ge; return RELOP; }
 {gt}              { HANDLE_COLUMN; yylval->r = gt; return RELOP; }
+{le}              { HANDLE_COLUMN; yylval->r = le; return RELOP; }
 {lt}              { HANDLE_COLUMN; yylval->r = lt; return RELOP; }
+{geu}             { HANDLE_COLUMN; yylval->r = geu; return RELOP; }
+{gtu}             { HANDLE_COLUMN; yylval->r = gtu; return RELOP; }
+{leu}             { HANDLE_COLUMN; yylval->r = leu; return RELOP; }
+{ltu}             { HANDLE_COLUMN; yylval->r = ltu; return RELOP; }
+{ne}              { HANDLE_COLUMN; yylval->r = ne; return RELOP; }
 {tsteq}           { HANDLE_COLUMN; yylval->r = tsteq; return TSTREL; }
 {tstne}           { HANDLE_COLUMN; yylval->r = tstne; return TSTREL; }
 {BRCOND}          { HANDLE_COLUMN; yylval->op = brcond_i64; return BRCOND; }

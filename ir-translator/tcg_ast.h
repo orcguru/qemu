@@ -70,20 +70,18 @@ typedef enum {
 
 #define RELOP_TYPE_LIST \
     X(eq) \
-    X(sge) \
-    X(sgt) \
-    X(sle) \
-    X(slt) \
-    X(uge) \
-    X(ugt) \
-    X(ule) \
-    X(ult) \
-    X(ne) \
-    X(leu) \
+    X(ge) \
     X(gt) \
+    X(le) \
     X(lt) \
+    X(geu) \
+    X(gtu) \
+    X(leu) \
+    X(ltu) \
+    X(ne) \
     X(tsteq) \
-    X(tstne)
+    X(tstne) \
+    X(RELOPMAX)
 
 typedef enum {
     #define X(name) name,
@@ -179,6 +177,7 @@ typedef enum {
     X(andc_i64) \
     X(andc_vec) \
     X(and_i64) \
+    X(and_i32) \
     X(and_vec) \
     X(bswap32_i64) \
     X(clz_i64) \
@@ -214,6 +213,7 @@ typedef enum {
     X(not_i64) \
     X(not_vec) \
     X(or_i64) \
+    X(or_i32) \
     X(or_vec) \
     X(push_ret_addr) \
     X(qemu_ld2_i128) \
@@ -229,6 +229,7 @@ typedef enum {
     X(setcond_i64) \
     X(sextract_i64) \
     X(shl_i64) \
+    X(shl_i32) \
     X(shli_vec) \
     X(shr_i64) \
     X(st16_i32) \
@@ -238,10 +239,12 @@ typedef enum {
     X(st_i64) \
     X(st_vec) \
     X(sub_i64) \
+    X(sub_i32) \
     X(sub_vec) \
     X(umax_vec) \
     X(umin_vec) \
     X(xor_i64) \
+    X(xor_i32) \
     X(xor_vec) \
     X(bswap64_i64) \
     X(set_label) \
@@ -615,7 +618,7 @@ size_t create_helper_env_imm(void *ptr, HelperType h, uint16_t cflags, uint8_t n
 size_t create_helper_env_imm_slot(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, uint32_t i0, OperandType s0);
 
 size_t create_branch_condition(void *ptr, OperandType s0, uint64_t i0, uint8_t relop, uint8_t label);
-size_t create_calldirect(void *ptr, OperandType s0, uint64_t i0, uint64_t i1);
+size_t create_slot_imm2(void *ptr, OpCodeType op, OperandType s0, uint64_t i0, uint64_t i1);
 size_t create_jmpdirect(void *ptr, uint64_t val);
 size_t create_setlabel(void *ptr, OpCodeType op, uint8_t label);
 void *get_instr_buffer();

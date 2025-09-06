@@ -420,7 +420,7 @@ size_t create_setlabel(void *ptr, OpCodeType op, uint8_t label) {
     Instr1B2 *i = (Instr1B2 *)ptr;
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1B2_ext;
-    i->opc = brcond_i64;
+    i->opc = set_label;
     assert(label <= 2);
     i->label = label;
     return sizeof(*i);
@@ -509,10 +509,11 @@ size_t create_vector_slot2_imm(void *ptr, OpCodeType op, AttrSrcInfo ai, Operand
     return sizeof(*i);
 }
 
-size_t create_calldirect(void *ptr, OperandType s0, uint64_t i0, uint64_t i1) {
+size_t create_slot_imm2(void *ptr, OpCodeType op, OperandType s0, uint64_t i0, uint64_t i1) {
     Instr1B24 *i = (Instr1B24 *)ptr;
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1B24_ext;
+    i->opc = op;
     SET_SLOT(0);
     assert(i0 < (1<<8));
     i->imm0 = i0;
@@ -874,6 +875,7 @@ LLVMType opciosz[OPCODE_MAX][3] = {
     [add_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [andc_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [and_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [and_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     // high 32bits ignored
     [bswap32_i64] = {LLVMInt64, LLVMInt32, LLVMInt64},
     [clz_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
@@ -904,6 +906,7 @@ LLVMType opciosz[OPCODE_MAX][3] = {
     [negsetcond_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [not_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [or_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [or_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [push_ret_addr] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [qemu_ld2_i128] = {LLVMInvalidType, LLVMInvalidType, LLVMInt64},
     [qemu_ld_i32] = {LLVMInvalidType, LLVMInvalidType, LLVMInt32},
@@ -918,6 +921,7 @@ LLVMType opciosz[OPCODE_MAX][3] = {
     [setcond_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [sextract_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [shl_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [shl_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [shr_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [st16_i32] = {LLVMInt32, LLVMInt16, LLVMInvalidType},
     [st16_i64] = {LLVMInt64, LLVMInt16, LLVMInvalidType},
@@ -925,7 +929,9 @@ LLVMType opciosz[OPCODE_MAX][3] = {
     [st_i32] = {LLVMInt32, LLVMInt32, LLVMInvalidType},
     [st_i64] = {LLVMInt64, LLVMInt64, LLVMInvalidType},
     [sub_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [sub_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [xor_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [xor_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [bswap64_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [brcond_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [call_direct] = {LLVMInt64, LLVMInt64, LLVMInt64},
@@ -949,6 +955,7 @@ uint8_t opcoc[OPCODE_MAX] = {
     [add_i64] = 1,
     [andc_i64] = 1,
     [and_i64] = 1,
+    [and_i32] = 1,
     [bswap32_i64] = 1,
     [clz_i64] = 1,
     [ctz_i64] = 1,
@@ -978,6 +985,7 @@ uint8_t opcoc[OPCODE_MAX] = {
     [negsetcond_i64] = 1,
     [not_i64] = 1,
     [or_i64] = 1,
+    [or_i32] = 1,
     [push_ret_addr] = 1,
     [qemu_ld2_i128] = 2,
     [qemu_ld_i32] = 1,
@@ -992,6 +1000,7 @@ uint8_t opcoc[OPCODE_MAX] = {
     [setcond_i64] = 1,
     [sextract_i64] = 1,
     [shl_i64] = 1,
+    [shl_i32] = 1,
     [shr_i64] = 1,
     [st16_i32] = 0,
     [st16_i64] = 0,
@@ -999,7 +1008,9 @@ uint8_t opcoc[OPCODE_MAX] = {
     [st_i32] = 0,
     [st_i64] = 0,
     [sub_i64] = 1,
+    [sub_i32] = 1,
     [xor_i64] = 1,
+    [xor_i32] = 1,
     [bswap64_i64] = 1,
     [brcond_i64] = 0,
     [call_direct] = 0,

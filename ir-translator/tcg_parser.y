@@ -137,7 +137,7 @@ CALL HELPER COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT              
 branch:
 BRCOND SLOT COMMA IMMX COMMA RELOP COMMA LABEL      { insert_instr(instr_buf, create_branch_condition(instr_buf, $2, $4, $6, $8)); }
 | BRCOND SLOT COMMA IMMX COMMA TSTREL COMMA LABEL   { insert_instr(instr_buf, create_branch_condition(instr_buf, $2, $4, $6, $8)); }
-| CALLDIR SLOT COMMA IMMX COMMA IMMX                { insert_instr(instr_buf, create_calldirect(instr_buf, $2, $4, $6)); }
+| CALLDIR SLOT COMMA IMMX COMMA IMMX                { insert_instr(instr_buf, create_slot_imm2(instr_buf, $1, $2, $4, $6)); }
 | JMPDIR IMMX                                       { insert_instr(instr_buf, create_jmpdirect(instr_buf, $2)); }
 | SETLABL LABEL                                     { insert_instr(instr_buf, create_setlabel(instr_buf, $1, $2)); };
 
