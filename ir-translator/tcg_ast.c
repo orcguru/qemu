@@ -36,6 +36,7 @@ static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
 static LLVMValueRef func_xreg_alloca[1 << 5] = {NULL};
 static LLVMValueRef func_tmpl_alloca[1 << 5] = {NULL};
 static LLVMValueRef func_tmpt_alloca[1 << 5] = {NULL};
+static LLVMValueRef func_xmm_alloca[1 << 5] = {NULL};
 static uint32_t env_var_offset[ENVVarMAX] = {0};
 static OperandType alias_tmpl[1<<5] = {0};
 static OperandType alias_tmpt[1<<5] = {0};
@@ -672,49 +673,55 @@ static void cleanup_func_resource() {
         alias_tmpt[i].i = 0;
     }
     tmp_var_available = 0;
+    ir_var_name_idx = 0;
 }
 
 void handle_func(uint64_t val) {
     printf("func %lx\n", val);
+    ir_var_name_idx = 0;
     tmp_var_available = 0xffffffff;
     void *ptr_init = get_instr_buffer();
     void *ptr_max = ptr_init + get_instr_buffer_size();
     void *ptr;
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
-    int tmpl_dirty = 0, tmpt_dirty = 0;
-    uint32_t xreg_valid = 0, tmpl_valid = 0, tmpt_valid = 0, is_imm = 0;
+    uint32_t xreg_valid = 0, tmpl_valid = 0, tmpt_valid = 0, xmm_valid = 0, is_imm = 0;
     uint8_t tmpl_bits_type[1<<5] = {0};
     uint8_t tmpt_bits_type[1<<5] = {0};
-    uint64_t xmm_valid = 0;
     int instr_idx = 0;
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), instr_idx += 1) {
         uint32_t slot_idx = 0;
         OperandType operand;
         OpCodeType opc = get_opcode(ptr);
+	uint8_t is_vec = is_vector(ptr);
+	LLVMType vtype = LLVMInvalidType;
+	if (is_vec) {
+	  vtype = get_llvm_vector_type(ptr);
+	}
         do {
             operand = get_operand(ptr, slot_idx, &is_imm);
+            // End-of-operands
             if (is_imm == 0 && operand.s.valid == 0) {
                 break;
             }
+            uint32_t shifted_slot_bit = (1 << operand.s.slot_idx);
+            LLVMType operand_type = vtype == LLVMInvalidType ?
+                                 opciosz[opc][slot_idx < opcoc[opc] ? 2 : 0] : vtype;
             if (is_imm == 0) {
                 if (operand.s.slot_type == SUB_SLOT_XREG) {
-                    xreg_valid |= (1 << operand.s.slot_idx);
+                    xreg_valid |= shifted_slot_bit;
                 } else if (operand.s.slot_type == SUB_SLOT_TMPL) {
-                    tmpl_dirty = 1;
                     tmpl_valid |= (1 << operand.s.slot_idx);
-                    if (tmpl_bits_type[operand.s.slot_idx] < opciosz[opc][slot_idx < opcoc[opc] ? 2 : 0]) {
-                        tmpl_bits_type[operand.s.slot_idx] = opciosz[opc][slot_idx < opcoc[opc] ? 2 : 0];
+                    if (tmpl_bits_type[operand.s.slot_idx] < operand_type) {
+                        tmpl_bits_type[operand.s.slot_idx] = operand_type;
                     }
                 } else if (operand.s.slot_type == SUB_SLOT_TMPT) {
-                    tmpt_dirty = 1;
-                    tmpt_valid |= (1 << operand.s.slot_idx);
-                    tmp_var_available &= ~(1 << operand.s.slot_idx);
-                    if (tmpt_bits_type[operand.s.slot_idx] < opciosz[opc][slot_idx < opcoc[opc] ? 2 : 0]) {
-                        tmpt_bits_type[operand.s.slot_idx] = opciosz[opc][slot_idx < opcoc[opc] ? 2 : 0];
+                    tmpt_valid |= shifted_slot_bit;
+                    tmp_var_available &= ~shifted_slot_bit;
+                    if (tmpt_bits_type[operand.s.slot_idx] < operand_type) {
+                        tmpt_bits_type[operand.s.slot_idx] = operand_type;
                     }
-                    assert(tmpt_bits_type[operand.s.slot_idx]);
                 } else if (operand.s.slot_type == SUB_SLOT_XMM) {
-                    xmm_valid |= (1UL << operand.s.slot_idx);
+                    xmm_valid |= shifted_slot_bit;
                 }
             }
             slot_idx += 1;
@@ -746,7 +753,7 @@ void handle_func(uint64_t val) {
         }
     }
 
-    if (tmpl_dirty) {
+    if (tmpl_valid) {
         for (int i = 0; i < (1<<5); ++i) {
             if (tmpl_valid & (1 << i)) {
                 assert(tmpl_bits_type[i]);
@@ -756,7 +763,7 @@ void handle_func(uint64_t val) {
             }
         }
     }
-    if (tmpt_dirty) {
+    if (tmpt_valid) {
         for (int i = 0; i < (1<<5); ++i) {
             if (tmpt_valid & (1 << i)) {
                 assert(tmpt_bits_type[i]);
@@ -766,9 +773,27 @@ void handle_func(uint64_t val) {
             }
         }
     }
+    if (xmm_valid) {
+        for (int i = 0; i < ((1<<5)-2); ++i) {
+            if (xmm_valid & (1 << i)) {
+                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[LLVMVector2xi64], fixed_vector_stack_names[XREG_MAX + i]);
+                func_xmm_alloca[i] = alloca_inst;
+                LLVMSetAlignment(alloca_inst, 16);
+                LLVMTypeRef ret_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
+                LLVMTypeRef param_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+                LLVMTypeRef intrinsic_types[] = {param_type, LLVMInt64Type()};
+                LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 2, 0);
+                LLVMValueRef intrinsic_func = LLVMAddFunction(module, "llvm.vector.extract.v2i64.nxv1i64", intrinsic_func_type);
+                LLVMValueRef index_0 = LLVMConstInt(LLVMInt64Type(), 0, 0);
+                LLVMValueRef call_args[] = {LLVMGetParam(llvm_func, (FIXED_PARAM_COUNT + i)), index_0};
+                LLVMValueRef call_inst = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, call_args, 2, get_next_var_name());
+                LLVMSetTailCall(call_inst, 1);
+                LLVMBuildStore(builder, call_inst, func_xmm_alloca[i]);
+            }
+        }
+    }
 
     // Handle each IR translation
-    ir_var_name_idx = 0;
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), instr_idx += 1) {
         OpCodeType opc = get_opcode(ptr);
         switch (opc) {
@@ -1117,7 +1142,7 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    //LLVMDumpModule(module);
+    LLVMDumpModule(module);
     LLVMDisposeModule(module);
 }
 
