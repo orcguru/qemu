@@ -232,6 +232,7 @@ typedef enum {
     X(shl_i32) \
     X(shli_vec) \
     X(shr_i64) \
+    X(shr_i32) \
     X(st16_i32) \
     X(st16_i64) \
     X(st32_i64) \
