@@ -61,8 +61,6 @@ void translate_dupm_vec(OpCodeType opc, void *ptr);
 void translate_extract2_i64(OpCodeType opc, void *ptr);
 void translate_extract(OpCodeType opc, void *ptr);
 void translate_ld_vec(OpCodeType opc, void *ptr);
-void translate_movcond_i32(OpCodeType opc, void *ptr);
-void translate_movcond_i64(OpCodeType opc, void *ptr);
 void translate_mov_i64_const(OpCodeType opc, void *ptr);
 void translate_mov_vec(OpCodeType opc, void *ptr);
 void translate_mul_i32(OpCodeType opc, void *ptr);
@@ -102,6 +100,7 @@ void translate_call_direct(OpCodeType opc, void *ptr);
 void translate_discard(OpCodeType opc, void *ptr);
 void translate_call(OpCodeType opc, void *ptr);
 void translate_ld_env_xmm(OpCodeType opc, void *ptr);
+void translate_movcond(OpCodeType opc, void *ptr);
 
 #define GET_2_OPERANDS()                                \
     do {                                                \
@@ -713,10 +712,30 @@ void translate_ld_vec(OpCodeType opc, void *ptr) {
     do_store(src, vtype, operand0);
 }
 
-void translate_movcond_i32(OpCodeType opc, void *ptr) {
-}
+void translate_movcond(OpCodeType opc, void *ptr) {
+    uint32_t is_imm0, is_imm1, is_imm2, is_imm3, is_imm4;
+    OperandType operand0, operand1, operand2, operand3, operand4;
+    GET_3_OPERANDS_NOCHECK();
+    operand3 = get_operand(ptr, 3, &is_imm3);
+    operand4 = get_operand(ptr, 4, &is_imm4);
 
-void translate_movcond_i64(OpCodeType opc, void *ptr) {
+    LLVMValueRef c1 = get_source_node_imm_or_stack(is_imm1, operand1, opciosz[opc][0]);
+    LLVMValueRef c2 = get_source_node_imm_or_stack(is_imm2, operand2, opciosz[opc][0]);
+    LLVMValueRef v1 = get_source_node_imm_or_stack(is_imm3, operand3, opciosz[opc][0]);
+    LLVMValueRef v2 = get_source_node_imm_or_stack(is_imm4, operand4, opciosz[opc][0]);
+
+    RelopType r = get_relop(ptr);
+    if (r == tsteq || r == tstne) {
+        r -= (tsteq - eq);
+        OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
+        c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name());
+        c2 = LLVMConstInt(llvm_int_types[opciosz[opc][0]], 0, 0);
+    }
+    assert(r < RELOPMAX && llvm_predicate[r]);
+    LLVMValueRef bool_val = LLVMBuildICmp(builder, llvm_predicate[r], c1, c2, get_next_var_name());
+
+    LLVMValueRef result = LLVMBuildSelect(builder, bool_val, v1, v2, get_next_var_name());
+    do_store(result, opciosz[opc][2], operand0);
 }
 
 void translate_mov_i64_const(OpCodeType opc, void *ptr) {
@@ -1062,10 +1081,8 @@ void handle_func(uint64_t val) {
             translate_ext(opc, ptr, LLVMBuildSExt);
             break;
         case movcond_i32:
-            translate_movcond_i32(opc, ptr);
-            break;
         case movcond_i64:
-            translate_movcond_i64(opc, ptr);
+            translate_movcond(opc, ptr);
             break;
         case mov_i64_const:
             translate_mov_i64_const(opc, ptr);

@@ -70,6 +70,7 @@ typedef enum {
 
 #define RELOP_TYPE_LIST \
     X(eq) \
+    X(ne) \
     X(ge) \
     X(gt) \
     X(le) \
@@ -78,7 +79,6 @@ typedef enum {
     X(gtu) \
     X(leu) \
     X(ltu) \
-    X(ne) \
     X(tsteq) \
     X(tstne) \
     X(RELOPMAX)

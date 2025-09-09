@@ -687,6 +687,7 @@ size_t create_scalar_slot5_relop(void *ptr, OpCodeType op, OperandType s0, Opera
     SET_SLOT(2);
     SET_SLOT(3);
     SET_SLOT(4);
+    i->relop = r;
     return sizeof(*i);
 }
 
