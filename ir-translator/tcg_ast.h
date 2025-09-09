@@ -629,5 +629,6 @@ void handle_func(uint64_t val);
 void module_prolog(void);
 void module_epilog(void);
 void insert_instr(void *ptr_src, size_t sz);
+uint64_t get_xmm_offset(uint64_t idx);
 
 #endif
