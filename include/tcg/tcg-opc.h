@@ -185,7 +185,6 @@ DEF(bitsel_vec, 1, 3, 0, TCG_OPF_VECTOR)
 DEF(cmpsel_vec, 1, 4, 1, TCG_OPF_VECTOR)
 
 #ifdef AOT_IR
-DEF(mov_i64_const, 1, 0, 1, TCG_OPF_NOT_PRESENT)
 DEF(call_direct, 0, 1, 2, TCG_OPF_BB_EXIT | TCG_OPF_BB_END | TCG_OPF_NOT_PRESENT)
 DEF(jmp_direct, 0, 0, 1, TCG_OPF_BB_EXIT | TCG_OPF_BB_END | TCG_OPF_NOT_PRESENT)
 DEF(push_ret_addr, 0, 1, 1, TCG_OPF_NOT_PRESENT)

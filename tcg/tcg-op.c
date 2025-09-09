@@ -3440,11 +3440,6 @@ static void DNI tcg_gen_op3i_i64_2(TCGOpcode opc, TCGv_i64 a1, TCGArg a2, TCGArg
     tcg_gen_op3(opc, TCG_TYPE_I64, tcgv_i64_arg(a1), a2, a3);
 }
 
-void tcg_gen_mov_i64_const(TCGv_i64 ret, tcg_target_long val)
-{
-    tcg_gen_op2i_i64(INDEX_op_mov_i64_const, ret, val);
-}
-
 uintptr_t x_load_addr = 0;
 extern uintptr_t pc_before;
 void tcg_gen_call_direct(unsigned long call_tgt, TCGv_i64 ret, unsigned long ret_tgt)
@@ -3457,6 +3452,7 @@ extern uintptr_t branch_right;
 void tcg_gen_jmp_direct(unsigned long tgt)
 {
     tcg_gen_op1i(INDEX_op_jmp_direct, TCG_TYPE_PTR, (tgt - x_load_addr) - pc_before);
+    // FIXME
     if (branch_left == -1) {
         branch_left = (tgt - x_load_addr);
     } else if (branch_right == -1) {

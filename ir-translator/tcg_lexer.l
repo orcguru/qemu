@@ -167,7 +167,6 @@ movcond_i32     movcond_i32
 movcond_i64     movcond_i64
 mov_i32         mov_i32
 mov_i64         mov_i64
-mov_i64_const   mov_i64_const
 mov_vec         mov_vec
 mul_i32         mul_i32
 mul_i64         mul_i64
@@ -388,7 +387,6 @@ xsave               xsave
 {movcond_i64}     { HANDLE_COLUMN; yylval->op = movcond_i64; return OPCODE; }
 {mov_i32}         { HANDLE_COLUMN; yylval->op = mov_i32; return OPCODE; }
 {mov_i64}         { HANDLE_COLUMN; yylval->op = mov_i64; return OPCODE; }
-{mov_i64_const}   { HANDLE_COLUMN; yylval->op = mov_i64_const; return OPCODE; }
 {mov_vec}         { HANDLE_COLUMN; yylval->op = mov_vec; return OPCODE; }
 {mul_i32}         { HANDLE_COLUMN; yylval->op = mul_i32; return OPCODE; }
 {mul_i64}         { HANDLE_COLUMN; yylval->op = mul_i64; return OPCODE; }

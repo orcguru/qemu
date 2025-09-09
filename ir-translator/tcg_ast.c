@@ -61,7 +61,6 @@ void translate_dupm_vec(OpCodeType opc, void *ptr);
 void translate_extract2_i64(OpCodeType opc, void *ptr);
 void translate_extract(OpCodeType opc, void *ptr);
 void translate_ld_vec(OpCodeType opc, void *ptr);
-void translate_mov_i64_const(OpCodeType opc, void *ptr);
 void translate_mov_vec(OpCodeType opc, void *ptr);
 void translate_mul_i32(OpCodeType opc, void *ptr);
 void translate_mul_i64(OpCodeType opc, void *ptr);
@@ -738,9 +737,6 @@ void translate_movcond(OpCodeType opc, void *ptr) {
     do_store(result, opciosz[opc][2], operand0);
 }
 
-void translate_mov_i64_const(OpCodeType opc, void *ptr) {
-}
-
 void translate_mov_vec(OpCodeType opc, void *ptr) {
 }
 
@@ -1083,9 +1079,6 @@ void handle_func(uint64_t val) {
         case movcond_i32:
         case movcond_i64:
             translate_movcond(opc, ptr);
-            break;
-        case mov_i64_const:
-            translate_mov_i64_const(opc, ptr);
             break;
         case mov_vec:
             translate_mov_vec(opc, ptr);

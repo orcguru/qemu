@@ -201,7 +201,6 @@ typedef enum {
     X(movcond_i64) \
     X(mov_i32) \
     X(mov_i64) \
-    X(mov_i64_const) \
     X(mov_vec) \
     X(mul_i32) \
     X(mul_i64) \

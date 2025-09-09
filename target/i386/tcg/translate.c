@@ -299,6 +299,7 @@ enum {
 
 #ifdef AOT_IR
 extern uintptr_t x_load_addr;
+extern uintptr_t pc_before;
 #endif
 
 /* Bit set if the global variable is live after setting CC_OP to X.  */
@@ -636,8 +637,7 @@ static TCGv eip_next_tl(DisasContext *s)
         tcg_gen_addi_tl(ret, cpu_eip, s->pc - s->pc_save);
 #else
         TCGv ret = tcg_temp_new();
-        tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->pc - s->pc_save)));
-        tcg_gen_addi_tl(ret, cpu_eip, 0);
+        tcg_gen_addi_tl(ret, cpu_eip, (((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->pc - s->pc_save)) - pc_before));
         s->eip_next_tl_set = true;
         s->eip_next_tl_val = ret;
         s->eip_next_pc = s->pc;
@@ -656,8 +656,7 @@ static TCGv eip_cur_tl(DisasContext *s)
     if (tb_cflags(s->base.tb) & CF_PCREL) {
         TCGv ret = tcg_temp_new();
 #ifdef AOT_IR
-        tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->base.pc_next - s->pc_save)));
-        tcg_gen_addi_tl(ret, cpu_eip, 0);
+        tcg_gen_addi_tl(ret, cpu_eip, (((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->base.pc_next - s->pc_save)) - pc_before));
 #else
         tcg_gen_addi_tl(ret, cpu_eip, s->base.pc_next - s->pc_save);
 #endif
@@ -1911,8 +1910,7 @@ static TCGv gen_lea_modrm_1(DisasContext *s, AddressParts a, bool is_vsib)
         if (tb_cflags(s->base.tb) & CF_PCREL && a.base == -2) {
             /* With cpu_eip ~= pc_save, the expression is pc-relative. */
 #ifdef AOT_IR
-            tcg_gen_mov_i64_const(cpu_eip, ((s->base.pc_first - x_load_addr + s->base.pc_acc) + (a.disp - s->pc_save)));
-            tcg_gen_addi_tl(s->A0, cpu_eip, 0);
+            tcg_gen_addi_tl(s->A0, cpu_eip, (((s->base.pc_first - x_load_addr + s->base.pc_acc) + (a.disp - s->pc_save)) - pc_before));
 #else
             tcg_gen_addi_tl(s->A0, cpu_eip, a.disp - s->pc_save);
 #endif
@@ -2380,9 +2378,11 @@ gen_eob(DisasContext *s, int mode)
         // FIXME: need helper_rechecking_single_step???
         assert(s->base.jmp_type != TR_IS_RET && s->base.jmp_type != INVALID_TYPE);
         if (s->base.jmp_type == TR_IS_JMP) {
+            tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
             tcg_gen_jmp_direct(s->rip_at_exit);
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
+            tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
             tcg_gen_call_direct(s->rip_at_exit, s->eip_next_tl_val, s->eip_next_pc);
         } else {
             assert(0);
@@ -2403,9 +2403,11 @@ gen_eob(DisasContext *s, int mode)
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
+            tcg_gen_mov_i64(cpu_eip, s->last_rip_mov_src);
             gen_helper_call_ind(tcg_env, s->last_rip_mov_src);
         } else if (s->base.jmp_type == TR_IS_RET) {
             assert(s->last_rip_mov);
+            tcg_gen_mov_i64(cpu_eip, s->last_rip_mov_src);
             tcg_gen_ret(s->last_rip_mov_src);
         } else if (s->base.jmp_type == TR_IS_IRET) {
             gen_helper_iret_ind(tcg_env);
@@ -2420,12 +2422,15 @@ gen_eob(DisasContext *s, int mode)
 #ifdef AOT_IR
         assert(s->base.jmp_type != INVALID_TYPE);
         if (s->base.jmp_type == TR_IS_JMP) {
+            tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
             tcg_gen_jmp_direct(s->rip_at_exit);
         } else if (s->base.jmp_type == TR_IS_RET) {
             assert(s->last_rip_mov);
+            tcg_gen_mov_i64(cpu_eip, s->last_rip_mov_src);
             tcg_gen_ret(s->last_rip_mov_src);
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
+            tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
             tcg_gen_call_direct(s->rip_at_exit, s->eip_next_tl_val, s->eip_next_pc);
         } else if (s->base.jmp_type == TR_IS_IRET) {
             // FIXME
