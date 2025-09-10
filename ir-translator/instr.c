@@ -416,7 +416,6 @@ size_t create_branch_condition(void *ptr, OperandType s0, uint64_t i0, uint8_t r
     SET_SLOT(0);
     i->imm = i0;
     i->relop = relop;
-    assert(label <= 2);
     i->label = label;
     return sizeof(*i);
 }
@@ -426,7 +425,6 @@ size_t create_setlabel(void *ptr, OpCodeType op, uint8_t label) {
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1B2_ext;
     i->opc = set_label;
-    assert(label <= 2);
     i->label = label;
     return sizeof(*i);
 }
@@ -913,15 +911,16 @@ LLVMType opciosz[OPCODE_MAX][3] = {
     [or_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [or_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [push_ret_addr] = {LLVMInt64, LLVMInt64, LLVMInt64},
-    [qemu_ld2_i128] = {LLVMInvalidType, LLVMInvalidType, LLVMInt64},
-    [qemu_ld_i32] = {LLVMInvalidType, LLVMInvalidType, LLVMInt32},
-    [qemu_ld_i64] = {LLVMInvalidType, LLVMInvalidType, LLVMInt64},
-    [qemu_st2_i128] = {LLVMInt64, LLVMInvalidType, LLVMInvalidType},
-    [qemu_st_i32] = {LLVMInt32, LLVMInvalidType, LLVMInvalidType},
-    [qemu_st_i64] = {LLVMInt64, LLVMInvalidType, LLVMInvalidType},
+    [qemu_ld2_i128] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [qemu_ld_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
+    [qemu_ld_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [qemu_st2_i128] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [qemu_st_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
+    [qemu_st_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [ret] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [rotr_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [rotr_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [sar_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [sar_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [setcond_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [sextract_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
@@ -929,11 +928,11 @@ LLVMType opciosz[OPCODE_MAX][3] = {
     [shl_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [shr_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [shr_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
-    [st16_i32] = {LLVMInt32, LLVMInt16, LLVMInvalidType},
-    [st16_i64] = {LLVMInt64, LLVMInt16, LLVMInvalidType},
-    [st32_i64] = {LLVMInt64, LLVMInt32, LLVMInvalidType},
-    [st_i32] = {LLVMInt32, LLVMInt32, LLVMInvalidType},
-    [st_i64] = {LLVMInt64, LLVMInt64, LLVMInvalidType},
+    [st16_i32] = {LLVMInt32, LLVMInt16, LLVMInt16},
+    [st16_i64] = {LLVMInt64, LLVMInt16, LLVMInt16},
+    [st32_i64] = {LLVMInt64, LLVMInt32, LLVMInt32},
+    [st_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
+    [st_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [sub_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [sub_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [xor_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
@@ -1001,6 +1000,7 @@ uint8_t opcoc[OPCODE_MAX] = {
     [ret] = 0,
     [rotr_i32] = 1,
     [rotr_i64] = 1,
+    [sar_i32] = 1,
     [sar_i64] = 1,
     [setcond_i64] = 1,
     [sextract_i64] = 1,

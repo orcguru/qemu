@@ -130,6 +130,7 @@ typedef enum {
     X(idivl_EAX) \
     X(idivq_EAX) \
     X(iret_ind) \
+    X(ret_ind) \
     X(iret_protected) \
     X(jmp_ind) \
     X(ljmp_protected) \
@@ -224,6 +225,7 @@ typedef enum {
     X(ret) \
     X(rotr_i32) \
     X(rotr_i64) \
+    X(sar_i32) \
     X(sar_i64) \
     X(setcond_i64) \
     X(sextract_i64) \

@@ -152,6 +152,9 @@ void gen_api() {
     printf("            ret.s.valid = 1;\n");
     printf("            ret.s.slot_type = i_Instr2B4->slot0_type;\n");
     printf("            ret.s.slot_idx = i_Instr2B4->slot0_idx;\n");
+    printf("        } else if (idx == 1) {\n");
+    printf("            *is_imm = 1;\n");
+    printf("            ret.i = (uint64_t)((int64_t)i_Instr2B4->imm);\n");
     printf("        }\n");
     printf("        return ret;\n");
     printf("    }\n");
@@ -383,11 +386,20 @@ void gen_api() {
     printf("\n");
     printf("AttributeType get_attribute(void *ptr) {\n");
     printf("    Instr4B *iptr = (Instr4B *)ptr;\n");
-    printf("    assert(iptr->instr_type == SIZE4B);\n");
-    printf("    AttributeType ret;\n");
-    printf("    ret.attr_type = iptr->attr_type;\n");
-    printf("    ret.attr_val = iptr->attr_val;\n");
-    printf("    return ret;\n");
+    printf("    if (iptr->instr_type == SIZE4B) {\n");
+    printf("        AttributeType ret;\n");
+    printf("        ret.attr_type = iptr->attr_type;\n");
+    printf("        ret.attr_val = iptr->attr_val;\n");
+    printf("        return ret;\n");
+    printf("    } else if (iptr->instr_type == SIZEXB) {\n");
+    printf("        Instr1B41 *i_Instr1B41 = (Instr1B41 *)ptr;\n");
+    printf("        assert(i_Instr1B41->instr_type_ext == Instr1B41_ext);\n");
+    printf("        AttributeType ret;\n");
+    printf("        ret.attr_type = i_Instr1B41->attr_type;\n");
+    printf("        ret.attr_val = i_Instr1B41->attr_val;\n");
+    printf("        return ret;\n");
+    printf("    }\n");
+    printf("    assert(0);\n");
     printf("}\n");
     /// is_vector
     printf("\n");
