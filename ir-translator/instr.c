@@ -323,6 +323,17 @@ size_t create_scalar_slot2_imm(void *ptr, OpCodeType op, OperandType s0, Operand
     return sizeof(*i);
 }
 
+size_t create_scalar_slot2_immUL(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0) {
+    Instr1B48 *i = (Instr1B48 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B48_ext;
+    i->opc = op;
+    SET_SLOT(0);
+    SET_SLOT(1);
+    i->imm = i0;
+    return sizeof(*i);
+}
+
 // Ignore num which is used as mmuidx for now.
 size_t create_scalar_slot2_attr3_num(void *ptr, OpCodeType op, OperandType s0, OperandType s1, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0) {
     Instr4B *i = (Instr4B *)ptr;
@@ -453,6 +464,21 @@ size_t create_vector_slot3(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
+    return sizeof(*i);
+}
+
+size_t create_vector_slot5_relop(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, uint8_t relop) {
+    Instr1BV8 *i = (Instr1BV8 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BV8_ext;
+    i->opc = op;
+    i->es = ai.p.ves;
+    SET_SLOT(0);
+    SET_SLOT(1);
+    SET_SLOT(2);
+    SET_SLOT(3);
+    SET_SLOT(4);
+    i->relop = relop;
     return sizeof(*i);
 }
 
@@ -954,6 +980,7 @@ LLVMType opciosz[OPCODE_MAX][3] = {
     [umax_vec] = {LLVMVector16xi8, LLVMVector16xi8, LLVMVector16xi8},
     [umin_vec] = {LLVMVector16xi8, LLVMVector16xi8, LLVMVector16xi8},
     [xor_vec] = {LLVMVector16xi8, LLVMVector16xi8, LLVMVector16xi8},
+    [movcond_vec] = {LLVMVector16xi8, LLVMVector16xi8, LLVMVector16xi8},
 };
 
 uint8_t opcoc[OPCODE_MAX] = {
@@ -1034,4 +1061,5 @@ uint8_t opcoc[OPCODE_MAX] = {
     [umax_vec] = 1,
     [umin_vec] = 1,
     [xor_vec] = 1,
+    [movcond_vec] = 1,
 };

@@ -200,6 +200,7 @@ typedef enum {
     X(ld_vec) \
     X(movcond_i32) \
     X(movcond_i64) \
+    X(movcond_vec) \
     X(mov_i32) \
     X(mov_i64) \
     X(mov_vec) \
@@ -428,6 +429,7 @@ typedef enum {
     X(Instr1B14_ext) \
     X(Instr1B28_ext) \
     X(Instr1B44_ext) \
+    X(Instr1B48_ext) \
     X(Instr1B4_ext) \
     X(Instr1BV4X_ext) \
     X(Instr1BV4XE_ext) \
@@ -438,6 +440,7 @@ typedef enum {
     X(Instr1B2_ext) \
     X(Instr1BH4_ext) \
     X(Instr1BV4_ext) \
+    X(Instr1BV8_ext) \
     X(Instr1BH141_ext) \
     X(Instr1BV21_ext) \
     X(Instr1B41_ext) \
@@ -587,6 +590,7 @@ size_t create_scalar_imm_slot_imm(void *ptr, OpCodeType op, uint64_t i0, Operand
 size_t create_scalar_slot3_attr3_num(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0);
 size_t create_scalar_slot3(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2);
 size_t create_scalar_slot2_imm(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0);
+size_t create_scalar_slot2_immUL(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0);
 size_t create_scalar_slot2_imm_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, uint64_t i0, RelopType r);
 size_t create_scalar_slot3_relop(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, RelopType r);
 size_t create_scalar_slot3_imm(void *ptr, OpCodeType op, OperandType s0, OperandType s1, OperandType s2, uint64_t i0);
@@ -604,6 +608,7 @@ size_t create_vector_slot_vimm(void *ptr, OpCodeType op, AttrSrcInfo ai, Operand
 size_t create_vector_slot2_imm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t i0);
 size_t create_vector_slot2_vimm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t vi0);
 size_t create_vector_slot_env_imm(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, uint64_t i0);
+size_t create_vector_slot5_relop(void *ptr, OpCodeType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, uint8_t relop);
 
 size_t create_helper_slot3(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2);
 size_t create_helper_slot2_imm(void *ptr, HelperType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0);

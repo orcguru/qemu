@@ -82,8 +82,6 @@ void translate_rotr(OpCodeType opc, void *ptr);
 void translate_setcond_i64(OpCodeType opc, void *ptr);
 void translate_sextract_i64(OpCodeType opc, void *ptr);
 void translate_st(OpCodeType opc, void *ptr);
-void translate_umax_vec(OpCodeType opc, void *ptr);
-void translate_umin_vec(OpCodeType opc, void *ptr);
 void translate_bswap64_i64(OpCodeType opc, void *ptr);
 void translate_set_label(OpCodeType opc, void *ptr);
 void translate_brcond_i64(OpCodeType opc, void *ptr);
@@ -771,24 +769,29 @@ void translate_movcond(OpCodeType opc, void *ptr) {
     GET_3_OPERANDS_NOCHECK();
     operand3 = get_operand(ptr, 3, &is_imm3);
     operand4 = get_operand(ptr, 4, &is_imm4);
+    uint8_t is_vec = is_vector(ptr);
+    LLVMType vtype = LLVMInvalidType;
+    if (is_vec) {
+      vtype = get_llvm_vector_type(ptr);
+    }
 
-    LLVMValueRef c1 = get_source_node_imm_or_stack(is_imm1, operand1, OPC_INPUT_T);
-    LLVMValueRef c2 = get_source_node_imm_or_stack(is_imm2, operand2, OPC_INPUT_T);
-    LLVMValueRef v1 = get_source_node_imm_or_stack(is_imm3, operand3, OPC_INPUT_T);
-    LLVMValueRef v2 = get_source_node_imm_or_stack(is_imm4, operand4, OPC_INPUT_T);
+    LLVMValueRef c1 = get_source_node_imm_or_stack(is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef c2 = get_source_node_imm_or_stack(is_imm2, operand2, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef v1 = get_source_node_imm_or_stack(is_imm3, operand3, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef v2 = get_source_node_imm_or_stack(is_imm4, operand4, is_vec ? vtype : OPC_INPUT_T);
 
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
         OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
         c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name());
-        c2 = LLVMConstInt(llvm_int_types[OPC_INPUT_T], 0, 0);
+        c2 = LLVMConstInt(llvm_int_types[is_vec ? vtype : OPC_INPUT_T], 0, 0);
     }
     assert(r < RELOPMAX && llvm_predicate[r]);
     LLVMValueRef bool_val = LLVMBuildICmp(builder, llvm_predicate[r], c1, c2, get_next_var_name());
 
     LLVMValueRef result = LLVMBuildSelect(builder, bool_val, v1, v2, get_next_var_name());
-    do_store(result, OPC_OUTPUT_T, operand0);
+    do_store(result, is_vec ? vtype : OPC_OUTPUT_T, operand0);
 }
 
 void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
@@ -1182,16 +1185,71 @@ void translate_st(OpCodeType opc, void *ptr) {
     }
 }
 
-void translate_umax_vec(OpCodeType opc, void *ptr) {
-}
+void translate_maxmin_vec(OpCodeType opc, void *ptr, RelopType r) {
+    OperandType operand0, operand1, operand2;
+    GET_3_OPERANDS();
+    AttrSrcInfo ai;
+    LLVMType vtype = get_llvm_vector_type(ptr);
+    ai.p.ves = vtype - LLVMVector16xi8;
+    OperandType tmp1 = get_tmp_and_do_alloc(vtype);
+    OperandType tmp2 = get_tmp_and_do_alloc(vtype);
 
-void translate_umin_vec(OpCodeType opc, void *ptr) {
+    uint8_t buf[16];
+    create_vector_slot2(buf, mov_vec, ai, tmp1, operand1);
+    translate_mov(mov_vec, buf);
+    create_vector_slot2(buf, mov_vec, ai, tmp2, operand2);
+    translate_mov(mov_vec, buf);
+    create_vector_slot5_relop(buf, movcond_vec, ai, operand0, operand1, operand2, tmp1, tmp2, r);
+    translate_movcond(movcond_vec, buf);
 }
 
 void translate_bswap64_i64(OpCodeType opc, void *ptr) {
+    OperandType t0 = get_tmp_and_do_alloc(LLVMInt64);
+    OperandType t1 = get_tmp_and_do_alloc(LLVMInt64);
+    uint64_t t2;
+
+    OperandType operand0, operand1;
+    GET_2_OPERANDS();
+
+    uint8_t buf[16];
+    t2 = 0x00ff00ff00ff00ffUL;
+    create_scalar_slot2_imm(buf, shr_i64, t0, operand1, 8);
+    translate_binary(shr_i64, buf, LLVMBuildLShr);
+    create_scalar_slot2_immUL(buf, and_i64, t1, operand1, t2);
+    translate_binary(and_i64, buf, LLVMBuildAnd);
+    create_scalar_slot2_immUL(buf, and_i64, t0, t0, t2);
+    translate_binary(and_i64, buf, LLVMBuildAnd);
+    create_scalar_slot2_imm(buf, shl_i64, t1, t1, 8);
+    translate_binary(shl_i64, buf, LLVMBuildShl);
+    create_scalar_slot3(buf, or_i64, operand0, t0, t1);
+    translate_binary(or_i64, buf, LLVMBuildOr);
+
+    t2 = 0x0000ffff0000ffffUL;
+    create_scalar_slot2_imm(buf, shr_i64, t0, operand0, 16);
+    translate_binary(shr_i64, buf, LLVMBuildLShr);
+    create_scalar_slot2_immUL(buf, and_i64, t1, operand0, t2);
+    translate_binary(and_i64, buf, LLVMBuildAnd);
+    create_scalar_slot2_immUL(buf, and_i64, t0, t0, t2);
+    translate_binary(and_i64, buf, LLVMBuildAnd);
+    create_scalar_slot2_imm(buf, shl_i64, t1, t1, 16);
+    translate_binary(shl_i64, buf, LLVMBuildShl);
+    create_scalar_slot3(buf, or_i64, operand0, t0, t1);
+    translate_binary(or_i64, buf, LLVMBuildOr);
+
+    create_scalar_slot2_imm(buf, shr_i64, t0, operand0, 32);
+    translate_binary(shl_i64, buf, LLVMBuildLShr);
+    create_scalar_slot2_imm(buf, shl_i64, t1, operand0, 32);
+    translate_binary(shl_i64, buf, LLVMBuildShl);
+    create_scalar_slot3(buf, or_i64, operand0, t0, t1);
+    translate_binary(or_i64, buf, LLVMBuildOr);
 }
 
 void translate_set_label(OpCodeType opc, void *ptr) {
+    uint8_t l = get_label(ptr);
+    char lstr[16];
+    sprintf(lstr, "bb_L%d", l);
+    LLVMBasicBlockRef label = LLVMAppendBasicBlock(llvm_func, lstr);
+    LLVMPositionBuilderAtEnd(builder, label);
 }
 
 void translate_brcond_i64(OpCodeType opc, void *ptr) {
@@ -1426,6 +1484,7 @@ void handle_func(uint64_t val) {
             break;
         case movcond_i32:
         case movcond_i64:
+        case movcond_vec:
             translate_movcond(opc, ptr);
             break;
         case mul_i32:
@@ -1515,10 +1574,10 @@ void handle_func(uint64_t val) {
             translate_binary(opc, ptr, LLVMBuildSub);
             break;
         case umax_vec:
-            translate_umax_vec(opc, ptr);
+            translate_maxmin_vec(opc, ptr, gtu);
             break;
         case umin_vec:
-            translate_umin_vec(opc, ptr);
+            translate_maxmin_vec(opc, ptr, ltu);
             break;
         case xor_i32:
         case xor_i64:
@@ -1672,7 +1731,7 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    //LLVMDumpModule(module);
+    LLVMDumpModule(module);
     LLVMDisposeModule(module);
 }
 
