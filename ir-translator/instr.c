@@ -7,9 +7,9 @@
 
 #define SET_SLOT(IDX)                               \
     do {                                            \
-        assert(s##IDX.s.slot_type <= SUB_SLOT_TMPT);      \
-        i->slot##IDX##_type = s##IDX.s.slot_type;    \
-        i->slot##IDX##_idx = s##IDX.s.slot_idx;   \
+        s##IDX = get_mapped_slot(s##IDX);    \
+        i->slot##IDX##_type = s##IDX.s.slot_type;   \
+        i->slot##IDX##_idx = s##IDX.s.slot_idx;     \
     } while (0)
 
 uint8_t instr_buf[64];
@@ -70,6 +70,40 @@ XMMReg lookup_xmm(uint64_t offset) {
         }
     }
     return x;
+}
+
+static uint8_t tmpl_map[1<<5] = {0xff};
+static uint8_t tmpt_map[1<<5] = {0xff};
+static uint8_t tmp_idx = 0;
+
+OperandType get_mapped_slot(OperandType slot) {
+    if (slot.s.slot_type == SUB_SLOT_TMPL) {
+        if (tmpl_map[slot.s.slot_idx] == 0xff) {
+            assert(tmp_idx < (1<<5));
+            tmpl_map[slot.s.slot_idx] = tmp_idx;
+            tmp_idx += 1;
+        }
+        slot.s.slot_type = SUB_SLOT_TMP;
+        slot.s.slot_idx = tmpl_map[slot.s.slot_idx];
+        return slot;
+    } else if (slot.s.slot_type == SUB_SLOT_TMPT) {
+        if (tmpt_map[slot.s.slot_idx] == 0xff) {
+            assert(tmp_idx < (1<<5));
+            tmpt_map[slot.s.slot_idx] = tmp_idx;
+            tmp_idx += 1;
+        }
+        slot.s.slot_type = SUB_SLOT_TMP;
+        slot.s.slot_idx = tmpt_map[slot.s.slot_idx];
+        return slot;
+    } else {
+        return slot;
+    }
+}
+
+void reset_tmp_mapping() {
+    memset(tmpl_map, 0xff, sizeof(tmpl_map));
+    memset(tmpt_map, 0xff, sizeof(tmpt_map));
+    tmp_idx = 0;
 }
 
 const char *attr_type_str[] = {
@@ -160,29 +194,6 @@ void insert_instr(void *ptr_src, size_t sz) {
         memcpy(ptr, ptr_src, sz);
     }
     tcg_instrs_idx += sz;
-}
-
-static void dump_2B(Instr2B i) {
-}
-
-static void dump_4B(Instr4B i) {
-}
-
-static void dump_instr() {
-    uint64_t idx = 0;
-    while (idx < tcg_instrs_idx) {
-        Instr2B *ptr2b = (Instr2B *)&tcg_instrs[idx];
-        Instr4B *ptr4b = (Instr4B *)&tcg_instrs[idx];
-        if (ptr2b->instr_type == SIZE2B) {
-            dump_2B(ptr2b[0]);
-            idx += sizeof(Instr2B);
-        } else if (ptr2b->instr_type == SIZE4B) {
-            dump_4B(ptr4b[0]);
-            idx += sizeof(Instr4B);
-        } else {
-            assert(0);
-        }
-    }
 }
 
 /* Sort by frequency in hello_world_static

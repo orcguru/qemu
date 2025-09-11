@@ -356,10 +356,11 @@ typedef struct {
 #define SLOT_TYPE_LIST \
     X(SUB_SLOT_ENVVAR) \
     X(SUB_SLOT_XREG) \
-    X(SUB_SLOT_TMPL) \
-    X(SUB_SLOT_TMPT) \
+    X(SUB_SLOT_TMP) \
     X(SUB_SLOT_XMM) \
-    X(SUB_SLOT_ENV)
+    X(SUB_SLOT_ENV) \
+    X(SUB_SLOT_TMPL) \
+    X(SUB_SLOT_TMPT)
 
 typedef enum {
     #define X(name) name,
@@ -576,6 +577,7 @@ typedef struct {
 
 void register_xmm(uint64_t idx, uint64_t offset);
 void register_xmm_tmp(uint64_t offset);
+void reset_tmp_mapping();
 
 size_t create_scalar_slot(void *ptr, OpCodeType op, OperandType s0);
 size_t create_scalar_slot2(void *ptr, OpCodeType op, OperandType s0, OperandType s1);
