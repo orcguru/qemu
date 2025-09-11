@@ -133,6 +133,11 @@ void gen_api() {
     printf("    *is_imm = 0;\n");
     printf("    Instr1B2 *iptr = (Instr1B2 *)ptr;\n");
     printf("    if (iptr->instr_type == SIZE2B) {\n");
+    printf("        Instr2B *i_Instr2B = (Instr2B *)ptr;\n");
+    printf("        if (idx == 0) {\n");
+    printf("            *is_imm = 1;\n");
+    printf("            ret.i = (uint64_t)(i_Instr2B->imm);\n");
+    printf("        }\n");
     printf("        return ret;\n");
     printf("    } else if (iptr->instr_type == SIZE4B) {\n");
     printf("        Instr4B *i_Instr4B = (Instr4B *)ptr;\n");

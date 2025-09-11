@@ -53,6 +53,7 @@ static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
 static int current_func_param_cnt = 0;
 static uint8_t last_instr_control_transfer = 0;
 static uint32_t br_count = 0;
+static uint64_t current_func_offset = 0;
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
@@ -888,7 +889,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     LLVMValueRef shadow_ptr0 = LLVMBuildIntToPtr(builder, shadow_val0, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
     LLVMBuildStore(builder, x64_ret_addr, shadow_ptr0);
 
-    LLVMTypeRef func_type = LLVMFunctionType(LLVMInt64Type(), NULL, 0, 0);
+    LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), NULL, 0, 0);
     char func_name[64] = {0};
     sprintf(func_name, "func_%lx", func_hex.i);
     LLVMValueRef func = LLVMGetNamedFunction(module, func_name);
@@ -1072,12 +1073,24 @@ void translate_ret(OpCodeType opc, void *ptr) {
                 param_in_stack.s.valid = 1;
                 param_in_stack.s.slot_type = SUB_SLOT_XREG;
                 param_in_stack.s.slot_idx = i;
+                call_args[i] = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
             } else {
                 param_in_stack.s.valid = 1;
                 param_in_stack.s.slot_type = SUB_SLOT_XMM;
                 param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
+                param_in_stack.s.offset = 0;
+
+                LLVMValueRef vec = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+
+                LLVMTypeRef ret_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+                LLVMTypeRef param_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
+                LLVMTypeRef intrinsic_types[] = {ret_type, param_type, LLVMInt64Type()};
+                LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 3, 0);
+                LLVMValueRef intrinsic_func = LLVMAddFunction(module, "llvm.vector.insert.nxv1i64.v2i64", intrinsic_func_type);
+                LLVMValueRef index_0 = LLVMConstInt(LLVMInt64Type(), 0, 0);
+                LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(ret_type), vec, index_0};
+                call_args[i] = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, intrinsic_call_args, 3, get_next_var_name());
             }
-            call_args[i] = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
         } else {
             call_args[i] = LLVMGetParam(llvm_func, i);
         }
@@ -1308,6 +1321,51 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_jmp_direct(OpCodeType opc, void *ptr) {
+    uint32_t is_imm;
+    OperandType delta;
+    delta = get_operand(ptr, 0, &is_imm);
+    assert(is_imm);
+
+    LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT];
+    for (int i = 0; i < current_func_param_cnt; ++i) {
+        if (fixed_vector_param_in_stack[i]) {
+            OperandType param_in_stack;
+            if (i < FIXED_PARAM_COUNT) {
+                param_in_stack.s.valid = 1;
+                param_in_stack.s.slot_type = SUB_SLOT_XREG;
+                param_in_stack.s.slot_idx = i;
+                call_args[i] = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+            } else {
+                param_in_stack.s.valid = 1;
+                param_in_stack.s.slot_type = SUB_SLOT_XMM;
+                param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
+                param_in_stack.s.offset = 0;
+                LLVMValueRef vec = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+
+                LLVMTypeRef ret_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+                LLVMTypeRef param_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
+                LLVMTypeRef intrinsic_types[] = {ret_type, param_type, LLVMInt64Type()};
+                LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 3, 0);
+                LLVMValueRef intrinsic_func = LLVMAddFunction(module, "llvm.vector.insert.nxv1i64.v2i64", intrinsic_func_type);
+                LLVMValueRef index_0 = LLVMConstInt(LLVMInt64Type(), 0, 0);
+                LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(ret_type), vec, index_0};
+                call_args[i] = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, intrinsic_call_args, 3, get_next_var_name());
+            }
+        } else {
+            call_args[i] = LLVMGetParam(llvm_func, i);
+        }
+    }
+    LLVMTypeRef ret_type = LLVMVoidType();
+    LLVMTypeRef func_type = LLVMFunctionType(ret_type, fixed_vector_param_types, current_func_param_cnt, 0);
+
+    char func_name[64] = {0};
+    sprintf(func_name, "func_%lx", (current_func_offset + delta.i));
+    LLVMValueRef func = LLVMGetNamedFunction(module, func_name);
+    if (!func) {
+        func = LLVMAddFunction(module, func_name, func_type);
+    }
+    LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, func, call_args, current_func_param_cnt, "");
+    LLVMSetTailCall(call_inst, 1);
 }
 
 void translate_call_direct(OpCodeType opc, void *ptr) {
@@ -1328,12 +1386,14 @@ static void cleanup_func_resource() {
     tmp_var_available = 0;
     ir_var_name_idx = 0;
     current_func_param_cnt = 0;
+    current_func_offset = 0;
     br_count = 0;
     memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
 }
 
 void handle_func(uint64_t val) {
     printf("func %lx\n", val);
+    current_func_offset = val;
     ir_var_name_idx = 0;
     tmp_var_available = 0xffffffff;
     void *ptr_init = get_instr_buffer();
@@ -1680,7 +1740,7 @@ void module_prolog() {
     builder = LLVMCreateBuilder();
 
     // Parameter setup (same for all functions)
-    LLVMTypeRef vscale_i64 = LLVMScalableVectorType(LLVMInt64Type(), 1); // <1 x i64>
+    LLVMTypeRef vscale_i64 = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
     const char *base_names[20] = {
         "rax", "rcx", "rdx", "rbx",
         "rsp", "rbp", "rsi", "rdi",
@@ -1790,7 +1850,7 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    LLVMDumpModule(module);
+    //LLVMDumpModule(module);
     LLVMDisposeModule(module);
 }
 
