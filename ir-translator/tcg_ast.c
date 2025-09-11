@@ -20,6 +20,7 @@ extern uint8_t opcoc[OPCODE_MAX];
 static LLVMModuleRef module;
 static LLVMBuilderRef builder;
 static LLVMValueRef llvm_func;
+static LLVMBasicBlockRef last_active_bb;
 #define FIXED_PARAM_COUNT           20
 static LLVMTypeRef fixed_param_types[FIXED_PARAM_COUNT] = {NULL};
 static const char *fixed_arg_names[FIXED_PARAM_COUNT] = {NULL};
@@ -50,6 +51,8 @@ static OperandType alias_tmpt[1<<5] = {0};
 static uint32_t tmp_var_available = 0;
 static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
 static int current_func_param_cnt = 0;
+static uint8_t last_instr_control_transfer = 0;
+static uint32_t br_count = 0;
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
@@ -58,6 +61,7 @@ static void do_store(LLVMValueRef val, LLVMType val_tidx, OperandType out);
 static OperandType get_env_ptr();
 static OperandType get_shadow_stack_pointer();
 static void set_shadow_stack_pointer(OperandType val);
+static LLVMBasicBlockRef get_bb(const char *name);
 void translate_add_i64(OpCodeType opc, void *ptr);
 void translate_andc_i64(OpCodeType opc, void *ptr);
 void translate_andc_vec(OpCodeType opc, void *ptr);
@@ -205,6 +209,18 @@ static void set_shadow_stack_pointer(OperandType val) {
 
     create_scalar_slot2_attr3_num(buf, qemu_st_i64, val, ptr_addr, a0, a1, a2, 2);
     translate_qemu_st(qemu_st_i64, buf);
+}
+
+static LLVMBasicBlockRef get_bb(const char *name) {
+    LLVMBasicBlockRef current_block = LLVMGetFirstBasicBlock(llvm_func);
+    while (current_block != NULL) {
+        const char *block_name = LLVMGetBasicBlockName(current_block);
+        if (block_name != NULL && strcmp(block_name, name) == 0) {
+            return current_block;
+        }
+        current_block = LLVMGetNextBasicBlock(current_block);
+    }
+    return NULL;
 }
 
 static LLVMModuleRef create_module(const char *module_name) {
@@ -1248,11 +1264,47 @@ void translate_set_label(OpCodeType opc, void *ptr) {
     uint8_t l = get_label(ptr);
     char lstr[16];
     sprintf(lstr, "bb_L%d", l);
-    LLVMBasicBlockRef label = LLVMAppendBasicBlock(llvm_func, lstr);
+    LLVMBasicBlockRef label = get_bb(lstr);
+    if (!label) {
+        label = LLVMAppendBasicBlock(llvm_func, lstr);
+    }
+    if (!last_instr_control_transfer) {
+        LLVMBuildBr(builder, label);
+    }
     LLVMPositionBuilderAtEnd(builder, label);
+    last_active_bb = label;
 }
 
 void translate_brcond_i64(OpCodeType opc, void *ptr) {
+    uint32_t is_imm0, is_imm1;
+    OperandType operand0, operand1;
+    GET_2_OPERANDS_NOCHECK();
+    LLVMValueRef c1 = get_source_node_imm_or_stack(is_imm0, operand0, OPC_INPUT_T);
+    LLVMValueRef c2 = get_source_node_imm_or_stack(is_imm1, operand1, OPC_INPUT_T);
+
+    RelopType r = get_relop(ptr);
+    if (r == tsteq || r == tstne) {
+        r -= (tsteq - eq);
+        OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
+        c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name());
+        c2 = LLVMConstInt(llvm_int_types[OPC_INPUT_T], 0, 0);
+    }
+    assert(r < RELOPMAX && llvm_predicate[r]);
+    LLVMValueRef bool_val = LLVMBuildICmp(builder, llvm_predicate[r], c1, c2, get_next_var_name());
+    char false_bb_name[16] = {0};
+    sprintf(false_bb_name, "bb_false%d", br_count);
+    LLVMBasicBlockRef bb_false = LLVMAppendBasicBlock(llvm_func, false_bb_name);
+    char true_bb_name[16] = {0};
+    sprintf(true_bb_name, "bb_L%d", get_label(ptr));
+    LLVMBasicBlockRef bb_true = get_bb(true_bb_name);
+    if (!bb_true) {
+        bb_true = LLVMAppendBasicBlock(llvm_func, true_bb_name);
+    }
+    LLVMPositionBuilderAtEnd(builder, last_active_bb);
+    LLVMBuildCondBr(builder, bool_val, bb_true, bb_false);
+    LLVMPositionBuilderAtEnd(builder, bb_false);
+    last_active_bb = bb_false;
+    br_count += 1;
 }
 
 void translate_jmp_direct(OpCodeType opc, void *ptr) {
@@ -1276,6 +1328,7 @@ static void cleanup_func_resource() {
     tmp_var_available = 0;
     ir_var_name_idx = 0;
     current_func_param_cnt = 0;
+    br_count = 0;
     memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
 }
 
@@ -1346,6 +1399,7 @@ void handle_func(uint64_t val) {
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlock(llvm_func, "entry");
     LLVMPositionBuilderAtEnd(builder, entry);
+    last_active_bb = entry;
 
     if (xreg_valid) {
         for (XRegType x = 0; x < XREG_MAX; ++x) {
@@ -1608,6 +1662,11 @@ void handle_func(uint64_t val) {
             translate_call(opc, ptr);
             break;
         default: assert(0);
+        }
+        if (opc == ret || opc == jmp_direct || opc == call_direct) {
+            last_instr_control_transfer = 1;
+        } else {
+            last_instr_control_transfer = 0;
         }
     }
 
