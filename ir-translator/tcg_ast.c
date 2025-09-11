@@ -22,8 +22,6 @@ static LLVMBuilderRef builder;
 static LLVMValueRef llvm_func;
 static LLVMBasicBlockRef last_active_bb;
 #define FIXED_PARAM_COUNT           20
-static LLVMTypeRef fixed_param_types[FIXED_PARAM_COUNT] = {NULL};
-static const char *fixed_arg_names[FIXED_PARAM_COUNT] = {NULL};
 #define FIXED_VECTOR_PARAM_COUNT   (20 + 15 * 2)
 static LLVMTypeRef fixed_vector_param_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 static LLVMType fixed_vector_param_llvmtypes[FIXED_VECTOR_PARAM_COUNT] = {0};
@@ -50,7 +48,6 @@ static OperandType alias_tmpl[1<<5] = {0};
 static OperandType alias_tmpt[1<<5] = {0};
 static uint32_t tmp_var_available = 0;
 static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
-static int current_func_param_cnt = 0;
 static uint8_t last_instr_control_transfer = 0;
 static uint32_t br_count = 0;
 static uint64_t current_func_offset = 0;
@@ -889,12 +886,12 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     LLVMValueRef shadow_ptr0 = LLVMBuildIntToPtr(builder, shadow_val0, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
     LLVMBuildStore(builder, x64_ret_addr, shadow_ptr0);
 
-    LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), NULL, 0, 0);
     char func_name[64] = {0};
     sprintf(func_name, "func_%lx", func_hex.i);
     LLVMValueRef func = LLVMGetNamedFunction(module, func_name);
     if (!func) {
-        func = LLVMAddFunction(module, func_name, func_type);
+        func = LLVMAddFunction(module, func_name,
+                               LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0));
     }
     LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, func, LLVMInt64Type(), get_next_var_name());
     create_scalar_slot2_imm(buf, add_i64, ptr_val, ptr_val, -8UL);
@@ -1066,7 +1063,7 @@ void translate_ret(OpCodeType opc, void *ptr) {
     create_branch_condition(buf, loc610, 0, ne, new_label);
 
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT];
-    for (int i = 0; i < current_func_param_cnt; ++i) {
+    for (int i = 0; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
         if (fixed_vector_param_in_stack[i]) {
             OperandType param_in_stack;
             if (i < FIXED_PARAM_COUNT) {
@@ -1079,7 +1076,6 @@ void translate_ret(OpCodeType opc, void *ptr) {
                 param_in_stack.s.slot_type = SUB_SLOT_XMM;
                 param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
                 param_in_stack.s.offset = 0;
-
                 LLVMValueRef vec = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
 
                 LLVMTypeRef ret_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
@@ -1095,11 +1091,10 @@ void translate_ret(OpCodeType opc, void *ptr) {
             call_args[i] = LLVMGetParam(llvm_func, i);
         }
     }
-    LLVMTypeRef ret_type = LLVMVoidType();
-    LLVMTypeRef func_type = LLVMFunctionType(ret_type, fixed_vector_param_types, current_func_param_cnt, 0);
+    LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0);
     LLVMValueRef ret_target = get_source_node_imm_or_stack(0, loc608, OPC_ADDR_T);
     LLVMValueRef ret_target_ptr = LLVMBuildIntToPtr(builder, ret_target, LLVMPointerType(func_type, 0), get_next_var_name());
-    LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, ret_target_ptr, call_args, current_func_param_cnt, "");
+    LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, ret_target_ptr, call_args, FIXED_VECTOR_PARAM_COUNT, "");
     LLVMSetTailCall(call_inst, 1);
 
     create_setlabel(buf, set_label, new_label);
@@ -1327,7 +1322,7 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
     assert(is_imm);
 
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT];
-    for (int i = 0; i < current_func_param_cnt; ++i) {
+    for (int i = 0; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
         if (fixed_vector_param_in_stack[i]) {
             OperandType param_in_stack;
             if (i < FIXED_PARAM_COUNT) {
@@ -1356,7 +1351,7 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
         }
     }
     LLVMTypeRef ret_type = LLVMVoidType();
-    LLVMTypeRef func_type = LLVMFunctionType(ret_type, fixed_vector_param_types, current_func_param_cnt, 0);
+    LLVMTypeRef func_type = LLVMFunctionType(ret_type, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0);
 
     char func_name[64] = {0};
     sprintf(func_name, "func_%lx", (current_func_offset + delta.i));
@@ -1364,8 +1359,10 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
     if (!func) {
         func = LLVMAddFunction(module, func_name, func_type);
     }
-    LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, func, call_args, current_func_param_cnt, "");
+    LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, func, call_args, FIXED_VECTOR_PARAM_COUNT, "");
     LLVMSetTailCall(call_inst, 1);
+    // FIXME: qemuaot
+    LLVMSetInstructionCallConv(call_inst, 124);
 }
 
 void translate_call_direct(OpCodeType opc, void *ptr) {
@@ -1393,6 +1390,7 @@ void translate_discard(OpCodeType opc, void *ptr) {
 }
 
 void translate_call(OpCodeType opc, void *ptr) {
+
 }
 
 static void cleanup_func_resource() {
@@ -1403,7 +1401,6 @@ static void cleanup_func_resource() {
     }
     tmp_var_available = 0;
     ir_var_name_idx = 0;
-    current_func_param_cnt = 0;
     current_func_offset = 0;
     br_count = 0;
     memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
@@ -1464,11 +1461,12 @@ void handle_func(uint64_t val) {
 
     char func_name[64];
     sprintf(func_name, "func_%lx", val);
-    current_func_param_cnt = xmm_valid == 0 ? FIXED_PARAM_COUNT : FIXED_VECTOR_PARAM_COUNT;
-    llvm_func = LLVMAddFunction(module, func_name,
-        LLVMFunctionType(LLVMVoidType(), xmm_valid == 0 ? fixed_param_types : fixed_vector_param_types,
-                         current_func_param_cnt, 0));
-    for (int j = 0; j < current_func_param_cnt; j++) {
+    llvm_func = LLVMGetNamedFunction(module, func_name);
+    if (!llvm_func) {
+        llvm_func = LLVMAddFunction(module, func_name,
+            LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0));
+    }
+    for (int j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
         LLVMValueRef param = LLVMGetParam(llvm_func, j);
         LLVMSetValueName(param, fixed_vector_arg_names[j]);
     }
@@ -1768,19 +1766,15 @@ void module_prolog() {
     };
     for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
         if (i < 16) {
-            fixed_param_types[i] = LLVMInt64Type();
             fixed_vector_param_types[i] = LLVMInt64Type();
             fixed_vector_param_llvmtypes[i] = LLVMInt64;
         } else if (i == 16 || i == 17 || i == 19) {
-            fixed_param_types[i] = LLVMInt64Type();
             fixed_vector_param_types[i] = LLVMInt64Type();
             fixed_vector_param_llvmtypes[i] = LLVMInt64;
         } else if (i == 18) {
-            fixed_param_types[i] = LLVMInt32Type();
             fixed_vector_param_types[i] = LLVMInt32Type();
             fixed_vector_param_llvmtypes[i] = LLVMInt32;
         }
-        fixed_arg_names[i] = base_names[i];
         fixed_vector_arg_names[i] = base_names[i];
     }
     static char extra_name_buf[30][16];
