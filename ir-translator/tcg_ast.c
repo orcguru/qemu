@@ -16,6 +16,7 @@ extern char *lineptr;
 extern const char *opcode_type_str[];
 extern LLVMType opciosz[OPCODE_MAX][3];
 extern uint8_t opcoc[OPCODE_MAX];
+extern uint8_t opcmem_addr_nzidx[OPCODE_MAX];
 
 static LLVMModuleRef module;
 static LLVMBuilderRef builder;
@@ -51,6 +52,11 @@ static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
 static uint8_t last_instr_control_transfer = 0;
 static uint32_t br_count = 0;
 static uint64_t current_func_offset = 0;
+#define BB_MAX_CALL_CNT     8
+static uint32_t tmpl_shadow_offset[BB_MAX_CALL_CNT][1<<5] = {0};
+static uint32_t tmpt_shadow_offset[BB_MAX_CALL_CNT][1<<5] = {0};
+static uint8_t current_call_idx = 0;
+static uint32_t shadow_call_offset = 16;
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
@@ -1403,11 +1409,15 @@ static void cleanup_func_resource() {
     ir_var_name_idx = 0;
     current_func_offset = 0;
     br_count = 0;
+    current_call_idx = 0;
+    shadow_call_offset = 16;
     memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
+    memset(tmpl_shadow_offset, 0, sizeof(tmpl_shadow_offset));
+    memset(tmpt_shadow_offset, 0, sizeof(tmpt_shadow_offset));
 }
 
 void handle_func(uint64_t val) {
-    printf("func %lx\n", val);
+    //printf("func %lx\n", val);
     current_func_offset = val;
     ir_var_name_idx = 0;
     tmp_var_available = 0xffffffff;
@@ -1419,10 +1429,16 @@ void handle_func(uint64_t val) {
     LLVMType tmpl_bits_type[1<<5] = {0};
     LLVMType tmpt_bits_type[1<<5] = {0};
     int instr_idx = 0;
+    uint8_t tmpl_has_known_def[1<<5] = {0};
+    uint8_t tmpt_has_known_def[1<<5] = {0};
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), instr_idx += 1) {
         uint32_t slot_idx = 0;
         OperandType operand;
         OpCodeType opc = get_opcode(ptr);
+        uint32_t noargs = 0;
+        if (opc == call) {
+            noargs = get_helper_noargs(ptr);
+        }
         uint8_t is_vec = is_vector(ptr);
         LLVMType vtype = LLVMInvalidType;
         if (is_vec) {
@@ -1436,7 +1452,10 @@ void handle_func(uint64_t val) {
             }
             uint32_t shifted_slot_bit = (1 << operand.s.slot_idx);
             LLVMType operand_type = vtype == LLVMInvalidType ?
-                                 opciosz[opc][slot_idx < opcoc[opc] ? 2 : 0] : vtype;
+                                (opcmem_addr_nzidx[opc] > 0 ?
+                                 ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_INPUT_T : OPC_ADDR_T) :
+                                 (slot_idx < opcoc[opc] ? OPC_OUTPUT_T : OPC_INPUT_T)) :
+                                vtype;
             if (is_imm == 0) {
                 if (operand.s.slot_type == SUB_SLOT_XREG) {
                     xreg_valid |= shifted_slot_bit;
@@ -1454,9 +1473,38 @@ void handle_func(uint64_t val) {
                 } else if (operand.s.slot_type == SUB_SLOT_XMM) {
                     xmm_valid |= shifted_slot_bit;
                 }
+                if (operand.s.slot_type == SUB_SLOT_TMPL || operand.s.slot_type == SUB_SLOT_TMPT) {
+                    if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
+                        if (operand.s.slot_type == SUB_SLOT_TMPL && !tmpl_has_known_def[operand.s.slot_idx] && tmpl_shadow_offset[current_call_idx][operand.s.slot_idx] == 0) {
+                            tmpl_shadow_offset[current_call_idx][operand.s.slot_idx] = shadow_call_offset;
+                            LLVMType t = func_tmpl_llvmtype[operand.s.slot_idx];
+                            shadow_call_offset += (llvm_vector_elem_bit_counts[t*2] * llvm_vector_elem_bit_counts[t*2+1])/8;
+                            printf("%lx tmpl %d\n", current_func_offset, operand.s.slot_idx);
+                        }
+                        if (operand.s.slot_type == SUB_SLOT_TMPT && !tmpt_has_known_def[operand.s.slot_idx] && tmpt_shadow_offset[current_call_idx][operand.s.slot_idx] == 0) {
+                            tmpt_shadow_offset[current_call_idx][operand.s.slot_idx] = shadow_call_offset;
+                            LLVMType t = func_tmpt_llvmtype[operand.s.slot_idx];
+                            shadow_call_offset += (llvm_vector_elem_bit_counts[t*2] * llvm_vector_elem_bit_counts[t*2+1])/8;
+                            printf("%lx tmpt %d\n", current_func_offset, operand.s.slot_idx);
+                        }
+                    }
+                    if ((opc == call && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
+                        if (operand.s.slot_type == SUB_SLOT_TMPL) {
+                            tmpl_has_known_def[operand.s.slot_idx] = 1;
+                        }
+                        if (operand.s.slot_type == SUB_SLOT_TMPT) {
+                            tmpt_has_known_def[operand.s.slot_idx] = 1;
+                        }
+                    }
+                }
             }
             slot_idx += 1;
         } while (1);
+        if (opc == call) {
+            memset(tmpl_has_known_def, 0, sizeof(tmpl_has_known_def));
+            memset(tmpt_has_known_def, 0, sizeof(tmpt_has_known_def));
+            current_call_idx += 1;
+        }
     }
 
     char func_name[64];
@@ -1542,6 +1590,7 @@ void handle_func(uint64_t val) {
         }
     }
 
+    current_call_idx = 0;
     // Handle each IR translation
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), instr_idx += 1) {
         OpCodeType opc = get_opcode(ptr);
@@ -1736,6 +1785,7 @@ void handle_func(uint64_t val) {
             break;
         case call:
             translate_call(opc, ptr);
+            current_call_idx += 1;
             break;
         default: assert(0);
         }
