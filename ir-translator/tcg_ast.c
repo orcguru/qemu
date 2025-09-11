@@ -1369,9 +1369,27 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
 }
 
 void translate_call_direct(OpCodeType opc, void *ptr) {
+    uint32_t is_imm0, is_imm1, is_imm2;
+    OperandType operand0, ret_delta_hex, call_delta_hex;
+    operand0 = get_operand(ptr, 0, &is_imm0);
+    ret_delta_hex = get_operand(ptr, 1, &is_imm1);
+    call_delta_hex = get_operand(ptr, 2, &is_imm2);
+    assert(is_imm1 && is_imm2);
+
+    uint8_t buf[16];
+    create_scalar_slot_imm(buf, push_ret_addr, operand0, ret_delta_hex.i);
+    translate_push_ret_addr(push_ret_addr, buf);
+    create_jmpdirect(buf, call_delta_hex.i);
+    translate_jmp_direct(jmp_direct, buf);
 }
 
 void translate_discard(OpCodeType opc, void *ptr) {
+    uint32_t is_imm;
+    OperandType operand0 = get_operand(ptr, 0, &is_imm);
+    assert(operand0.s.valid);
+    if (operand0.s.slot_type == SUB_SLOT_XREG) {
+        LLVMBuildStore(builder, LLVMGetPoison(llvm_int_types[func_xreg_llvmtype[operand0.s.slot_idx]]), func_xreg_alloca[operand0.s.slot_idx]);
+    }
 }
 
 void translate_call(OpCodeType opc, void *ptr) {

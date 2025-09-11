@@ -3444,7 +3444,7 @@ uintptr_t x_load_addr = 0;
 extern uintptr_t pc_before;
 void tcg_gen_call_direct(unsigned long call_tgt, TCGv_i64 ret, unsigned long ret_tgt)
 {
-    tcg_gen_op3i_i64_2(INDEX_op_call_direct, ret, (ret_tgt - x_load_addr) - pc_before, (call_tgt - x_load_addr));
+    tcg_gen_op3i_i64_2(INDEX_op_call_direct, ret, (ret_tgt - x_load_addr) - pc_before, (call_tgt - x_load_addr) - pc_before);
 }
 
 extern uintptr_t branch_left;

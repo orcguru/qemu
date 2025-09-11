@@ -259,7 +259,7 @@ typedef struct __attribute__((packed)) {
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :5;
     uint16_t imm0           :8;
-    uint32_t imm1;
+    int32_t imm1;
 } Instr1B24;
 
 typedef struct __attribute__((packed)) {

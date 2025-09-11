@@ -546,7 +546,7 @@ size_t create_slot_imm2(void *ptr, OpCodeType op, OperandType s0, uint64_t i0, u
     SET_SLOT(0);
     assert(i0 < (1<<8));
     i->imm0 = i0;
-    // NOTICE: those calls to negative address are illegal
+    assert((uint64_t)((long)((int32_t)i1)) == i1);
     i->imm1 = i1;
     return sizeof(*i);
 }
