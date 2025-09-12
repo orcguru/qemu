@@ -37,7 +37,7 @@ void register_xmm(uint64_t idx, uint64_t offset) {
 }
 
 uint64_t get_xmm_offset(uint64_t idx) {
-    assert(idx < 15);
+    assert(idx <= 15);
     return xmm_offsets[idx];
 }
 
