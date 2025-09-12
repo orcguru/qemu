@@ -19,6 +19,7 @@ extern uint8_t opcoc[OPCODE_MAX];
 extern uint8_t opcmem_addr_nzidx[OPCODE_MAX];
 extern const char *helper_str[];
 
+static LLVMContextRef context;
 static LLVMModuleRef module;
 static LLVMBuilderRef builder;
 static LLVMValueRef llvm_func;
@@ -62,6 +63,9 @@ static uint32_t func_instr_cnt_remain = 0;
 static uint8_t current_active_labels[BB_MAX_CNT];
 static uint8_t current_active_label_cnt = 0;
 static uint8_t exception_or_interrupt_on = 0;
+#define MAX_FUNC_CNT    16000000
+static uint32_t current_func_cnt = 0;
+#define LLVMNoInlineAttribute   32
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
@@ -244,12 +248,11 @@ static LLVMBasicBlockRef get_bb(const char *name) {
     return NULL;
 }
 
-static LLVMModuleRef create_module(const char *module_name) {
-    LLVMContextRef context = LLVMGetGlobalContext();
-    LLVMModuleRef module = LLVMModuleCreateWithNameInContext(module_name, context);
+static void create_module(const char *module_name) {
+    context = LLVMGetGlobalContext();
+    module = LLVMModuleCreateWithNameInContext(module_name, context);
 
     LLVMSetTarget(module, "riscv64-unknown-linux-gnu");
-    return module;
 }
 
 static void register_alias(OperandType lval, OperandType rval) {
@@ -908,6 +911,8 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     if (!func) {
         func = LLVMAddFunction(module, func_name,
                                LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0));
+        LLVMAttributeRef NoInlineAttr = LLVMCreateEnumAttribute(context, LLVMNoInlineAttribute, 0);
+        LLVMAddAttributeAtIndex(func, -1, NoInlineAttr);
     }
     LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, func, LLVMInt64Type(), get_next_var_name());
     create_scalar_slot2_imm(buf, add_i64, ptr_val, ptr_val, -8UL);
@@ -1396,6 +1401,8 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
     LLVMValueRef func = LLVMGetNamedFunction(module, func_name);
     if (!func) {
         func = LLVMAddFunction(module, func_name, func_type);
+        LLVMAttributeRef NoInlineAttr = LLVMCreateEnumAttribute(context, LLVMNoInlineAttribute, 0);
+        LLVMAddAttributeAtIndex(func, -1, NoInlineAttr);
     }
     LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, func, call_args, FIXED_VECTOR_PARAM_COUNT, "");
     LLVMSetTailCall(call_inst, 1);
@@ -1602,6 +1609,8 @@ void translate_call(OpCodeType opc, void *ptr) {
     sprintf(func_name, "func_%lx_call%d", current_func_offset, current_call_idx);
     LLVMValueRef new_llvm_func = LLVMAddFunction(module, func_name,
             LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0));
+    LLVMAttributeRef NoInlineAttr = LLVMCreateEnumAttribute(context, LLVMNoInlineAttribute, 0);
+    LLVMAddAttributeAtIndex(new_llvm_func, -1, NoInlineAttr);
     LLVMValueRef new_func_addr = LLVMBuildPtrToInt(builder, new_llvm_func, LLVMInt64Type(), get_next_var_name());
     uint8_t noargs = get_helper_noargs(ptr);
     OperandType oarg;
@@ -1931,6 +1940,8 @@ void handle_func(uint64_t val) {
     if (!llvm_func) {
         llvm_func = LLVMAddFunction(module, func_name,
             LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0));
+        LLVMAttributeRef NoInlineAttr = LLVMCreateEnumAttribute(context, LLVMNoInlineAttribute, 0);
+        LLVMAddAttributeAtIndex(llvm_func, -1, NoInlineAttr);
     }
     for (int j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
         LLVMValueRef param = LLVMGetParam(llvm_func, j);
@@ -2018,6 +2029,12 @@ void handle_func(uint64_t val) {
     }
 
     cleanup_func_resource();
+
+    current_func_cnt += 1;
+    if (current_func_cnt > MAX_FUNC_CNT) {
+        module_epilog();
+        module_prolog();
+    }
 }
 
 static void handle_single_instr(OpCodeType opc, void *ptr) {
@@ -2218,7 +2235,7 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
 }
 
 void module_prolog() {
-    module = create_module("qemuaot");
+    create_module("qemuaot");
     builder = LLVMCreateBuilder();
 
     // Parameter setup (same for all functions)
