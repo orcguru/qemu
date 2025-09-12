@@ -49,15 +49,19 @@ static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
 static uint8_t last_instr_control_transfer = 0;
 static uint32_t br_count = 0;
 static uint64_t current_func_offset = 0;
-#define BB_MAX_CALL_CNT     8
-static uint32_t tmp_shadow_offset[BB_MAX_CALL_CNT][1<<5] = {0};
-static LLVMType helper_output_type[BB_MAX_CALL_CNT];
-static OperandType helper_output_slot[BB_MAX_CALL_CNT];
+#define BB_MAX_CNT  8
+static uint32_t tmp_shadow_offset[BB_MAX_CNT][1<<5] = {0};
+static LLVMType helper_output_type[BB_MAX_CNT];
+static OperandType helper_output_slot[BB_MAX_CNT];
 static uint8_t current_call_idx = 0;
 static uint32_t shadow_call_offset = 16;
 static uint8_t xmmt_valid[2] = {0};
 static uint32_t xreg_valid = 0, tmp_valid = 0, xmm_valid = 0;
 static LLVMType tmp_bits_type[1<<5] = {0};
+static uint32_t func_instr_cnt_remain = 0;
+static uint8_t current_active_labels[BB_MAX_CNT];
+static uint8_t current_active_label_cnt = 0;
+static uint8_t exception_or_interrupt_on = 0;
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
@@ -68,6 +72,9 @@ static OperandType get_env_ptr();
 static OperandType get_shadow_stack_pointer();
 static void set_shadow_stack_pointer(OperandType val);
 static LLVMBasicBlockRef get_bb(const char *name);
+static void handle_single_instr(OpCodeType opc, void *ptr);
+static uint8_t is_tail_call(HelperType h);
+static uint8_t is_opc_end_of_control_flow(OpCodeType opc);
 void translate_add_i64(OpCodeType opc, void *ptr);
 void translate_andc_i64(OpCodeType opc, void *ptr);
 void translate_andc_vec(OpCodeType opc, void *ptr);
@@ -98,6 +105,7 @@ void translate_brcond_i64(OpCodeType opc, void *ptr);
 void translate_jmp_direct(OpCodeType opc, void *ptr);
 void translate_call_direct(OpCodeType opc, void *ptr);
 void translate_discard(OpCodeType opc, void *ptr);
+void translate_tail_call(OpCodeType opc, void *ptr);
 void translate_call(OpCodeType opc, void *ptr);
 void translate_ld_env_xmm(OpCodeType opc, void *ptr);
 void translate_movcond(OpCodeType opc, void *ptr);
@@ -145,6 +153,13 @@ void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api);
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
 #define OPC_OUTPUT_T        opciosz[opc][2]
 #define OPC_ADDR_T          LLVMInt64
+
+static uint8_t is_opc_end_of_control_flow(OpCodeType opc) {
+    if (opc == jmp_direct || opc == call_direct || opc == ret) {
+        return 1;
+    }
+    return 0;
+}
 
 static uint8_t get_next_spare_tmp_var() {
     uint8_t ret = 0xff;
@@ -1106,7 +1121,6 @@ void translate_ret(OpCodeType opc, void *ptr) {
 
     create_helper_env_slot(buf, ret_ind, 0, 0, operand0);
     translate_call(call, buf);
-    LLVMBuildRetVoid(builder);
 }
 
 void translate_rotr(OpCodeType opc, void *ptr) {
@@ -1285,6 +1299,17 @@ void translate_set_label(OpCodeType opc, void *ptr) {
     }
     LLVMPositionBuilderAtEnd(builder, label);
     last_active_bb = label;
+
+    int do_move = 0;
+    for (int i = 0; i < current_active_label_cnt; ++i) {
+        if (do_move) {
+            current_active_labels[i-1] = current_active_labels[i];
+        }
+        if (current_active_labels[i] == l) {
+            do_move = 1;
+        }
+    }
+    current_active_label_cnt -= 1;
 }
 
 void translate_brcond_i64(OpCodeType opc, void *ptr) {
@@ -1307,10 +1332,16 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
     sprintf(false_bb_name, "bb_false%d", br_count);
     LLVMBasicBlockRef bb_false = LLVMAppendBasicBlock(llvm_func, false_bb_name);
     char true_bb_name[16] = {0};
-    sprintf(true_bb_name, "bb_L%d", get_label(ptr));
+    uint8_t lbl = get_label(ptr);
+    sprintf(true_bb_name, "bb_L%d", lbl);
     LLVMBasicBlockRef bb_true = get_bb(true_bb_name);
     if (!bb_true) {
         bb_true = LLVMAppendBasicBlock(llvm_func, true_bb_name);
+        for (int i = 0; i < current_active_label_cnt; ++i) {
+            assert(current_active_labels[i] != lbl);
+        }
+        current_active_labels[current_active_label_cnt] = lbl;
+        current_active_label_cnt += 1;
     }
     LLVMPositionBuilderAtEnd(builder, last_active_bb);
     LLVMBuildCondBr(builder, bool_val, bb_true, bb_false);
@@ -1397,7 +1428,111 @@ void translate_discard(OpCodeType opc, void *ptr) {
     }
 }
 
+static uint8_t is_tail_call(HelperType h) {
+    if (h == ret_ind || h == call_ind || h == icebp ||
+        h == iret_ind || h == jmp_ind || h == ljmp_protected ||
+        h == lret_protected || h == helper_pause || h == raise_exception ||
+        h == raise_interrupt) {
+        return 1;
+    }
+    return 0;
+}
+
+void translate_tail_call(OpCodeType opc, void *ptr) {
+    uint8_t op_idx = 0;
+    OperandType operands[16] = {0};
+    uint32_t is_imm[16] = {0};
+    uint8_t op_cnt = 0;
+    do {
+        operands[op_cnt] = get_operand(ptr, op_idx, &is_imm[op_cnt]);
+        if (is_imm[op_cnt] == 0 && operands[op_cnt].s.valid == 0) {
+            break;
+        }
+        op_cnt += 1;
+        op_idx += 1;
+    } while (1);
+
+    // Build the call
+    LLVMTypeRef call_types[FIXED_PARAM_COUNT + 16] = {NULL};
+    LLVMValueRef call_args[FIXED_PARAM_COUNT + 16];
+    for (int i = 0; i < FIXED_PARAM_COUNT; ++i) {
+        call_types[i] = fixed_vector_param_types[i];
+        if (fixed_vector_param_in_stack[i]) {
+            OperandType param_in_stack;
+            param_in_stack.s.valid = 1;
+            param_in_stack.s.slot_type = SUB_SLOT_XREG;
+            param_in_stack.s.slot_idx = i;
+            call_args[i] = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+        } else {
+            call_args[i] = LLVMGetParam(llvm_func, i);
+        }
+    }
+    call_types[FIXED_PARAM_COUNT] = llvm_int_types[LLVMInt64];
+    call_args[FIXED_PARAM_COUNT] = LLVMConstInt(call_types[FIXED_PARAM_COUNT], 0, 0);
+    int call_arg_cnts = FIXED_PARAM_COUNT + 1 + op_cnt;
+    for (int i = FIXED_PARAM_COUNT + 1, op_idx = 0; i < call_arg_cnts; ++i, ++op_idx) {
+        if (is_imm[op_idx]) {
+            call_types[i] = llvm_int_types[LLVMInt64];
+            call_args[i] = LLVMConstInt(call_types[i], operands[op_idx].i, 0);
+        } else {
+            assert(operands[op_idx].s.slot_type != SUB_SLOT_XMM);
+            if (operands[op_idx].s.slot_type == SUB_SLOT_TMP && has_alias(operands[op_idx])) {
+                call_types[i] = llvm_int_types[LLVMInt64];
+                OperandType alias = get_alias(operands[op_idx]);
+                assert(alias.s.valid);
+                if (alias.s.slot_type == SUB_SLOT_XMM) {
+                    LLVMValueRef env_raw = get_env_ptr_raw();
+                    uint64_t xmm_offset = get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset;
+                    LLVMValueRef off = LLVMConstInt(LLVMInt64Type(), xmm_offset, 0);
+                    call_args[i] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                } else if (alias.s.slot_type == SUB_SLOT_ENV) {
+                    LLVMValueRef env_raw = get_env_ptr_raw();
+                    LLVMValueRef off = LLVMConstInt(LLVMInt64Type(), alias.s.offset, 0);
+                    call_args[i] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                } else {
+                    assert(0);
+                }
+            } else {
+                if (operands[op_idx].s.slot_type == SUB_SLOT_ENVVAR) {
+                    call_types[i] = llvm_int_types[LLVMInt64];
+                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], LLVMInt64);
+                } else if (operands[op_idx].s.slot_type == SUB_SLOT_XREG) {
+                    call_types[i] = fixed_vector_param_types[operands[op_idx].s.slot_idx];
+                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], fixed_vector_param_llvmtypes[operands[op_idx].s.slot_idx]);
+                } else if (operands[op_idx].s.slot_type == SUB_SLOT_TMP) {
+                    assert(func_tmp_llvmtype[operands[op_idx].s.slot_idx] <= LLVMInt64);
+                    call_types[i] = llvm_int_types[func_tmp_llvmtype[operands[op_idx].s.slot_idx]];
+                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], func_tmp_llvmtype[operands[op_idx].s.slot_idx]);
+                } else {
+                    assert(0);
+                }
+            }
+        }
+    }
+
+    LLVMTypeRef helper_type = LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnts, 0);
+
+    char helper_name[64] = {0};
+    sprintf(helper_name, "helper_A_%s", helper_str[get_helper(ptr)]);
+    LLVMValueRef helper = LLVMGetNamedFunction(module, helper_name);
+    if (!helper) {
+        helper = LLVMAddFunction(module, helper_name, helper_type);
+    }
+    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper, call_args, call_arg_cnts, "");
+    LLVMSetTailCall(call_helper_inst, 1);
+    // FIXME: qemuaot
+    LLVMSetInstructionCallConv(call_helper_inst, 124);
+    LLVMBuildRetVoid(builder);
+}
+
 void translate_call(OpCodeType opc, void *ptr) {
+    HelperType h = get_helper(ptr);
+    if (is_tail_call(h)) {
+        if (h == raise_exception || h == raise_interrupt) {
+            exception_or_interrupt_on = 1;
+        }
+        return translate_tail_call(opc, ptr);
+    }
     // Store all vectors to memory
     LLVMValueRef env_raw = get_env_ptr_raw();
     LLVMTypeRef ret_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
@@ -1561,6 +1696,31 @@ void translate_call(OpCodeType opc, void *ptr) {
     LLVMSetInstructionCallConv(call_helper_inst, 124);
     LLVMBuildRetVoid(builder);
 
+    // Check if we got remaining BBs
+    do {
+        if (!current_active_label_cnt) {
+            break;
+        }
+        uint8_t tgt_lbl = current_active_labels[0];
+        void *ptr_init = get_instr_buffer();
+        void *ptr_max = ptr_init + get_instr_buffer_size();
+        void *ptr_tmp = NULL;
+        for (ptr_tmp = move_to_next(ptr); ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+            OpCodeType opc = get_opcode(ptr_tmp);
+            if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+                break;
+            }
+        }
+        assert(ptr_tmp < ptr_max);
+        for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+            OpCodeType opc = get_opcode(ptr_tmp);
+            handle_single_instr(opc, ptr_tmp);
+            if (is_opc_end_of_control_flow(opc)) {
+                break;
+            }
+        }
+    } while (1);
+
     // Setup new function
     llvm_func = new_llvm_func;
     for (int j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
@@ -1664,6 +1824,9 @@ static void cleanup_func_resource() {
     xreg_valid = 0;
     tmp_valid = 0;
     xmm_valid = 0;
+    func_instr_cnt_remain = 0;
+    current_active_label_cnt = 0;
+    exception_or_interrupt_on = 0;
     memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
     memset(tmp_shadow_offset, 0, sizeof(tmp_shadow_offset));
     memset(tmp_bits_type, 0, sizeof(tmp_bits_type));
@@ -1673,7 +1836,7 @@ static void cleanup_func_resource() {
 }
 
 void handle_func(uint64_t val) {
-    printf("func %lx\n", val);
+    //printf("func %lx\n", val);
     current_func_offset = val;
     ir_var_name_idx = 0;
     tmp_var_available = 0xffffffff;
@@ -1682,9 +1845,8 @@ void handle_func(uint64_t val) {
     void *ptr;
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint32_t is_imm = 0;
-    int instr_idx = 0;
     uint8_t tmp_has_known_def[1<<5] = {0};
-    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), instr_idx += 1) {
+    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), func_instr_cnt_remain += 1) {
         uint32_t slot_idx = 0;
         OperandType operand;
         OpCodeType opc = get_opcode(ptr);
@@ -1758,6 +1920,7 @@ void handle_func(uint64_t val) {
                 tmp_has_known_def[oarg.s.slot_idx] = 1;
             }
             current_call_idx += 1;
+            assert(current_call_idx < BB_MAX_CNT);
         }
     }
     tmp_var_available_backup = tmp_var_available;
@@ -1838,202 +2001,13 @@ void handle_func(uint64_t val) {
 
     current_call_idx = 0;
     // Handle each IR translation
-    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), instr_idx += 1) {
+    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), func_instr_cnt_remain -= 1) {
         OpCodeType opc = get_opcode(ptr);
-        switch (opc) {
-        case add_i64:
-            translate_add_i64(opc, ptr);
-            break;
-        case add_vec:
-            translate_binary(opc, ptr, LLVMBuildAdd);
-            break;
-        case andc_i64:
-            translate_andc_i64(opc, ptr);
-            break;
-        case andc_vec:
-            translate_andc_vec(opc, ptr);
-            break;
-        case and_i32:
-        case and_i64:
-            translate_binary(opc, ptr, LLVMBuildAnd);
-            break;
-        case and_vec:
-            translate_binary(opc, ptr, LLVMBuildAnd);
-            break;
-        case bswap32_i64:
-            translate_bswap32_i64(opc, ptr);
-            break;
-        case clz_i64:
-            translate_clz_i64(opc, ptr);
-            break;
-        case cmp_vec:
-            translate_cmp_vec(opc, ptr);
-            break;
-        case ctz_i64:
-            translate_ctz_i64(opc, ptr);
-            break;
-        case deposit_i32:
-        case deposit_i64:
-            translate_deposit(opc, ptr);
-            break;
-        case dupm_vec:
-            translate_dupm_vec(opc, ptr);
-            break;
-        case extract2_i64:
-            translate_extract2_i64(opc, ptr);
-            break;
-        case extract_i32:
-        case extract_i64:
-            translate_extract(opc, ptr);
-            break;
-        case extrl_i64_i32:
-        case mov_i32:
-        case mov_i64:
-        case mov_vec:
-            translate_mov(opc, ptr);
-            break;
-        case ld_vec:
-            translate_ld_vec(opc, ptr);
-            break;
-        case ld_i32:
-        case ld_i64:
-            translate_ld_env_xmm(opc, ptr);
-            break;
-        case extu_i32_i64:
-        case ld8u_i64:
-        case ld32u_i64:
-            translate_ext(opc, ptr, LLVMBuildZExt);
-            break;
-        case ld32s_i64:
-            translate_ext(opc, ptr, LLVMBuildSExt);
-            break;
-        case movcond_i32:
-        case movcond_i64:
-        case movcond_vec:
-            translate_movcond(opc, ptr);
-            break;
-        case mul_i32:
-        case mul_i64:
-            translate_binary(opc, ptr, LLVMBuildMul);
-            break;
-        case mulsh_i64:
-            translate_mulxh(opc, ptr, LLVMBuildSExt);
-            break;
-        case muluh_i64:
-            translate_mulxh(opc, ptr, LLVMBuildZExt);
-            break;
-        case neg_i32:
-        case neg_i64:
-            translate_neg(opc, ptr);
-            break;
-        case negsetcond_i64:
-            translate_negsetcond_i64(opc, ptr);
-            break;
-        case not_i64:
-            translate_not_i64(opc, ptr);
-            break;
-        case or_i32:
-        case or_i64:
-            translate_binary(opc, ptr, LLVMBuildOr);
-            break;
-        case or_vec:
-            translate_binary(opc, ptr, LLVMBuildOr);
-            break;
-        case push_ret_addr:
-            translate_push_ret_addr(opc, ptr);
-            break;
-        case qemu_ld2_i128:
-            translate_qemu_ld2_i128(opc, ptr);
-            break;
-        case qemu_ld_i32:
-        case qemu_ld_i64:
-            translate_qemu_ld(opc, ptr);
-            break;
-        case qemu_st2_i128:
-            translate_qemu_st2_i128(opc, ptr);
-            break;
-        case qemu_st_i32:
-        case qemu_st_i64:
-            translate_qemu_st(opc, ptr);
-            break;
-        case ret:
-            translate_ret(opc, ptr);
-            break;
-        case rotr_i32:
-        case rotr_i64:
-            translate_rotr(opc, ptr);
-            break;
-        case sar_i64:
-            translate_binary(opc, ptr, LLVMBuildAShr);
-            break;
-        case setcond_i64:
-            translate_setcond_i64(opc, ptr);
-            break;
-        case sextract_i64:
-            translate_sextract_i64(opc, ptr);
-            break;
-        case shl_i32:
-        case shl_i64:
-            translate_binary(opc, ptr, LLVMBuildShl);
-            break;
-        case shli_vec:
-            translate_binary(opc, ptr, LLVMBuildShl);
-            break;
-        case shr_i32:
-        case shr_i64:
-            translate_binary(opc, ptr, LLVMBuildLShr);
-            break;
-        case st16_i32:
-        case st16_i64:
-        case st32_i64:
-        case st_i32:
-        case st_i64:
-        case st_vec:
-            translate_st(opc, ptr);
-            break;
-        case sub_i32:
-        case sub_i64:
-            translate_binary(opc, ptr, LLVMBuildSub);
-            break;
-        case sub_vec:
-            translate_binary(opc, ptr, LLVMBuildSub);
-            break;
-        case umax_vec:
-            translate_maxmin_vec(opc, ptr, gtu);
-            break;
-        case umin_vec:
-            translate_maxmin_vec(opc, ptr, ltu);
-            break;
-        case xor_i32:
-        case xor_i64:
-            translate_binary(opc, ptr, LLVMBuildXor);
-            break;
-        case xor_vec:
-            translate_binary(opc, ptr, LLVMBuildXor);
-            break;
-        case bswap64_i64:
-            translate_bswap64_i64(opc, ptr);
-            break;
-        case set_label:
-            translate_set_label(opc, ptr);
-            break;
-        case brcond_i64:
-            translate_brcond_i64(opc, ptr);
-            break;
-        case jmp_direct:
-            translate_jmp_direct(opc, ptr);
-            break;
-        case call_direct:
-            translate_call_direct(opc, ptr);
-            break;
-        case discard:
-            translate_discard(opc, ptr);
-            break;
-        case call:
-            translate_call(opc, ptr);
+        if (!exception_or_interrupt_on) {
+            handle_single_instr(opc, ptr);
+        }
+        if (opc == call) {
             current_call_idx += 1;
-            break;
-        default: assert(0);
         }
         if (opc == ret || opc == jmp_direct || opc == call_direct) {
             last_instr_control_transfer = 1;
@@ -2044,6 +2018,203 @@ void handle_func(uint64_t val) {
     }
 
     cleanup_func_resource();
+}
+
+static void handle_single_instr(OpCodeType opc, void *ptr) {
+    switch (opc) {
+    case add_i64:
+        translate_add_i64(opc, ptr);
+        break;
+    case add_vec:
+        translate_binary(opc, ptr, LLVMBuildAdd);
+        break;
+    case andc_i64:
+        translate_andc_i64(opc, ptr);
+        break;
+    case andc_vec:
+        translate_andc_vec(opc, ptr);
+        break;
+    case and_i32:
+    case and_i64:
+        translate_binary(opc, ptr, LLVMBuildAnd);
+        break;
+    case and_vec:
+        translate_binary(opc, ptr, LLVMBuildAnd);
+        break;
+    case bswap32_i64:
+        translate_bswap32_i64(opc, ptr);
+        break;
+    case clz_i64:
+        translate_clz_i64(opc, ptr);
+        break;
+    case cmp_vec:
+        translate_cmp_vec(opc, ptr);
+        break;
+    case ctz_i64:
+        translate_ctz_i64(opc, ptr);
+        break;
+    case deposit_i32:
+    case deposit_i64:
+        translate_deposit(opc, ptr);
+        break;
+    case dupm_vec:
+        translate_dupm_vec(opc, ptr);
+        break;
+    case extract2_i64:
+        translate_extract2_i64(opc, ptr);
+        break;
+    case extract_i32:
+    case extract_i64:
+        translate_extract(opc, ptr);
+        break;
+    case extrl_i64_i32:
+    case mov_i32:
+    case mov_i64:
+    case mov_vec:
+        translate_mov(opc, ptr);
+        break;
+    case ld_vec:
+        translate_ld_vec(opc, ptr);
+        break;
+    case ld_i32:
+    case ld_i64:
+        translate_ld_env_xmm(opc, ptr);
+        break;
+    case extu_i32_i64:
+    case ld8u_i64:
+    case ld32u_i64:
+        translate_ext(opc, ptr, LLVMBuildZExt);
+        break;
+    case ld32s_i64:
+        translate_ext(opc, ptr, LLVMBuildSExt);
+        break;
+    case movcond_i32:
+    case movcond_i64:
+    case movcond_vec:
+        translate_movcond(opc, ptr);
+        break;
+    case mul_i32:
+    case mul_i64:
+        translate_binary(opc, ptr, LLVMBuildMul);
+        break;
+    case mulsh_i64:
+        translate_mulxh(opc, ptr, LLVMBuildSExt);
+        break;
+    case muluh_i64:
+        translate_mulxh(opc, ptr, LLVMBuildZExt);
+        break;
+    case neg_i32:
+    case neg_i64:
+        translate_neg(opc, ptr);
+        break;
+    case negsetcond_i64:
+        translate_negsetcond_i64(opc, ptr);
+        break;
+    case not_i64:
+        translate_not_i64(opc, ptr);
+        break;
+    case or_i32:
+    case or_i64:
+        translate_binary(opc, ptr, LLVMBuildOr);
+        break;
+    case or_vec:
+        translate_binary(opc, ptr, LLVMBuildOr);
+        break;
+    case push_ret_addr:
+        translate_push_ret_addr(opc, ptr);
+        break;
+    case qemu_ld2_i128:
+        translate_qemu_ld2_i128(opc, ptr);
+        break;
+    case qemu_ld_i32:
+    case qemu_ld_i64:
+        translate_qemu_ld(opc, ptr);
+        break;
+    case qemu_st2_i128:
+        translate_qemu_st2_i128(opc, ptr);
+        break;
+    case qemu_st_i32:
+    case qemu_st_i64:
+        translate_qemu_st(opc, ptr);
+        break;
+    case ret:
+        translate_ret(opc, ptr);
+        break;
+    case rotr_i32:
+    case rotr_i64:
+        translate_rotr(opc, ptr);
+        break;
+    case sar_i64:
+        translate_binary(opc, ptr, LLVMBuildAShr);
+        break;
+    case setcond_i64:
+        translate_setcond_i64(opc, ptr);
+        break;
+    case sextract_i64:
+        translate_sextract_i64(opc, ptr);
+        break;
+    case shl_i32:
+    case shl_i64:
+        translate_binary(opc, ptr, LLVMBuildShl);
+        break;
+    case shli_vec:
+        translate_binary(opc, ptr, LLVMBuildShl);
+        break;
+    case shr_i32:
+    case shr_i64:
+        translate_binary(opc, ptr, LLVMBuildLShr);
+        break;
+    case st16_i32:
+    case st16_i64:
+    case st32_i64:
+    case st_i32:
+    case st_i64:
+    case st_vec:
+        translate_st(opc, ptr);
+        break;
+    case sub_i32:
+    case sub_i64:
+        translate_binary(opc, ptr, LLVMBuildSub);
+        break;
+    case sub_vec:
+        translate_binary(opc, ptr, LLVMBuildSub);
+        break;
+    case umax_vec:
+        translate_maxmin_vec(opc, ptr, gtu);
+        break;
+    case umin_vec:
+        translate_maxmin_vec(opc, ptr, ltu);
+        break;
+    case xor_i32:
+    case xor_i64:
+        translate_binary(opc, ptr, LLVMBuildXor);
+        break;
+    case xor_vec:
+        translate_binary(opc, ptr, LLVMBuildXor);
+        break;
+    case bswap64_i64:
+        translate_bswap64_i64(opc, ptr);
+        break;
+    case set_label:
+        translate_set_label(opc, ptr);
+        break;
+    case brcond_i64:
+        translate_brcond_i64(opc, ptr);
+        break;
+    case jmp_direct:
+        translate_jmp_direct(opc, ptr);
+        break;
+    case call_direct:
+        translate_call_direct(opc, ptr);
+        break;
+    case discard:
+        translate_discard(opc, ptr);
+        break;
+    case call:
+        translate_call(opc, ptr);
+        break;
+    default: assert(0);
+    }
 }
 
 void module_prolog() {
