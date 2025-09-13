@@ -280,6 +280,8 @@ update_mxcsr        update_mxcsr
 xgetbv              xgetbv
 xrstor              xrstor
 xsave               xsave
+dump_load           dump_load
+dump_store          dump_store
 
 %%
 
@@ -502,6 +504,8 @@ xsave               xsave
 {xgetbv}            { HANDLE_COLUMN; yylval->h = xgetbv; return HELPER; }
 {xrstor}            { HANDLE_COLUMN; yylval->h = xrstor; return HELPER; }
 {xsave}             { HANDLE_COLUMN; yylval->h = xsave; return HELPER; }
+{dump_load}         { HANDLE_COLUMN; yylval->h = dump_load; return HELPER; }
+{dump_store}        { HANDLE_COLUMN; yylval->h = dump_store; return HELPER; }
 ","               { HANDLE_COLUMN; return COMMA; }
 ":"               { HANDLE_COLUMN; return COLON; }
 "+"               { HANDLE_COLUMN; return PLUS; }

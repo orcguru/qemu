@@ -14,6 +14,7 @@
 
 extern char *lineptr;
 extern const char *opcode_type_str[];
+extern const char *llvm_type_str[];
 extern LLVMType opciosz[OPCODE_MAX][3];
 extern uint8_t opcoc[OPCODE_MAX];
 extern uint8_t opcmem_addr_nzidx[OPCODE_MAX];
@@ -33,7 +34,7 @@ static const char *fixed_vector_arg_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 static const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 static const char *xmm_tmp_stack_names[2] = {NULL};
 static const char *tmp_stack_names[1<<5] = {NULL};
-static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)] = {NULL};
+static const char *ir_var_name[('z'-'a'+1)*(('z'-'a'+1)+('Z'-'A'+1))] = {NULL};
 static int ir_var_name_idx = 0;
 static LLVMTypeRef llvm_int_types[LLVMMAXType] = {NULL};
 static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
@@ -77,6 +78,7 @@ static OperandType get_shadow_stack_pointer();
 static void set_shadow_stack_pointer(OperandType val);
 static LLVMBasicBlockRef get_bb(const char *name);
 static void handle_single_instr(OpCodeType opc, void *ptr);
+static uint8_t is_dump_call(HelperType h);
 static uint8_t is_tail_call(HelperType h);
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc);
 void translate_add_i64(OpCodeType opc, void *ptr);
@@ -110,6 +112,7 @@ void translate_jmp_direct(OpCodeType opc, void *ptr);
 void translate_call_direct(OpCodeType opc, void *ptr);
 void translate_discard(OpCodeType opc, void *ptr);
 void translate_tail_call(OpCodeType opc, void *ptr);
+void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers);
 void translate_call(OpCodeType opc, void *ptr);
 void translate_ld_env_xmm(OpCodeType opc, void *ptr);
 void translate_movcond(OpCodeType opc, void *ptr);
@@ -120,7 +123,7 @@ void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api);
         uint32_t is_imm0, is_imm1;                      \
         operand0 = get_operand(ptr, 0, &is_imm0);       \
         operand1 = get_operand(ptr, 1, &is_imm1);       \
-        assert(operand0.s.valid && operand1.s.valid);   \
+        assert(!is_imm0 && operand0.s.valid && !is_imm1 && operand1.s.valid);   \
     } while (0)
 
 #define GET_2_OPERANDS_NOCHECK()                        \
@@ -135,7 +138,7 @@ void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api);
         operand0 = get_operand(ptr, 0, &is_imm0);       \
         operand1 = get_operand(ptr, 1, &is_imm1);       \
         operand2 = get_operand(ptr, 2, &is_imm2);       \
-        assert(operand0.s.valid && operand1.s.valid && operand2.s.valid);   \
+        assert(!is_imm0 && operand0.s.valid && !is_imm1 && operand1.s.valid && !is_imm2 && operand2.s.valid);   \
     } while (0)
 
 #define GET_3_OPERANDS_NOCHECK()                        \
@@ -288,7 +291,6 @@ static uint32_t has_alias(OperandType operand) {
 }
 
 static LLVMValueRef get_stack_alloca(OperandType operand) {
-    assert(operand.s.valid);
     LLVMValueRef alloca = NULL;
     if (operand.s.slot_type == SUB_SLOT_XREG) {
         alloca = func_xreg_alloca[operand.s.slot_idx];
@@ -304,7 +306,6 @@ static LLVMValueRef get_stack_alloca(OperandType operand) {
 }
 
 static LLVMType get_stack_llvmtype(OperandType operand) {
-    assert(operand.s.valid);
     if (operand.s.slot_type == SUB_SLOT_XREG) {
         return func_xreg_llvmtype[operand.s.slot_idx];
     } else if (operand.s.slot_type == SUB_SLOT_TMP) {
@@ -447,6 +448,7 @@ void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
     OperandType operand_l, operand_r, output;
     uint32_t idx = opcoc[opc];
     output = get_operand(ptr, 0, &is_imm_out);
+    assert(!is_imm_out && output.s.valid);
     operand_l = get_operand(ptr, idx, &is_imm_l);
     operand_r = get_operand(ptr, idx + 1, &is_imm_r);
     uint8_t is_vec = is_vector(ptr);
@@ -465,17 +467,25 @@ void translate_add_i64(OpCodeType opc, void *ptr) {
     OperandType operand_l, operand_r, output;
     uint32_t idx = opcoc[opc];
     output = get_operand(ptr, 0, &is_imm_out);
+    assert(!is_imm_out && output.s.valid);
     operand_l = get_operand(ptr, idx, &is_imm_l);
+    assert(!is_imm_l && operand_l.s.valid);
     operand_r = get_operand(ptr, idx + 1, &is_imm_r);
-    if (operand_r.s.valid == 0 && is_imm_r == 0) {
+    if (!operand_r.s.valid && !is_imm_r) {
         assert(operand_l.s.slot_type == SUB_SLOT_XMM ||
                operand_l.s.slot_type == SUB_SLOT_ENV);
         register_alias(output, operand_l);
     } else {
-        LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, OPC_INPUT_T);
-        LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, OPC_INPUT_T);
-        LLVMValueRef add_val = LLVMBuildAdd(builder, left, right, get_next_var_name());
-        do_store(add_val, OPC_OUTPUT_T, output);
+        if (is_imm_r && operand_l.s.slot_type == SUB_SLOT_TMP && has_alias(operand_l)) {
+            OperandType alias = get_alias(operand_l);
+            alias.s.offset += operand_r.i;
+            register_alias(output, alias);
+        } else {
+            LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, OPC_INPUT_T);
+            LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, OPC_INPUT_T);
+            LLVMValueRef add_val = LLVMBuildAdd(builder, left, right, get_next_var_name());
+            do_store(add_val, OPC_OUTPUT_T, output);
+        }
     }
 }
 
@@ -745,6 +755,7 @@ void translate_mov(OpCodeType opc, void *ptr) {
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
     GET_2_OPERANDS_NOCHECK();
+    assert(!is_imm0 && operand0.s.valid);
 
     uint8_t is_vec = is_vector(ptr);
     LLVMType vtype = LLVMInvalidType;
@@ -752,11 +763,16 @@ void translate_mov(OpCodeType opc, void *ptr) {
       vtype = get_llvm_vector_type(ptr);
     }
 
-    LLVMValueRef src = get_source_node_imm_or_stack(is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T);
-    if (OPC_EFFECTIVE_T < OPC_INPUT_T) {
-        src = LLVMBuildTrunc(builder, src, llvm_int_types[OPC_EFFECTIVE_T], get_next_var_name());
+    if (!is_imm1 && operand1.s.valid && operand1.s.slot_type == SUB_SLOT_TMP && has_alias(operand1)) {
+        assert(operand0.s.slot_type == SUB_SLOT_TMP);
+        register_alias(operand0, get_alias(operand1));
+    } else {
+        LLVMValueRef src = get_source_node_imm_or_stack(is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T);
+        if (OPC_EFFECTIVE_T < OPC_INPUT_T) {
+            src = LLVMBuildTrunc(builder, src, llvm_int_types[OPC_EFFECTIVE_T], get_next_var_name());
+        }
+        do_store(src, is_vec ? vtype : OPC_OUTPUT_T, operand0);
     }
-    do_store(src, is_vec ? vtype : OPC_OUTPUT_T, operand0);
 }
 
 void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
@@ -780,10 +796,11 @@ void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
 }
 
 void translate_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
+    uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
-    GET_2_OPERANDS();
+    GET_2_OPERANDS_NOCHECK();
 
-    LLVMValueRef src = get_source_node_imm_or_stack(0, operand1, OPC_INPUT_T);
+    LLVMValueRef src = get_source_node_imm_or_stack(is_imm1, operand1, OPC_INPUT_T);
     src = api(builder, src, llvm_int_types[OPC_OUTPUT_T], get_next_var_name());
     do_store(src, OPC_OUTPUT_T, operand0);
 }
@@ -896,7 +913,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     func_hex = get_operand(ptr, 1, &is_imm1);
     assert(is_imm1);
 
-    LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(0, operand0, OPC_INPUT_T);
+    LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(is_imm0, operand0, OPC_INPUT_T);
     uint8_t buf[16];
     OperandType ptr_val = get_shadow_stack_pointer();
     create_scalar_slot2_imm(buf, add_i64, ptr_val, ptr_val, -8UL);
@@ -1050,6 +1067,7 @@ void translate_ret(OpCodeType opc, void *ptr) {
     uint32_t is_imm;
     OperandType operand0;
     operand0 = get_operand(ptr, 0, &is_imm);
+    assert(!is_imm && operand0.s.valid);
     AttrSrcInfo a0, a1, a2;
     a0.subt = SUB_ATTR_ATOMIC;
     a0.p.storage.attr.atomic = NONATOMIC;
@@ -1200,7 +1218,7 @@ void translate_st(OpCodeType opc, void *ptr) {
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
     GET_2_OPERANDS_NOCHECK();
-    assert(operand1.s.valid);
+    assert(!is_imm1 && operand1.s.valid);
 
     LLVMValueRef val = get_source_node_imm_or_stack(is_imm0, operand0, OPC_INPUT_T);
     if (OPC_EFFECTIVE_T < OPC_INPUT_T) {
@@ -1415,6 +1433,7 @@ void translate_call_direct(OpCodeType opc, void *ptr) {
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, ret_delta_hex, call_delta_hex;
     operand0 = get_operand(ptr, 0, &is_imm0);
+    assert(!is_imm0 && operand0.s.valid);
     ret_delta_hex = get_operand(ptr, 1, &is_imm1);
     call_delta_hex = get_operand(ptr, 2, &is_imm2);
     assert(is_imm1 && is_imm2);
@@ -1429,10 +1448,17 @@ void translate_call_direct(OpCodeType opc, void *ptr) {
 void translate_discard(OpCodeType opc, void *ptr) {
     uint32_t is_imm;
     OperandType operand0 = get_operand(ptr, 0, &is_imm);
-    assert(operand0.s.valid);
+    assert(!is_imm && operand0.s.valid);
     if (operand0.s.slot_type == SUB_SLOT_XREG) {
         LLVMBuildStore(builder, LLVMGetPoison(llvm_int_types[func_xreg_llvmtype[operand0.s.slot_idx]]), func_xreg_alloca[operand0.s.slot_idx]);
     }
+}
+
+static uint8_t is_dump_call(HelperType h) {
+    if (h == dump_load || h == dump_store || h == dump_registers) {
+        return 1;
+    }
+    return 0;
 }
 
 static uint8_t is_tail_call(HelperType h) {
@@ -1532,9 +1558,123 @@ void translate_tail_call(OpCodeType opc, void *ptr) {
     LLVMBuildRetVoid(builder);
 }
 
+void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers) {
+    if (is_dump_registers) {
+        // Store all vectors to memory
+        LLVMValueRef env_raw = get_env_ptr_raw();
+        LLVMTypeRef ret_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
+        LLVMTypeRef param_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+        LLVMTypeRef intrinsic_types[] = {param_type, LLVMInt64Type()};
+        LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 2, 0);
+        LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, "llvm.vector.extract.v2i64.nxv1i64");
+        if (!intrinsic_func) {
+            intrinsic_func = LLVMAddFunction(module, "llvm.vector.extract.v2i64.nxv1i64", intrinsic_func_type);
+        }
+        LLVMValueRef index_0 = LLVMConstInt(LLVMInt64Type(), 0, 0);
+        for (int i = FIXED_PARAM_COUNT; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
+            LLVMValueRef vec_val = NULL;
+            if (fixed_vector_param_in_stack[i]) {
+                OperandType param_in_stack;
+                param_in_stack.s.valid = 1;
+                param_in_stack.s.slot_type = SUB_SLOT_XMM;
+                param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
+                param_in_stack.s.offset = 0;
+                vec_val = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+            } else {
+                LLVMValueRef call_args[] = {LLVMGetParam(llvm_func, i), index_0};
+                vec_val = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, call_args, 2, get_next_var_name());
+            }
+            uint64_t xmm_offset = get_xmm_offset((i - FIXED_PARAM_COUNT)/2) + 16 * ((i - FIXED_PARAM_COUNT) % 2);
+            LLVMValueRef off = LLVMConstInt(LLVMInt64Type(), xmm_offset, 0);
+            LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+            LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(ret_type, 0), get_next_var_name());
+            LLVMBuildStore(builder, vec_val, ptr);
+        }
+    }
+
+    uint8_t op_idx = 0;
+    OperandType operands[16] = {0};
+    uint32_t is_imm[16] = {0};
+    uint8_t op_cnt = 0;
+    do {
+        operands[op_cnt] = get_operand(ptr, op_idx, &is_imm[op_cnt]);
+        if (is_imm[op_cnt] == 0 && operands[op_cnt].s.valid == 0) {
+            break;
+        }
+        op_cnt += 1;
+        op_idx += 1;
+    } while (1);
+
+    // Build the call
+    LLVMTypeRef call_types[FIXED_PARAM_COUNT + 16] = {NULL};
+    LLVMValueRef call_args[FIXED_PARAM_COUNT + 16];
+    for (int i = 0; i < FIXED_PARAM_COUNT; ++i) {
+        call_types[i] = fixed_vector_param_types[i];
+        if (fixed_vector_param_in_stack[i]) {
+            OperandType param_in_stack;
+            param_in_stack.s.valid = 1;
+            param_in_stack.s.slot_type = SUB_SLOT_XREG;
+            param_in_stack.s.slot_idx = i;
+            call_args[i] = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+        } else {
+            call_args[i] = LLVMGetParam(llvm_func, i);
+        }
+    }
+    call_types[FIXED_PARAM_COUNT] = llvm_int_types[LLVMInt64];
+    call_args[FIXED_PARAM_COUNT] = LLVMConstInt(call_types[FIXED_PARAM_COUNT], 0, 0);
+    int call_arg_cnts = FIXED_PARAM_COUNT + 1 + op_cnt;
+    for (int i = FIXED_PARAM_COUNT + 1, op_idx = 0; i < call_arg_cnts; ++i, ++op_idx) {
+        if (is_imm[op_idx]) {
+            call_types[i] = llvm_int_types[LLVMInt64];
+            call_args[i] = LLVMConstInt(call_types[i], operands[op_idx].i, 0);
+        } else {
+            if (operands[op_idx].s.slot_type == SUB_SLOT_XREG) {
+                call_types[i] = fixed_vector_param_types[operands[op_idx].s.slot_idx];
+                call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], fixed_vector_param_llvmtypes[operands[op_idx].s.slot_idx]);
+            } else if (operands[op_idx].s.slot_type == SUB_SLOT_TMP) {
+                if (has_alias(operands[op_idx])) {
+                    call_types[i] = llvm_int_types[LLVMInt64];
+                    OperandType alias = get_alias(operands[op_idx]);
+                    assert(alias.s.valid);
+                    if (alias.s.slot_type == SUB_SLOT_XMM) {
+                        LLVMValueRef env_raw = get_env_ptr_raw();
+                        uint64_t xmm_offset = get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset;
+                        LLVMValueRef off = LLVMConstInt(LLVMInt64Type(), xmm_offset, 0);
+                        call_args[i] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                    } else if (alias.s.slot_type == SUB_SLOT_ENV) {
+                        LLVMValueRef env_raw = get_env_ptr_raw();
+                        LLVMValueRef off = LLVMConstInt(LLVMInt64Type(), alias.s.offset, 0);
+                        call_args[i] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                    } else {
+                        assert(0);
+                    }
+                } else {
+                    assert(func_tmp_llvmtype[operands[op_idx].s.slot_idx] <= LLVMInt64);
+                    call_types[i] = llvm_int_types[func_tmp_llvmtype[operands[op_idx].s.slot_idx]];
+                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], func_tmp_llvmtype[operands[op_idx].s.slot_idx]);
+                }
+            } else {
+                assert(0);
+            }
+        }
+    }
+
+    LLVMTypeRef helper_type = LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnts, 0);
+
+    char helper_name[64] = {0};
+    sprintf(helper_name, "helper_A_%s", helper_str[get_helper(ptr)]);
+    LLVMValueRef helper = LLVMGetNamedFunction(module, helper_name);
+    if (!helper) {
+        helper = LLVMAddFunction(module, helper_name, helper_type);
+    }
+    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper, call_args, call_arg_cnts, "");
+}
+
 void translate_call(OpCodeType opc, void *ptr) {
     HelperType h = get_helper(ptr);
-    if (is_tail_call(h)) {
+    if (is_dump_call(h)) {
+        return translate_dump_call(opc, ptr, (h == dump_registers));
+    } else if (is_tail_call(h)) {
         if (h == raise_exception || h == raise_interrupt) {
             exception_or_interrupt_on = 1;
         }
@@ -1592,6 +1732,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     LLVMValueRef shadow_pointer = LLVMBuildLoad2(builder, LLVMInt64Type(), pointer, get_next_var_name());
     for (int i = 0; i < (1<<5); ++i) {
         if (tmp_shadow_offset[current_call_idx][i]) {
+            printf("i:%d\n", i);
             OperandType op;
             op.s.valid = 1;
             op.s.slot_type = SUB_SLOT_TMP;
@@ -1618,7 +1759,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     if (noargs) {
         uint32_t is_imm;
         oarg = get_operand(ptr, 0, &is_imm);
-        assert(oarg.s.valid);
+        assert(!is_imm && oarg.s.valid);
     }
     uint8_t op_idx = noargs;
     OperandType operands[16] = {0};
@@ -1845,7 +1986,7 @@ static void cleanup_func_resource() {
 }
 
 void handle_func(uint64_t val) {
-    //printf("func %lx\n", val);
+    printf("func %lx\n", val);
     current_func_offset = val;
     ir_var_name_idx = 0;
     tmp_var_available = 0xffffffff;
@@ -1853,7 +1994,6 @@ void handle_func(uint64_t val) {
     void *ptr_max = ptr_init + get_instr_buffer_size();
     void *ptr;
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
-    uint32_t is_imm = 0;
     uint8_t tmp_has_known_def[1<<5] = {0};
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), func_instr_cnt_remain += 1) {
         uint32_t slot_idx = 0;
@@ -1861,12 +2001,13 @@ void handle_func(uint64_t val) {
         OpCodeType opc = get_opcode(ptr);
         uint32_t noargs = 0;
         OperandType oarg;
+        uint32_t is_immo;
         oarg.s.valid = 0;
-        if (opc == call) {
+        if (opc == call && !is_dump_call(get_helper(ptr))) {
             noargs = get_helper_noargs(ptr);
             if (noargs) {
-                oarg = get_operand(ptr, 0, &is_imm);
-                assert(oarg.s.valid);
+                oarg = get_operand(ptr, 0, &is_immo);
+                assert(!is_immo && oarg.s.valid);
                 helper_output_slot[current_call_idx] = oarg;
             }
         }
@@ -1876,9 +2017,10 @@ void handle_func(uint64_t val) {
           vtype = get_llvm_vector_type(ptr);
         }
         do {
+            uint32_t is_imm = 0;
             operand = get_operand(ptr, slot_idx, &is_imm);
             // End-of-operands
-            if (is_imm == 0 && operand.s.valid == 0) {
+            if (!is_imm && !operand.s.valid) {
                 break;
             }
             uint32_t shifted_slot_bit = (1 << operand.s.slot_idx);
@@ -1909,23 +2051,23 @@ void handle_func(uint64_t val) {
                     xmm_valid |= shifted_slot_bit;
                 }
                 if (operand.s.slot_type == SUB_SLOT_TMP) {
-                    if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
+                    if ((opc == call && !is_dump_call(get_helper(ptr)) && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
                         if (!tmp_has_known_def[operand.s.slot_idx] && tmp_shadow_offset[current_call_idx][operand.s.slot_idx] == 0) {
                             tmp_shadow_offset[current_call_idx][operand.s.slot_idx] = shadow_call_offset;
                             LLVMType t = func_tmp_llvmtype[operand.s.slot_idx];
                             shadow_call_offset += (llvm_vector_elem_bit_counts[t*2] * llvm_vector_elem_bit_counts[t*2+1])/8;
                         }
                     }
-                    if ((opc == call && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
+                    if ((opc == call && !is_dump_call(get_helper(ptr)) && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
                         tmp_has_known_def[operand.s.slot_idx] = 1;
                     }
                 }
             }
             slot_idx += 1;
         } while (1);
-        if (opc == call) {
+        if (opc == call && !is_dump_call(get_helper(ptr))) {
             memset(tmp_has_known_def, 0, sizeof(tmp_has_known_def));
-            if (oarg.s.valid) {
+            if (!is_immo && oarg.s.valid) {
                 tmp_has_known_def[oarg.s.slot_idx] = 1;
             }
             current_call_idx += 1;
@@ -2010,6 +2152,12 @@ void handle_func(uint64_t val) {
         }
     }
 
+    /// Add dump_registers
+    uint8_t buf[16];
+    create_helper_env(buf, dump_registers, 0, 0);
+    translate_call(call, buf);
+    ///
+
     current_call_idx = 0;
     // Handle each IR translation
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), func_instr_cnt_remain -= 1) {
@@ -2017,7 +2165,7 @@ void handle_func(uint64_t val) {
         if (!exception_or_interrupt_on) {
             handle_single_instr(opc, ptr);
         }
-        if (opc == call) {
+        if (opc == call && !is_dump_call(get_helper(ptr))) {
             current_call_idx += 1;
         }
         if (opc == ret || opc == jmp_direct || opc == call_direct) {
@@ -2038,6 +2186,7 @@ void handle_func(uint64_t val) {
 }
 
 static void handle_single_instr(OpCodeType opc, void *ptr) {
+    //printf("handle_single_instr: %s\n", opcode_type_str[opc]);
     switch (opc) {
     case add_i64:
         translate_add_i64(opc, ptr);
@@ -2284,10 +2433,17 @@ void module_prolog() {
         snprintf(tmp_name_buf[i], sizeof(tmp_name_buf[i]), "tmp%d.stack", i);
         tmp_stack_names[i] = tmp_name_buf[i];
     }
-    static char ir_var_name_buffer[('z'-'a'+1)*('z'-'a'+1)][3];
+    static char ir_var_name_buffer[('z'-'a'+1)*(('z'-'a'+1)+('Z'-'A'+1))][3];
     for (char c1 = 'a'; c1 <= 'z'; ++c1) {
         for (char c2 = 'a'; c2 <= 'z'; ++c2) {
-            int idx = (c1 - 'a') * ('z' - 'a' + 1) + (c2 - 'a');
+            int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1)) + (c2 - 'a');
+            ir_var_name_buffer[idx][0] = c1;
+            ir_var_name_buffer[idx][1] = c2;
+            ir_var_name_buffer[idx][2] = 0;
+            ir_var_name[idx] = ir_var_name_buffer[idx];
+        }
+        for (char c2 = 'A'; c2 <= 'Z'; ++c2) {
+            int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1)) + ('z' - 'a' + 1) + (c2 - 'A');
             ir_var_name_buffer[idx][0] = c1;
             ir_var_name_buffer[idx][1] = c2;
             ir_var_name_buffer[idx][2] = 0;
@@ -2342,7 +2498,7 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    LLVMDumpModule(module);
+    //LLVMDumpModule(module);
     LLVMDisposeModule(module);
 }
 

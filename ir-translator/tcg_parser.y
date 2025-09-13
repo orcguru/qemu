@@ -115,7 +115,8 @@ OPCODE V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT                         
 | OPCODE V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA ENV COMMA IMMX                 { insert_instr(instr_buf, create_vector_slot_env_imm(instr_buf, $1, $4, $6, $10)); };
 
 call_helper:
-CALL HELPER COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT                          { insert_instr(instr_buf, create_helper_slot3(instr_buf, $2, $4, $6, $8, $10, $12)); }
+CALL HELPER COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT                                     { insert_instr(instr_buf, create_helper_env_slot2(instr_buf, $2, $4, $6, $10, $12)); }
+| CALL HELPER COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT                        { insert_instr(instr_buf, create_helper_slot3(instr_buf, $2, $4, $6, $8, $10, $12)); }
 | CALL HELPER COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA IMMX                        { insert_instr(instr_buf, create_helper_slot2_imm(instr_buf, $2, $4, $6, $8, $10, $12)); }
 | CALL HELPER COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT             { insert_instr(instr_buf, create_helper_slot4(instr_buf, $2, $4, $6, $8, $10, $12, $14)); }
 | CALL HELPER COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT  { insert_instr(instr_buf, create_helper_slot5(instr_buf, $2, $4, $6, $8, $10, $12, $14, $16)); }

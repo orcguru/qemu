@@ -164,7 +164,10 @@ typedef enum {
     X(update_mxcsr) \
     X(xgetbv) \
     X(xrstor) \
-    X(xsave)
+    X(xsave) \
+    X(dump_registers) \
+    X(dump_load) \
+    X(dump_store)
 
 typedef enum {
     #define X(name) name,
