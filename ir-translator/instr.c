@@ -62,10 +62,10 @@ XMMReg lookup_xmm(uint64_t offset) {
         }
     } else if (xmm_offsets[15] <= off && off < (xmm_offsets[15] + 0x20)) {
         if ((off - xmm_offsets[15]) < 0x10) {
-            x.xmm_idx = XMMT;
+            x.xmm_idx = xmmt;
             x.xmm_offset = (off - xmm_offsets[15]);
         } else {
-            x.xmm_idx = YMMT_H;
+            x.xmm_idx = ymmt_h;
             x.xmm_offset = (off - (xmm_offsets[15] + 0x10));
         }
     }
@@ -179,6 +179,12 @@ const char *instr_ext_type_str[] = {
 const char *llvm_type_str[] = {
     #define X(name) #name,
     LLVM_TYPE_LIST
+    #undef X
+};
+
+const char *xmmreg_str[] = {
+    #define X(name) #name,
+    XMM_REG_LIST
     #undef X
 };
 
@@ -1164,4 +1170,105 @@ uint8_t opcmem_addr_nzidx[OPCODE_MAX] = {
     [umin_vec] = 0,
     [xor_vec] = 0,
     [movcond_vec] = 0,
+};
+
+LLVMType helper_vec_type[HELPER_MAX] = {
+    [psrlw_xmm] = LLVMVector2xi64,
+    [psllw_xmm] = LLVMVector2xi64,
+    [psraw_xmm] = LLVMVector8xi16,
+    [psrld_xmm] = LLVMVector2xi64,
+    [pslld_xmm] = LLVMVector2xi64,
+    [psrad_xmm] = LLVMVector4xi32,
+    [psrlq_xmm] = LLVMVector2xi64,
+    [psllq_xmm] = LLVMVector2xi64,
+    [psrldq_xmm] = LLVMVector16xi8,
+    [pslldq_xmm] = LLVMVector16xi8,
+    [pmulhuw_xmm] = LLVMVector8xi16,
+    [pmulhw_xmm] = LLVMVector8xi16,
+    [pavgb_xmm] = LLVMVector16xi8,
+    [pavgw_xmm] = LLVMVector8xi16,
+    [pmuludq_xmm] = LLVMVector4xi32,
+    [pmaddwd_xmm] = LLVMVector8xi16,
+    [psadbw_xmm] = LLVMVector16xi8,
+    [maskmov_xmm] = LLVMVector16xi8,
+    [shufps_xmm] = LLVMVector4xi32,
+    [shufpd_xmm] = LLVMVector2xi64,
+    [pshufd_xmm] = LLVMVector4xi32,
+    [pshuflw_xmm] = LLVMVector8xi16,
+    [pshufhw_xmm] = LLVMVector8xi16,
+    [cvtpd2dq_xmm] = LLVMVector2xi64,
+    [cvttpd2dq_xmm] = LLVMVector2xi64,
+    [movmskps_xmm] = LLVMVector4xi32,
+    [movmskpd_xmm] = LLVMVector2xi64,
+    [packsswb_xmm] = LLVMVector8xi16,
+    [packuswb_xmm] = LLVMVector8xi16,
+    [packssdw_xmm] = LLVMVector4xi32,
+    [punpcklbw_xmm] = LLVMVector16xi8,
+    [punpcklwd_xmm] = LLVMVector8xi16,
+    [punpckldq_xmm] = LLVMVector4xi32,
+    [punpcklqdq_xmm] = LLVMVector2xi64,
+    [punpckhbw_xmm] = LLVMVector16xi8,
+    [punpckhwd_xmm] = LLVMVector8xi16,
+    [punpckhdq_xmm] = LLVMVector4xi32,
+    [punpckhqdq_xmm] = LLVMVector2xi64,
+    [pshufb_xmm] = LLVMVector16xi8,
+    [phaddw_xmm] = LLVMVector8xi16,
+    [phsubw_xmm] = LLVMVector8xi16,
+    [phaddsw_xmm] = LLVMVector8xi16,
+    [phsubsw_xmm] = LLVMVector8xi16,
+    [phaddd_xmm] = LLVMVector4xi32,
+    [phsubd_xmm] = LLVMVector4xi32,
+    [pmaddubsw_xmm] = LLVMVector16xi8,
+    [pmulhrsw_xmm] = LLVMVector8xi16,
+    [psignb_xmm] = LLVMVector16xi8,
+    [psignw_xmm] = LLVMVector8xi16,
+    [psignd_xmm] = LLVMVector4xi32,
+    [palignr_xmm] = LLVMVector2xi64,
+    [pblendvb_xmm] = LLVMVector16xi8,
+    [blendvps_xmm] = LLVMVector4xi32,
+    [blendvpd_xmm] = LLVMVector2xi64,
+    [ptest_xmm] = LLVMVector2xi64,
+    [pmovsxbw_xmm] = LLVMVector8xi16,
+    [pmovsxbd_xmm] = LLVMVector4xi32,
+    [pmovsxbq_xmm] = LLVMVector2xi64,
+    [pmovsxwd_xmm] = LLVMVector4xi32,
+    [pmovsxwq_xmm] = LLVMVector8xi16,
+    [pmovsxdq_xmm] = LLVMVector4xi32,
+    [pmovzxbw_xmm] = LLVMVector16xi8,
+    [pmovzxbd_xmm] = LLVMVector16xi8,
+    [pmovzxbq_xmm] = LLVMVector2xi64,
+    [pmovzxwd_xmm] = LLVMVector8xi16,
+    [pmovzxwq_xmm] = LLVMVector2xi64,
+    [pmovzxdq_xmm] = LLVMVector2xi64,
+    [pmovsldup_xmm] = LLVMVector4xi32,
+    [pmovshdup_xmm] = LLVMVector4xi32,
+    [pmovdldup_xmm] = LLVMVector2xi64,
+    [pmuldq_xmm] = LLVMVector4xi32,
+    [packusdw_xmm] = LLVMVector4xi32,
+    [phminposuw_xmm] = LLVMVector8xi16,
+    [blendps_xmm] = LLVMVector4xi32,
+    [blendpd_xmm] = LLVMVector2xi64,
+    [pblendw_xmm] = LLVMVector8xi16,
+    [mpsadbw_xmm] = LLVMVector16xi8,
+    [aeskeygenassist_xmm] = LLVMVector4xi32,
+    [vpermilpd_xmm] = LLVMVector2xi64,
+    [vpermilps_xmm] = LLVMVector4xi32,
+    [vpermilpd_imm_xmm] = LLVMVector2xi64,
+    [vpermilps_imm_xmm] = LLVMVector4xi32,
+    [vpsrlvd_xmm] = LLVMVector4xi32,
+    [vpsravd_xmm] = LLVMVector4xi32,
+    [vpsllvd_xmm] = LLVMVector4xi32,
+    [vpsrlvq_xmm] = LLVMVector2xi64,
+    [vpsravq_xmm] = LLVMVector2xi64,
+    [vpsllvq_xmm] = LLVMVector2xi64,
+    [vtestps_xmm] = LLVMVector4xi32,
+    [vtestpd_xmm] = LLVMVector2xi64,
+    [vpmaskmovd_st_xmm] = LLVMVector4xi32,
+    [vpmaskmovq_st_xmm] = LLVMVector2xi64,
+    [vpmaskmovd_xmm] = LLVMVector4xi32,
+    [vpmaskmovq_xmm] = LLVMVector2xi64,
+    [vpgatherdd_xmm] = LLVMVector4xi32,
+    [vpgatherdq_xmm] = LLVMVector2xi64,
+    [vpgatherqd_xmm] = LLVMVector2xi64,
+    [vpgatherqq_xmm] = LLVMVector2xi64,
 };
