@@ -75,8 +75,8 @@ static uint32_t func_instr_cnt_remain = 0;
 static uint8_t current_active_labels[BB_MAX_CNT];
 static uint8_t current_active_label_cnt = 0;
 static uint8_t exception_or_interrupt_on = 0;
-#define MAX_FUNC_CNT    0x6000000000UL
-//#define MAX_FUNC_CNT    100
+//#define MAX_FUNC_CNT    0x6000000000UL
+#define MAX_FUNC_CNT    100
 static uint32_t current_func_cnt = 0;
 static uint32_t additional_scalar_arg_cnt = 0;
 #define LLVMNoInlineAttribute       32
@@ -1749,21 +1749,20 @@ void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers) 
 }
 
 void translate_call(OpCodeType opc, void *ptr) {
-    static int check_recursive_call = 0;
-    assert(check_recursive_call == 0);
-    check_recursive_call = 1;
-
     HelperType h = get_helper(ptr);
     if (is_dump_call(h)) {
-        check_recursive_call = 0;
         return translate_dump_call(opc, ptr, (h == dump_registers));
     } else if (is_tail_call(h)) {
         if (h == raise_exception || h == raise_interrupt) {
             exception_or_interrupt_on = 1;
         }
-        check_recursive_call = 0;
         return translate_tail_call(opc, ptr);
     }
+
+    static int check_recursive_call = 0;
+    assert(check_recursive_call == 0);
+    check_recursive_call = 1;
+
     char second_half_name[64];
     sprintf(second_half_name, "func_%lx_call%d", current_func_offset, current_call_idx);
     // Need check arguments to determine the helper can be inlined
