@@ -3,6 +3,8 @@
 #include <string.h>
 #include <assert.h>
 #include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include "tcg_ast.h"
 #include "tcg_context.h"
 #include "tcg_parser.tab.h"
@@ -79,6 +81,7 @@ static uint8_t exception_or_interrupt_on = 0;
 #define MAX_FUNC_CNT    100
 static uint32_t current_func_cnt = 0;
 static uint32_t additional_scalar_arg_cnt = 0;
+static uint32_t obj_idx = 0;
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
 static const char *data_layout_str = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128";
@@ -2703,13 +2706,16 @@ void module_epilog() {
 
     //LLVMDumpModule(module);
     char *error_msg = NULL;
-    if (LLVMTargetMachineEmitToFile(target_machine, module, "output.o", LLVMObjectFile, &error_msg)) {
+    char output_file[32] = {0};
+    sprintf(output_file, "output/%d.o", obj_idx);
+    if (LLVMTargetMachineEmitToFile(target_machine, module, output_file, LLVMObjectFile, &error_msg)) {
         printf("Failed to emit object file: %s", error_msg);
         exit(1);
     }
-    printf("Object file 'output.o' generated successfully.\n");
+    printf("Object file %s generated successfully.\n", output_file);
     fflush(NULL);
     LLVMDisposeModule(module);
+    obj_idx += 1;
 }
 
 void parse_tcg_instructions(const char *filename) {
