@@ -28,15 +28,15 @@ extern LLVMType helper_vec_type[HELPER_MAX];
 extern const char *xmmreg_str[];
 extern uint8_t inline_helper_enabled[HELPER_MAX];
 
-static LLVMAttributeRef target_features_attr;
-static LLVMAttributeRef NoInlineAttr;
-static LLVMAttributeRef AlwaysInlineAttr;
-static LLVMTargetMachineRef target_machine;
-static LLVMContextRef context;
-static LLVMModuleRef module;
-static LLVMBuilderRef builder;
-static LLVMValueRef llvm_func;
-static LLVMBasicBlockRef last_active_bb;
+static LLVMAttributeRef target_features_attr = NULL;
+static LLVMAttributeRef NoInlineAttr = NULL;
+static LLVMAttributeRef AlwaysInlineAttr = NULL;
+static LLVMTargetMachineRef target_machine = NULL;
+static LLVMContextRef context = NULL;
+static LLVMModuleRef module = NULL;
+static LLVMBuilderRef builder = NULL;
+static LLVMValueRef llvm_func = NULL;
+static LLVMBasicBlockRef last_active_bb = NULL;
 #define FIXED_PARAM_COUNT           20
 #define FIXED_VECTOR_PARAM_COUNT   (20 + 15 * 2)
 static LLVMTypeRef fixed_vector_param_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
@@ -60,7 +60,6 @@ static uint32_t env_var_offset[ENVVarMAX] = {0};
 static OperandType alias_tmp[1<<5] = {0};
 static uint32_t tmp_var_available = 0, tmp_var_available_backup = 0;
 static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
-static uint8_t last_instr_control_transfer = 0;
 static uint32_t br_count = 0;
 static uint64_t current_func_offset = 0;
 #define BB_MAX_CNT  8
@@ -77,6 +76,7 @@ static uint8_t current_active_labels[BB_MAX_CNT];
 static uint8_t current_active_label_cnt = 0;
 static uint8_t exception_or_interrupt_on = 0;
 #define MAX_FUNC_CNT    0x6000000000UL
+//#define MAX_FUNC_CNT    100
 static uint32_t current_func_cnt = 0;
 static uint32_t additional_scalar_arg_cnt = 0;
 #define LLVMNoInlineAttribute       32
@@ -1350,7 +1350,14 @@ void translate_set_label(OpCodeType opc, void *ptr) {
     if (!label) {
         label = LLVMAppendBasicBlock(llvm_func, lstr);
     }
-    if (!last_instr_control_transfer) {
+    assert(last_active_bb);
+    LLVMValueRef instr = LLVMGetLastInstruction(last_active_bb);
+    if (instr) {
+        LLVMOpcode opc_llvm = LLVMGetInstructionOpcode(instr);
+        if (opc_llvm != LLVMRet && opc_llvm != LLVMBr) {
+            LLVMBuildBr(builder, label);
+        }
+    } else {
         LLVMBuildBr(builder, label);
     }
     LLVMPositionBuilderAtEnd(builder, label);
@@ -1742,13 +1749,19 @@ void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers) 
 }
 
 void translate_call(OpCodeType opc, void *ptr) {
+    static int check_recursive_call = 0;
+    assert(check_recursive_call == 0);
+    check_recursive_call = 1;
+
     HelperType h = get_helper(ptr);
     if (is_dump_call(h)) {
+        check_recursive_call = 0;
         return translate_dump_call(opc, ptr, (h == dump_registers));
     } else if (is_tail_call(h)) {
         if (h == raise_exception || h == raise_interrupt) {
             exception_or_interrupt_on = 1;
         }
+        check_recursive_call = 0;
         return translate_tail_call(opc, ptr);
     }
     char second_half_name[64];
@@ -2116,6 +2129,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     } else if (noargs) {
         assert(0);
     }
+    check_recursive_call = 0;
 }
 
 static void cleanup_func_resource() {
@@ -2148,7 +2162,7 @@ static void cleanup_func_resource() {
 }
 
 void handle_func(uint64_t val) {
-    printf("func %lx\n", val);
+    //printf("func %lx\n", val); fflush(NULL);
     current_func_offset = val;
     ir_var_name_idx = 0;
     tmp_var_available = 0xffffffff;
@@ -2348,11 +2362,6 @@ void handle_func(uint64_t val) {
         if (opc == call && !is_dump_call(get_helper(ptr))) {
             current_call_idx += 1;
         }
-        if (opc == ret || opc == jmp_direct || opc == call_direct) {
-            last_instr_control_transfer = 1;
-        } else {
-            last_instr_control_transfer = 0;
-        }
         tmp_var_available = tmp_var_available_backup;
     }
 
@@ -2361,7 +2370,7 @@ void handle_func(uint64_t val) {
     current_func_cnt += 1;
     if (current_func_cnt >= MAX_FUNC_CNT) {
         module_epilog();
-        exit(0);
+        current_func_cnt = 0;
         module_prolog();
     }
 }
@@ -2679,18 +2688,10 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    /*
-    const char* cpu_str = LLVMGetTargetMachineCPU(target_machine);
-    const char* feature_str = LLVMGetTargetMachineFeatureString(target_machine);
-    printf("CPU: %s\n", cpu_str);
-    printf("Features: %s\n", feature_str);
-    */
-
     //LLVMDumpModule(module);
-#if 0
     LLVMPassBuilderOptionsRef options = LLVMCreatePassBuilderOptions();
     //LLVMPassBuilderOptionsSetDebugLogging(options, 1);
-    LLVMErrorRef error = LLVMRunPasses(module, "default<O2>", target_machine, options);
+    LLVMErrorRef error = LLVMRunPasses(module, "default<O1>", target_machine, options);
 
     if (error) {
         char* error_msg = LLVMGetErrorMessage(error);
@@ -2708,7 +2709,7 @@ void module_epilog() {
         exit(1);
     }
     printf("Object file 'output.o' generated successfully.\n");
-#endif
+    fflush(NULL);
     LLVMDisposeModule(module);
 }
 
