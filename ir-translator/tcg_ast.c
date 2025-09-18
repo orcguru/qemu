@@ -77,12 +77,9 @@ static uint32_t func_instr_cnt_remain = 0;
 static uint8_t current_active_labels[BB_MAX_CNT];
 static uint8_t current_active_label_cnt = 0;
 static uint8_t exception_or_interrupt_on = 0;
-//#define MAX_FUNC_CNT    0x6000000000UL
-#define MAX_FUNC_CNT    100
-static uint32_t current_func_cnt = 0;
 static uint32_t additional_scalar_arg_cnt = 0;
 static uint32_t obj_idx = 0;
-static char output_dir[128] = {0};
+static char output_file[128] = {0};
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
 
@@ -2394,13 +2391,6 @@ void handle_func(uint64_t val) {
     }
 
     cleanup_func_resource();
-
-    current_func_cnt += 1;
-    if (current_func_cnt >= MAX_FUNC_CNT) {
-        module_epilog();
-        current_func_cnt = 0;
-        module_prolog();
-    }
 }
 
 static void handle_single_instr(OpCodeType opc, void *ptr) {
@@ -2736,8 +2726,6 @@ void module_epilog() {
 
     //LLVMDumpModule(module);
     char *error_msg = NULL;
-    char output_file[32] = {0};
-    sprintf(output_file, "%s/%d.o", output_dir, obj_idx);
     if (LLVMTargetMachineEmitToFile(target_machine, module, output_file, LLVMObjectFile, &error_msg)) {
         printf("Failed to emit object file: %s", error_msg);
         exit(1);
@@ -2768,12 +2756,12 @@ void parse_tcg_instructions(const char *filename) {
 }
 
 int main(int argc, const char *argv[]) {
-    if (argc < 3) {
-        printf("Usage: ./app <tcg-ir> <output-folder>\n");
+    if (argc < 2) {
+        printf("Usage: ./app <tcg-ir>\n");
         return -1;
     }
 
-    strncpy(output_dir, argv[2], sizeof(output_dir)-1);
+    sprintf(output_file, "%s.o", argv[1]);
     LLVMInitializeRISCVTargetInfo();
     LLVMInitializeRISCVTarget();
     LLVMInitializeRISCVTargetMC();
