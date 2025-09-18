@@ -343,6 +343,8 @@ typedef enum {
     X(call_direct) \
     X(discard) \
     X(call) \
+    X(rotl_i32) \
+    X(rotl_i64) \
     X(OPCODE_MAX)
 
 typedef enum {

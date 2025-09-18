@@ -177,6 +177,7 @@ neg_i64         neg_i64
 negsetcond_i64  negsetcond_i64
 not_i64         not_i64
 or_i64          or_i64
+or_i32          or_i32
 or_vec          or_vec
 push_ret_addr   push_ret_addr
 qemu_ld2_i128   qemu_ld2_i128
@@ -188,10 +189,13 @@ qemu_st_i64     qemu_st_i64
 ret             ret
 rotr_i32        rotr_i32
 rotr_i64        rotr_i64
+rotl_i32        rotl_i32
+rotl_i64        rotl_i64
 sar_i64         sar_i64
 setcond_i64     setcond_i64
 sextract_i64    sextract_i64
 shl_i64         shl_i64
+shl_i32         shl_i32
 shli_vec        shli_vec
 shr_i64         shr_i64
 st16_i32        st16_i32
@@ -399,6 +403,7 @@ dump_store          dump_store
 {negsetcond_i64}  { HANDLE_COLUMN; yylval->op = negsetcond_i64; return OPCODE; }
 {not_i64}         { HANDLE_COLUMN; yylval->op = not_i64; return OPCODE; }
 {or_i64}          { HANDLE_COLUMN; yylval->op = or_i64; return OPCODE; }
+{or_i32}          { HANDLE_COLUMN; yylval->op = or_i32; return OPCODE; }
 {or_vec}          { HANDLE_COLUMN; yylval->op = or_vec; return OPCODE; }
 {push_ret_addr}   { HANDLE_COLUMN; yylval->op = push_ret_addr; return OPCODE; }
 {qemu_ld2_i128}   { HANDLE_COLUMN; yylval->op = qemu_ld2_i128; return OPCODE; }
@@ -410,10 +415,13 @@ dump_store          dump_store
 {ret}             { HANDLE_COLUMN; yylval->op = ret; return OPCODE; }
 {rotr_i32}        { HANDLE_COLUMN; yylval->op = rotr_i32; return OPCODE; }
 {rotr_i64}        { HANDLE_COLUMN; yylval->op = rotr_i64; return OPCODE; }
+{rotl_i32}        { HANDLE_COLUMN; yylval->op = rotl_i32; return OPCODE; }
+{rotl_i64}        { HANDLE_COLUMN; yylval->op = rotl_i64; return OPCODE; }
 {sar_i64}         { HANDLE_COLUMN; yylval->op = sar_i64; return OPCODE; }
 {setcond_i64}     { HANDLE_COLUMN; yylval->op = setcond_i64; return OPCODE; }
 {sextract_i64}    { HANDLE_COLUMN; yylval->op = sextract_i64; return OPCODE; }
 {shl_i64}         { HANDLE_COLUMN; yylval->op = shl_i64; return OPCODE; }
+{shl_i32}         { HANDLE_COLUMN; yylval->op = shl_i32; return OPCODE; }
 {shli_vec}        { HANDLE_COLUMN; yylval->op = shli_vec; return OPCODE; }
 {shr_i64}         { HANDLE_COLUMN; yylval->op = shr_i64; return OPCODE; }
 {st16_i32}        { HANDLE_COLUMN; yylval->op = st16_i32; return OPCODE; }

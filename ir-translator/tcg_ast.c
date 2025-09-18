@@ -84,7 +84,6 @@ static uint32_t additional_scalar_arg_cnt = 0;
 static uint32_t obj_idx = 0;
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
-static const char *data_layout_str = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128";
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
@@ -122,6 +121,7 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr);
 void translate_qemu_st(OpCodeType opc, void *ptr);
 void translate_ret(OpCodeType opc, void *ptr);
 void translate_rotr(OpCodeType opc, void *ptr);
+void translate_rotl(OpCodeType opc, void *ptr);
 void translate_setcond_i64(OpCodeType opc, void *ptr);
 void translate_sextract_i64(OpCodeType opc, void *ptr);
 void translate_st(OpCodeType opc, void *ptr);
@@ -291,7 +291,6 @@ static void create_module(const char *module_name) {
     module = LLVMModuleCreateWithNameInContext(module_name, context);
 
     LLVMSetTarget(module, "riscv64-unknown-linux-gnu");
-    //LLVMSetDataLayout(module, data_layout_str);
 }
 
 static void register_alias(OperandType lval, OperandType rval) {
@@ -1196,12 +1195,38 @@ void translate_rotr(OpCodeType opc, void *ptr) {
     translate_binary(tmp_opc, buf, LLVMBuildLShr);
     // sub
     tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
-    create_scalar_slot_imm_slot(buf, tmp_opc, t1, 32, operand2);
+    create_scalar_slot_imm_slot(buf, tmp_opc, t1, OPC_OUTPUT_T == LLVMInt64 ? 64 : 32, operand2);
     translate_binary(tmp_opc, buf, LLVMBuildSub);
     // shl
     tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
     create_scalar_slot3(buf, tmp_opc, t1, operand1, t1);
     translate_binary(tmp_opc, buf, LLVMBuildShl);
+    // or
+    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
+    create_scalar_slot3(buf, tmp_opc, operand0, t0, t1);
+    translate_binary(tmp_opc, buf, LLVMBuildOr);
+}
+
+void translate_rotl(OpCodeType opc, void *ptr) {
+    OperandType t0 = get_tmp_and_do_alloc(LLVMInt64);
+    OperandType t1 = get_tmp_and_do_alloc(LLVMInt64);
+    OperandType operand0, operand1, operand2;
+    GET_3_OPERANDS();
+
+    uint8_t buf[16];
+    OpCodeType tmp_opc;
+    // shl
+    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    create_scalar_slot3(buf, tmp_opc, t0, operand1, operand2);
+    translate_binary(tmp_opc, buf, LLVMBuildShl);
+    // sub
+    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
+    create_scalar_slot_imm_slot(buf, tmp_opc, t1, OPC_OUTPUT_T == LLVMInt64 ? 64 : 32, operand2);
+    translate_binary(tmp_opc, buf, LLVMBuildSub);
+    // shr
+    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;
+    create_scalar_slot3(buf, tmp_opc, t1, operand1, t1);
+    translate_binary(tmp_opc, buf, LLVMBuildLShr);
     // or
     tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
     create_scalar_slot3(buf, tmp_opc, operand0, t0, t1);
@@ -2501,6 +2526,10 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
     case rotr_i32:
     case rotr_i64:
         translate_rotr(opc, ptr);
+        break;
+    case rotl_i32:
+    case rotl_i64:
+        translate_rotl(opc, ptr);
         break;
     case sar_i64:
         translate_binary(opc, ptr, LLVMBuildAShr);
