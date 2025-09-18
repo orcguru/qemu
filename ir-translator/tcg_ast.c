@@ -82,6 +82,7 @@ static uint8_t exception_or_interrupt_on = 0;
 static uint32_t current_func_cnt = 0;
 static uint32_t additional_scalar_arg_cnt = 0;
 static uint32_t obj_idx = 0;
+static char output_dir[128] = {0};
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
 
@@ -2736,7 +2737,7 @@ void module_epilog() {
     //LLVMDumpModule(module);
     char *error_msg = NULL;
     char output_file[32] = {0};
-    sprintf(output_file, "output/%d.o", obj_idx);
+    sprintf(output_file, "%s/%d.o", output_dir, obj_idx);
     if (LLVMTargetMachineEmitToFile(target_machine, module, output_file, LLVMObjectFile, &error_msg)) {
         printf("Failed to emit object file: %s", error_msg);
         exit(1);
@@ -2767,11 +2768,12 @@ void parse_tcg_instructions(const char *filename) {
 }
 
 int main(int argc, const char *argv[]) {
-    if (argc < 2) {
-        printf("Usage: ./app <tcg-ir>\n");
+    if (argc < 3) {
+        printf("Usage: ./app <tcg-ir> <output-folder>\n");
         return -1;
     }
 
+    strncpy(output_dir, argv[2], sizeof(output_dir)-1);
     LLVMInitializeRISCVTargetInfo();
     LLVMInitializeRISCVTarget();
     LLVMInitializeRISCVTargetMC();
