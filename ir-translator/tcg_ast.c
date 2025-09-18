@@ -2710,6 +2710,27 @@ void module_prolog() {
 }
 
 void module_epilog() {
+    LLVMValueRef function = LLVMGetFirstFunction(module);
+    while (function != NULL) {
+        if (LLVMIsAFunction(function)) {
+            if (LLVMIsDeclaration(function) && strstr(LLVMGetValueName(function), "func_")) {
+                LLVMSetLinkage(function, LLVMWeakAnyLinkage);
+                LLVMAddAttributeAtIndex(function, -1, NoInlineAttr);
+                LLVMAddAttributeAtIndex(function, -1, target_features_attr);
+                LLVMBasicBlockRef entry = LLVMAppendBasicBlock(function, "entry");
+                LLVMPositionBuilderAtEnd(builder, entry);
+                LLVMBasicBlockRef bb_loop = LLVMAppendBasicBlock(function, "loop");
+                LLVMBuildBr(builder, bb_loop);
+                LLVMPositionBuilderAtEnd(builder, bb_loop);
+                LLVMBuildBr(builder, bb_loop);
+                LLVMBasicBlockRef bb_exit = LLVMAppendBasicBlock(function, "exit");
+                LLVMPositionBuilderAtEnd(builder, bb_exit);
+                LLVMBuildRetVoid(builder);
+            }
+        }
+        function = LLVMGetNextFunction(function);
+    }
+
     //LLVMDumpModule(module);
     LLVMPassBuilderOptionsRef options = LLVMCreatePassBuilderOptions();
     //LLVMPassBuilderOptionsSetDebugLogging(options, 1);
