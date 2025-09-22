@@ -24,4 +24,13 @@ ir-translator/lex.yy.*
 ir-translator/tcg_ast.o
 ir-translator/tcg_parser
 ir-translator/tcg_parser.tab.*
-
+ir-translator/*.o
+ir-translator/*.yy.*
+ir-translator/*.tab.*
+ir-translator/qemu-SSE-helper-extractor/parser/*.class
+ir-translator/qemu-SSE-helper-extractor/parser/*.interp
+ir-translator/qemu-SSE-helper-extractor/parser/*.tokens
+ir-translator/qemu-SSE-helper-extractor/parser/*.java
+ir-translator/qemu-SSE-helper-extractor/parser/antlr-4.9.3-complete.jar
+ir-translator/qemu-SSE-helper-extractor/*.helper_xmm
+ir-translator/*.splits
