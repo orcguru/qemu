@@ -139,19 +139,6 @@ G_NORETURN void raise_exception_ra(CPUX86State *env, int exception_index,
     raise_interrupt2(env, exception_index, 0, 0, 0, retaddr);
 }
 
-#ifdef AOT
-void __attribute__((qemuaot)) raise_exception_ra_A(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, int exception_index, uintptr_t retaddr)
-{
-    CPUX86State *env;
-#if defined(__aarch64__)
-    asm volatile ("mov %0, x25" : "=r" (env) :);
-#elif defined(__riscv) && __riscv_xlen == 64
-    asm volatile ("mv %0, x25" : "=r" (env) :);
-#endif
-    raise_interrupt2(env, exception_index, 0, 0, 0, retaddr);
-}
-#endif
-
 G_NORETURN void helper_icebp(CPUX86State *env)
 {
     CPUState *cs = env_cpu(env);
