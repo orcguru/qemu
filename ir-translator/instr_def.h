@@ -280,14 +280,14 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
     uint8_t instr_type_ext  :6;
     uint16_t helper         :11;
-} Instr1BH2;
+} Instr1BH2_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
     uint8_t instr_type_ext  :6;
     uint16_t helper         :11;
     uint32_t imm;
-} Instr1BH24I;
+} Instr1BH24I_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
@@ -362,7 +362,16 @@ typedef struct __attribute__((packed)) {
     uint16_t noargs         :1;
     uint8_t slot0_type      :2;
     uint8_t slot0_idx       :5;
-} Instr1BH21;
+} Instr1BH21_ENV0;
+
+typedef struct __attribute__((packed)) {
+    uint8_t instr_type      :2;
+    uint8_t instr_type_ext  :6;
+    uint16_t helper         :11;
+    uint16_t noargs         :1;
+    uint8_t slot0_type      :2;
+    uint8_t slot0_idx       :5;
+} Instr1BH21_ENV1;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
@@ -415,6 +424,20 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type_ext  :6;
     uint8_t helper_l;
     uint32_t helper_h       :3;
+    uint32_t slot0_type     :2;
+    uint32_t slot0_idx      :5;
+    uint32_t slot1_type     :2;
+    uint32_t slot1_idx      :5;
+    uint32_t slot2_type     :2;
+    uint32_t slot2_idx      :5;
+    uint32_t imm            :8;
+} Instr1BH4I_ENV0;
+
+typedef struct __attribute__((packed)) {
+    uint8_t instr_type      :2;
+    uint8_t instr_type_ext  :6;
+    uint8_t helper_l;
+    uint32_t helper_h       :3;
     uint32_t noargs         :1;
     uint32_t slot0_type     :2;
     uint32_t slot0_idx      :5;
@@ -423,6 +446,20 @@ typedef struct __attribute__((packed)) {
     uint32_t slot2_type     :2;
     uint32_t slot2_idx      :5;
 } Instr1BH4S3;
+
+typedef struct __attribute__((packed)) {
+    uint8_t instr_type      :2;
+    uint8_t instr_type_ext  :6;
+    uint8_t helper_l;
+    uint32_t helper_h       :3;
+    uint32_t noargs         :1;
+    uint32_t slot0_type     :2;
+    uint32_t slot0_idx      :5;
+    uint32_t slot1_type     :2;
+    uint32_t slot1_idx      :5;
+    uint32_t slot2_type     :2;
+    uint32_t slot2_idx      :5;
+} Instr1BH4S3_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
@@ -451,12 +488,24 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
     uint8_t instr_type_ext  :6;
+    uint32_t helper         :11;
+    uint32_t noargs         :1;
+    uint32_t slot0_type     :2;
+    uint32_t slot0_idx      :5;
+    uint32_t slot1_type     :2;
+    uint32_t slot1_idx      :5;
+    uint8_t imm;
+} Instr1BH41_ENV0;
+
+typedef struct __attribute__((packed)) {
+    uint8_t instr_type      :2;
+    uint8_t instr_type_ext  :6;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t imm            :4;
     uint8_t slot0_type      :2;
     uint8_t slot0_idx       :5;
-} Instr1BH21S;
+} Instr1BH21S_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
@@ -517,7 +566,7 @@ typedef struct __attribute__((packed)) {
     uint16_t noargs         :1;
     uint16_t imm0           :4;
     uint32_t imm1;
-} Instr1BH24;
+} Instr1BH24_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
@@ -527,7 +576,7 @@ typedef struct __attribute__((packed)) {
     uint8_t slot0_type      :2;
     uint8_t slot0_idx       :5;
     uint8_t imm;
-} Instr1BH211;
+} Instr1BH211_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;
@@ -538,7 +587,18 @@ typedef struct __attribute__((packed)) {
     uint32_t slot0_idx      :5;
     uint32_t slot1_type     :2;
     uint32_t slot1_idx      :5;
-} Instr1BH4S;
+} Instr1BH4S_ENV0;
+
+typedef struct __attribute__((packed)) {
+    uint8_t instr_type      :2;
+    uint8_t instr_type_ext  :6;
+    uint32_t helper         :11;
+    uint32_t noargs         :1;
+    uint32_t slot0_type     :2;
+    uint32_t slot0_idx      :5;
+    uint32_t slot1_type     :2;
+    uint32_t slot1_idx      :5;
+} Instr1BH4S_ENV1;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :2;

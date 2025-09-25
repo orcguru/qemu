@@ -227,7 +227,9 @@ static OperandType get_shadow_stack_pointer() {
     uint8_t buf[16];
     OperandType ptr_addr = get_tmp_and_do_alloc(LLVMInt64);
     OperandType env = get_env_ptr();
-    create_scalar_slot2_imm(buf, add_i64, ptr_addr, env, -8UL);
+    OHType opc;
+    opc.o = add_i64;
+    create_scalar_slot2_imm(buf, opc, ptr_addr, env, -8UL);
     translate_add_i64(add_i64, buf);
     OperandType ptr_val = get_tmp_and_do_alloc(LLVMInt64);
 
@@ -240,7 +242,8 @@ static OperandType get_shadow_stack_pointer() {
     a2.p.storage.attr.ext = ZERO;
     a2.p.storage.size = SRC8B;
 
-    create_scalar_slot2_attr3_num(buf, qemu_ld_i64, ptr_val, ptr_addr, a0, a1, a2, 2);
+    opc.o = qemu_ld_i64;
+    create_scalar_slot2_attr3_num(buf, opc, ptr_val, ptr_addr, a0, a1, a2, 2);
     translate_qemu_ld(qemu_ld_i64, buf);
     return ptr_val;
 }
@@ -249,7 +252,9 @@ static void set_shadow_stack_pointer(OperandType val) {
     uint8_t buf[16];
     OperandType ptr_addr = get_tmp_and_do_alloc(LLVMInt64);
     OperandType env = get_env_ptr();
-    create_scalar_slot2_imm(buf, add_i64, ptr_addr, env, -8UL);
+    OHType opc;
+    opc.o = add_i64;
+    create_scalar_slot2_imm(buf, opc, ptr_addr, env, -8UL);
     translate_add_i64(add_i64, buf);
 
     AttrSrcInfo a0, a1, a2;
@@ -261,7 +266,8 @@ static void set_shadow_stack_pointer(OperandType val) {
     a2.p.storage.attr.ext = ZERO;
     a2.p.storage.size = SRC8B;
 
-    create_scalar_slot2_attr3_num(buf, qemu_st_i64, val, ptr_addr, a0, a1, a2, 2);
+    opc.o = qemu_st_i64;
+    create_scalar_slot2_attr3_num(buf, opc, val, ptr_addr, a0, a1, a2, 2);
     translate_qemu_st(qemu_st_i64, buf);
 }
 
@@ -375,7 +381,9 @@ static void do_store(LLVMValueRef val, LLVMType val_tidx, OperandType out) {
         OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
         OperandType env = get_env_ptr();
         uint8_t buf[16];
-        create_scalar_slot2_imm(buf, add_i64, tmp, env, env_var_offset[out.s.slot_idx]);
+        OHType opc;
+        opc.o = add_i64;
+        create_scalar_slot2_imm(buf, opc, tmp, env, env_var_offset[out.s.slot_idx]);
         translate_add_i64(add_i64, buf);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, func_tmp_alloca[tmp.s.slot_idx], LLVMPointerType(val_type, 0), get_next_var_name());
         LLVMBuildStore(builder, val, ptr);
@@ -412,6 +420,8 @@ static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType op
     assert(tidx != LLVMInvalidType && tidx < LLVMMAXType);
     LLVMTypeRef type = llvm_int_types[tidx];
     LLVMValueRef ret = NULL;
+    OHType opc;
+    opc.o = add_i64;
     if (is_imm) {
         if (tidx <= LLVMInt64) {
             ret = LLVMConstInt(type, operand.i, 0);
@@ -434,7 +444,7 @@ static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType op
         OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
         OperandType env = get_env_ptr();
         uint8_t buf[16];
-        create_scalar_slot2_imm(buf, add_i64, tmp, env, env_var_offset[operand.s.slot_idx]);
+        create_scalar_slot2_imm(buf, opc, tmp, env, env_var_offset[operand.s.slot_idx]);
         translate_add_i64(add_i64, buf);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, func_tmp_alloca[tmp.s.slot_idx], LLVMPointerType(type, 0), get_next_var_name());
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name());
@@ -442,7 +452,7 @@ static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType op
         OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
         OperandType env = get_env_ptr();
         uint8_t buf[16];
-        create_scalar_slot2_imm(buf, add_i64, tmp, env, operand.s.offset);
+        create_scalar_slot2_imm(buf, opc, tmp, env, operand.s.offset);
         translate_add_i64(add_i64, buf);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, func_tmp_alloca[tmp.s.slot_idx], LLVMPointerType(type, 0), get_next_var_name());
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name());
@@ -528,10 +538,13 @@ void translate_andc_i64(OpCodeType opc, void *ptr) {
     GET_3_OPERANDS();
 
     uint8_t buf[16];
-    create_scalar_slot2(buf, not_i64, tmp, operand2);
+    OHType o;
+    o.o = not_i64;
+    create_scalar_slot2(buf, o, tmp, operand2);
     translate_not_i64(not_i64, buf);
 
-    create_scalar_slot3(buf, and_i64, operand0, operand1, tmp);
+    o.o = and_i64;
+    create_scalar_slot3(buf, o, operand0, operand1, tmp);
     translate_binary(and_i64, buf, LLVMBuildAnd);
 }
 
@@ -543,10 +556,13 @@ void translate_andc_vec(OpCodeType opc, void *ptr) {
     ai.p.ves = get_llvm_vector_type(ptr) - LLVMVector16xi8;
 
     uint8_t buf[16];
-    create_vector_slot2(buf, not_vec, ai, tmp, operand2);
+    OHType o;
+    o.o = not_vec;
+    create_vector_slot2(buf, o, ai, tmp, operand2);
     translate_not_vec(not_vec, buf);
 
-    create_vector_slot3(buf, and_vec, ai, operand0, operand1, tmp);
+    o.o = and_vec;
+    create_vector_slot3(buf, o, ai, operand0, operand1, tmp);
     translate_binary(and_vec, buf, LLVMBuildAnd);
 }
 
@@ -559,31 +575,42 @@ void translate_bswap32_i64(OpCodeType opc, void *ptr) {
     GET_2_OPERANDS();
 
     uint8_t buf[16];
-    create_scalar_slot2_imm(buf, shr_i64, tmp0, operand1, 8);
+    OHType o;
+    o.o = shr_i64;
+    create_scalar_slot2_imm(buf, o, tmp0, operand1, 8);
     translate_binary(shr_i64, buf, LLVMBuildLShr);
-    create_scalar_slot2_imm(buf, and_i64, tmp1, operand1, constant_t2);
+    o.o = and_i64;
+    create_scalar_slot2_imm(buf, o, tmp1, operand1, constant_t2);
     translate_binary(and_i64, buf, LLVMBuildAnd);
-    create_scalar_slot2_imm(buf, and_i64, tmp0, tmp0, constant_t2);
+    o.o = and_i64;
+    create_scalar_slot2_imm(buf, o, tmp0, tmp0, constant_t2);
     translate_binary(and_i64, buf, LLVMBuildAnd);
-    create_scalar_slot2_imm(buf, shl_i64, tmp1, tmp1, 8);
+    o.o = shl_i64;
+    create_scalar_slot2_imm(buf, o, tmp1, tmp1, 8);
     translate_binary(shl_i64, buf, LLVMBuildShl);
-    create_scalar_slot3(buf, or_i64, operand0, tmp0, tmp1);
+    o.o = or_i64;
+    create_scalar_slot3(buf, o, operand0, tmp0, tmp1);
     translate_binary(or_i64, buf, LLVMBuildOr);
-    create_scalar_slot2_imm(buf, shl_i64, tmp1, operand0, 48);
+    o.o = shl_i64;
+    create_scalar_slot2_imm(buf, o, tmp1, operand0, 48);
     translate_binary(shl_i64, buf, LLVMBuildShl);
-    create_scalar_slot2_imm(buf, shl_i64, tmp0, operand0, 16);
+    o.o = shl_i64;
+    create_scalar_slot2_imm(buf, o, tmp0, operand0, 16);
     translate_binary(shl_i64, buf, LLVMBuildShl);
 
     AttributeType attr = get_attribute(ptr);
     assert(attr.attr_type == SUB_ATTR_SWAP);
     if (attr.attr_val & OS) {
-        create_scalar_slot2_imm(buf, sar_i64, tmp1, tmp1, 32);
+        o.o = sar_i64;
+        create_scalar_slot2_imm(buf, o, tmp1, tmp1, 32);
         translate_binary(sar_i64, buf, LLVMBuildAShr);
     } else {
-        create_scalar_slot2_imm(buf, shr_i64, tmp1, tmp1, 32);
+        o.o = shr_i64;
+        create_scalar_slot2_imm(buf, o, tmp1, tmp1, 32);
         translate_binary(shr_i64, buf, LLVMBuildLShr);
     }
-    create_scalar_slot3(buf, or_i64, operand0, tmp0, tmp1);
+    o.o = or_i64;
+    create_scalar_slot3(buf, o, operand0, tmp0, tmp1);
     translate_binary(or_i64, buf, LLVMBuildOr);
 }
 
@@ -668,46 +695,46 @@ void translate_deposit(OpCodeType opc, void *ptr) {
     assert(is_imm3 && is_imm4);
 
     uint8_t buf[16];
-    OpCodeType tmp_opc;
+    OHType tmp_opc;
     // shl
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
     OperandType mask1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     create_slot_imm2(buf, tmp_opc, mask1, 1, len.i);
-    translate_binary(tmp_opc, buf, LLVMBuildShl);
+    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
     // sub
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
     OperandType mask_not_shifted = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     create_scalar_slot2_imm(buf, tmp_opc, mask_not_shifted, mask1, 1);
-    translate_binary(tmp_opc, buf, LLVMBuildSub);
+    translate_binary(tmp_opc.o, buf, LLVMBuildSub);
     // shl
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
     OperandType mask_shifted = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     create_scalar_slot2_imm(buf, tmp_opc, mask_shifted, mask_not_shifted, ofs.i);
-    translate_binary(tmp_opc, buf, LLVMBuildShl);
+    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
     // xor
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? xor_i64 : xor_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? xor_i64 : xor_i32;
     OperandType rev_mask_shifted = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     create_scalar_slot2_imm(buf, tmp_opc, rev_mask_shifted, mask_shifted, -1UL);
-    translate_binary(tmp_opc, buf, LLVMBuildXor);
+    translate_binary(tmp_opc.o, buf, LLVMBuildXor);
     // and
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? and_i64 : and_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? and_i64 : and_i32;
     OperandType part1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     create_scalar_slot3(buf, tmp_opc, part1, operand1, rev_mask_shifted);
-    translate_binary(tmp_opc, buf, LLVMBuildAnd);
+    translate_binary(tmp_opc.o, buf, LLVMBuildAnd);
     // and
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? and_i64 : and_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? and_i64 : and_i32;
     OperandType part2_0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     create_scalar_slot3(buf, tmp_opc, part2_0, operand2, mask_not_shifted);
-    translate_binary(tmp_opc, buf, LLVMBuildAnd);
+    translate_binary(tmp_opc.o, buf, LLVMBuildAnd);
     // shl
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
     OperandType part2_1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     create_scalar_slot2_imm(buf, tmp_opc, part2_1, part2_0, ofs.i);
-    translate_binary(tmp_opc, buf, LLVMBuildShl);
+    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
     // or
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
     create_scalar_slot3(buf, tmp_opc, operand0, part1, part2_1);
-    translate_binary(tmp_opc, buf, LLVMBuildOr);
+    translate_binary(tmp_opc.o, buf, LLVMBuildOr);
 }
 
 void translate_dupm_vec(OpCodeType opc, void *ptr) {
@@ -718,7 +745,6 @@ void translate_dupm_vec(OpCodeType opc, void *ptr) {
     LLVMValueRef index = LLVMConstInt(LLVMInt64Type(), 0, 0);
     LLVMValueRef elem = LLVMBuildExtractElement(builder, src, index, get_next_var_name());
     uint8_t full_cnt = llvm_vector_elem_bit_counts[vtype*2];
-    uint8_t bit_cnt = llvm_vector_elem_bit_counts[vtype*2+1];
     LLVMValueRef constants[16];
     LLVMValueRef element_value = LLVMConstInt(llvm_int_types[vtype - 4], 0, 0);
     for (int i = 0; i < full_cnt; i++) {
@@ -727,7 +753,7 @@ void translate_dupm_vec(OpCodeType opc, void *ptr) {
     LLVMValueRef result = LLVMConstVector(constants, full_cnt);
     for (int i = 0; i < full_cnt; i++) {
         index = LLVMConstInt(LLVMInt64Type(), i, 0);
-        result = LLVMBuildInsertElement(builder, result, element_value, index, get_next_var_name());
+        result = LLVMBuildInsertElement(builder, result, elem, index, get_next_var_name());
     }
     do_store(result, OPC_OUTPUT_T, operand0);
 }
@@ -747,9 +773,12 @@ void translate_extract2_i64(OpCodeType opc, void *ptr) {
     assert(is_imm);
 
     uint8_t buf[16];
-    create_scalar_slot2_imm(buf, shr_i64, tmp, operand1, ofs.i);
+    OHType o;
+    o.o = shr_i64;
+    create_scalar_slot2_imm(buf, o, tmp, operand1, ofs.i);
     translate_binary(shr_i64, buf, LLVMBuildLShr);
-    create_scalar_slot3_imm2(buf, deposit_i64, operand0, tmp, operand2, (64 - ofs.i), ofs.i);
+    o.o = deposit_i64;
+    create_scalar_slot3_imm2(buf, o, operand0, tmp, operand2, (64 - ofs.i), ofs.i);
     translate_deposit(deposit_i64, buf);
 }
 
@@ -762,26 +791,26 @@ void translate_extract(OpCodeType opc, void *ptr) {
     assert(is_imm2 && is_imm3);
 
     uint8_t buf[16];
-    OpCodeType tmp_opc;
+    OHType tmp_opc;
     // shl
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
     OperandType mask1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     create_slot_imm2(buf, tmp_opc, mask1, 1, len.i);
-    translate_binary(tmp_opc, buf, LLVMBuildShl);
+    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
     // sub
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
     OperandType mask_not_shifted = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     create_scalar_slot2_imm(buf, tmp_opc, mask_not_shifted, mask1, 1);
-    translate_binary(tmp_opc, buf, LLVMBuildSub);
+    translate_binary(tmp_opc.o, buf, LLVMBuildSub);
     // shr
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;
     OperandType arg_shifted = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     create_scalar_slot2_imm(buf, tmp_opc, arg_shifted, operand1, ofs.i);
-    translate_binary(tmp_opc, buf, LLVMBuildLShr);
+    translate_binary(tmp_opc.o, buf, LLVMBuildLShr);
     // and
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? and_i64 : and_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? and_i64 : and_i32;
     create_scalar_slot3(buf, tmp_opc, operand0, arg_shifted, mask_not_shifted);
-    translate_binary(tmp_opc, buf, LLVMBuildAnd);
+    translate_binary(tmp_opc.o, buf, LLVMBuildAnd);
 }
 
 void translate_mov(OpCodeType opc, void *ptr) {
@@ -823,7 +852,9 @@ void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
         assert(alias.s.valid && alias.s.slot_type == SUB_SLOT_XMM);
         alias.s.offset += operand2.i;
         uint8_t buf[16];
-        create_scalar_slot_env_imm(buf, opc, operand0, get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset);
+        OHType o;
+        o.o = opc;
+        create_scalar_slot_env_imm(buf, o, operand0, get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset);
         translate_ld_env_xmm(opc, buf);
     }
 }
@@ -866,7 +897,6 @@ void translate_movcond(OpCodeType opc, void *ptr) {
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
-        OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
         c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name());
         c2 = LLVMConstInt(llvm_int_types[is_vec ? vtype : OPC_INPUT_T], 0, 0);
     }
@@ -925,7 +955,9 @@ void translate_not_i64(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
     uint8_t buf[16];
-    create_scalar_slot2_imm(buf, xor_i64, operand0, operand1, -1UL);
+    OHType o;
+    o.o = xor_i64;
+    create_scalar_slot2_imm(buf, o, operand0, operand1, -1UL);
     translate_binary(xor_i64, buf, LLVMBuildXor);
 }
 
@@ -935,7 +967,9 @@ void translate_not_vec(OpCodeType opc, void *ptr) {
     AttrSrcInfo ai;
     ai.p.ves = get_llvm_vector_type(ptr) - LLVMVector16xi8;
     uint8_t buf[16];
-    create_vector_slot2_vimm(buf, xor_vec, ai, operand0, operand1, -1UL);
+    OHType o;
+    o.o = xor_vec;
+    create_vector_slot2_vimm(buf, o, ai, operand0, operand1, -1UL);
     translate_binary(xor_vec, buf, LLVMBuildXor);
 }
 
@@ -949,7 +983,9 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(is_imm0, operand0, OPC_INPUT_T);
     uint8_t buf[16];
     OperandType ptr_val = get_shadow_stack_pointer();
-    create_scalar_slot2_imm(buf, add_i64, ptr_val, ptr_val, -8UL);
+    OHType o;
+    o.o = add_i64;
+    create_scalar_slot2_imm(buf, o, ptr_val, ptr_val, -8UL);
     translate_add_i64(add_i64, buf);
     LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(0, ptr_val, OPC_ADDR_T);
     LLVMValueRef shadow_ptr0 = LLVMBuildIntToPtr(builder, shadow_val0, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
@@ -965,7 +1001,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
         LLVMAddAttributeAtIndex(func, -1, target_features_attr);
     }
     LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, func, LLVMInt64Type(), get_next_var_name());
-    create_scalar_slot2_imm(buf, add_i64, ptr_val, ptr_val, -8UL);
+    create_scalar_slot2_imm(buf, o, ptr_val, ptr_val, -8UL);
     translate_add_i64(add_i64, buf);
     LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(0, ptr_val, OPC_ADDR_T);
     LLVMValueRef shadow_ptr1 = LLVMBuildIntToPtr(builder, shadow_val1, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
@@ -1119,17 +1155,24 @@ void translate_ret(OpCodeType opc, void *ptr) {
     uint8_t new_label = 42;
 
     uint8_t buf[16];
-    create_scalar_slot2(buf, mov_i64, loc606, shadow_stack);
+    OHType o;
+    o.o = mov_i64;
+    create_scalar_slot2(buf, o, loc606, shadow_stack);
     translate_mov(mov_i64, buf);
-    create_scalar_slot2_imm(buf, add_i64, loc607, loc606, 8);
+    o.o = add_i64;
+    create_scalar_slot2_imm(buf, o, loc607, loc606, 8);
     translate_add_i64(add_i64, buf);
-    create_scalar_slot2_attr3_num(buf, qemu_ld_i64, loc608, loc606, a0, a1, a2, 2);
+    o.o = qemu_ld_i64;
+    create_scalar_slot2_attr3_num(buf, o, loc608, loc606, a0, a1, a2, 2);
     translate_qemu_ld(qemu_ld_i64, buf);
-    create_scalar_slot2_attr3_num(buf, qemu_ld_i64, loc609, loc607, a0, a1, a2, 2);
+    o.o = qemu_ld_i64;
+    create_scalar_slot2_attr3_num(buf, o, loc609, loc607, a0, a1, a2, 2);
     translate_qemu_ld(qemu_ld_i64, buf);
-    create_scalar_slot3(buf, sub_i64, loc610, operand0, loc609);
+    o.o = sub_i64;
+    create_scalar_slot3(buf, o, loc610, operand0, loc609);
     translate_binary(sub_i64, buf, LLVMBuildSub);
-    create_scalar_slot2_imm(buf, add_i64, loc611, loc606, 0x10);
+    o.o = add_i64;
+    create_scalar_slot2_imm(buf, o, loc611, loc606, 0x10);
     translate_add_i64(add_i64, buf);
     set_shadow_stack_pointer(loc611);
     create_branch_condition(buf, loc610, 0, ne, new_label);
@@ -1172,10 +1215,12 @@ void translate_ret(OpCodeType opc, void *ptr) {
     LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, ret_target_ptr, call_args, FIXED_VECTOR_PARAM_COUNT, "");
     LLVMSetTailCall(call_inst, 1);
 
-    create_setlabel(buf, set_label, new_label);
+    o.o = set_label;
+    create_setlabel(buf, o, new_label);
     translate_set_label(set_label, buf);
 
-    create_helper_env_slot(buf, ret_ind, 0, 0, operand0);
+    o.h = helper_ret_ind;
+    create_helper_env_slot(buf, o, 0, 0, operand0);
     translate_call(call, buf);
 }
 
@@ -1186,23 +1231,23 @@ void translate_rotr(OpCodeType opc, void *ptr) {
     GET_3_OPERANDS();
 
     uint8_t buf[16];
-    OpCodeType tmp_opc;
+    OHType tmp_opc;
     // shr
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;
     create_scalar_slot3(buf, tmp_opc, t0, operand1, operand2);
-    translate_binary(tmp_opc, buf, LLVMBuildLShr);
+    translate_binary(tmp_opc.o, buf, LLVMBuildLShr);
     // sub
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
     create_scalar_slot_imm_slot(buf, tmp_opc, t1, OPC_OUTPUT_T == LLVMInt64 ? 64 : 32, operand2);
-    translate_binary(tmp_opc, buf, LLVMBuildSub);
+    translate_binary(tmp_opc.o, buf, LLVMBuildSub);
     // shl
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
     create_scalar_slot3(buf, tmp_opc, t1, operand1, t1);
-    translate_binary(tmp_opc, buf, LLVMBuildShl);
+    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
     // or
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
     create_scalar_slot3(buf, tmp_opc, operand0, t0, t1);
-    translate_binary(tmp_opc, buf, LLVMBuildOr);
+    translate_binary(tmp_opc.o, buf, LLVMBuildOr);
 }
 
 void translate_rotl(OpCodeType opc, void *ptr) {
@@ -1212,23 +1257,23 @@ void translate_rotl(OpCodeType opc, void *ptr) {
     GET_3_OPERANDS();
 
     uint8_t buf[16];
-    OpCodeType tmp_opc;
+    OHType tmp_opc;
     // shl
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
     create_scalar_slot3(buf, tmp_opc, t0, operand1, operand2);
-    translate_binary(tmp_opc, buf, LLVMBuildShl);
+    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
     // sub
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
     create_scalar_slot_imm_slot(buf, tmp_opc, t1, OPC_OUTPUT_T == LLVMInt64 ? 64 : 32, operand2);
-    translate_binary(tmp_opc, buf, LLVMBuildSub);
+    translate_binary(tmp_opc.o, buf, LLVMBuildSub);
     // shr
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;
     create_scalar_slot3(buf, tmp_opc, t1, operand1, t1);
-    translate_binary(tmp_opc, buf, LLVMBuildLShr);
+    translate_binary(tmp_opc.o, buf, LLVMBuildLShr);
     // or
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
     create_scalar_slot3(buf, tmp_opc, operand0, t0, t1);
-    translate_binary(tmp_opc, buf, LLVMBuildOr);
+    translate_binary(tmp_opc.o, buf, LLVMBuildOr);
 }
 
 void translate_setcond_i64(OpCodeType opc, void *ptr) {
@@ -1242,7 +1287,6 @@ void translate_setcond_i64(OpCodeType opc, void *ptr) {
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
-        OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
         c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name());
         c2 = LLVMConstInt(llvm_int_types[OPC_INPUT_T], 0, 0);
     }
@@ -1262,15 +1306,15 @@ void translate_sextract_i64(OpCodeType opc, void *ptr) {
     OperandType t0 = get_tmp_and_do_alloc(LLVMInt64);
 
     uint8_t buf[16];
-    OpCodeType tmp_opc;
+    OHType tmp_opc;
     // shl
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
     create_scalar_slot2_imm(buf, tmp_opc, t0, operand1, (64 - len.i - ofs.i));
-    translate_binary(tmp_opc, buf, LLVMBuildShl);
+    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
     // sar
-    tmp_opc = OPC_OUTPUT_T == LLVMInt64 ? sar_i64 : sar_i32;
+    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sar_i64 : sar_i32;
     create_scalar_slot2_imm(buf, tmp_opc, operand0, t0, (64 - len.i));
-    translate_binary(tmp_opc, buf, LLVMBuildAShr);
+    translate_binary(tmp_opc.o, buf, LLVMBuildAShr);
 }
 
 void translate_st(OpCodeType opc, void *ptr) {
@@ -1319,11 +1363,14 @@ void translate_maxmin_vec(OpCodeType opc, void *ptr, RelopType r) {
     OperandType tmp2 = get_tmp_and_do_alloc(vtype);
 
     uint8_t buf[16];
-    create_vector_slot2(buf, mov_vec, ai, tmp1, operand1);
+    OHType o;
+    o.o = mov_vec;
+    create_vector_slot2(buf, o, ai, tmp1, operand1);
     translate_mov(mov_vec, buf);
-    create_vector_slot2(buf, mov_vec, ai, tmp2, operand2);
+    create_vector_slot2(buf, o, ai, tmp2, operand2);
     translate_mov(mov_vec, buf);
-    create_vector_slot5_relop(buf, movcond_vec, ai, operand0, operand1, operand2, tmp1, tmp2, r);
+    o.o = movcond_vec;
+    create_vector_slot5_relop(buf, o, ai, operand0, operand1, operand2, tmp1, tmp2, r);
     translate_movcond(movcond_vec, buf);
 }
 
@@ -1337,34 +1384,46 @@ void translate_bswap64_i64(OpCodeType opc, void *ptr) {
 
     uint8_t buf[16];
     t2 = 0x00ff00ff00ff00ffUL;
-    create_scalar_slot2_imm(buf, shr_i64, t0, operand1, 8);
+    OHType o;
+    o.o = shr_i64;
+    create_scalar_slot2_imm(buf, o, t0, operand1, 8);
     translate_binary(shr_i64, buf, LLVMBuildLShr);
-    create_scalar_slot2_immUL(buf, and_i64, t1, operand1, t2);
+    o.o = and_i64;
+    create_scalar_slot2_immUL(buf, o, t1, operand1, t2);
     translate_binary(and_i64, buf, LLVMBuildAnd);
-    create_scalar_slot2_immUL(buf, and_i64, t0, t0, t2);
+    create_scalar_slot2_immUL(buf, o, t0, t0, t2);
     translate_binary(and_i64, buf, LLVMBuildAnd);
-    create_scalar_slot2_imm(buf, shl_i64, t1, t1, 8);
+    o.o = shl_i64;
+    create_scalar_slot2_imm(buf, o, t1, t1, 8);
     translate_binary(shl_i64, buf, LLVMBuildShl);
-    create_scalar_slot3(buf, or_i64, operand0, t0, t1);
+    o.o = or_i64;
+    create_scalar_slot3(buf, o, operand0, t0, t1);
     translate_binary(or_i64, buf, LLVMBuildOr);
 
     t2 = 0x0000ffff0000ffffUL;
-    create_scalar_slot2_imm(buf, shr_i64, t0, operand0, 16);
+    o.o = shr_i64;
+    create_scalar_slot2_imm(buf, o, t0, operand0, 16);
     translate_binary(shr_i64, buf, LLVMBuildLShr);
-    create_scalar_slot2_immUL(buf, and_i64, t1, operand0, t2);
+    o.o = and_i64;
+    create_scalar_slot2_immUL(buf, o, t1, operand0, t2);
     translate_binary(and_i64, buf, LLVMBuildAnd);
-    create_scalar_slot2_immUL(buf, and_i64, t0, t0, t2);
+    create_scalar_slot2_immUL(buf, o, t0, t0, t2);
     translate_binary(and_i64, buf, LLVMBuildAnd);
-    create_scalar_slot2_imm(buf, shl_i64, t1, t1, 16);
+    o.o = shl_i64;
+    create_scalar_slot2_imm(buf, o, t1, t1, 16);
     translate_binary(shl_i64, buf, LLVMBuildShl);
-    create_scalar_slot3(buf, or_i64, operand0, t0, t1);
+    o.o = or_i64;
+    create_scalar_slot3(buf, o, operand0, t0, t1);
     translate_binary(or_i64, buf, LLVMBuildOr);
 
-    create_scalar_slot2_imm(buf, shr_i64, t0, operand0, 32);
+    o.o = shr_i64;
+    create_scalar_slot2_imm(buf, o, t0, operand0, 32);
     translate_binary(shl_i64, buf, LLVMBuildLShr);
-    create_scalar_slot2_imm(buf, shl_i64, t1, operand0, 32);
+    o.o = shl_i64;
+    create_scalar_slot2_imm(buf, o, t1, operand0, 32);
     translate_binary(shl_i64, buf, LLVMBuildShl);
-    create_scalar_slot3(buf, or_i64, operand0, t0, t1);
+    o.o = or_i64;
+    create_scalar_slot3(buf, o, operand0, t0, t1);
     translate_binary(or_i64, buf, LLVMBuildOr);
 }
 
@@ -1411,7 +1470,6 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
-        OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
         c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name());
         c2 = LLVMConstInt(llvm_int_types[OPC_INPUT_T], 0, 0);
     }
@@ -1505,7 +1563,9 @@ void translate_call_direct(OpCodeType opc, void *ptr) {
     assert(is_imm1 && is_imm2);
 
     uint8_t buf[16];
-    create_scalar_slot_imm(buf, push_ret_addr, operand0, ret_delta_hex.i);
+    OHType o;
+    o.o = push_ret_addr;
+    create_scalar_slot_imm(buf, o, operand0, ret_delta_hex.i);
     translate_push_ret_addr(push_ret_addr, buf);
     create_jmpdirect(buf, call_delta_hex.i);
     translate_jmp_direct(jmp_direct, buf);
@@ -1559,17 +1619,17 @@ static uint8_t can_inline_helper(HelperType h, const char *build_macro, const ch
 }
 
 static uint8_t is_dump_call(HelperType h) {
-    if (h == dump_load || h == dump_store || h == dump_registers) {
+    if (h == helper_dump_load || h == helper_dump_store || h == helper_dump_registers) {
         return 1;
     }
     return 0;
 }
 
 static uint8_t is_tail_call(HelperType h) {
-    if (h == ret_ind || h == call_ind || h == icebp ||
-        h == iret_ind || h == jmp_ind || h == ljmp_protected ||
-        h == lret_protected || h == helper_pause || h == raise_exception ||
-        h == raise_interrupt) {
+    if (h == helper_ret_ind || h == helper_call_ind || h == helper_icebp ||
+        h == helper_iret_ind || h == helper_jmp_ind || h == helper_ljmp_protected ||
+        h == helper_lret_protected || h == helper_pause || h == helper_raise_exception ||
+        h == helper_raise_interrupt) {
         return 1;
     }
     return 0;
@@ -1650,7 +1710,7 @@ void translate_tail_call(OpCodeType opc, void *ptr) {
     LLVMTypeRef helper_type = LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnts, 0);
 
     char helper_name[64] = {0};
-    sprintf(helper_name, "helper_A_%s", helper_str[get_helper(ptr)]);
+    sprintf(helper_name, "helper_%s", helper_str[get_helper(ptr)]);
     LLVMValueRef helper = LLVMGetNamedFunction(module, helper_name);
     if (!helper) {
         helper = LLVMAddFunction(module, helper_name, helper_type);
@@ -1777,9 +1837,9 @@ void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers) 
 void translate_call(OpCodeType opc, void *ptr) {
     HelperType h = get_helper(ptr);
     if (is_dump_call(h)) {
-        return translate_dump_call(opc, ptr, (h == dump_registers));
+        return translate_dump_call(opc, ptr, (h == helper_dump_registers));
     } else if (is_tail_call(h)) {
-        if (h == raise_exception || h == raise_interrupt) {
+        if (h == helper_raise_exception || h == helper_raise_interrupt) {
             exception_or_interrupt_on = 1;
         }
         return translate_tail_call(opc, ptr);
@@ -2370,9 +2430,11 @@ void handle_func(uint64_t val) {
     }
 
     /*
-    /// Add dump_registers
+    /// Add helper_dump_registers
     uint8_t buf[16];
-    create_helper_env(buf, dump_registers, 0, 0);
+    OHType h;
+    h.h = helper_dump_registers;
+    create_helper_env(buf, h, 0, 0);
     translate_call(call, buf);
     ///
     */

@@ -429,6 +429,29 @@ void gen_api() {
     printf("    }\n");
     printf("    return -1;\n");
     printf("}\n");
+    /// get_env_idx
+    printf("\n");
+    printf("uint8_t get_env_idx(void *ptr) {\n");
+    printf("    Instr1B2 *iptr = (Instr1B2 *)ptr;\n");
+    printf("    if (iptr->instr_type != SIZEXB) {\n");
+    printf("        return 0xff;\n");
+    printf("    }\n");
+    printf("    switch (iptr->instr_type_ext) {\n");
+
+    for (uint32_t j = 0; j < instr_def_idx; ++j) {
+        char *instr = instr_def[j];
+        char *env = strstr(instr, "_ENV");
+        if (env) {
+            printf("    case %s_ext:\n", instr);
+            int idx = atoi(env+4);
+            printf("    return %d;\n", idx);
+        }
+    }
+
+    printf("    default: break;\n");
+    printf("    }\n");
+    printf("    return 0xff;\n");
+    printf("}\n");
 }
 
 void parse_tcg_instructions(const char *filename) {
