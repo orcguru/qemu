@@ -2,6 +2,7 @@
 #define TCG_AST_H
 
 #include <stddef.h>
+#include <llvm-c/Types.h>
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -1696,7 +1697,6 @@ size_t create_scalar_imm_slot_imm(void *ptr, OHType op, uint64_t i0, OperandType
 size_t create_scalar_slot3_attr3_num(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0);
 size_t create_scalar_slot3(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2);
 size_t create_scalar_slot2_imm(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0);
-size_t create_scalar_slot2_immUL(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0);
 size_t create_scalar_slot2_imm_relop(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0, RelopType r);
 size_t create_scalar_slot3_relop(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2, RelopType r);
 size_t create_scalar_slot3_imm(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2, uint64_t i0);
@@ -1747,5 +1747,46 @@ void module_prolog(void);
 void module_epilog(void);
 void insert_instr(void *ptr_src, size_t sz);
 uint64_t get_xmm_offset(uint64_t idx);
+
+typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
+typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
+
+void translate_add_i64(OpCodeType opc, void *ptr);
+void translate_andc_i64(OpCodeType opc, void *ptr);
+void translate_andc_vec(OpCodeType opc, void *ptr);
+void translate_bswap32_i64(OpCodeType opc, void *ptr);
+void translate_clz_i64(OpCodeType opc, void *ptr);
+void translate_cmp_vec(OpCodeType opc, void *ptr);
+void translate_ctz_i64(OpCodeType opc, void *ptr);
+void translate_dupm_vec(OpCodeType opc, void *ptr);
+void translate_extract2_i64(OpCodeType opc, void *ptr);
+void translate_extract(OpCodeType opc, void *ptr);
+void translate_ld_vec(OpCodeType opc, void *ptr);
+void translate_negsetcond_i64(OpCodeType opc, void *ptr);
+void translate_not(OpCodeType opc, void *ptr);
+void translate_push_ret_addr(OpCodeType opc, void *ptr);
+void translate_qemu_ld2_i128(OpCodeType opc, void *ptr);
+void translate_qemu_ld(OpCodeType opc, void *ptr);
+void translate_qemu_st2_i128(OpCodeType opc, void *ptr);
+void translate_qemu_st(OpCodeType opc, void *ptr);
+void translate_ret(OpCodeType opc, void *ptr);
+void translate_rotr(OpCodeType opc, void *ptr);
+void translate_rotl(OpCodeType opc, void *ptr);
+void translate_setcond_i64(OpCodeType opc, void *ptr);
+void translate_sextract_i64(OpCodeType opc, void *ptr);
+void translate_st(OpCodeType opc, void *ptr);
+void translate_bswap64_i64(OpCodeType opc, void *ptr);
+void translate_set_label(OpCodeType opc, void *ptr);
+void translate_brcond_i64(OpCodeType opc, void *ptr);
+void translate_jmp_direct(OpCodeType opc, void *ptr);
+void translate_call_direct(OpCodeType opc, void *ptr);
+void translate_discard(OpCodeType opc, void *ptr);
+void translate_tail_call(OpCodeType opc, void *ptr);
+void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers);
+void translate_call(OpCodeType opc, void *ptr);
+void translate_ld_env_xmm(OpCodeType opc, void *ptr);
+void translate_movcond(OpCodeType opc, void *ptr);
+void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api);
+void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api);
 
 #endif

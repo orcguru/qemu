@@ -11,13 +11,252 @@
 #include "tcg_lexer.yy.h"
 #include "api.h"
 #include <llvm-c/Core.h>
-#include <llvm-c/Types.h>
 #include <llvm-c/Target.h>
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/Transforms/PassBuilder.h>
 #include <llvm-c/BitReader.h>
 #include <llvm-c/Linker.h>
 #include <stdbool.h>
+
+#define OPC_INPUT_T         opciosz[opc][0]
+#define OPC_EFFECTIVE_T     opciosz[opc][1]
+#define OPC_OUTPUT_T        opciosz[opc][2]
+#define OPC_ADDR_T          LLVMInt64
+
+#define CREATE_NOT(OUT, IN)                         \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        uint8_t is_vec = is_vector(ptr);            \
+        if (is_vec) {                               \
+            tmp_opc.o = not_vec;                    \
+            AttrSrcInfo ai;                         \
+            ai.p.ves = get_llvm_vector_type(ptr) - LLVMVector16xi8; \
+            create_vector_slot2(buf, tmp_opc, ai, OUT, IN); \
+        } else {                                    \
+            tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? not_i64 : not_i32;      \
+            create_scalar_slot2(buf, tmp_opc, OUT, IN); \
+        }                                           \
+        translate_not(tmp_opc.o, buf);      \
+    } while (0)
+
+#define CREATE_AND(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        uint8_t is_vec = is_vector(ptr);            \
+        if (is_vec) {                               \
+            tmp_opc.o = and_vec;                    \
+            AttrSrcInfo ai;                         \
+            ai.p.ves = get_llvm_vector_type(ptr) - LLVMVector16xi8; \
+            create_vector_slot3(buf, tmp_opc, ai, OUT, IN0, IN1); \
+            translate_binary(tmp_opc.o, buf, LLVMBuildAnd);     \
+        } else {                                    \
+            tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? not_i64 : not_i32;      \
+            create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
+            translate_binary(tmp_opc.o, buf, LLVMBuildAnd);     \
+        }                                           \
+    } while (0)
+
+#define CREATE_XOR(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        uint8_t is_vec = is_vector(ptr);            \
+        if (is_vec) {                               \
+            tmp_opc.o = and_vec;                    \
+            AttrSrcInfo ai;                         \
+            ai.p.ves = get_llvm_vector_type(ptr) - LLVMVector16xi8; \
+            create_vector_slot2_vimm(buf, tmp_opc, ai, OUT, IN0, IN1); \
+        } else {                                    \
+            tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? xor_i64 : xor_i32;      \
+            create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
+        }                               \
+        translate_binary(tmp_opc.o, buf, LLVMBuildXor);     \
+    } while (0)
+
+#define CREATE_SHR(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;      \
+        create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
+        translate_binary(tmp_opc.o, buf, LLVMBuildLShr);              \
+    } while (0)
+
+#define CREATE_SHR_SLOT(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;      \
+        create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
+        translate_binary(tmp_opc.o, buf, LLVMBuildLShr);              \
+    } while (0)
+
+#define CREATE_SHL(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;      \
+        create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
+        translate_binary(tmp_opc.o, buf, LLVMBuildShl);              \
+    } while (0)
+
+#define CREATE_SHL_SLOT(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;      \
+        create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
+        translate_binary(tmp_opc.o, buf, LLVMBuildShl);              \
+    } while (0)
+
+#define CREATE_OR(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;      \
+        create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
+        translate_binary(tmp_opc.o, buf, LLVMBuildOr);              \
+    } while (0)
+
+#define CREATE_DEPOSIT(OUT, IN0, IN1, OFS, LEN)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? deposit_i64 : deposit_i32;      \
+        create_scalar_slot3_imm2(buf, tmp_opc, OUT, IN0, IN1, OFS, LEN); \
+        translate_deposit(tmp_opc.o, buf);    \
+    } while (0)
+
+#define CREATE_SAR(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sar_i64 : sar_i32;      \
+        create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
+        translate_binary(tmp_opc.o, buf, LLVMBuildAShr);              \
+    } while (0)
+
+#define CREATE_ADD(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? add_i64 : add_i32;      \
+        create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
+        translate_binary(tmp_opc.o, buf, LLVMBuildAdd);  \
+    } while (0)
+
+#define CREATE_SUB(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;      \
+        create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
+        translate_binary(tmp_opc.o, buf, LLVMBuildSub);  \
+    } while (0)
+
+#define CREATE_MOV(OUT, IN)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? mov_i64 : mov_i32;      \
+        create_scalar_slot2(buf, tmp_opc, OUT, IN); \
+        translate_mov(tmp_opc.o, buf);  \
+    } while (0)
+
+#define CREATE_MOV_VEC(ATTR, OUT, IN)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = mov_vec;      \
+        create_vector_slot2(buf, tmp_opc, ATTR, OUT, IN); \
+        translate_mov(tmp_opc.o, buf);  \
+    } while (0)
+
+#define CREATE_MOVCOND_VEC(ATTR, OUT, IN0, IN1, CMP0, CMP1, ROP)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = movcond_vec;      \
+        create_vector_slot5_relop(buf, tmp_opc, ATTR, OUT, IN0, IN1, CMP0, CMP1, ROP); \
+        translate_mov(tmp_opc.o, buf);  \
+    } while (0)
+
+#define CREATE_LABEL(LABEL)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = set_label;     \
+        create_setlabel(buf, tmp_opc, LABEL); \
+        translate_set_label(tmp_opc.o, buf);  \
+    } while (0)
+
+#define CREATE_PUSH_RET_ADDR(OP, RET)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = push_ret_addr;     \
+    create_scalar_slot_imm(buf, tmp_opc, OP, RET);  \
+    translate_push_ret_addr(tmp_opc.o, buf);    \
+    } while (0)
+
+#define CREATE_JMP_DIRECT(ADDR)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        create_jmpdirect(buf, ADDR);        \
+        translate_jmp_direct(jmp_direct, buf);  \
+    } while (0)
+
+#define CREATE_BRCOND(SLOT, I, ROP, LABEL)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        create_branch_condition(buf, SLOT, I, ROP, LABEL); \
+        translate_brcond_i64(brcond_i64, buf); \
+    } while (0)
+
+#define CREATE_CALL_RET_IND(OP)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.h = helper_ret_ind;                 \
+        create_helper_env_slot(buf, tmp_opc, 0, 0, OP); \
+        translate_call(call, buf);                  \
+    } while (0)
+
+#define CREATE_LD(L, ADDR)                \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = qemu_ld_i64;                    \
+        AttrSrcInfo a0, a1, a2;                     \
+        a0.subt = SUB_ATTR_ATOMIC;                  \
+        a0.p.storage.attr.atomic = NONATOMIC;       \
+        a1.subt = SUB_ATTR_ALIGNMENT;               \
+        a1.p.storage.attr.alignment = ALIGN_MEM_SIZE;   \
+        a2.subt = SUB_ATTR_SRCSIZEEXT;              \
+        a2.p.storage.attr.ext = ZERO;               \
+        a2.p.storage.size = SRC8B;                  \
+        create_scalar_slot2_attr3_num(buf, tmp_opc, L, ADDR, a0, a1, a2, 2);      \
+        translate_qemu_ld(tmp_opc.o, buf);        \
+    } while (0)
+
+#define CREATE_ST(R, ADDR)                \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = qemu_st_i64;                    \
+        AttrSrcInfo a0, a1, a2;                     \
+        a0.subt = SUB_ATTR_ATOMIC;                  \
+        a0.p.storage.attr.atomic = NONATOMIC;       \
+        a1.subt = SUB_ATTR_ALIGNMENT;               \
+        a1.p.storage.attr.alignment = ALIGN_MEM_SIZE;   \
+        a2.subt = SUB_ATTR_SRCSIZEEXT;              \
+        a2.p.storage.attr.ext = ZERO;               \
+        a2.p.storage.size = SRC8B;                  \
+        create_scalar_slot2_attr3_num(buf, tmp_opc, R, ADDR, a0, a1, a2, 2);      \
+        translate_qemu_st(tmp_opc.o, buf);        \
+    } while (0)
 
 extern char *lineptr;
 extern const char *opcode_type_str[];
@@ -83,14 +322,11 @@ static char output_file[128] = {0};
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
 
-typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
-typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
-
-static void do_store(LLVMValueRef val, LLVMType val_tidx, OperandType out);
+static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, OperandType out);
 static LLVMValueRef get_env_ptr_raw();
-static OperandType get_env_ptr();
-static OperandType get_shadow_stack_pointer();
-static void set_shadow_stack_pointer(OperandType val);
+static OperandType get_env_ptr(OpCodeType opc);
+static OperandType get_shadow_stack_pointer(OpCodeType opc);
+static void set_shadow_stack_pointer(OpCodeType opc, OperandType val);
 static LLVMBasicBlockRef get_bb(const char *name);
 static void handle_single_instr(OpCodeType opc, void *ptr);
 static uint8_t can_inline_helper(HelperType h, const char *build_macro, const char *bc_name, const char *helper_func_name);
@@ -98,43 +334,6 @@ static uint8_t is_dump_call(HelperType h);
 static uint8_t is_tail_call(HelperType h);
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc);
 static LLVMValueRef get_func_param(int i);
-void translate_add_i64(OpCodeType opc, void *ptr);
-void translate_andc_i64(OpCodeType opc, void *ptr);
-void translate_andc_vec(OpCodeType opc, void *ptr);
-void translate_bswap32_i64(OpCodeType opc, void *ptr);
-void translate_clz_i64(OpCodeType opc, void *ptr);
-void translate_cmp_vec(OpCodeType opc, void *ptr);
-void translate_ctz_i64(OpCodeType opc, void *ptr);
-void translate_dupm_vec(OpCodeType opc, void *ptr);
-void translate_extract2_i64(OpCodeType opc, void *ptr);
-void translate_extract(OpCodeType opc, void *ptr);
-void translate_ld_vec(OpCodeType opc, void *ptr);
-void translate_negsetcond_i64(OpCodeType opc, void *ptr);
-void translate_not_i64(OpCodeType opc, void *ptr);
-void translate_not_vec(OpCodeType opc, void *ptr);
-void translate_push_ret_addr(OpCodeType opc, void *ptr);
-void translate_qemu_ld2_i128(OpCodeType opc, void *ptr);
-void translate_qemu_ld(OpCodeType opc, void *ptr);
-void translate_qemu_st2_i128(OpCodeType opc, void *ptr);
-void translate_qemu_st(OpCodeType opc, void *ptr);
-void translate_ret(OpCodeType opc, void *ptr);
-void translate_rotr(OpCodeType opc, void *ptr);
-void translate_rotl(OpCodeType opc, void *ptr);
-void translate_setcond_i64(OpCodeType opc, void *ptr);
-void translate_sextract_i64(OpCodeType opc, void *ptr);
-void translate_st(OpCodeType opc, void *ptr);
-void translate_bswap64_i64(OpCodeType opc, void *ptr);
-void translate_set_label(OpCodeType opc, void *ptr);
-void translate_brcond_i64(OpCodeType opc, void *ptr);
-void translate_jmp_direct(OpCodeType opc, void *ptr);
-void translate_call_direct(OpCodeType opc, void *ptr);
-void translate_discard(OpCodeType opc, void *ptr);
-void translate_tail_call(OpCodeType opc, void *ptr);
-void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers);
-void translate_call(OpCodeType opc, void *ptr);
-void translate_ld_env_xmm(OpCodeType opc, void *ptr);
-void translate_movcond(OpCodeType opc, void *ptr);
-void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api);
 
 #define GET_2_OPERANDS()                                \
     do {                                                \
@@ -173,11 +372,6 @@ void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api);
         a2.p.storage.attr.ext = (attr.attr_val >> 3) & 0x1;     \
         a2.p.storage.size = attr.attr_val & 0x7;                \
     } while (0)
-
-#define OPC_INPUT_T         opciosz[opc][0]
-#define OPC_EFFECTIVE_T     opciosz[opc][1]
-#define OPC_OUTPUT_T        opciosz[opc][2]
-#define OPC_ADDR_T          LLVMInt64
 
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc) {
     if (opc == jmp_direct || opc == call_direct || opc == ret) {
@@ -218,57 +412,64 @@ static OperandType get_tmp_and_do_alloc(LLVMType type) {
     return tmp;
 }
 
+static OperandType get_alias(OperandType operand) {
+    if (operand.s.slot_type == SUB_SLOT_TMP) {
+        return alias_tmp[operand.s.slot_idx];
+    } else {
+        assert(0);
+    }
+}
+
+static uint32_t has_alias(OperandType operand) {
+    if (operand.s.slot_type == SUB_SLOT_TMP) {
+        return alias_tmp[operand.s.slot_idx].s.valid;
+    } else {
+        assert(0);
+    }
+}
+
+static LLVMValueRef get_stack_alloca(OperandType operand) {
+    LLVMValueRef alloca = NULL;
+    if (operand.s.slot_type == SUB_SLOT_XREG) {
+        alloca = func_xreg_alloca[operand.s.slot_idx];
+    } else if (operand.s.slot_type == SUB_SLOT_TMP) {
+        assert(has_alias(operand) == 0);
+        alloca = func_tmp_alloca[operand.s.slot_idx];
+    } else if (operand.s.slot_type == SUB_SLOT_XMM) {
+        alloca = func_xmm_alloca[operand.s.slot_idx];
+    } else {
+        assert(0);
+    }
+    return alloca;
+}
+
+static OperandType get_tmp_and_do_alloc_with_init(LLVMType type, uint64_t val) {
+    OperandType tmp = get_tmp_and_do_alloc(type);
+    LLVMValueRef constant = LLVMConstInt(llvm_int_types[type], 0x00ff00ff, 0);
+    LLVMBuildStore(builder, constant, get_stack_alloca(tmp));
+    return tmp;
+}
+
 static const char *get_next_var_name() {
     assert(ir_var_name_idx < sizeof(ir_var_name)/sizeof(const char *));
     return ir_var_name[ir_var_name_idx++];
 }
 
-static OperandType get_shadow_stack_pointer() {
-    uint8_t buf[16];
+static OperandType get_shadow_stack_pointer(OpCodeType opc) {
     OperandType ptr_addr = get_tmp_and_do_alloc(LLVMInt64);
-    OperandType env = get_env_ptr();
-    OHType opc;
-    opc.o = add_i64;
-    create_scalar_slot2_imm(buf, opc, ptr_addr, env, -8UL);
-    translate_add_i64(add_i64, buf);
+    OperandType env = get_env_ptr(opc);
+    CREATE_ADD(ptr_addr, env, -8UL);
     OperandType ptr_val = get_tmp_and_do_alloc(LLVMInt64);
-
-    AttrSrcInfo a0, a1, a2;
-    a0.subt = SUB_ATTR_ATOMIC;
-    a0.p.storage.attr.atomic = NONATOMIC;
-    a1.subt = SUB_ATTR_ALIGNMENT;
-    a1.p.storage.attr.alignment = ALIGN_MEM_SIZE;
-    a2.subt = SUB_ATTR_SRCSIZEEXT;
-    a2.p.storage.attr.ext = ZERO;
-    a2.p.storage.size = SRC8B;
-
-    opc.o = qemu_ld_i64;
-    create_scalar_slot2_attr3_num(buf, opc, ptr_val, ptr_addr, a0, a1, a2, 2);
-    translate_qemu_ld(qemu_ld_i64, buf);
+    CREATE_LD(ptr_val, ptr_addr);
     return ptr_val;
 }
 
-static void set_shadow_stack_pointer(OperandType val) {
+static void set_shadow_stack_pointer(OpCodeType opc, OperandType val) {
     uint8_t buf[16];
     OperandType ptr_addr = get_tmp_and_do_alloc(LLVMInt64);
-    OperandType env = get_env_ptr();
-    OHType opc;
-    opc.o = add_i64;
-    create_scalar_slot2_imm(buf, opc, ptr_addr, env, -8UL);
-    translate_add_i64(add_i64, buf);
-
-    AttrSrcInfo a0, a1, a2;
-    a0.subt = SUB_ATTR_ATOMIC;
-    a0.p.storage.attr.atomic = NONATOMIC;
-    a1.subt = SUB_ATTR_ALIGNMENT;
-    a1.p.storage.attr.alignment = ALIGN_MEM_SIZE;
-    a2.subt = SUB_ATTR_SRCSIZEEXT;
-    a2.p.storage.attr.ext = ZERO;
-    a2.p.storage.size = SRC8B;
-
-    opc.o = qemu_st_i64;
-    create_scalar_slot2_attr3_num(buf, opc, val, ptr_addr, a0, a1, a2, 2);
-    translate_qemu_st(qemu_st_i64, buf);
+    OperandType env = get_env_ptr(opc);
+    CREATE_ADD(ptr_addr, env, -8UL);
+    CREATE_ST(val, ptr_addr);
 }
 
 static LLVMBasicBlockRef get_bb(const char *name) {
@@ -313,37 +514,6 @@ static void unregister_alias(OperandType operand) {
     }
 }
 
-static OperandType get_alias(OperandType operand) {
-    if (operand.s.slot_type == SUB_SLOT_TMP) {
-        return alias_tmp[operand.s.slot_idx];
-    } else {
-        assert(0);
-    }
-}
-
-static uint32_t has_alias(OperandType operand) {
-    if (operand.s.slot_type == SUB_SLOT_TMP) {
-        return alias_tmp[operand.s.slot_idx].s.valid;
-    } else {
-        assert(0);
-    }
-}
-
-static LLVMValueRef get_stack_alloca(OperandType operand) {
-    LLVMValueRef alloca = NULL;
-    if (operand.s.slot_type == SUB_SLOT_XREG) {
-        alloca = func_xreg_alloca[operand.s.slot_idx];
-    } else if (operand.s.slot_type == SUB_SLOT_TMP) {
-        assert(has_alias(operand) == 0);
-        alloca = func_tmp_alloca[operand.s.slot_idx];
-    } else if (operand.s.slot_type == SUB_SLOT_XMM) {
-        alloca = func_xmm_alloca[operand.s.slot_idx];
-    } else {
-        assert(0);
-    }
-    return alloca;
-}
-
 static LLVMType get_stack_llvmtype(OperandType operand) {
     if (operand.s.slot_type == SUB_SLOT_XREG) {
         return func_xreg_llvmtype[operand.s.slot_idx];
@@ -367,24 +537,20 @@ static LLVMValueRef get_env_ptr_raw() {
     return LLVMBuildCall2(builder, asm_function_type, inline_asm, NULL, 0, get_next_var_name());
 }
 
-static OperandType get_env_ptr() {
+static OperandType get_env_ptr(OpCodeType opc) {
     OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
     LLVMValueRef val = get_env_ptr_raw();
-    do_store(val, LLVMInt64, tmp);
+    do_store(opc, val, LLVMInt64, tmp);
     return tmp;
 }
 
-static void do_store(LLVMValueRef val, LLVMType val_tidx, OperandType out) {
+static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, OperandType out) {
     assert(val_tidx != LLVMInvalidType && val_tidx < LLVMMAXType);
     LLVMTypeRef val_type = llvm_int_types[val_tidx];
     if (out.s.slot_type == SUB_SLOT_ENVVAR) {
         OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
-        OperandType env = get_env_ptr();
-        uint8_t buf[16];
-        OHType opc;
-        opc.o = add_i64;
-        create_scalar_slot2_imm(buf, opc, tmp, env, env_var_offset[out.s.slot_idx]);
-        translate_add_i64(add_i64, buf);
+        OperandType env = get_env_ptr(opc);
+        CREATE_ADD(tmp, env, env_var_offset[out.s.slot_idx]);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, func_tmp_alloca[tmp.s.slot_idx], LLVMPointerType(val_type, 0), get_next_var_name());
         LLVMBuildStore(builder, val, ptr);
     } else {
@@ -416,12 +582,10 @@ static void do_store(LLVMValueRef val, LLVMType val_tidx, OperandType out) {
     }
 }
 
-static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType operand, LLVMType tidx) {
+static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm, OperandType operand, LLVMType tidx) {
     assert(tidx != LLVMInvalidType && tidx < LLVMMAXType);
     LLVMTypeRef type = llvm_int_types[tidx];
     LLVMValueRef ret = NULL;
-    OHType opc;
-    opc.o = add_i64;
     if (is_imm) {
         if (tidx <= LLVMInt64) {
             ret = LLVMConstInt(type, operand.i, 0);
@@ -442,18 +606,14 @@ static LLVMValueRef get_source_node_imm_or_stack(uint32_t is_imm, OperandType op
         }
     } else if (operand.s.slot_type == SUB_SLOT_ENVVAR) {
         OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
-        OperandType env = get_env_ptr();
-        uint8_t buf[16];
-        create_scalar_slot2_imm(buf, opc, tmp, env, env_var_offset[operand.s.slot_idx]);
-        translate_add_i64(add_i64, buf);
+        OperandType env = get_env_ptr(opc);
+        CREATE_ADD(tmp, env, env_var_offset[operand.s.slot_idx]);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, func_tmp_alloca[tmp.s.slot_idx], LLVMPointerType(type, 0), get_next_var_name());
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name());
     } else if (operand.s.slot_type == SUB_SLOT_ENV) {
         OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
-        OperandType env = get_env_ptr();
-        uint8_t buf[16];
-        create_scalar_slot2_imm(buf, opc, tmp, env, operand.s.offset);
-        translate_add_i64(add_i64, buf);
+        OperandType env = get_env_ptr(opc);
+        CREATE_ADD(tmp, env, operand.s.offset);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, func_tmp_alloca[tmp.s.slot_idx], LLVMPointerType(type, 0), get_next_var_name());
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name());
     } else if (operand.s.slot_type == SUB_SLOT_XMM) {
@@ -499,10 +659,10 @@ void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
     if (is_vec) {
         vtype = get_llvm_vector_type(ptr);
     }
-    LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, is_vec ? vtype : OPC_INPUT_T);
-    LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef left = get_source_node_imm_or_stack(opc, is_imm_l, operand_l, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef right = get_source_node_imm_or_stack(opc, is_imm_r, operand_r, is_vec ? vtype : OPC_INPUT_T);
     LLVMValueRef out_val = api(builder, left, right, get_next_var_name());
-    do_store(out_val, OPC_OUTPUT_T, output);
+    do_store(opc, out_val, OPC_OUTPUT_T, output);
 }
 
 void translate_add_i64(OpCodeType opc, void *ptr) {
@@ -524,10 +684,10 @@ void translate_add_i64(OpCodeType opc, void *ptr) {
             alias.s.offset += operand_r.i;
             register_alias(output, alias);
         } else {
-            LLVMValueRef left = get_source_node_imm_or_stack(is_imm_l, operand_l, OPC_INPUT_T);
-            LLVMValueRef right = get_source_node_imm_or_stack(is_imm_r, operand_r, OPC_INPUT_T);
+            LLVMValueRef left = get_source_node_imm_or_stack(opc, is_imm_l, operand_l, OPC_INPUT_T);
+            LLVMValueRef right = get_source_node_imm_or_stack(opc, is_imm_r, operand_r, OPC_INPUT_T);
             LLVMValueRef add_val = LLVMBuildAdd(builder, left, right, get_next_var_name());
-            do_store(add_val, OPC_OUTPUT_T, output);
+            do_store(opc, add_val, OPC_OUTPUT_T, output);
         }
     }
 }
@@ -536,82 +696,41 @@ void translate_andc_i64(OpCodeType opc, void *ptr) {
     OperandType tmp = get_tmp_and_do_alloc(LLVMInt64);
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
-
-    uint8_t buf[16];
-    OHType o;
-    o.o = not_i64;
-    create_scalar_slot2(buf, o, tmp, operand2);
-    translate_not_i64(not_i64, buf);
-
-    o.o = and_i64;
-    create_scalar_slot3(buf, o, operand0, operand1, tmp);
-    translate_binary(and_i64, buf, LLVMBuildAnd);
+    CREATE_NOT(tmp, operand2);
+    CREATE_AND(operand0, operand1, tmp);
 }
 
 void translate_andc_vec(OpCodeType opc, void *ptr) {
     OperandType tmp = get_tmp_and_do_alloc(LLVMVector16xi8);
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
-    AttrSrcInfo ai;
-    ai.p.ves = get_llvm_vector_type(ptr) - LLVMVector16xi8;
-
-    uint8_t buf[16];
-    OHType o;
-    o.o = not_vec;
-    create_vector_slot2(buf, o, ai, tmp, operand2);
-    translate_not_vec(not_vec, buf);
-
-    o.o = and_vec;
-    create_vector_slot3(buf, o, ai, operand0, operand1, tmp);
-    translate_binary(and_vec, buf, LLVMBuildAnd);
+    CREATE_NOT(tmp, operand2);
+    CREATE_AND(operand0, operand1, tmp);
 }
 
 void translate_bswap32_i64(OpCodeType opc, void *ptr) {
     OperandType tmp0 = get_tmp_and_do_alloc(LLVMInt64);
     OperandType tmp1 = get_tmp_and_do_alloc(LLVMInt64);
-    uint32_t constant_t2 = 0x00ff00ff;
-
+    OperandType tmp2 = get_tmp_and_do_alloc_with_init(LLVMInt64, 0x00ff00ff);
     OperandType operand0, operand1;
     GET_2_OPERANDS();
-
-    uint8_t buf[16];
-    OHType o;
-    o.o = shr_i64;
-    create_scalar_slot2_imm(buf, o, tmp0, operand1, 8);
-    translate_binary(shr_i64, buf, LLVMBuildLShr);
-    o.o = and_i64;
-    create_scalar_slot2_imm(buf, o, tmp1, operand1, constant_t2);
-    translate_binary(and_i64, buf, LLVMBuildAnd);
-    o.o = and_i64;
-    create_scalar_slot2_imm(buf, o, tmp0, tmp0, constant_t2);
-    translate_binary(and_i64, buf, LLVMBuildAnd);
-    o.o = shl_i64;
-    create_scalar_slot2_imm(buf, o, tmp1, tmp1, 8);
-    translate_binary(shl_i64, buf, LLVMBuildShl);
-    o.o = or_i64;
-    create_scalar_slot3(buf, o, operand0, tmp0, tmp1);
-    translate_binary(or_i64, buf, LLVMBuildOr);
-    o.o = shl_i64;
-    create_scalar_slot2_imm(buf, o, tmp1, operand0, 48);
-    translate_binary(shl_i64, buf, LLVMBuildShl);
-    o.o = shl_i64;
-    create_scalar_slot2_imm(buf, o, tmp0, operand0, 16);
-    translate_binary(shl_i64, buf, LLVMBuildShl);
+    CREATE_SHR(tmp0, operand1, 8);
+    CREATE_AND(tmp1, operand1, tmp2);
+    CREATE_AND(tmp0, tmp0, tmp2);
+    CREATE_SHL(tmp1, tmp1, 8);
+    CREATE_OR(operand0, tmp0, tmp1);
+    CREATE_SHL(tmp1, operand0, 48);
+    CREATE_SHL(tmp0, operand0, 16);
 
     AttributeType attr = get_attribute(ptr);
     assert(attr.attr_type == SUB_ATTR_SWAP);
     if (attr.attr_val & OS) {
-        o.o = sar_i64;
-        create_scalar_slot2_imm(buf, o, tmp1, tmp1, 32);
-        translate_binary(sar_i64, buf, LLVMBuildAShr);
+        CREATE_SAR(tmp1, tmp1, 32);
     } else {
-        o.o = shr_i64;
-        create_scalar_slot2_imm(buf, o, tmp1, tmp1, 32);
-        translate_binary(shr_i64, buf, LLVMBuildLShr);
+        CREATE_SHR(tmp1, tmp1, 32);
     }
-    o.o = or_i64;
-    create_scalar_slot3(buf, o, operand0, tmp0, tmp1);
-    translate_binary(or_i64, buf, LLVMBuildOr);
+
+    CREATE_OR(operand0, tmp0, tmp1);
 }
 
 void translate_cmp_vec(OpCodeType opc, void *ptr) {
@@ -620,8 +739,8 @@ void translate_cmp_vec(OpCodeType opc, void *ptr) {
     GET_3_OPERANDS_NOCHECK();
     LLVMType vtype = get_llvm_vector_type(ptr);
 
-    LLVMValueRef src1 = get_source_node_imm_or_stack(is_imm1, operand1, vtype);
-    LLVMValueRef src2 = get_source_node_imm_or_stack(is_imm2, operand2, vtype);
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, vtype);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, vtype);
 
     RelopType r = get_relop(ptr);
     assert(r < RELOPMAX && llvm_predicate[r]);
@@ -631,11 +750,11 @@ void translate_cmp_vec(OpCodeType opc, void *ptr) {
     ones.i = 0xffffffffffffffffUL;
     zeros.i = 0;
 
-    LLVMValueRef vec_true = get_source_node_imm_or_stack(1, ones, vtype);
-    LLVMValueRef vec_false = get_source_node_imm_or_stack(1, zeros, vtype);
+    LLVMValueRef vec_true = get_source_node_imm_or_stack(opc, 1, ones, vtype);
+    LLVMValueRef vec_false = get_source_node_imm_or_stack(opc, 1, zeros, vtype);
 
     LLVMValueRef result = LLVMBuildSelect(builder, bool_vec, vec_true, vec_false, get_next_var_name());
-    do_store(result, OPC_OUTPUT_T, operand0);
+    do_store(opc, result, OPC_OUTPUT_T, operand0);
 }
 
 void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
@@ -643,8 +762,8 @@ void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
 
-    LLVMValueRef src1 = get_source_node_imm_or_stack(is_imm1, operand1, OPC_INPUT_T);
-    LLVMValueRef src2 = get_source_node_imm_or_stack(is_imm2, operand2, OPC_INPUT_T);
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T);
 
     LLVMValueRef bool1 = LLVMBuildICmp(builder, LLVMIntEQ, src1, LLVMConstInt(llvm_int_types[LLVMInt64], 0, 0), get_next_var_name());
 
@@ -675,7 +794,7 @@ void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
     LLVMValueRef phi_incoming_values[] = {src2, call_result};
     LLVMBasicBlockRef phi_incoming_blocks[] = {bb_ctz_is_zero, bb_ctz_not_zero};
     LLVMAddIncoming(phi, phi_incoming_values, phi_incoming_blocks, 2);
-    do_store(phi, OPC_OUTPUT_T, operand0);
+    do_store(opc, phi, OPC_OUTPUT_T, operand0);
 }
 
 void translate_clz_i64(OpCodeType opc, void *ptr) {
@@ -694,54 +813,29 @@ void translate_deposit(OpCodeType opc, void *ptr) {
     len = get_operand(ptr, 4, &is_imm4);
     assert(is_imm3 && is_imm4);
 
-    uint8_t buf[16];
-    OHType tmp_opc;
-    // shl
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    OperandType tmp_v = get_tmp_and_do_alloc_with_init(OPC_OUTPUT_T, 1);
     OperandType mask1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
-    create_slot_imm2(buf, tmp_opc, mask1, 1, len.i);
-    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
-    // sub
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
+    CREATE_SHL(mask1, tmp_v, len.i);
     OperandType mask_not_shifted = get_tmp_and_do_alloc(OPC_OUTPUT_T);
-    create_scalar_slot2_imm(buf, tmp_opc, mask_not_shifted, mask1, 1);
-    translate_binary(tmp_opc.o, buf, LLVMBuildSub);
-    // shl
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    CREATE_SUB(mask_not_shifted, mask1, tmp_v);
     OperandType mask_shifted = get_tmp_and_do_alloc(OPC_OUTPUT_T);
-    create_scalar_slot2_imm(buf, tmp_opc, mask_shifted, mask_not_shifted, ofs.i);
-    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
-    // xor
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? xor_i64 : xor_i32;
+    CREATE_SHL(mask_shifted, mask_not_shifted, ofs.i);
     OperandType rev_mask_shifted = get_tmp_and_do_alloc(OPC_OUTPUT_T);
-    create_scalar_slot2_imm(buf, tmp_opc, rev_mask_shifted, mask_shifted, -1UL);
-    translate_binary(tmp_opc.o, buf, LLVMBuildXor);
-    // and
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? and_i64 : and_i32;
+    CREATE_XOR(rev_mask_shifted, mask_shifted, -1UL);
     OperandType part1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
-    create_scalar_slot3(buf, tmp_opc, part1, operand1, rev_mask_shifted);
-    translate_binary(tmp_opc.o, buf, LLVMBuildAnd);
-    // and
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? and_i64 : and_i32;
+    CREATE_AND(part1, operand1, rev_mask_shifted);
     OperandType part2_0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
-    create_scalar_slot3(buf, tmp_opc, part2_0, operand2, mask_not_shifted);
-    translate_binary(tmp_opc.o, buf, LLVMBuildAnd);
-    // shl
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    CREATE_AND(part2_0, operand2, mask_not_shifted);
     OperandType part2_1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
-    create_scalar_slot2_imm(buf, tmp_opc, part2_1, part2_0, ofs.i);
-    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
-    // or
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
-    create_scalar_slot3(buf, tmp_opc, operand0, part1, part2_1);
-    translate_binary(tmp_opc.o, buf, LLVMBuildOr);
+    CREATE_SHL(part2_1, part2_0, ofs.i);
+    CREATE_OR(operand0, part1, part2_1);
 }
 
 void translate_dupm_vec(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
     LLVMType vtype = get_llvm_vector_type(ptr);
-    LLVMValueRef src = get_source_node_imm_or_stack(0, operand1, vtype);
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, vtype);
     LLVMValueRef index = LLVMConstInt(LLVMInt64Type(), 0, 0);
     LLVMValueRef elem = LLVMBuildExtractElement(builder, src, index, get_next_var_name());
     uint8_t full_cnt = llvm_vector_elem_bit_counts[vtype*2];
@@ -755,7 +849,7 @@ void translate_dupm_vec(OpCodeType opc, void *ptr) {
         index = LLVMConstInt(LLVMInt64Type(), i, 0);
         result = LLVMBuildInsertElement(builder, result, elem, index, get_next_var_name());
     }
-    do_store(result, OPC_OUTPUT_T, operand0);
+    do_store(opc, result, OPC_OUTPUT_T, operand0);
 }
 
 /*
@@ -771,15 +865,8 @@ void translate_extract2_i64(OpCodeType opc, void *ptr) {
     uint32_t is_imm;
     ofs = get_operand(ptr, 3, &is_imm);
     assert(is_imm);
-
-    uint8_t buf[16];
-    OHType o;
-    o.o = shr_i64;
-    create_scalar_slot2_imm(buf, o, tmp, operand1, ofs.i);
-    translate_binary(shr_i64, buf, LLVMBuildLShr);
-    o.o = deposit_i64;
-    create_scalar_slot3_imm2(buf, o, operand0, tmp, operand2, (64 - ofs.i), ofs.i);
-    translate_deposit(deposit_i64, buf);
+    CREATE_SHR(tmp, operand1, ofs.i);
+    CREATE_DEPOSIT(operand0, tmp, operand2, (64 - ofs.i), ofs.i);
 }
 
 void translate_extract(OpCodeType opc, void *ptr) {
@@ -789,28 +876,14 @@ void translate_extract(OpCodeType opc, void *ptr) {
     ofs = get_operand(ptr, 2, &is_imm2);
     len = get_operand(ptr, 3, &is_imm3);
     assert(is_imm2 && is_imm3);
-
-    uint8_t buf[16];
-    OHType tmp_opc;
-    // shl
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
+    OperandType tmp_v = get_tmp_and_do_alloc_with_init(OPC_OUTPUT_T, 1);
     OperandType mask1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
-    create_slot_imm2(buf, tmp_opc, mask1, 1, len.i);
-    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
-    // sub
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
+    CREATE_SHL(mask1, tmp_v, len.i);
     OperandType mask_not_shifted = get_tmp_and_do_alloc(OPC_OUTPUT_T);
-    create_scalar_slot2_imm(buf, tmp_opc, mask_not_shifted, mask1, 1);
-    translate_binary(tmp_opc.o, buf, LLVMBuildSub);
-    // shr
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;
+    CREATE_SUB(mask_not_shifted, mask1, tmp_v);
     OperandType arg_shifted = get_tmp_and_do_alloc(OPC_OUTPUT_T);
-    create_scalar_slot2_imm(buf, tmp_opc, arg_shifted, operand1, ofs.i);
-    translate_binary(tmp_opc.o, buf, LLVMBuildLShr);
-    // and
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? and_i64 : and_i32;
-    create_scalar_slot3(buf, tmp_opc, operand0, arg_shifted, mask_not_shifted);
-    translate_binary(tmp_opc.o, buf, LLVMBuildAnd);
+    CREATE_SHR(arg_shifted, operand1, ofs.i);
+    CREATE_AND(operand0, arg_shifted, mask_not_shifted);
 }
 
 void translate_mov(OpCodeType opc, void *ptr) {
@@ -829,11 +902,11 @@ void translate_mov(OpCodeType opc, void *ptr) {
         assert(operand0.s.slot_type == SUB_SLOT_TMP);
         register_alias(operand0, get_alias(operand1));
     } else {
-        LLVMValueRef src = get_source_node_imm_or_stack(is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T);
+        LLVMValueRef src = get_source_node_imm_or_stack(opc, is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T);
         if (OPC_EFFECTIVE_T < OPC_INPUT_T) {
             src = LLVMBuildTrunc(builder, src, llvm_int_types[OPC_EFFECTIVE_T], get_next_var_name());
         }
-        do_store(src, is_vec ? vtype : OPC_OUTPUT_T, operand0);
+        do_store(opc, src, is_vec ? vtype : OPC_OUTPUT_T, operand0);
     }
 }
 
@@ -864,17 +937,17 @@ void translate_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
     OperandType operand0, operand1;
     GET_2_OPERANDS_NOCHECK();
 
-    LLVMValueRef src = get_source_node_imm_or_stack(is_imm1, operand1, OPC_INPUT_T);
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
     src = api(builder, src, llvm_int_types[OPC_OUTPUT_T], get_next_var_name());
-    do_store(src, OPC_OUTPUT_T, operand0);
+    do_store(opc, src, OPC_OUTPUT_T, operand0);
 }
 
 void translate_ld_vec(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
     LLVMType vtype = get_llvm_vector_type(ptr);
-    LLVMValueRef src = get_source_node_imm_or_stack(0, operand1, vtype);
-    do_store(src, vtype, operand0);
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, vtype);
+    do_store(opc, src, vtype, operand0);
 }
 
 void translate_movcond(OpCodeType opc, void *ptr) {
@@ -889,10 +962,10 @@ void translate_movcond(OpCodeType opc, void *ptr) {
       vtype = get_llvm_vector_type(ptr);
     }
 
-    LLVMValueRef c1 = get_source_node_imm_or_stack(is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T);
-    LLVMValueRef c2 = get_source_node_imm_or_stack(is_imm2, operand2, is_vec ? vtype : OPC_INPUT_T);
-    LLVMValueRef v1 = get_source_node_imm_or_stack(is_imm3, operand3, is_vec ? vtype : OPC_INPUT_T);
-    LLVMValueRef v2 = get_source_node_imm_or_stack(is_imm4, operand4, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef v1 = get_source_node_imm_or_stack(opc, is_imm3, operand3, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef v2 = get_source_node_imm_or_stack(opc, is_imm4, operand4, is_vec ? vtype : OPC_INPUT_T);
 
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
@@ -904,7 +977,7 @@ void translate_movcond(OpCodeType opc, void *ptr) {
     LLVMValueRef bool_val = LLVMBuildICmp(builder, llvm_predicate[r], c1, c2, get_next_var_name());
 
     LLVMValueRef result = LLVMBuildSelect(builder, bool_val, v1, v2, get_next_var_name());
-    do_store(result, is_vec ? vtype : OPC_OUTPUT_T, operand0);
+    do_store(opc, result, is_vec ? vtype : OPC_OUTPUT_T, operand0);
 }
 
 void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
@@ -912,25 +985,25 @@ void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
     GET_3_OPERANDS();
     LLVMTypeRef t128 = LLVMInt128Type();
 
-    LLVMValueRef src1 = get_source_node_imm_or_stack(0, operand1, OPC_INPUT_T);
-    LLVMValueRef src2 = get_source_node_imm_or_stack(0, operand2, OPC_INPUT_T);
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, 0, operand2, OPC_INPUT_T);
     src1 = api(builder, src1, t128, get_next_var_name());
     src2 = api(builder, src2, t128, get_next_var_name());
     LLVMValueRef out = LLVMBuildMul(builder, src1, src2, get_next_var_name());
     LLVMValueRef shift = LLVMConstInt(t128, 64, 0);
     out = LLVMBuildLShr(builder, out, shift, get_next_var_name());
     out = LLVMBuildTrunc(builder, out, llvm_int_types[OPC_OUTPUT_T], get_next_var_name());
-    do_store(out, OPC_OUTPUT_T, operand0);
+    do_store(opc, out, OPC_OUTPUT_T, operand0);
 }
 
 void translate_neg(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
 
-    LLVMValueRef src = get_source_node_imm_or_stack(0, operand1, OPC_INPUT_T);
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T);
     LLVMValueRef zero = LLVMConstInt(llvm_int_types[OPC_INPUT_T], 0, 0);
     LLVMValueRef out = LLVMBuildSub(builder, zero, src, get_next_var_name());
-    do_store(out, OPC_OUTPUT_T, operand0);
+    do_store(opc, out, OPC_OUTPUT_T, operand0);
 }
 
 void translate_negsetcond_i64(OpCodeType opc, void *ptr) {
@@ -938,8 +1011,8 @@ void translate_negsetcond_i64(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
 
-    LLVMValueRef arg1 = get_source_node_imm_or_stack(is_imm1, operand1, OPC_INPUT_T);
-    LLVMValueRef arg2 = get_source_node_imm_or_stack(is_imm2, operand2, OPC_INPUT_T);
+    LLVMValueRef arg1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
+    LLVMValueRef arg2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T);
 
     RelopType r = get_relop(ptr);
     assert(r < RELOPMAX && llvm_predicate[r]);
@@ -948,29 +1021,13 @@ void translate_negsetcond_i64(OpCodeType opc, void *ptr) {
     LLVMValueRef result = LLVMBuildSExt(builder, bool_val, llvm_int_types[OPC_OUTPUT_T], get_next_var_name());
     LLVMValueRef neg_one = LLVMConstInt(llvm_int_types[OPC_INPUT_T], -1UL, 0);
     result = LLVMBuildXor(builder, result, neg_one, get_next_var_name());
-    do_store(result, OPC_OUTPUT_T, operand0);
+    do_store(opc, result, OPC_OUTPUT_T, operand0);
 }
 
-void translate_not_i64(OpCodeType opc, void *ptr) {
+void translate_not(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
-    uint8_t buf[16];
-    OHType o;
-    o.o = xor_i64;
-    create_scalar_slot2_imm(buf, o, operand0, operand1, -1UL);
-    translate_binary(xor_i64, buf, LLVMBuildXor);
-}
-
-void translate_not_vec(OpCodeType opc, void *ptr) {
-    OperandType operand0, operand1;
-    GET_2_OPERANDS();
-    AttrSrcInfo ai;
-    ai.p.ves = get_llvm_vector_type(ptr) - LLVMVector16xi8;
-    uint8_t buf[16];
-    OHType o;
-    o.o = xor_vec;
-    create_vector_slot2_vimm(buf, o, ai, operand0, operand1, -1UL);
-    translate_binary(xor_vec, buf, LLVMBuildXor);
+    CREATE_XOR(operand0, operand1, -1UL);
 }
 
 void translate_push_ret_addr(OpCodeType opc, void *ptr) {
@@ -980,14 +1037,11 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     func_hex = get_operand(ptr, 1, &is_imm1);
     assert(is_imm1);
 
-    LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(is_imm0, operand0, OPC_INPUT_T);
+    LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(opc, is_imm0, operand0, OPC_INPUT_T);
     uint8_t buf[16];
-    OperandType ptr_val = get_shadow_stack_pointer();
-    OHType o;
-    o.o = add_i64;
-    create_scalar_slot2_imm(buf, o, ptr_val, ptr_val, -8UL);
-    translate_add_i64(add_i64, buf);
-    LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(0, ptr_val, OPC_ADDR_T);
+    OperandType ptr_val = get_shadow_stack_pointer(opc);
+    CREATE_ADD(ptr_val, ptr_val, -8UL);
+    LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T);
     LLVMValueRef shadow_ptr0 = LLVMBuildIntToPtr(builder, shadow_val0, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
     LLVMBuildStore(builder, x64_ret_addr, shadow_ptr0);
 
@@ -1001,13 +1055,12 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
         LLVMAddAttributeAtIndex(func, -1, target_features_attr);
     }
     LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, func, LLVMInt64Type(), get_next_var_name());
-    create_scalar_slot2_imm(buf, o, ptr_val, ptr_val, -8UL);
-    translate_add_i64(add_i64, buf);
-    LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(0, ptr_val, OPC_ADDR_T);
+    CREATE_ADD(ptr_val, ptr_val, -8UL);
+    LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T);
     LLVMValueRef shadow_ptr1 = LLVMBuildIntToPtr(builder, shadow_val1, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
     LLVMBuildStore(builder, func_addr, shadow_ptr1);
 
-    set_shadow_stack_pointer(ptr_val);
+    set_shadow_stack_pointer(opc, ptr_val);
 }
 
 void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
@@ -1021,7 +1074,7 @@ void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
     assert(a2.p.storage.size == SRC16B);
     LLVMType out_type = LLVMVector2xi64;
 
-    LLVMValueRef addr = get_source_node_imm_or_stack(0, operand2, OPC_ADDR_T);
+    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name());
     LLVMValueRef result = LLVMBuildLoad2(builder, llvm_int_types[out_type], pointer, get_next_var_name());
     if (a1.p.storage.attr.alignment == ALIGN_16 ||
@@ -1032,10 +1085,10 @@ void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
     }
     LLVMValueRef index = LLVMConstInt(LLVMInt64Type(), 0, 0);
     LLVMValueRef elem = LLVMBuildExtractElement(builder, result, index, get_next_var_name());
-    do_store(elem, OPC_OUTPUT_T, operand0);
+    do_store(opc, elem, OPC_OUTPUT_T, operand0);
     index = LLVMConstInt(LLVMInt64Type(), 1, 0);
     elem = LLVMBuildExtractElement(builder, result, index, get_next_var_name());
-    do_store(elem, OPC_OUTPUT_T, operand1);
+    do_store(opc, elem, OPC_OUTPUT_T, operand1);
 }
 
 void translate_qemu_ld(OpCodeType opc, void *ptr) {
@@ -1050,7 +1103,7 @@ void translate_qemu_ld(OpCodeType opc, void *ptr) {
     LLVMType out_type = (a2.p.storage.size - SRC1B) + LLVMInt8;
     assert(out_type <= OPC_OUTPUT_T);
 
-    LLVMValueRef addr = get_source_node_imm_or_stack(0, operand1, OPC_ADDR_T);
+    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name());
     LLVMValueRef result = LLVMBuildLoad2(builder, llvm_int_types[out_type], pointer, get_next_var_name());
     if (a1.p.storage.attr.alignment == ALIGN_16) {
@@ -1067,7 +1120,7 @@ void translate_qemu_ld(OpCodeType opc, void *ptr) {
             result = LLVMBuildSExt(builder, result, llvm_int_types[OPC_OUTPUT_T], get_next_var_name());
         }
     }
-    do_store(result, OPC_OUTPUT_T, operand0);
+    do_store(opc, result, OPC_OUTPUT_T, operand0);
 }
 
 void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
@@ -1081,9 +1134,9 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
     assert(a2.p.storage.size == SRC16B);
     LLVMType out_type = LLVMVector2xi64;
 
-    LLVMValueRef val0 = get_source_node_imm_or_stack(0, operand0, OPC_INPUT_T);
-    LLVMValueRef val1 = get_source_node_imm_or_stack(0, operand1, OPC_INPUT_T);
-    LLVMValueRef addr = get_source_node_imm_or_stack(0, operand2, OPC_ADDR_T);
+    LLVMValueRef val0 = get_source_node_imm_or_stack(opc, 0, operand0, OPC_INPUT_T);
+    LLVMValueRef val1 = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T);
+    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name());
 
     LLVMValueRef constants[2];
@@ -1116,8 +1169,8 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
     LLVMType out_type = (a2.p.storage.size - SRC1B) + LLVMInt8;
     assert(out_type <= OPC_OUTPUT_T);
 
-    LLVMValueRef val = get_source_node_imm_or_stack(0, operand0, OPC_INPUT_T);
-    LLVMValueRef addr = get_source_node_imm_or_stack(0, operand1, OPC_ADDR_T);
+    LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, operand0, OPC_INPUT_T);
+    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name());
     if (out_type < OPC_OUTPUT_T) {
         val = LLVMBuildTrunc(builder, val, llvm_int_types[out_type], get_next_var_name());
@@ -1137,45 +1190,23 @@ void translate_ret(OpCodeType opc, void *ptr) {
     OperandType operand0;
     operand0 = get_operand(ptr, 0, &is_imm);
     assert(!is_imm && operand0.s.valid);
-    AttrSrcInfo a0, a1, a2;
-    a0.subt = SUB_ATTR_ATOMIC;
-    a0.p.storage.attr.atomic = NONATOMIC;
-    a1.subt = SUB_ATTR_ALIGNMENT;
-    a1.p.storage.attr.alignment = ALIGN_MEM_SIZE;
-    a2.subt = SUB_ATTR_SRCSIZEEXT;
-    a2.p.storage.attr.ext = ZERO;
-    a2.p.storage.size = SRC8B;
     OperandType loc606 = get_tmp_and_do_alloc(LLVMInt64);
     OperandType loc607 = get_tmp_and_do_alloc(LLVMInt64);
     OperandType loc608 = get_tmp_and_do_alloc(LLVMInt64);
     OperandType loc609 = get_tmp_and_do_alloc(LLVMInt64);
     OperandType loc610 = get_tmp_and_do_alloc(LLVMInt64);
     OperandType loc611 = get_tmp_and_do_alloc(LLVMInt64);
-    OperandType shadow_stack = get_shadow_stack_pointer();
+    OperandType shadow_stack = get_shadow_stack_pointer(opc);
     uint8_t new_label = 42;
 
-    uint8_t buf[16];
-    OHType o;
-    o.o = mov_i64;
-    create_scalar_slot2(buf, o, loc606, shadow_stack);
-    translate_mov(mov_i64, buf);
-    o.o = add_i64;
-    create_scalar_slot2_imm(buf, o, loc607, loc606, 8);
-    translate_add_i64(add_i64, buf);
-    o.o = qemu_ld_i64;
-    create_scalar_slot2_attr3_num(buf, o, loc608, loc606, a0, a1, a2, 2);
-    translate_qemu_ld(qemu_ld_i64, buf);
-    o.o = qemu_ld_i64;
-    create_scalar_slot2_attr3_num(buf, o, loc609, loc607, a0, a1, a2, 2);
-    translate_qemu_ld(qemu_ld_i64, buf);
-    o.o = sub_i64;
-    create_scalar_slot3(buf, o, loc610, operand0, loc609);
-    translate_binary(sub_i64, buf, LLVMBuildSub);
-    o.o = add_i64;
-    create_scalar_slot2_imm(buf, o, loc611, loc606, 0x10);
-    translate_add_i64(add_i64, buf);
-    set_shadow_stack_pointer(loc611);
-    create_branch_condition(buf, loc610, 0, ne, new_label);
+    CREATE_MOV(loc606, shadow_stack);
+    CREATE_ADD(loc607, loc606, 8);
+    CREATE_LD(loc608, loc606);
+    CREATE_LD(loc609, loc607);
+    CREATE_SUB(loc610, operand0, loc609);
+    CREATE_ADD(loc611, loc606, 0x10);
+    set_shadow_stack_pointer(opc, loc611);
+    CREATE_BRCOND(loc610, 0, ne, new_label);
 
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT];
     for (int i = 0; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
@@ -1185,13 +1216,13 @@ void translate_ret(OpCodeType opc, void *ptr) {
                 param_in_stack.s.valid = 1;
                 param_in_stack.s.slot_type = SUB_SLOT_XREG;
                 param_in_stack.s.slot_idx = i;
-                call_args[i] = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+                call_args[i] = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
             } else {
                 param_in_stack.s.valid = 1;
                 param_in_stack.s.slot_type = SUB_SLOT_XMM;
                 param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
                 param_in_stack.s.offset = 0;
-                LLVMValueRef vec = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+                LLVMValueRef vec = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
 
                 LLVMTypeRef ret_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
                 LLVMTypeRef param_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
@@ -1210,44 +1241,27 @@ void translate_ret(OpCodeType opc, void *ptr) {
         }
     }
     LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0);
-    LLVMValueRef ret_target = get_source_node_imm_or_stack(0, loc608, OPC_ADDR_T);
+    LLVMValueRef ret_target = get_source_node_imm_or_stack(opc, 0, loc608, OPC_ADDR_T);
     LLVMValueRef ret_target_ptr = LLVMBuildIntToPtr(builder, ret_target, LLVMPointerType(func_type, 0), get_next_var_name());
     LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, ret_target_ptr, call_args, FIXED_VECTOR_PARAM_COUNT, "");
     LLVMSetTailCall(call_inst, 1);
 
-    o.o = set_label;
-    create_setlabel(buf, o, new_label);
-    translate_set_label(set_label, buf);
-
-    o.h = helper_ret_ind;
-    create_helper_env_slot(buf, o, 0, 0, operand0);
-    translate_call(call, buf);
+    CREATE_LABEL(new_label);
+    CREATE_CALL_RET_IND(operand0);
 }
 
+// FIXME: LLVMInt64 should not be hard-coded
 void translate_rotr(OpCodeType opc, void *ptr) {
-    OperandType t0 = get_tmp_and_do_alloc(LLVMInt64);
-    OperandType t1 = get_tmp_and_do_alloc(LLVMInt64);
+    OperandType t0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
+    OperandType t1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
 
-    uint8_t buf[16];
-    OHType tmp_opc;
-    // shr
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;
-    create_scalar_slot3(buf, tmp_opc, t0, operand1, operand2);
-    translate_binary(tmp_opc.o, buf, LLVMBuildLShr);
-    // sub
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
-    create_scalar_slot_imm_slot(buf, tmp_opc, t1, OPC_OUTPUT_T == LLVMInt64 ? 64 : 32, operand2);
-    translate_binary(tmp_opc.o, buf, LLVMBuildSub);
-    // shl
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
-    create_scalar_slot3(buf, tmp_opc, t1, operand1, t1);
-    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
-    // or
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
-    create_scalar_slot3(buf, tmp_opc, operand0, t0, t1);
-    translate_binary(tmp_opc.o, buf, LLVMBuildOr);
+    CREATE_SHR_SLOT(t0, operand1, operand2);
+    OperandType constant = get_tmp_and_do_alloc_with_init(OPC_OUTPUT_T, OPC_OUTPUT_T == LLVMInt64 ? 64 : 32);
+    CREATE_SUB(t1, constant, operand2);
+    CREATE_SHL_SLOT(t1, operand1, t1);
+    CREATE_OR(operand0, t0, t1);
 }
 
 void translate_rotl(OpCodeType opc, void *ptr) {
@@ -1256,24 +1270,11 @@ void translate_rotl(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
 
-    uint8_t buf[16];
-    OHType tmp_opc;
-    // shl
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
-    create_scalar_slot3(buf, tmp_opc, t0, operand1, operand2);
-    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
-    // sub
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;
-    create_scalar_slot_imm_slot(buf, tmp_opc, t1, OPC_OUTPUT_T == LLVMInt64 ? 64 : 32, operand2);
-    translate_binary(tmp_opc.o, buf, LLVMBuildSub);
-    // shr
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;
-    create_scalar_slot3(buf, tmp_opc, t1, operand1, t1);
-    translate_binary(tmp_opc.o, buf, LLVMBuildLShr);
-    // or
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;
-    create_scalar_slot3(buf, tmp_opc, operand0, t0, t1);
-    translate_binary(tmp_opc.o, buf, LLVMBuildOr);
+    CREATE_SHL_SLOT(t0, operand1, operand2);
+    OperandType constant = get_tmp_and_do_alloc_with_init(OPC_OUTPUT_T, OPC_OUTPUT_T == LLVMInt64 ? 64 : 32);
+    CREATE_SUB(t1, constant, operand2);
+    CREATE_SHR_SLOT(t1, operand1, t1);
+    CREATE_OR(operand0, t0, t1);
 }
 
 void translate_setcond_i64(OpCodeType opc, void *ptr) {
@@ -1281,8 +1282,8 @@ void translate_setcond_i64(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
 
-    LLVMValueRef c1 = get_source_node_imm_or_stack(is_imm1, operand1, OPC_INPUT_T);
-    LLVMValueRef c2 = get_source_node_imm_or_stack(is_imm2, operand2, OPC_INPUT_T);
+    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
+    LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T);
 
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
@@ -1293,7 +1294,7 @@ void translate_setcond_i64(OpCodeType opc, void *ptr) {
     assert(r < RELOPMAX && llvm_predicate[r]);
     LLVMValueRef bool_val = LLVMBuildICmp(builder, llvm_predicate[r], c1, c2, get_next_var_name());
     LLVMValueRef result = LLVMBuildZExt(builder, bool_val, llvm_int_types[OPC_OUTPUT_T], get_next_var_name());
-    do_store(result, OPC_OUTPUT_T, operand0);
+    do_store(opc, result, OPC_OUTPUT_T, operand0);
 }
 
 void translate_sextract_i64(OpCodeType opc, void *ptr) {
@@ -1305,16 +1306,8 @@ void translate_sextract_i64(OpCodeType opc, void *ptr) {
     assert(is_imm2 & is_imm3);
     OperandType t0 = get_tmp_and_do_alloc(LLVMInt64);
 
-    uint8_t buf[16];
-    OHType tmp_opc;
-    // shl
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;
-    create_scalar_slot2_imm(buf, tmp_opc, t0, operand1, (64 - len.i - ofs.i));
-    translate_binary(tmp_opc.o, buf, LLVMBuildShl);
-    // sar
-    tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sar_i64 : sar_i32;
-    create_scalar_slot2_imm(buf, tmp_opc, operand0, t0, (64 - len.i));
-    translate_binary(tmp_opc.o, buf, LLVMBuildAShr);
+    CREATE_SHL(t0, operand1, (64 - len.i - ofs.i));
+    CREATE_SAR(operand0, t0, (64 - len.i));
 }
 
 void translate_st(OpCodeType opc, void *ptr) {
@@ -1323,7 +1316,7 @@ void translate_st(OpCodeType opc, void *ptr) {
     GET_2_OPERANDS_NOCHECK();
     assert(!is_imm1 && operand1.s.valid);
 
-    LLVMValueRef val = get_source_node_imm_or_stack(is_imm0, operand0, OPC_INPUT_T);
+    LLVMValueRef val = get_source_node_imm_or_stack(opc, is_imm0, operand0, OPC_INPUT_T);
     if (OPC_EFFECTIVE_T < OPC_INPUT_T) {
         val = LLVMBuildTrunc(builder, val, llvm_int_types[OPC_EFFECTIVE_T], get_next_var_name());
     }
@@ -1342,12 +1335,12 @@ void translate_st(OpCodeType opc, void *ptr) {
 
         OperandType src = alias;
         src.s.offset = 0;
-        LLVMValueRef src_val = get_source_node_imm_or_stack(0, src, OPC_OUTPUT_T + 4);
+        LLVMValueRef src_val = get_source_node_imm_or_stack(opc, 0, src, OPC_OUTPUT_T + 4);
         LLVMValueRef index = LLVMConstInt(LLVMInt64Type(), (alias.s.offset * 8) / llvm_vector_elem_bit_counts[OPC_OUTPUT_T*2+1], 0);
         val = LLVMBuildInsertElement(builder, src_val, val, index, get_next_var_name());
-        do_store(val, OPC_OUTPUT_T + 4, src);
+        do_store(opc, val, OPC_OUTPUT_T + 4, src);
     } else {
-        addr_val = get_source_node_imm_or_stack(0, operand1, OPC_ADDR_T);
+        addr_val = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T);
         LLVMValueRef addr_ptr = LLVMBuildIntToPtr(builder, addr_val, LLVMPointerType(llvm_int_types[OPC_OUTPUT_T], 0), get_next_var_name());
         LLVMBuildStore(builder, val, addr_ptr);
     }
@@ -1362,69 +1355,32 @@ void translate_maxmin_vec(OpCodeType opc, void *ptr, RelopType r) {
     OperandType tmp1 = get_tmp_and_do_alloc(vtype);
     OperandType tmp2 = get_tmp_and_do_alloc(vtype);
 
-    uint8_t buf[16];
-    OHType o;
-    o.o = mov_vec;
-    create_vector_slot2(buf, o, ai, tmp1, operand1);
-    translate_mov(mov_vec, buf);
-    create_vector_slot2(buf, o, ai, tmp2, operand2);
-    translate_mov(mov_vec, buf);
-    o.o = movcond_vec;
-    create_vector_slot5_relop(buf, o, ai, operand0, operand1, operand2, tmp1, tmp2, r);
-    translate_movcond(movcond_vec, buf);
+    CREATE_MOV_VEC(ai, tmp1, operand1);
+    CREATE_MOV_VEC(ai, tmp2, operand2);
+    CREATE_MOVCOND_VEC(ai, operand0, operand1, operand2, tmp1, tmp2, r);
 }
 
 void translate_bswap64_i64(OpCodeType opc, void *ptr) {
     OperandType t0 = get_tmp_and_do_alloc(LLVMInt64);
     OperandType t1 = get_tmp_and_do_alloc(LLVMInt64);
-    uint64_t t2;
-
     OperandType operand0, operand1;
     GET_2_OPERANDS();
 
-    uint8_t buf[16];
-    t2 = 0x00ff00ff00ff00ffUL;
-    OHType o;
-    o.o = shr_i64;
-    create_scalar_slot2_imm(buf, o, t0, operand1, 8);
-    translate_binary(shr_i64, buf, LLVMBuildLShr);
-    o.o = and_i64;
-    create_scalar_slot2_immUL(buf, o, t1, operand1, t2);
-    translate_binary(and_i64, buf, LLVMBuildAnd);
-    create_scalar_slot2_immUL(buf, o, t0, t0, t2);
-    translate_binary(and_i64, buf, LLVMBuildAnd);
-    o.o = shl_i64;
-    create_scalar_slot2_imm(buf, o, t1, t1, 8);
-    translate_binary(shl_i64, buf, LLVMBuildShl);
-    o.o = or_i64;
-    create_scalar_slot3(buf, o, operand0, t0, t1);
-    translate_binary(or_i64, buf, LLVMBuildOr);
-
-    t2 = 0x0000ffff0000ffffUL;
-    o.o = shr_i64;
-    create_scalar_slot2_imm(buf, o, t0, operand0, 16);
-    translate_binary(shr_i64, buf, LLVMBuildLShr);
-    o.o = and_i64;
-    create_scalar_slot2_immUL(buf, o, t1, operand0, t2);
-    translate_binary(and_i64, buf, LLVMBuildAnd);
-    create_scalar_slot2_immUL(buf, o, t0, t0, t2);
-    translate_binary(and_i64, buf, LLVMBuildAnd);
-    o.o = shl_i64;
-    create_scalar_slot2_imm(buf, o, t1, t1, 16);
-    translate_binary(shl_i64, buf, LLVMBuildShl);
-    o.o = or_i64;
-    create_scalar_slot3(buf, o, operand0, t0, t1);
-    translate_binary(or_i64, buf, LLVMBuildOr);
-
-    o.o = shr_i64;
-    create_scalar_slot2_imm(buf, o, t0, operand0, 32);
-    translate_binary(shl_i64, buf, LLVMBuildLShr);
-    o.o = shl_i64;
-    create_scalar_slot2_imm(buf, o, t1, operand0, 32);
-    translate_binary(shl_i64, buf, LLVMBuildShl);
-    o.o = or_i64;
-    create_scalar_slot3(buf, o, operand0, t0, t1);
-    translate_binary(or_i64, buf, LLVMBuildOr);
+    CREATE_SHR(t0, operand1, 8);
+    OperandType t2 = get_tmp_and_do_alloc_with_init(LLVMInt64, 0x00ff00ff00ff00ffUL);
+    CREATE_AND(t1, operand1, t2);
+    CREATE_AND(t0, t0, t2);
+    CREATE_SHL(t1, t1, 8);
+    CREATE_OR(operand0, t0, t1);
+    t2 = get_tmp_and_do_alloc_with_init(LLVMInt64, 0x0000ffff0000ffffUL);
+    CREATE_SHR(t0, operand0, 16);
+    CREATE_AND(t1, operand0, t2);
+    CREATE_AND(t0, t0, t2);
+    CREATE_SHL(t1, t1, 16);
+    CREATE_OR(operand0, t0, t1);
+    CREATE_SHR(t0, operand0, 32);
+    CREATE_SHL(t1, operand0, 32);
+    CREATE_OR(operand0, t0, t1);
 }
 
 void translate_set_label(OpCodeType opc, void *ptr) {
@@ -1464,8 +1420,8 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
     GET_2_OPERANDS_NOCHECK();
-    LLVMValueRef c1 = get_source_node_imm_or_stack(is_imm0, operand0, OPC_INPUT_T);
-    LLVMValueRef c2 = get_source_node_imm_or_stack(is_imm1, operand1, OPC_INPUT_T);
+    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm0, operand0, OPC_INPUT_T);
+    LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
 
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
@@ -1511,13 +1467,13 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
                 param_in_stack.s.valid = 1;
                 param_in_stack.s.slot_type = SUB_SLOT_XREG;
                 param_in_stack.s.slot_idx = i;
-                call_args[i] = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+                call_args[i] = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
             } else {
                 param_in_stack.s.valid = 1;
                 param_in_stack.s.slot_type = SUB_SLOT_XMM;
                 param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
                 param_in_stack.s.offset = 0;
-                LLVMValueRef vec = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+                LLVMValueRef vec = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
 
                 LLVMTypeRef ret_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
                 LLVMTypeRef param_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
@@ -1562,13 +1518,8 @@ void translate_call_direct(OpCodeType opc, void *ptr) {
     call_delta_hex = get_operand(ptr, 2, &is_imm2);
     assert(is_imm1 && is_imm2);
 
-    uint8_t buf[16];
-    OHType o;
-    o.o = push_ret_addr;
-    create_scalar_slot_imm(buf, o, operand0, ret_delta_hex.i);
-    translate_push_ret_addr(push_ret_addr, buf);
-    create_jmpdirect(buf, call_delta_hex.i);
-    translate_jmp_direct(jmp_direct, buf);
+    CREATE_PUSH_RET_ADDR(operand0, ret_delta_hex.i);
+    CREATE_JMP_DIRECT(call_delta_hex.i);
 }
 
 void translate_discard(OpCodeType opc, void *ptr) {
@@ -1659,7 +1610,7 @@ void translate_tail_call(OpCodeType opc, void *ptr) {
             param_in_stack.s.valid = 1;
             param_in_stack.s.slot_type = SUB_SLOT_XREG;
             param_in_stack.s.slot_idx = i;
-            call_args[i] = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+            call_args[i] = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
         } else {
             call_args[i] = get_func_param(i);
         }
@@ -1692,14 +1643,14 @@ void translate_tail_call(OpCodeType opc, void *ptr) {
             } else {
                 if (operands[op_idx].s.slot_type == SUB_SLOT_ENVVAR) {
                     call_types[i] = llvm_int_types[LLVMInt64];
-                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], LLVMInt64);
+                    call_args[i] = get_source_node_imm_or_stack(opc, 0, operands[op_idx], LLVMInt64);
                 } else if (operands[op_idx].s.slot_type == SUB_SLOT_XREG) {
                     call_types[i] = fixed_vector_param_types[operands[op_idx].s.slot_idx];
-                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], fixed_vector_param_llvmtypes[operands[op_idx].s.slot_idx]);
+                    call_args[i] = get_source_node_imm_or_stack(opc, 0, operands[op_idx], fixed_vector_param_llvmtypes[operands[op_idx].s.slot_idx]);
                 } else if (operands[op_idx].s.slot_type == SUB_SLOT_TMP) {
                     assert(func_tmp_llvmtype[operands[op_idx].s.slot_idx] <= LLVMInt64);
                     call_types[i] = llvm_int_types[func_tmp_llvmtype[operands[op_idx].s.slot_idx]];
-                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], func_tmp_llvmtype[operands[op_idx].s.slot_idx]);
+                    call_args[i] = get_source_node_imm_or_stack(opc, 0, operands[op_idx], func_tmp_llvmtype[operands[op_idx].s.slot_idx]);
                 } else {
                     assert(0);
                 }
@@ -1743,7 +1694,7 @@ void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers) 
                 param_in_stack.s.slot_type = SUB_SLOT_XMM;
                 param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
                 param_in_stack.s.offset = 0;
-                vec_val = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+                vec_val = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
             } else {
                 LLVMValueRef call_args[] = {get_func_param(i), index_0};
                 vec_val = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, call_args, 2, get_next_var_name());
@@ -1779,7 +1730,7 @@ void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers) 
             param_in_stack.s.valid = 1;
             param_in_stack.s.slot_type = SUB_SLOT_XREG;
             param_in_stack.s.slot_idx = i;
-            call_args[i] = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+            call_args[i] = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
         } else {
             call_args[i] = get_func_param(i);
         }
@@ -1794,7 +1745,7 @@ void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers) 
         } else {
             if (operands[op_idx].s.slot_type == SUB_SLOT_XREG) {
                 call_types[i] = fixed_vector_param_types[operands[op_idx].s.slot_idx];
-                call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], fixed_vector_param_llvmtypes[operands[op_idx].s.slot_idx]);
+                call_args[i] = get_source_node_imm_or_stack(opc, 0, operands[op_idx], fixed_vector_param_llvmtypes[operands[op_idx].s.slot_idx]);
             } else if (operands[op_idx].s.slot_type == SUB_SLOT_TMP) {
                 if (has_alias(operands[op_idx])) {
                     call_types[i] = llvm_int_types[LLVMInt64];
@@ -1815,7 +1766,7 @@ void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers) 
                 } else {
                     assert(func_tmp_llvmtype[operands[op_idx].s.slot_idx] <= LLVMInt64);
                     call_types[i] = llvm_int_types[func_tmp_llvmtype[operands[op_idx].s.slot_idx]];
-                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], func_tmp_llvmtype[operands[op_idx].s.slot_idx]);
+                    call_args[i] = get_source_node_imm_or_stack(opc, 0, operands[op_idx], func_tmp_llvmtype[operands[op_idx].s.slot_idx]);
                 }
             } else {
                 assert(0);
@@ -1921,7 +1872,7 @@ void translate_call(OpCodeType opc, void *ptr) {
                 param_in_stack.s.slot_type = SUB_SLOT_XMM;
                 param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
                 param_in_stack.s.offset = 0;
-                vec_val = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+                vec_val = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
             } else {
                 LLVMValueRef call_args[] = {get_func_param(i), index_0};
                 vec_val = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, call_args, 2, get_next_var_name());
@@ -1939,7 +1890,7 @@ void translate_call(OpCodeType opc, void *ptr) {
                 param_in_stack.s.slot_type = SUB_SLOT_XMM;
                 param_in_stack.s.slot_idx = xmmt + i;
                 param_in_stack.s.offset = 0;
-                LLVMValueRef vec_val = get_source_node_imm_or_stack(0, param_in_stack, LLVMVector2xi64);
+                LLVMValueRef vec_val = get_source_node_imm_or_stack(opc, 0, param_in_stack, LLVMVector2xi64);
                 uint64_t xmm_offset = get_xmm_offset(param_in_stack.s.slot_idx/2) + 16*(param_in_stack.s.slot_idx%2);
                 LLVMValueRef off = LLVMConstInt(LLVMInt64Type(), xmm_offset, 0);
                 LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
@@ -1960,7 +1911,7 @@ void translate_call(OpCodeType opc, void *ptr) {
             op.s.valid = 1;
             op.s.slot_type = SUB_SLOT_TMP;
             op.s.slot_idx = i;
-            LLVMValueRef val = get_source_node_imm_or_stack(0, op, func_tmp_llvmtype[i]);
+            LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_tmp_llvmtype[i]);
 
             LLVMValueRef shadow_off = LLVMConstInt(LLVMInt64Type(), tmp_shadow_offset[current_call_idx][i], 0);
             LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name());
@@ -2001,7 +1952,7 @@ void translate_call(OpCodeType opc, void *ptr) {
             param_in_stack.s.valid = 1;
             param_in_stack.s.slot_type = SUB_SLOT_XREG;
             param_in_stack.s.slot_idx = i;
-            call_args[i] = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+            call_args[i] = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
         } else {
             call_args[i] = get_func_param(i);
         }
@@ -2037,14 +1988,14 @@ void translate_call(OpCodeType opc, void *ptr) {
             } else {
                 if (operands[op_idx].s.slot_type == SUB_SLOT_ENVVAR) {
                     call_types[i] = llvm_int_types[LLVMInt64];
-                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], LLVMInt64);
+                    call_args[i] = get_source_node_imm_or_stack(opc, 0, operands[op_idx], LLVMInt64);
                 } else if (operands[op_idx].s.slot_type == SUB_SLOT_XREG) {
                     call_types[i] = fixed_vector_param_types[operands[op_idx].s.slot_idx];
-                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], fixed_vector_param_llvmtypes[operands[op_idx].s.slot_idx]);
+                    call_args[i] = get_source_node_imm_or_stack(opc, 0, operands[op_idx], fixed_vector_param_llvmtypes[operands[op_idx].s.slot_idx]);
                 } else if (operands[op_idx].s.slot_type == SUB_SLOT_TMP) {
                     assert(func_tmp_llvmtype[operands[op_idx].s.slot_idx] <= LLVMInt64);
                     call_types[i] = llvm_int_types[func_tmp_llvmtype[operands[op_idx].s.slot_idx]];
-                    call_args[i] = get_source_node_imm_or_stack(0, operands[op_idx], func_tmp_llvmtype[operands[op_idx].s.slot_idx]);
+                    call_args[i] = get_source_node_imm_or_stack(opc, 0, operands[op_idx], func_tmp_llvmtype[operands[op_idx].s.slot_idx]);
                 } else {
                     assert(0);
                 }
@@ -2065,7 +2016,7 @@ void translate_call(OpCodeType opc, void *ptr) {
                 param_in_stack.s.slot_type = SUB_SLOT_XMM;
                 param_in_stack.s.slot_idx = i_param - FIXED_PARAM_COUNT;
                 param_in_stack.s.offset = 0;
-                LLVMValueRef vec = get_source_node_imm_or_stack(0, param_in_stack, fixed_vector_param_llvmtypes[i_param]);
+                LLVMValueRef vec = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i_param]);
 
                 LLVMTypeRef param_type = LLVMVectorType(LLVMInt64Type(), 2);
                 LLVMTypeRef intrinsic_types[] = {default_scalable_vec_type, param_type, LLVMInt64Type()};
@@ -2210,7 +2161,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         if (oarg.s.slot_type == SUB_SLOT_TMP && has_alias(oarg)) {
             unregister_alias(oarg);
         }
-        do_store(param, helper_output_type[current_call_idx], oarg);
+        do_store(opc, param, helper_output_type[current_call_idx], oarg);
     } else if (noargs) {
         assert(0);
     }
@@ -2458,9 +2409,110 @@ void handle_func(uint64_t val) {
 static void handle_single_instr(OpCodeType opc, void *ptr) {
     //printf("handle_single_instr: %s\n", opcode_type_str[opc]);
     switch (opc) {
+    case addc1o_i32:
+    case addc1o_i64:
+    case addci_i32:
+    case addci_i64:
+    case addcio_i32:
+    case addcio_i64:
+    case addco_i32:
+    case addco_i64:
+    case subb1o_i32:
+    case subb1o_i64:
+    case subbi_i32:
+    case subbi_i64:
+    case subbio_i32:
+    case subbio_i64:
+    case subbo_i32:
+    case subbo_i64:
+    case brcond_i32:
+        assert(0);
+        break;
+
+    case abs_vec:
+    case andc_i32:
+    case bitsel_vec:
+    case bswap16_i32:
+    case bswap16_i64:
+    case bswap32_i32:
+    case clz_i32:
+    case cmpsel_vec:
+    case ctpop_i32:
+    case ctpop_i64:
+    case ctz_i32:
+    case divs2_i32:
+    case divs2_i64:
+    case divs_i32:
+    case divs_i64:
+    case divu2_i32:
+    case divu2_i64:
+    case divu_i32:
+    case divu_i64:
+    case dup_vec:
+    case eqv_i32:
+    case eqv_i64:
+    case eqv_vec:
+    case ext_i32_i64:
+    case extract2_i32:
+    case extrh_i64_i32:
+    case ld16s_i32:
+    case ld16s_i64:
+    case ld16u_i32:
+    case ld16u_i64:
+    case ld8s_i32:
+    case ld8s_i64:
+    case ld8u_i32:
+    case muls2_i32:
+    case muls2_i64:
+    case mulsh_i32:
+    case mulu2_i32:
+    case mulu2_i64:
+    case muluh_i32:
+    case mul_vec:
+    case nand_i32:
+    case nand_i64:
+    case nand_vec:
+    case negsetcond_i32:
+    case neg_vec:
+    case nor_i32:
+    case nor_i64:
+    case nor_vec:
+    case orc_i32:
+    case orc_i64:
+    case orc_vec:
+    case rems_i32:
+    case rems_i64:
+    case remu_i32:
+    case remu_i64:
+    case rotli_vec:
+    case rotls_vec:
+    case rotlv_vec:
+    case rotrv_vec:
+    case sar_i32:
+    case sari_vec:
+    case sars_vec:
+    case sarv_vec:
+    case setcond_i32:
+    case sextract_i32:
+    case shls_vec:
+    case shlv_vec:
+    case shri_vec:
+    case shrs_vec:
+    case shrv_vec:
+    case smax_vec:
+    case smin_vec:
+    case ssadd_vec:
+    case sssub_vec:
+    case st8_i32:
+    case st8_i64:
+    case usadd_vec:
+    case ussub_vec:
+        // TODO
+
     case add_i64:
         translate_add_i64(opc, ptr);
         break;
+    case add_i32:
     case add_vec:
         translate_binary(opc, ptr, LLVMBuildAdd);
         break;
@@ -2546,8 +2598,10 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
     case negsetcond_i64:
         translate_negsetcond_i64(opc, ptr);
         break;
+    case not_i32:
     case not_i64:
-        translate_not_i64(opc, ptr);
+    case not_vec:
+        translate_not(opc, ptr);
         break;
     case or_i32:
     case or_i64:

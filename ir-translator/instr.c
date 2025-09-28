@@ -350,17 +350,6 @@ size_t create_scalar_slot2_imm(void *ptr, OHType op, OperandType s0, OperandType
     return sizeof(*i);
 }
 
-size_t create_scalar_slot2_immUL(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0) {
-    Instr1B48 *i = (Instr1B48 *)ptr;
-    i->instr_type = SIZEXB;
-    i->instr_type_ext = Instr1B48_ext;
-    i->opc = op.o;
-    SET_SLOT(0);
-    SET_SLOT(1);
-    i->imm = i0;
-    return sizeof(*i);
-}
-
 // Ignore num which is used as mmuidx for now.
 size_t create_scalar_slot2_attr3_num(void *ptr, OHType op, OperandType s0, OperandType s1, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0) {
     Instr4B *i = (Instr4B *)ptr;
