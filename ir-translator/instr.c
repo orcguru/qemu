@@ -1525,6 +1525,18 @@ uint8_t inline_helper_enabled[HELPER_MAX] = {
     [helper_vtestps_xmm] = 1,
 };
 
+uint8_t can_do_helper_inline[HELPER_MAX] = {
+    [helper_movmskpd_xmm] = 1,
+    [helper_movmskps_xmm] = 1,
+    [helper_pshufb_xmm] = 1,
+    [helper_punpckhdq_xmm] = 1,
+    [helper_punpckhqdq_xmm] = 1,
+    [helper_punpcklbw_xmm] = 1,
+    [helper_punpckldq_xmm] = 1,
+    [helper_punpcklqdq_xmm] = 1,
+    [helper_punpcklwd_xmm] = 1,
+};
+
 uint8_t call_helper_using_qemuaot[HELPER_MAX] = {
     [helper_divb_AL] = 1,
     [helper_idivb_AL] = 1,

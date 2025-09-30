@@ -98,8 +98,8 @@ sub GetText
 sub UpdateFunc
 {
   my ($funcStr, $funcShortName) = @_;
-  $funcStr =~ s/_xmm\s*\(\s*ZMMReg/_xmm\(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, unsigned long lr__EXTRACT_HELPER_CALL_PARAM__, ZMMReg/;
-  $funcStr =~ s/_xmm\s*\(\s*CPUX86State\s*\*env\s*,\n?\s*/_xmm\(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, unsigned long lr__EXTRACT_HELPER_CALL_PARAM__, /;
+  $funcStr =~ s/_xmm\s*\(\s*ZMMReg/_xmm\(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip__EXTRACT_HELPER_CALL_PARAM__, ZMMReg/;
+  $funcStr =~ s/_xmm\s*\(\s*CPUX86State\s*\*env\s*,\n?\s*/_xmm\(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip__EXTRACT_HELPER_CALL_PARAM__, /;
   my @fields = split("_ZMMReg", $funcStr);
   my $out = "";
   my %prefix = ();
@@ -153,13 +153,14 @@ sub UpdateFunc
   $arg_str =~ s/\s*$//;
   my @args = split(/,/, $arg_str);
   my $uniq_vec_type = "";
+  my $additional_params = "";
   foreach my $i (0 .. $#args) {
     $args[$i] =~ s/^\s*//;
     $args[$i] =~ s/\s*$//;
     my @fields = split(/\s+/, $args[$i]);
     if (not exists $typeMap{$fields[0]}) {
-      print "FIXME:non-vector type:$funcShortName - $fields[0]\n";
-      return "";
+        $additional_params = $additional_params.", $args[$i]";
+        next;
     }
     if ($uniq_vec_type eq "") {
       $uniq_vec_type = $fields[0];
@@ -169,7 +170,7 @@ sub UpdateFunc
     }
     $out = $out."#define $fields[1] ARGUMENT$i\n";
   }
-  $funcStr = $splits[0].", $uniq_vec_type xmm0, $uniq_vec_type ymm0_h, $uniq_vec_type xmm1, $uniq_vec_type ymm1_h, $uniq_vec_type xmm2, $uniq_vec_type ymm2_h, $uniq_vec_type xmm3, $uniq_vec_type ymm3_h, $uniq_vec_type xmm4, $uniq_vec_type ymm4_h, $uniq_vec_type xmm5, $uniq_vec_type ymm5_h, $uniq_vec_type xmm6, $uniq_vec_type ymm6_h, $uniq_vec_type xmm7, $uniq_vec_type ymm7_h, $uniq_vec_type xmm8, $uniq_vec_type ymm8_h, $uniq_vec_type xmm9, $uniq_vec_type ymm9_h, $uniq_vec_type xmm10, $uniq_vec_type ymm10_h, $uniq_vec_type xmm11, $uniq_vec_type ymm11_h, $uniq_vec_type xmm12, $uniq_vec_type ymm12_h, $uniq_vec_type xmm13, $uniq_vec_type ymm13_h, $uniq_vec_type xmm14, $uniq_vec_type ymm14_h";
+  $funcStr = $splits[0].", $uniq_vec_type xmm0, $uniq_vec_type ymm0_h, $uniq_vec_type xmm1, $uniq_vec_type ymm1_h, $uniq_vec_type xmm2, $uniq_vec_type ymm2_h, $uniq_vec_type xmm3, $uniq_vec_type ymm3_h, $uniq_vec_type xmm4, $uniq_vec_type ymm4_h, $uniq_vec_type xmm5, $uniq_vec_type ymm5_h, $uniq_vec_type xmm6, $uniq_vec_type ymm6_h, $uniq_vec_type xmm7, $uniq_vec_type ymm7_h, $uniq_vec_type xmm8, $uniq_vec_type ymm8_h, $uniq_vec_type xmm9, $uniq_vec_type ymm9_h, $uniq_vec_type xmm10, $uniq_vec_type ymm10_h, $uniq_vec_type xmm11, $uniq_vec_type ymm11_h, $uniq_vec_type xmm12, $uniq_vec_type ymm12_h, $uniq_vec_type xmm13, $uniq_vec_type ymm13_h, $uniq_vec_type xmm14, $uniq_vec_type ymm14_h$additional_params";
   foreach my $i (1 .. $#sub_splits) {
     $funcStr = $funcStr.")".$sub_splits[$i];
   }
