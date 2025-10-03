@@ -1445,8 +1445,8 @@ xsetbv                          xsetbv
 {brcond_i32}    { HANDLE_COLUMN; yylval->oh.o = brcond_i32; return SYMBOL; }
 {add_i32}       { HANDLE_COLUMN; yylval->oh.o = add_i32; return SYMBOL; }
 {andc_i32}      { HANDLE_COLUMN; yylval->oh.o = andc_i32; return SYMBOL; }
-{bswap16_i32}   { HANDLE_COLUMN; yylval->oh.o = bswap16_i32; return SYMBOL; }
-{bswap32_i32}   { HANDLE_COLUMN; yylval->oh.o = bswap32_i32; return SYMBOL; }
+{bswap16_i32}   { HANDLE_COLUMN; yylval->oh.o = bswap16_i32; return BSWAP; }
+{bswap32_i32}   { HANDLE_COLUMN; yylval->oh.o = bswap32_i32; return BSWAP; }
 {clz_i32}       { HANDLE_COLUMN; yylval->oh.o = clz_i32; yylval->oh.h = helper_clz_i32; return SYMBOL; }
 {ctpop_i32}     { HANDLE_COLUMN; yylval->oh.o = ctpop_i32; yylval->oh.h = helper_ctpop_i32; return SYMBOL; }
 {ctz_i32}       { HANDLE_COLUMN; yylval->oh.o = ctz_i32; yylval->oh.h = helper_ctz_i32; return SYMBOL; }
@@ -1482,7 +1482,7 @@ xsetbv                          xsetbv
 {subb1o_i32}    { HANDLE_COLUMN; yylval->oh.o = subb1o_i32; return SYMBOL; }
 {subbi_i32}     { HANDLE_COLUMN; yylval->oh.o = subbi_i32; return SYMBOL; }
 {subbio_i32}    { HANDLE_COLUMN; yylval->oh.o = subbio_i32; return SYMBOL; }
-{bswap16_i64}   { HANDLE_COLUMN; yylval->oh.o = bswap16_i64; return SYMBOL; }
+{bswap16_i64}   { HANDLE_COLUMN; yylval->oh.o = bswap16_i64; return BSWAP; }
 {ctpop_i64}     { HANDLE_COLUMN; yylval->oh.o = ctpop_i64; yylval->oh.h = helper_ctpop_i64; return SYMBOL; }
 {divs_i64}      { HANDLE_COLUMN; yylval->oh.o = divs_i64; return SYMBOL; }
 {divs2_i64}     { HANDLE_COLUMN; yylval->oh.o = divs2_i64; return SYMBOL; }
@@ -1546,7 +1546,7 @@ xsetbv                          xsetbv
 {and_i64}       { HANDLE_COLUMN; yylval->oh.o = and_i64; return SYMBOL; }
 {and_i32}       { HANDLE_COLUMN; yylval->oh.o = and_i32; return SYMBOL; }
 {and_vec}       { HANDLE_COLUMN; yylval->oh.o = and_vec; return SYMBOL; }
-{bswap32_i64}   { HANDLE_COLUMN; yylval->oh.o = bswap32_i64; return SYMBOL; }
+{bswap32_i64}   { HANDLE_COLUMN; yylval->oh.o = bswap32_i64; return BSWAP; }
 {clz_i64}       { HANDLE_COLUMN; yylval->oh.o = clz_i64; yylval->oh.h = helper_clz_i64; return SYMBOL; }
 {cmp_vec}       { HANDLE_COLUMN; yylval->oh.o = cmp_vec; return SYMBOL; }
 {ctz_i64}       { HANDLE_COLUMN; yylval->oh.o = ctz_i64; yylval->oh.h = helper_ctz_i64; return SYMBOL; }
@@ -1614,13 +1614,13 @@ xsetbv                          xsetbv
 {xor_i64}       { HANDLE_COLUMN; yylval->oh.o = xor_i64; return SYMBOL; }
 {xor_i32}       { HANDLE_COLUMN; yylval->oh.o = xor_i32; return SYMBOL; }
 {xor_vec}       { HANDLE_COLUMN; yylval->oh.o = xor_vec; return SYMBOL; }
-{bswap64_i64}   { HANDLE_COLUMN; yylval->oh.o = bswap64_i64; return SYMBOL; }
-{set_label}     { HANDLE_COLUMN; yylval->oh.o = set_label; return SYMBOL; }
-{brcond_i64}    { HANDLE_COLUMN; yylval->oh.o = brcond_i64; return SYMBOL; }
-{jmp_direct}    { HANDLE_COLUMN; yylval->oh.o = jmp_direct; return SYMBOL; }
-{call_direct}   { HANDLE_COLUMN; yylval->oh.o = call_direct; return SYMBOL; }
-{discard}       { HANDLE_COLUMN; yylval->oh.o = discard; return SYMBOL; }
-{call}          { HANDLE_COLUMN; yylval->oh.o = call; return SYMBOL; }
+{bswap64_i64}   { HANDLE_COLUMN; yylval->oh.o = bswap64_i64; return BSWAP; }
+{set_label}     { HANDLE_COLUMN; yylval->oh.o = set_label; return SETLABL; }
+{brcond_i64}    { HANDLE_COLUMN; yylval->oh.o = brcond_i64; return BRCOND; }
+{jmp_direct}    { HANDLE_COLUMN; yylval->oh.o = jmp_direct; return JMPDIR; }
+{call_direct}   { HANDLE_COLUMN; yylval->oh.o = call_direct; return CALLDIR; }
+{discard}       { HANDLE_COLUMN; yylval->oh.o = discard; return DISCARD; }
+{call}          { HANDLE_COLUMN; yylval->oh.o = call; return CALL; }
 {rotl_i32}      { HANDLE_COLUMN; yylval->oh.o = rotl_i32; return SYMBOL; }
 {rotl_i64}      { HANDLE_COLUMN; yylval->oh.o = rotl_i64; return SYMBOL; }
 

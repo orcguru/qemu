@@ -48,7 +48,7 @@ extern uint8_t instr_buf[64];
 %token <ai> MEMATTR SWAPATTR ELEMENTSIZEATTR
 %token <si> SLOT
 %token <r> RELOP TSTREL
-%token <oh> SYMBOL BSWAP64 SETLABL BRCOND CALL JMPDIR CALLDIR DISCARD
+%token <oh> SYMBOL BSWAP SETLABL BRCOND CALL JMPDIR CALLDIR DISCARD
 %token COMMA COLON PLUS ENV V128 XMMTMP
 
 %%
@@ -80,7 +80,7 @@ scalar
 scalar:
 SYMBOL SLOT                                                             { insert_instr(instr_buf, create_scalar_slot(instr_buf, $1, $2)); }
 | SYMBOL SLOT COMMA SLOT                                                { insert_instr(instr_buf, create_scalar_slot2(instr_buf, $1, $2, $4)); }
-| BSWAP64 SLOT COMMA SLOT COMMA                                         { insert_instr(instr_buf, create_scalar_slot2(instr_buf, $1, $2, $4)); }
+| BSWAP SLOT COMMA SLOT COMMA                                         { insert_instr(instr_buf, create_scalar_slot2(instr_buf, $1, $2, $4)); }
 | SYMBOL SLOT COMMA SLOT COMMA SWAPATTR                                 { insert_instr(instr_buf, create_scalar_slot2_attr(instr_buf, $1, $2, $4, $6)); }
 | SYMBOL SLOT COMMA SLOT COMMA SWAPATTR COMMA SWAPATTR                  { insert_instr(instr_buf, create_scalar_slot2_attr2(instr_buf, $1, $2, $4, $6, $8)); }
 | SYMBOL SLOT COMMA IMMX                                                { insert_instr(instr_buf, create_scalar_slot_imm(instr_buf, $1, $2, $4)); }

@@ -1547,3 +1547,26 @@ uint8_t call_helper_using_qemuaot[HELPER_MAX] = {
     [helper_cpuid] = 1,
     [helper_rdtsc] = 1,
 };
+
+uint64_t xreg_offsets[XREG_MAX] = {
+    [rax] = 0x0,
+    [rcx] = 0x8,
+    [rdx] = 0x10,
+    [rbx] = 0x18,
+    [rsp] = 0x20,
+    [rbp] = 0x28,
+    [rsi] = 0x30,
+    [rdi] = 0x38,
+    [r8] = 0x40,
+    [r9] = 0x48,
+    [r10] = 0x50,
+    [r11] = 0x58,
+    [r12] = 0x60,
+    [r13] = 0x68,
+    [r14] = 0x70,
+    [r15] = 0x78,
+    [cc_src] = 0x98,
+    [cc_dst] = 0x90,
+    [cc_op] = 0xa8,
+    [rip] = 0x80,
+};
