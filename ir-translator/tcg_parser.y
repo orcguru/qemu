@@ -81,8 +81,8 @@ scalar:
 SYMBOL SLOT                                                             { insert_instr(instr_buf, create_scalar_slot(instr_buf, $1, $2)); }
 | SYMBOL SLOT COMMA SLOT                                                { insert_instr(instr_buf, create_scalar_slot2(instr_buf, $1, $2, $4)); }
 | BSWAP SLOT COMMA SLOT COMMA                                         { insert_instr(instr_buf, create_scalar_slot2(instr_buf, $1, $2, $4)); }
-| SYMBOL SLOT COMMA SLOT COMMA SWAPATTR                                 { insert_instr(instr_buf, create_scalar_slot2_attr(instr_buf, $1, $2, $4, $6)); }
-| SYMBOL SLOT COMMA SLOT COMMA SWAPATTR COMMA SWAPATTR                  { insert_instr(instr_buf, create_scalar_slot2_attr2(instr_buf, $1, $2, $4, $6, $8)); }
+| BSWAP SLOT COMMA SLOT COMMA SWAPATTR                                 { insert_instr(instr_buf, create_scalar_slot2_attr(instr_buf, $1, $2, $4, $6)); }
+| BSWAP SLOT COMMA SLOT COMMA SWAPATTR COMMA SWAPATTR                  { insert_instr(instr_buf, create_scalar_slot2_attr2(instr_buf, $1, $2, $4, $6, $8)); }
 | SYMBOL SLOT COMMA IMMX                                                { insert_instr(instr_buf, create_scalar_slot_imm(instr_buf, $1, $2, $4)); }
 | SYMBOL SLOT COMMA IMMX COMMA SLOT                                     { insert_instr(instr_buf, create_scalar_slot_imm_slot(instr_buf, $1, $2, $4, $6)); }
 | SYMBOL SLOT COMMA ENV COMMA IMMX                                      { insert_instr(instr_buf, create_scalar_slot_env_imm(instr_buf, $1, $2, $6)); }

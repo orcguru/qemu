@@ -18,7 +18,7 @@
 #include <llvm-c/Linker.h>
 #include <stdbool.h>
 
-#define DEBUG                       1
+//#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
@@ -1711,27 +1711,36 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t with_ret, u
 
     LLVMValueRef call_args[16] = {NULL};
     int idx_with_env = 0;
-    for (int i = 0; i < param_cnt; ++i) {
-        if (i == env_idx) {
+    if (param_cnt) {
+        for (int i = 0; i < param_cnt; ++i) {
+            if (i == env_idx) {
+                LLVMValueRef env_raw = get_env_ptr_raw();
+                LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
+                call_args[idx_with_env] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                idx_with_env += 1;
+            }
+            if (is_imm[i] == 0 && operands[i].s.valid && operands[i].s.slot_type == SUB_SLOT_XREG) {
+                call_args[idx_with_env] = LLVMGetParam(trampoline, operands[i].s.slot_idx);
+                if (fixed_vector_param_llvmtypes[operands[i].s.slot_idx] != LLVMInt64) {
+                    call_args[idx_with_env] = LLVMBuildZExt(builder, call_args[idx_with_env], llvm_int_types[LLVMInt64], get_next_var_name());
+                }
+                idx_with_env += 1;
+            } else {
+                call_args[idx_with_env] = LLVMGetParam(trampoline, FIXED_VECTOR_PARAM_COUNT + i);
+                idx_with_env += 1;
+            }
+        }
+    } else {
+        if (env_idx != 0xff) {
+            assert(env_idx == 0);
             LLVMValueRef env_raw = get_env_ptr_raw();
             LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
             call_args[idx_with_env] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
             idx_with_env += 1;
         }
-        if (is_imm[i] == 0 && operands[i].s.valid && operands[i].s.slot_type == SUB_SLOT_XREG) {
-            call_args[idx_with_env] = LLVMGetParam(trampoline, operands[i].s.slot_idx);
-            if (fixed_vector_param_llvmtypes[operands[i].s.slot_idx] != LLVMInt64) {
-                call_args[idx_with_env] = LLVMBuildZExt(builder, call_args[idx_with_env], llvm_int_types[LLVMInt64], get_next_var_name());
-            }
-            idx_with_env += 1;
-        } else {
-            call_args[idx_with_env] = LLVMGetParam(trampoline, FIXED_VECTOR_PARAM_COUNT + i);
-            idx_with_env += 1;
-        }
     }
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
-    char *type_str = LLVMPrintTypeToString(helper_type);
-    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, idx_with_env, get_next_var_name());
+    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, idx_with_env, with_ret ? get_next_var_name() : "");
 
     // Load all fixed from ENV
     LLVMValueRef return_args[FIXED_VECTOR_PARAM_COUNT + 16] = {NULL};
@@ -1767,8 +1776,13 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t with_ret, u
     }
 
     LLVMTypeRef next_type = LLVMGlobalGetValueType(next_func);
-    LLVMValueRef call_next_inst = LLVMBuildCall2(builder, next_type, next_func, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), get_next_var_name());
+    LLVMValueRef call_next_inst = LLVMBuildCall2(builder, next_type, next_func, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), "");
+    LLVMSetTailCall(call_next_inst, 1);
     LLVMSetInstructionCallConv(call_next_inst, QEMUAOT_CC);
+    LLVMBuildRetVoid(builder);
+
+    assert(last_active_bb);
+    LLVMPositionBuilderAtEnd(builder, last_active_bb);
     return trampoline;
 }
 
@@ -1887,6 +1901,9 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
                     } else if (params[op_idx].s.slot_type == SUB_SLOT_TMP) {
                         assert(func_tmp_llvmtype[params[op_idx].s.slot_idx] <= LLVMInt64);
                         out_args[i] = get_source_node_imm_or_stack(opc, 0, params[op_idx], func_tmp_llvmtype[params[op_idx].s.slot_idx]);
+                        if (func_tmp_llvmtype[params[op_idx].s.slot_idx] < LLVMInt64) {
+                            out_args[i] = LLVMBuildZExt(builder, out_args[i], llvm_int_types[LLVMInt64], get_next_var_name());
+                        }
                     } else {
                         assert(0);
                     }
@@ -2020,7 +2037,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name());
 
         // Trampoline handles register-context switch
-        LLVMValueRef trampoline = get_trampoline(helper_func, noargs, op_cnt, env_idx, operands, is_imm, second_half_func);
+        LLVMValueRef trampoline = get_trampoline(helper_func, noargs, op_cnt, (env_idx - noargs), operands, is_imm, second_half_func);
         LLVMValueRef call_args[FIXED_PARAM_COUNT + 16] = {NULL};
         int call_arg_cnts = collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, operands, is_imm, op_cnt);
         call_args[call_arg_cnts] = helper_addr;
@@ -2770,6 +2787,8 @@ void module_prolog() {
 }
 
 void module_epilog() {
+    //LLVMDumpModule(module);
+#if 0
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
         if (LLVMIsAFunction(function)) {
@@ -2813,6 +2832,7 @@ void module_epilog() {
     }
     printf("Object file %s generated successfully.\n", output_file);
     fflush(NULL);
+#endif
     LLVMDisposeModule(module);
 }
 
