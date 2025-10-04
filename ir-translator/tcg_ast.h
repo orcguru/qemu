@@ -1516,8 +1516,6 @@ typedef struct {
 
 #define INSTR_TYPE_LIST \
     X(SIZE2B) \
-    X(SIZE4B) \
-    X(SIZE6B) \
     X(SIZEXB)
 
 typedef enum {
@@ -1578,7 +1576,9 @@ typedef enum {
     X(Instr1BH211_ENV0_ext) \
     X(Instr1B1111_ext) \
     X(Instr1BH4S_ENV0_ext) \
-    X(Instr1BH4S_ENV1_ext)
+    X(Instr1BH4S_ENV1_ext) \
+    X(Instr4B_ext) \
+    X(Instr2B4_ext)
 
 typedef enum {
     #define X(name) name,
@@ -1607,40 +1607,10 @@ typedef enum {
 /// NOTICE: all immediate fields with signed type are signed-ext,
 /// otherwise zero-ext.
 typedef struct __attribute__((packed)) {
-    uint16_t instr_type   :2;
-    uint16_t opc          :7;
+    uint16_t instr_type   :1;
+    uint16_t opc          :8;
     uint16_t imm          :7;
 } Instr2B;
-
-typedef struct __attribute__((packed)) {
-    uint16_t instr_type   :2;
-    uint16_t opc          :7;
-    uint16_t slot0_type   :2;
-    uint16_t slot0_idx    :5;
-    int32_t imm;
-} Instr2B4;
-
-typedef struct __attribute__((packed)) {
-    uint32_t instr_type :2;
-    uint32_t opc        :7;
-    uint32_t slot0_type :2;
-    uint32_t slot0_idx  :5;
-    uint32_t slot1_type :2;
-    uint32_t slot1_idx  :5;
-    uint32_t attr_type  :2;
-    /*
-    union {
-        struct {
-            uint32_t atomic :1;
-            uint32_t alignment :2;
-            uint32_t sign_ext :1;
-            uint32_t src_size :3;
-        } storage_attr;
-        uint32_t attr_val :7;
-    } p;
-    */
-    uint32_t attr_val   :7;
-} Instr4B;
 
 #include "instr_def.h"
 

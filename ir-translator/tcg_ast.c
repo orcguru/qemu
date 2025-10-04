@@ -18,6 +18,7 @@
 #include <llvm-c/Linker.h>
 #include <stdbool.h>
 
+#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
@@ -339,7 +340,6 @@ static uint32_t func_instr_cnt_remain = 0;
 static uint8_t current_active_labels[BB_MAX_CNT];
 static uint8_t current_active_label_cnt = 0;
 static uint8_t exception_or_interrupt_on = 0;
-static uint32_t obj_idx = 0;
 static char output_file[128] = {0};
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
@@ -674,6 +674,9 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
 }
 
 void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm_l, is_imm_r, is_imm_out;
     OperandType operand_l, operand_r, output;
     uint32_t idx = opcoc[opc];
@@ -693,6 +696,9 @@ void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
 }
 
 void translate_add_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
@@ -715,6 +721,9 @@ void translate_add_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_andc_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType tmp = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
@@ -723,6 +732,9 @@ void translate_andc_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_andc_vec(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType tmp = get_tmp_and_do_alloc(LLVMVector16xi8);
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
@@ -731,6 +743,9 @@ void translate_andc_vec(OpCodeType opc, void *ptr) {
 }
 
 void translate_bswap32_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType tmp0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType tmp1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType tmp2 = get_tmp_and_do_alloc_with_init(OPC_OUTPUT_T, 0x00ff00ff);
@@ -756,6 +771,9 @@ void translate_bswap32_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_cmp_vec(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
@@ -780,6 +798,9 @@ void translate_cmp_vec(OpCodeType opc, void *ptr) {
 }
 
 void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
@@ -820,14 +841,23 @@ void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
 }
 
 void translate_clz_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     translate_count_zero(opc, ptr, "llvm.ctlz.i64");
 }
 
 void translate_ctz_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     translate_count_zero(opc, ptr, "llvm.cttz.i64");
 }
 
 void translate_deposit(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1, operand2, ofs, len;
     GET_3_OPERANDS();
     uint32_t is_imm3, is_imm4;
@@ -854,6 +884,9 @@ void translate_deposit(OpCodeType opc, void *ptr) {
 }
 
 void translate_dupm_vec(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
     LLVMType vtype = get_llvm_vector_type(ptr);
@@ -881,6 +914,9 @@ void translate_dupm_vec(OpCodeType opc, void *ptr) {
   # tcg_gen_deposit_i64(ret, t0, ah, 64 - ofs, ofs);
 */
 void translate_extract2_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType tmp = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType operand0, operand1, operand2, ofs;
     GET_3_OPERANDS();
@@ -892,6 +928,9 @@ void translate_extract2_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_extract(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1, ofs, len;
     GET_2_OPERANDS();
     uint32_t is_imm2, is_imm3;
@@ -909,6 +948,9 @@ void translate_extract(OpCodeType opc, void *ptr) {
 }
 
 void translate_mov(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
     GET_2_OPERANDS_NOCHECK();
@@ -933,6 +975,9 @@ void translate_mov(OpCodeType opc, void *ptr) {
 }
 
 void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1, operand2;
     GET_2_OPERANDS();
     uint32_t is_imm;
@@ -955,6 +1000,9 @@ void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
 }
 
 void translate_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
     GET_2_OPERANDS_NOCHECK();
@@ -965,6 +1013,9 @@ void translate_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
 }
 
 void translate_ld_vec(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
     LLVMType vtype = get_llvm_vector_type(ptr);
@@ -973,6 +1024,9 @@ void translate_ld_vec(OpCodeType opc, void *ptr) {
 }
 
 void translate_movcond(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1, is_imm2, is_imm3, is_imm4;
     OperandType operand0, operand1, operand2, operand3, operand4;
     GET_3_OPERANDS_NOCHECK();
@@ -1003,6 +1057,9 @@ void translate_movcond(OpCodeType opc, void *ptr) {
 }
 
 void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
     LLVMTypeRef t128 = LLVMInt128Type();
@@ -1019,6 +1076,9 @@ void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
 }
 
 void translate_neg(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
 
@@ -1029,6 +1089,9 @@ void translate_neg(OpCodeType opc, void *ptr) {
 }
 
 void translate_negsetcond_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
@@ -1047,12 +1110,18 @@ void translate_negsetcond_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_not(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
     CREATE_XOR(operand0, operand1, -1UL);
 }
 
 void translate_push_ret_addr(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1;
     OperandType operand0, func_hex;
     operand0 = get_operand(ptr, 0, &is_imm0);
@@ -1079,6 +1148,9 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
 }
 
 void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
 
@@ -1107,6 +1179,9 @@ void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
 }
 
 void translate_qemu_ld(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
 
@@ -1139,6 +1214,9 @@ void translate_qemu_ld(OpCodeType opc, void *ptr) {
 }
 
 void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
 
@@ -1173,6 +1251,9 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
 }
 
 void translate_qemu_st(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
 
@@ -1201,6 +1282,9 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
 }
 
 void translate_ret(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm;
     OperandType operand0;
     operand0 = get_operand(ptr, 0, &is_imm);
@@ -1266,6 +1350,9 @@ void translate_ret(OpCodeType opc, void *ptr) {
 }
 
 void translate_rotr(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType t0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType t1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType operand0, operand1, operand2;
@@ -1279,6 +1366,9 @@ void translate_rotr(OpCodeType opc, void *ptr) {
 }
 
 void translate_rotl(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType t0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType t1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType operand0, operand1, operand2;
@@ -1292,6 +1382,9 @@ void translate_rotl(OpCodeType opc, void *ptr) {
 }
 
 void translate_setcond_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
@@ -1312,6 +1405,9 @@ void translate_setcond_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_sextract_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1, ofs, len;
     GET_2_OPERANDS();
     uint32_t is_imm2, is_imm3;
@@ -1325,6 +1421,9 @@ void translate_sextract_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_st(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
     GET_2_OPERANDS_NOCHECK();
@@ -1361,6 +1460,9 @@ void translate_st(OpCodeType opc, void *ptr) {
 }
 
 void translate_maxmin_vec(OpCodeType opc, void *ptr, RelopType r) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
     AttrSrcInfo ai;
@@ -1375,6 +1477,9 @@ void translate_maxmin_vec(OpCodeType opc, void *ptr, RelopType r) {
 }
 
 void translate_bswap64_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     OperandType t0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType t1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType operand0, operand1;
@@ -1398,6 +1503,9 @@ void translate_bswap64_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_set_label(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint8_t l = get_label(ptr);
     char lstr[16];
     sprintf(lstr, "bb_L%d", l);
@@ -1431,6 +1539,9 @@ void translate_set_label(OpCodeType opc, void *ptr) {
 }
 
 void translate_brcond_i64(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
     GET_2_OPERANDS_NOCHECK();
@@ -1468,6 +1579,9 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
 }
 
 void translate_jmp_direct(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm;
     OperandType delta;
     delta = get_operand(ptr, 0, &is_imm);
@@ -1487,6 +1601,9 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
 }
 
 void translate_call_direct(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, ret_delta_hex, call_delta_hex;
     operand0 = get_operand(ptr, 0, &is_imm0);
@@ -1500,6 +1617,9 @@ void translate_call_direct(OpCodeType opc, void *ptr) {
 }
 
 void translate_discard(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     uint32_t is_imm;
     OperandType operand0 = get_operand(ptr, 0, &is_imm);
     assert(!is_imm && operand0.s.valid);
@@ -1791,6 +1911,9 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, LLVMTypeRe
 }
 
 void translate_call(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+#endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef env_raw = get_env_ptr_raw();
     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
@@ -2066,7 +2189,9 @@ static void setup_func_stack() {
 }
 
 void handle_func(uint64_t val) {
+#ifdef DEBUG
     printf("func %lx\n", val); fflush(NULL);
+#endif
     current_func_offset = val;
     ir_var_name_idx = 0;
     tmp_var_available = 0xffffffff;
@@ -2213,7 +2338,16 @@ void handle_func(uint64_t val) {
 }
 
 static void handle_single_instr(OpCodeType opc, void *ptr) {
-    printf("handle_single_instr: %s ptr:%lx\n", opcode_type_str[opc], ptr);
+#ifdef DEBUG
+    printf("handle_single_instr: %s ptr:%lx", opcode_type_str[opc], ptr);
+    void *next = move_to_next(ptr);
+    unsigned char *byte = (unsigned char *)ptr;
+    while (byte != (unsigned char *)next) {
+        printf(" %02x", byte[0]);
+        byte += 1;
+    }
+    printf("\n");
+#endif
     switch (opc) {
     case addc1o_i32:
     case addc1o_i64:
@@ -2314,6 +2448,7 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
     case usadd_vec:
     case ussub_vec:
         // TODO
+        assert(0);
 
     case add_i64:
         translate_add_i64(opc, ptr);
@@ -2679,7 +2814,6 @@ void module_epilog() {
     printf("Object file %s generated successfully.\n", output_file);
     fflush(NULL);
     LLVMDisposeModule(module);
-    obj_idx += 1;
 }
 
 void parse_tcg_instructions(const char *filename) {

@@ -139,29 +139,6 @@ void gen_api() {
     printf("            ret.i = (uint64_t)(i_Instr2B->imm);\n");
     printf("        }\n");
     printf("        return ret;\n");
-    printf("    } else if (iptr->instr_type == SIZE4B) {\n");
-    printf("        Instr4B *i_Instr4B = (Instr4B *)ptr;\n");
-    printf("        if (idx == 0) {\n");
-    printf("            ret.s.valid = 1;\n");
-    printf("            ret.s.slot_type = i_Instr4B->slot0_type;\n");
-    printf("            ret.s.slot_idx = i_Instr4B->slot0_idx;\n");
-    printf("        } else if (idx == 1) {\n");
-    printf("            ret.s.valid = 1;\n");
-    printf("            ret.s.slot_type = i_Instr4B->slot1_type;\n");
-    printf("            ret.s.slot_idx = i_Instr4B->slot1_idx;\n");
-    printf("        }\n");
-    printf("        return ret;\n");
-    printf("    } else if (iptr->instr_type == SIZE6B) {\n");
-    printf("        Instr2B4 *i_Instr2B4 = (Instr2B4 *)ptr;\n");
-    printf("        if (idx == 0) {\n");
-    printf("            ret.s.valid = 1;\n");
-    printf("            ret.s.slot_type = i_Instr2B4->slot0_type;\n");
-    printf("            ret.s.slot_idx = i_Instr2B4->slot0_idx;\n");
-    printf("        } else if (idx == 1) {\n");
-    printf("            *is_imm = 1;\n");
-    printf("            ret.i = (uint64_t)((int64_t)i_Instr2B4->imm);\n");
-    printf("        }\n");
-    printf("        return ret;\n");
     printf("    }\n");
     printf("    switch (iptr->instr_type_ext) {\n");
 
@@ -216,12 +193,6 @@ void gen_api() {
     printf("    if (iptr->instr_type == SIZE2B) {\n");
     printf("        ptr += 2;\n");
     printf("        return ptr;\n");
-    printf("    } else if (iptr->instr_type == SIZE4B) {\n");
-    printf("        ptr += 4;\n");
-    printf("        return ptr;\n");
-    printf("    } else if (iptr->instr_type == SIZE6B) {\n");
-    printf("        ptr += 6;\n");
-    printf("        return ptr;\n");
     printf("    }\n");
     printf("    switch (iptr->instr_type_ext) {\n");
 
@@ -243,12 +214,6 @@ void gen_api() {
     printf("    if (iptr->instr_type == SIZE2B) {\n");
     printf("        Instr2B *i_Instr2B = (Instr2B *)ptr;\n");
     printf("        return i_Instr2B->opc;\n");
-    printf("    } else if (iptr->instr_type == SIZE4B) {\n");
-    printf("        Instr4B *i_Instr4B = (Instr4B *)ptr;\n");
-    printf("        return i_Instr4B->opc;\n");
-    printf("    } else if (iptr->instr_type == SIZE6B) {\n");
-    printf("        Instr2B4 *i_Instr2B4 = (Instr2B4 *)ptr;\n");
-    printf("        return i_Instr2B4->opc;\n");
     printf("    }\n");
     printf("    switch (iptr->instr_type_ext) {\n");
 
@@ -391,14 +356,14 @@ void gen_api() {
     printf("\n");
     printf("AttributeType get_attribute(void *ptr) {\n");
     printf("    Instr4B *iptr = (Instr4B *)ptr;\n");
-    printf("    if (iptr->instr_type == SIZE4B) {\n");
+    printf("    assert(iptr->instr_type == SIZEXB);\n");
+    printf("    if (iptr->instr_type_ext == Instr4B_ext) {\n");
     printf("        AttributeType ret;\n");
     printf("        ret.attr_type = iptr->attr_type;\n");
     printf("        ret.attr_val = iptr->attr_val;\n");
     printf("        return ret;\n");
-    printf("    } else if (iptr->instr_type == SIZEXB) {\n");
+    printf("    } else if (iptr->instr_type_ext == Instr1B41_ext) {\n");
     printf("        Instr1B41 *i_Instr1B41 = (Instr1B41 *)ptr;\n");
-    printf("        assert(i_Instr1B41->instr_type_ext == Instr1B41_ext);\n");
     printf("        AttributeType ret;\n");
     printf("        ret.attr_type = i_Instr1B41->attr_type;\n");
     printf("        ret.attr_val = i_Instr1B41->attr_val;\n");
