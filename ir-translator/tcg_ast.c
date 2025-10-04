@@ -2037,7 +2037,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name());
 
         // Trampoline handles register-context switch
-        LLVMValueRef trampoline = get_trampoline(helper_func, noargs, op_cnt, (env_idx - noargs), operands, is_imm, second_half_func);
+        LLVMValueRef trampoline = get_trampoline(helper_func, noargs, op_cnt, (env_idx == 0xff ? env_idx : (env_idx - noargs)), operands, is_imm, second_half_func);
         LLVMValueRef call_args[FIXED_PARAM_COUNT + 16] = {NULL};
         int call_arg_cnts = collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, operands, is_imm, op_cnt);
         call_args[call_arg_cnts] = helper_addr;
@@ -2787,7 +2787,7 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    //LLVMDumpModule(module);
+    LLVMDumpModule(module);
 #if 0
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {

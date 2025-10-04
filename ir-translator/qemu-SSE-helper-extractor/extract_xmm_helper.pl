@@ -66,7 +66,7 @@ while (<FD>) {
       my $def = &GetText($fullStart, $fullStop, $ARGV[0]);
       $def = &UpdateFunc($def, $shortFuncName);
       if ($def ne "") {
-        open OUT, "> $path/${shortFuncName}.c" or die "cannot open $path/${shortFuncName}.c for write!\n";
+        open OUT, "> $path/helper_${shortFuncName}.c" or die "cannot open $path/helper_${shortFuncName}.c for write!\n";
         print OUT "$def";
         close OUT;
       }
