@@ -4114,7 +4114,9 @@ void x86_translate_code(CPUState *cpu, TranslationBlock *tb,
                 for (int i = 0; i < 15; ++i) {
                     fprintf(logfile, "XMM%d:$0x%x\n", i, (int)offsetof(CPUX86State, xmm_regs[i]));
                 }
-                fprintf(logfile, "XMM_t0:$0x%x\n\n", (int)offsetof(CPUX86State, xmm_t0));
+                // TODO: optimize XMM_t0
+                //fprintf(logfile, "XMM_t0:$0x%x\n\n", (int)offsetof(CPUX86State, xmm_t0));
+                fprintf(logfile, "\n");
                 qemu_log_unlock(logfile);
             }
         }
