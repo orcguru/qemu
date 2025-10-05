@@ -356,7 +356,7 @@ static uint8_t is_tail_call(HelperType h);
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc);
 static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fixed_vec_context,
                            OperandType *params, uint32_t *is_imm, uint8_t param_count);
-static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, LLVMTypeRef *types, int cnt, int with_ret);
+static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, LLVMTypeRef *types, int cnt, int with_ret, LLVMAttributeRef attr_inline_ctrl);
 static void setup_func_stack();
 static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, uint8_t param_cnt, uint8_t env_idx, OperandType *operands, uint32_t *is_imm, LLVMValueRef next_func);
 
@@ -1138,7 +1138,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
 
     char func_name[64] = {0};
     sprintf(func_name, "func_%lx", func_hex.i);
-    LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0), llvm_int_types[OPC_ADDR_T], get_next_var_name());
+    LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0, NoInlineAttr), llvm_int_types[OPC_ADDR_T], get_next_var_name());
     CREATE_ADD(ptr_val, ptr_val, -8UL);
     LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T);
     LLVMValueRef shadow_ptr1 = LLVMBuildIntToPtr(builder, shadow_val1, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
@@ -1594,7 +1594,7 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
 
     char func_name[64] = {0};
     sprintf(func_name, "func_%lx", (current_func_offset + delta.i));
-    LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, get_or_add_func_with_qemuaot_cc(func_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0), call_args, FIXED_VECTOR_PARAM_COUNT, "");
+    LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, get_or_add_func_with_qemuaot_cc(func_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0, NoInlineAttr), call_args, FIXED_VECTOR_PARAM_COUNT, "");
     LLVMSetTailCall(call_inst, 1);
     LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
     LLVMBuildRetVoid(builder);
@@ -1924,12 +1924,12 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
     return i;
 }
 
-static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, LLVMTypeRef *types, int cnt, int with_ret) {
+static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, LLVMTypeRef *types, int cnt, int with_ret, LLVMAttributeRef attr_inline_ctrl) {
     LLVMValueRef func = LLVMGetNamedFunction(module, name);
     if (!func) {
         LLVMTypeRef func_type = LLVMFunctionType(with_ret ? LLVMInt64Type() : LLVMVoidType(), types, cnt, 0);
         func = LLVMAddFunction(module, name, func_type);
-        LLVMAddAttributeAtIndex(func, -1, AlwaysInlineAttr);
+        LLVMAddAttributeAtIndex(func, -1, attr_inline_ctrl);
         LLVMAddAttributeAtIndex(func, -1, target_features_attr);
         LLVMSetFunctionCallConv(func, QEMUAOT_CC);
     }
@@ -1941,11 +1941,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
 #endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
-    LLVMValueRef env_raw = get_env_ptr_raw();
-    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
-    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
-    LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
-    LLVMValueRef shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name());
+    LLVMValueRef shadow_pointer = NULL;
     for (int i = 0; i < (1<<5); ++i) {
         if (tmp_shadow_offset[current_call_idx][i]) {
             OperandType op;
@@ -1954,6 +1950,13 @@ void translate_call(OpCodeType opc, void *ptr) {
             op.s.slot_idx = i;
             LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_tmp_llvmtype[i]);
             LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[current_call_idx][i], 0);
+            if (!shadow_pointer) {
+                LLVMValueRef env_raw = get_env_ptr_raw();
+                LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
+                LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
+                shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name());
+            }
             LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name());
             LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name());
             LLVMBuildStore(builder, val, shadow_p);
@@ -2015,10 +2018,11 @@ void translate_call(OpCodeType opc, void *ptr) {
     }
 
     // Get the second half
-    LLVMValueRef second_half_func = get_or_add_func_with_qemuaot_cc(second_half_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT + noargs, noargs);
+    LLVMValueRef second_half_func = get_or_add_func_with_qemuaot_cc(second_half_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT + noargs, noargs, AlwaysInlineAttr);
     uint8_t do_inline_helper = all_alias ? can_inline_helper(h, build_macro, bc_name) : 0;
     if (!do_inline_helper) {
         // FIXME: how do we handle xmm_tmp? trampoline does not have enough vector slots, so we have to dump it before hand
+        LLVMValueRef env_raw = NULL;
         for (int i = 0; i < 2; ++i) {
             if (xmmt_valid[i]) {
                 OperandType param_in_stack;
@@ -2030,6 +2034,9 @@ void translate_call(OpCodeType opc, void *ptr) {
                 uint64_t xmm_offset = get_xmm_offset(param_in_stack.s.slot_idx/2) + 16*(param_in_stack.s.slot_idx%2);
                 LLVMTypeRef ret_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
                 LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+                if (!env_raw) {
+                    env_raw = get_env_ptr_raw();
+                }
                 LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
                 LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(ret_type, 0), get_next_var_name());
                 LLVMBuildStore(builder, vec_val, ptr);
@@ -2325,7 +2332,7 @@ void handle_func(uint64_t val) {
 
     char func_name[64];
     sprintf(func_name, "func_%lx", val);
-    llvm_func = get_or_add_func_with_qemuaot_cc(func_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0);
+    llvm_func = get_or_add_func_with_qemuaot_cc(func_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0, NoInlineAttr);
     for (int j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
         LLVMValueRef param = LLVMGetParam(llvm_func, j);
         LLVMSetValueName(param, fixed_vector_arg_names[j]);
