@@ -18,7 +18,7 @@
 #include <llvm-c/Linker.h>
 #include <stdbool.h>
 
-#define DEBUG                       1
+//#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
@@ -1745,7 +1745,9 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     }
     assert(idx_with_env < MAX_OPERANDS_COUNT);
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
-    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, idx_with_env, with_ret ? get_next_var_name() : "");
+    LLVMValueRef helper_addr = LLVMGetParam(trampoline, (FIXED_VECTOR_PARAM_COUNT + (param_cnt - reuse_cnt)));
+    LLVMValueRef the_helper = LLVMBuildIntToPtr(builder, helper_addr, LLVMPointerType(helper_type, 0), get_next_var_name());
+    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, the_helper, call_args, idx_with_env, with_ret ? get_next_var_name() : "");
     if (!do_return) {
         LLVMSetTailCall(call_helper_inst, 1);
         LLVMBuildRetVoid(builder);
@@ -1789,7 +1791,9 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     }
 
     LLVMTypeRef next_type = LLVMGlobalGetValueType(next_func);
-    LLVMValueRef call_next_inst = LLVMBuildCall2(builder, next_type, next_func, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), "");
+    LLVMValueRef next_addr = LLVMGetParam(trampoline, (FIXED_VECTOR_PARAM_COUNT + (param_cnt - reuse_cnt) + 1));
+    LLVMValueRef the_next = LLVMBuildIntToPtr(builder, next_addr, LLVMPointerType(next_type, 0), get_next_var_name());
+    LLVMValueRef call_next_inst = LLVMBuildCall2(builder, next_type, the_next, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), "");
     LLVMSetTailCall(call_next_inst, 1);
     LLVMSetInstructionCallConv(call_next_inst, QEMUAOT_CC);
     LLVMBuildRetVoid(builder);
@@ -2099,7 +2103,10 @@ void translate_call(OpCodeType opc, void *ptr) {
                 break;
             }
         }
-        assert(ptr_tmp < ptr_max);
+        assert(ptr_tmp <= ptr_max);
+        if (ptr_tmp == ptr_max) {
+            break;
+        }
         for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
             handle_single_instr(opc, ptr_tmp);
@@ -2810,6 +2817,8 @@ void module_prolog() {
 }
 
 void module_epilog() {
+    LLVMDumpModule(module);
+#if 0
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
         if (LLVMIsAFunction(function)) {
@@ -2853,6 +2862,7 @@ void module_epilog() {
     }
     printf("Object file %s generated successfully.\n", output_file);
     fflush(NULL);
+#endif
     LLVMDisposeModule(module);
 }
 
