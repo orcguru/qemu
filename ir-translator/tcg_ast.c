@@ -18,7 +18,7 @@
 #include <llvm-c/Linker.h>
 #include <stdbool.h>
 
-//#define DEBUG                       1
+#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
@@ -683,7 +683,7 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
 
 void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm_l, is_imm_r, is_imm_out;
     OperandType operand_l, operand_r, output;
@@ -705,7 +705,7 @@ void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
 
 void translate_add_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
@@ -730,7 +730,7 @@ void translate_add_i64(OpCodeType opc, void *ptr) {
 
 void translate_andc_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType tmp = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType operand0, operand1, operand2;
@@ -741,7 +741,7 @@ void translate_andc_i64(OpCodeType opc, void *ptr) {
 
 void translate_andc_vec(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType tmp = get_tmp_and_do_alloc(LLVMVector16xi8);
     OperandType operand0, operand1, operand2;
@@ -752,7 +752,7 @@ void translate_andc_vec(OpCodeType opc, void *ptr) {
 
 void translate_bswap32_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType tmp0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType tmp1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
@@ -780,7 +780,7 @@ void translate_bswap32_i64(OpCodeType opc, void *ptr) {
 
 void translate_cmp_vec(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
@@ -807,7 +807,7 @@ void translate_cmp_vec(OpCodeType opc, void *ptr) {
 
 void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
@@ -850,21 +850,21 @@ void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
 
 void translate_clz_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     translate_count_zero(opc, ptr, "llvm.ctlz.i64");
 }
 
 void translate_ctz_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     translate_count_zero(opc, ptr, "llvm.cttz.i64");
 }
 
 void translate_deposit(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1, operand2, ofs, len;
     GET_3_OPERANDS();
@@ -893,7 +893,7 @@ void translate_deposit(OpCodeType opc, void *ptr) {
 
 void translate_dupm_vec(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
@@ -923,7 +923,7 @@ void translate_dupm_vec(OpCodeType opc, void *ptr) {
 */
 void translate_extract2_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType tmp = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType operand0, operand1, operand2, ofs;
@@ -937,7 +937,7 @@ void translate_extract2_i64(OpCodeType opc, void *ptr) {
 
 void translate_extract(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1, ofs, len;
     GET_2_OPERANDS();
@@ -957,7 +957,7 @@ void translate_extract(OpCodeType opc, void *ptr) {
 
 void translate_mov(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
@@ -984,7 +984,7 @@ void translate_mov(OpCodeType opc, void *ptr) {
 
 void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1, operand2;
     GET_2_OPERANDS();
@@ -1005,7 +1005,7 @@ void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
 
 void translate_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
@@ -1018,7 +1018,7 @@ void translate_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
 
 void translate_ld_vec(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
@@ -1029,7 +1029,7 @@ void translate_ld_vec(OpCodeType opc, void *ptr) {
 
 void translate_movcond(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1, is_imm2, is_imm3, is_imm4;
     OperandType operand0, operand1, operand2, operand3, operand4;
@@ -1062,7 +1062,7 @@ void translate_movcond(OpCodeType opc, void *ptr) {
 
 void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
@@ -1081,7 +1081,7 @@ void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
 
 void translate_neg(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
@@ -1094,7 +1094,7 @@ void translate_neg(OpCodeType opc, void *ptr) {
 
 void translate_negsetcond_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
@@ -1115,7 +1115,7 @@ void translate_negsetcond_i64(OpCodeType opc, void *ptr) {
 
 void translate_not(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
@@ -1124,7 +1124,7 @@ void translate_not(OpCodeType opc, void *ptr) {
 
 void translate_push_ret_addr(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1;
     OperandType operand0, func_hex;
@@ -1152,7 +1152,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
 
 void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
@@ -1183,7 +1183,7 @@ void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
 
 void translate_qemu_ld(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
@@ -1218,7 +1218,7 @@ void translate_qemu_ld(OpCodeType opc, void *ptr) {
 
 void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
@@ -1255,7 +1255,7 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
 
 void translate_qemu_st(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1;
     GET_2_OPERANDS();
@@ -1286,7 +1286,7 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
 
 void translate_ret(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm;
     OperandType operand0;
@@ -1354,7 +1354,7 @@ void translate_ret(OpCodeType opc, void *ptr) {
 
 void translate_rotr(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType t0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType t1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
@@ -1370,7 +1370,7 @@ void translate_rotr(OpCodeType opc, void *ptr) {
 
 void translate_rotl(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType t0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType t1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
@@ -1386,7 +1386,7 @@ void translate_rotl(OpCodeType opc, void *ptr) {
 
 void translate_setcond_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
@@ -1409,7 +1409,7 @@ void translate_setcond_i64(OpCodeType opc, void *ptr) {
 
 void translate_sextract_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1, ofs, len;
     GET_2_OPERANDS();
@@ -1425,7 +1425,7 @@ void translate_sextract_i64(OpCodeType opc, void *ptr) {
 
 void translate_st(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
@@ -1464,7 +1464,7 @@ void translate_st(OpCodeType opc, void *ptr) {
 
 void translate_maxmin_vec(OpCodeType opc, void *ptr, RelopType r) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
@@ -1481,7 +1481,7 @@ void translate_maxmin_vec(OpCodeType opc, void *ptr, RelopType r) {
 
 void translate_bswap64_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     OperandType t0 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
     OperandType t1 = get_tmp_and_do_alloc(OPC_OUTPUT_T);
@@ -1507,7 +1507,7 @@ void translate_bswap64_i64(OpCodeType opc, void *ptr) {
 
 void translate_set_label(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint8_t l = get_label(ptr);
     char lstr[16];
@@ -1543,7 +1543,7 @@ void translate_set_label(OpCodeType opc, void *ptr) {
 
 void translate_brcond_i64(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
@@ -1583,7 +1583,7 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
 
 void translate_jmp_direct(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm;
     OperandType delta;
@@ -1605,7 +1605,7 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
 
 void translate_call_direct(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, ret_delta_hex, call_delta_hex;
@@ -1621,7 +1621,7 @@ void translate_call_direct(OpCodeType opc, void *ptr) {
 
 void translate_discard(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     uint32_t is_imm;
     OperandType operand0 = get_operand(ptr, 0, &is_imm);
@@ -1946,7 +1946,7 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, LLVMTypeRe
 
 void translate_call(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr);
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef shadow_pointer = NULL;
@@ -2098,16 +2098,13 @@ void translate_call(OpCodeType opc, void *ptr) {
         void *ptr_init = get_instr_buffer();
         void *ptr_max = ptr_init + get_instr_buffer_size();
         void *ptr_tmp = NULL;
-        for (ptr_tmp = move_to_next(ptr); ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+        for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
             if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
                 break;
             }
         }
-        assert(ptr_tmp <= ptr_max);
-        if (ptr_tmp == ptr_max) {
-            break;
-        }
+        assert(ptr_tmp < ptr_max);
         for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
             handle_single_instr(opc, ptr_tmp);
@@ -2156,6 +2153,9 @@ void translate_call(OpCodeType opc, void *ptr) {
 }
 
 static void cleanup_func_resource() {
+#ifdef DEBUG
+    printf("%s\n", __FUNCTION__); fflush(NULL);
+#endif
     reset_instr_buffer();
     for (int i = 0; i < (1<<5); ++i) {
         alias_tmp[i].i = 0;
@@ -2392,14 +2392,14 @@ void handle_func(uint64_t val) {
 
 static void handle_single_instr(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("handle_single_instr: %s ptr:%lx", opcode_type_str[opc], ptr);
+    printf("handle_single_instr: %s ptr:%lx", opcode_type_str[opc], ptr); fflush(NULL);
     void *next = move_to_next(ptr);
     unsigned char *byte = (unsigned char *)ptr;
     while (byte != (unsigned char *)next) {
         printf(" %02x", byte[0]);
         byte += 1;
     }
-    printf("\n");
+    printf("\n"); fflush(NULL);
 #endif
     switch (opc) {
     case addc1o_i32:
