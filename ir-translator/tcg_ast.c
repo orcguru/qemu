@@ -2016,6 +2016,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         all_alias = 0;
     }
     HelperType h = get_helper(ptr);
+    uint8_t second_half_disabled = (h == helper_call_ind || h == helper_jmp_ind || h == helper_ret_ind) ? 1 : 0;
     char helper_func_name[64] = {0};
     char bc_name[64] = {0};
     if (all_alias) {
@@ -2027,7 +2028,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     }
 
     // Get the second half
-    LLVMValueRef second_half_func = get_or_add_func_with_qemuaot_cc(second_half_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT + noargs, noargs, AlwaysInlineAttr);
+    LLVMValueRef second_half_func = get_or_add_func_with_qemuaot_cc(second_half_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT + noargs, 0, AlwaysInlineAttr);
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnts = 0;
     uint8_t do_inline_helper = all_alias ? can_inline_helper(h, build_macro, bc_name) : 0;
@@ -2064,7 +2065,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name());
 
         // Trampoline handles register-context switch
-        LLVMValueRef trampoline = get_trampoline(helper_func, (h == helper_call_ind || h == helper_jmp_ind || h == helper_ret_ind) ? 0 : 1, noargs, op_cnt, (env_idx == 0xff ? env_idx : (env_idx - noargs)), operands, is_imm, second_half_func);
+        LLVMValueRef trampoline = get_trampoline(helper_func, second_half_disabled ? 0 : 1, noargs, op_cnt, (env_idx == 0xff ? env_idx : (env_idx - noargs)), operands, is_imm, second_half_func);
         call_arg_cnts = collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, operands, is_imm, op_cnt);
         call_args[call_arg_cnts] = helper_addr;
         call_arg_cnts += 1;
@@ -2115,6 +2116,11 @@ void translate_call(OpCodeType opc, void *ptr) {
             }
         }
     } while (1);
+
+    if (second_half_disabled) {
+        check_recursive_call = 0;
+        return;
+    }
 
     /// Setup the second-half function
     llvm_func = second_half_func;
