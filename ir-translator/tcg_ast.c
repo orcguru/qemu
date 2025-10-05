@@ -358,7 +358,7 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
                            OperandType *params, uint32_t *is_imm, uint8_t param_count);
 static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, LLVMTypeRef *types, int cnt, int with_ret);
 static void setup_func_stack();
-static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t with_ret, uint8_t param_cnt, uint8_t env_idx, OperandType *operands, uint32_t *is_imm, LLVMValueRef next_func);
+static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, uint8_t param_cnt, uint8_t env_idx, OperandType *operands, uint32_t *is_imm, LLVMValueRef next_func);
 
 #define GET_2_OPERANDS()                                \
     do {                                                \
@@ -1628,12 +1628,12 @@ void translate_discard(OpCodeType opc, void *ptr) {
     }
 }
 
-static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t with_ret, uint8_t param_cnt, uint8_t env_idx, OperandType *operands, uint32_t *is_imm, LLVMValueRef next_func) {
+static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, uint8_t param_cnt, uint8_t env_idx, OperandType *operands, uint32_t *is_imm, LLVMValueRef next_func) {
     char trampoline_name[512] = {0};
     if (env_idx == 0xff) {
-        sprintf(trampoline_name, "trampoline_r%d_param%d_env0", with_ret, param_cnt);
+        sprintf(trampoline_name, "trampoline%s_r%d_param%d_env0", do_return ? "" : "_noreturn", with_ret, param_cnt);
     } else {
-        sprintf(trampoline_name, "trampoline_r%d_param%d_env1_idx%d", with_ret, param_cnt, env_idx);
+        sprintf(trampoline_name, "trampoline%s_r%d_param%d_env1_idx%d", do_return ? "" : "_noreturn", with_ret, param_cnt, env_idx);
     }
     // Collect information for fixed reuse pattern
     int reuse_cnt = 0;
@@ -1657,6 +1657,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t with_ret, u
         LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, trampoline_arg_count, 0));
     LLVMAddAttributeAtIndex(trampoline, -1, NoInlineAttr);
     LLVMAddAttributeAtIndex(trampoline, -1, target_features_attr);
+    LLVMSetLinkage(trampoline, LLVMWeakAnyLinkage);
     int j = 0;
     LLVMValueRef param = NULL;
     for (j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
@@ -1741,6 +1742,14 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t with_ret, u
     }
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
     LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, idx_with_env, with_ret ? get_next_var_name() : "");
+    if (!do_return) {
+        LLVMSetTailCall(call_helper_inst, 1);
+        LLVMBuildRetVoid(builder);
+
+        assert(last_active_bb);
+        LLVMPositionBuilderAtEnd(builder, last_active_bb);
+        return trampoline;
+    }
 
     // Load all fixed from ENV
     LLVMValueRef return_args[FIXED_VECTOR_PARAM_COUNT + 16] = {NULL};
@@ -2037,7 +2046,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name());
 
         // Trampoline handles register-context switch
-        LLVMValueRef trampoline = get_trampoline(helper_func, noargs, op_cnt, (env_idx == 0xff ? env_idx : (env_idx - noargs)), operands, is_imm, second_half_func);
+        LLVMValueRef trampoline = get_trampoline(helper_func, (h == helper_call_ind || h == helper_jmp_ind || h == helper_ret_ind) ? 0 : 1, noargs, op_cnt, (env_idx == 0xff ? env_idx : (env_idx - noargs)), operands, is_imm, second_half_func);
         LLVMValueRef call_args[FIXED_PARAM_COUNT + 16] = {NULL};
         int call_arg_cnts = collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, operands, is_imm, op_cnt);
         call_args[call_arg_cnts] = helper_addr;
