@@ -1816,10 +1816,19 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     if (param_cnt) {
         for (int i = 0; i < param_cnt; ++i) {
             if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_XREG) {
-                char snippet[16] = {0};
-                sprintf(snippet, "_rs%drd%d", operands[i].s.slot_idx, i);
+                char snippet[32] = {0};
+                sprintf(snippet, "_rsxreg%drd%d", operands[i].s.slot_idx, i);
                 strcat(trampoline_name, snippet);
                 reuse_cnt += 1;
+            } else if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[i])) {
+                OperandType alias = get_alias(operands[i]);
+                assert(alias.s.valid);
+                if (alias.s.offset == 0) {
+                    char snippet[32] = {0};
+                    sprintf(snippet, "_rsxmm%drd%d", alias.s.slot_idx, i);
+                    strcat(trampoline_name, snippet);
+                    reuse_cnt += 1;
+                }
             }
         }
     }
@@ -1901,6 +1910,14 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
                 if (fixed_vector_param_llvmtypes[operands[i].s.slot_idx] != LLVMInt64) {
                     call_args[idx_with_env] = LLVMBuildZExt(builder, call_args[idx_with_env], llvm_int_types[LLVMInt64], get_next_var_name());
                 }
+                idx_with_env += 1;
+            } else if (is_imm[i] == 0 && operands[i].s.valid && operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[i])) {
+                OperandType alias = get_alias(operands[i]);
+                assert(alias.s.valid);
+                LLVMValueRef env_raw = get_env_ptr_raw();
+                uint64_t xmm_offset = get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset;
+                LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+                call_args[idx_with_env] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
                 idx_with_env += 1;
             } else {
                 call_args[idx_with_env] = LLVMGetParam(trampoline, FIXED_VECTOR_PARAM_COUNT + i);
@@ -2071,10 +2088,15 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
                     OperandType alias = get_alias(params[op_idx]);
                     assert(alias.s.valid);
                     if (alias.s.slot_type == SUB_SLOT_XMM) {
-                        LLVMValueRef env_raw = get_env_ptr_raw();
-                        uint64_t xmm_offset = get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset;
-                        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
-                        out_args[i] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                        if (alias.s.offset == 0) {
+                            // Skipped, should be handled by trampoline
+                            continue;
+                        } else {
+                            LLVMValueRef env_raw = get_env_ptr_raw();
+                            uint64_t xmm_offset = get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset;
+                            LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+                            out_args[i] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                        }
                     } else if (alias.s.slot_type == SUB_SLOT_ENV) {
                         LLVMValueRef env_raw = get_env_ptr_raw();
                         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], alias.s.offset, 0);
@@ -2189,7 +2211,9 @@ void translate_call(OpCodeType opc, void *ptr) {
         if (is_imm[op_cnt] == 0 && operands[op_cnt].s.valid == 0) {
             break;
         }
-        if (!(is_imm[op_cnt] == 0 && operands[op_cnt].s.slot_type == SUB_SLOT_TMP && has_alias(operands[op_cnt]))) {
+        if (is_imm[op_cnt]) {
+            // Immediate value should be fine
+        } else if (!(is_imm[op_cnt] == 0 && operands[op_cnt].s.slot_type == SUB_SLOT_TMP && has_alias(operands[op_cnt]))) {
             all_alias = 0;
         } else {
             OperandType alias = get_alias(operands[op_cnt]);
@@ -3144,8 +3168,8 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    LLVMDumpModule(module);
-#if 0
+    //LLVMDumpModule(module);
+#if 1
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
         if (LLVMIsAFunction(function)) {
