@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <glib.h>
 
-//#define DEBUG                       1
+#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
@@ -379,8 +379,8 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, LLVMTypeRe
 static void setup_func_stack();
 static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, uint8_t param_cnt, uint8_t env_idx, OperandType *operands, uint32_t *is_imm, LLVMValueRef next_func);
 static void register_labels_for_func(LLVMValueRef func);
-static uint8_t *get_current_active_labels();
-static uint8_t get_current_active_label_cnt(void);
+static uint8_t *get_current_active_labels(LLVMValueRef func);
+static uint8_t get_current_active_label_cnt(LLVMValueRef func);
 static void set_current_active_label_cnt(uint8_t current_active_label_cnt);
 
 static void register_idx_for_call_helper(void *ptr, uint8_t call_idx);
@@ -1526,11 +1526,11 @@ void translate_bswap64_i64(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, t0, t1);
 }
 
-static uint8_t *get_current_active_labels() {
-    active_label_info_t *info = g_hash_table_lookup(current_active_label_info, llvm_func);
+static uint8_t *get_current_active_labels(LLVMValueRef func) {
+    active_label_info_t *info = g_hash_table_lookup(current_active_label_info, func);
     assert(info);
     while (info) {
-        if (info->llvm_func == llvm_func) {
+        if (info->llvm_func == func) {
             return info->current_active_labels;
         }
         info = info->next;
@@ -1539,11 +1539,11 @@ static uint8_t *get_current_active_labels() {
     return NULL;
 }
 
-static uint8_t get_current_active_label_cnt() {
-    active_label_info_t *info = g_hash_table_lookup(current_active_label_info, llvm_func);
+static uint8_t get_current_active_label_cnt(LLVMValueRef func) {
+    active_label_info_t *info = g_hash_table_lookup(current_active_label_info, func);
     assert(info);
     while (info) {
-        if (info->llvm_func == llvm_func) {
+        if (info->llvm_func == func) {
             return info->current_active_label_cnt;
         }
         info = info->next;
@@ -1662,8 +1662,8 @@ void translate_set_label(OpCodeType opc, void *ptr) {
     last_active_bb = label;
 
     int do_move = 0;
-    uint8_t current_active_label_cnt = get_current_active_label_cnt();
-    uint8_t *current_active_labels = get_current_active_labels();
+    uint8_t current_active_label_cnt = get_current_active_label_cnt(llvm_func);
+    uint8_t *current_active_labels = get_current_active_labels(llvm_func);
     for (int i = 0; i < current_active_label_cnt; ++i) {
         if (do_move) {
             current_active_labels[i-1] = current_active_labels[i];
@@ -1704,8 +1704,8 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
     sprintf(true_bb_name, "bb_L%d", lbl);
     LLVMBasicBlockRef bb_true = get_bb(true_bb_name);
     if (!bb_true) {
-        uint8_t current_active_label_cnt = get_current_active_label_cnt();
-        uint8_t *current_active_labels = get_current_active_labels();
+        uint8_t current_active_label_cnt = get_current_active_label_cnt(llvm_func);
+        uint8_t *current_active_labels = get_current_active_labels(llvm_func);
         bb_true = LLVMAppendBasicBlock(llvm_func, true_bb_name);
         for (int i = 0; i < current_active_label_cnt; ++i) {
             assert(current_active_labels[i] != lbl);
@@ -2090,7 +2090,7 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, LLVMTypeRe
 // FIXME: update translate_call to be re-entrant safe!
 void translate_call(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef shadow_pointer = NULL;
@@ -2173,6 +2173,9 @@ void translate_call(OpCodeType opc, void *ptr) {
     uint8_t second_half_already_exists = 0;
     LLVMValueRef second_half_func = LLVMGetNamedFunction(module, second_half_name);
     if (!second_half_func) {
+#ifdef DEBUG
+        printf("creating %s\n", second_half_name); fflush(NULL);
+#endif
         LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT + noargs, 0);
         second_half_func = LLVMAddFunction(module, second_half_name, func_type);
         LLVMAddAttributeAtIndex(second_half_func, -1, AlwaysInlineAttr);
@@ -2249,11 +2252,11 @@ void translate_call(OpCodeType opc, void *ptr) {
     // Check if we got remaining BBs
     do {
         llvm_func = llvm_func_backup;
-        uint8_t current_active_label_cnt = get_current_active_label_cnt();
+        uint8_t current_active_label_cnt = get_current_active_label_cnt(llvm_func);
         if (!current_active_label_cnt) {
             break;
         }
-        uint8_t *current_active_labels = get_current_active_labels();
+        uint8_t *current_active_labels = get_current_active_labels(llvm_func);
         uint8_t tgt_lbl = current_active_labels[0];
         void *ptr_tmp = NULL;
         for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
@@ -2266,6 +2269,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
             handle_single_instr(opc, ptr_tmp);
+            tmp_var_available = tmp_var_available_backup;
             if (is_opc_end_of_control_flow(opc)) {
                 break;
             }
@@ -2273,6 +2277,9 @@ void translate_call(OpCodeType opc, void *ptr) {
     } while (1);
 
     if (second_half_disabled || second_half_already_exists) {
+#ifdef DEBUG
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
         return;
     }
 
@@ -2313,7 +2320,34 @@ void translate_call(OpCodeType opc, void *ptr) {
         OpCodeType opc = get_opcode(ptr_tmp);
         handle_single_instr(opc, ptr_tmp);
         tmp_var_available = tmp_var_available_backup;
+        if (is_opc_end_of_control_flow(opc)) {
+            while (get_current_active_label_cnt(second_half_func)) {
+                uint8_t *current_active_labels = get_current_active_labels(second_half_func);
+                uint8_t tgt_lbl = current_active_labels[0];
+                void *ptr_tmp = NULL;
+                for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+                    OpCodeType opc = get_opcode(ptr_tmp);
+                    if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+                        break;
+                    }
+                }
+                assert(ptr_tmp < ptr_max);
+                for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+                    OpCodeType opc = get_opcode(ptr_tmp);
+                    handle_single_instr(opc, ptr_tmp);
+                    tmp_var_available = tmp_var_available_backup;
+                    if (is_opc_end_of_control_flow(opc)) {
+                        break;
+                    }
+                }
+            }
+            break;
+        }
     }
+    llvm_func = NULL;
+#ifdef DEBUG
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
 }
 
 static void cleanup_func_resource() {
@@ -2577,10 +2611,34 @@ void handle_func(uint64_t val) {
     */
 
     // Handle each IR translation
+    LLVMValueRef llvm_func_backup = llvm_func;
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
         OpCodeType opc = get_opcode(ptr);
         handle_single_instr(opc, ptr);
         tmp_var_available = tmp_var_available_backup;
+        if (is_opc_end_of_control_flow(opc)) {
+            while (get_current_active_label_cnt(llvm_func_backup)) {
+                uint8_t *current_active_labels = get_current_active_labels(llvm_func_backup);
+                uint8_t tgt_lbl = current_active_labels[0];
+                void *ptr_tmp = NULL;
+                for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+                    OpCodeType opc = get_opcode(ptr_tmp);
+                    if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+                        break;
+                    }
+                }
+                assert(ptr_tmp < ptr_max);
+                for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+                    OpCodeType opc = get_opcode(ptr_tmp);
+                    handle_single_instr(opc, ptr_tmp);
+                    tmp_var_available = tmp_var_available_backup;
+                    if (is_opc_end_of_control_flow(opc)) {
+                        break;
+                    }
+                }
+            }
+            break;
+        }
     }
 
     cleanup_func_resource();
