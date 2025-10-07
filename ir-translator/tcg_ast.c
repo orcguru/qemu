@@ -337,15 +337,11 @@ static uint32_t tmp_var_available = 0, tmp_var_available_backup = 0;
 static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
 static uint32_t br_count = 0;
 static uint64_t current_func_offset = 0;
-static uint32_t tmp_shadow_offset[BB_MAX_CNT][1<<5] = {0};
-static LLVMType helper_output_type[BB_MAX_CNT];
-static OperandType helper_output_slot[BB_MAX_CNT];
 static uint8_t current_call_idx = 0;
 static uint32_t shadow_call_offset = 16;
 static uint8_t xmmt_valid[2] = {0};
 static uint32_t xreg_valid = 0, tmp_valid = 0, xmm_valid = 0;
 static LLVMType tmp_bits_type[1<<5] = {0};
-static uint32_t func_instr_cnt_remain = 0;
 static char output_file[128] = {0};
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
@@ -357,6 +353,15 @@ typedef struct active_label_info {
     struct active_label_info *next;
 } active_label_info_t;
 static GHashTable *current_active_label_info = NULL;
+
+typedef struct helper_aux_info {
+    void *ptr;
+    uint8_t idx;
+    uint32_t tmp_shadow_offset[1<<5];
+    LLVMType helper_output_type;
+    struct helper_aux_info *next;
+} helper_aux_info_t;
+static GHashTable *current_helper_aux_info = NULL;
 
 static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, OperandType out);
 static LLVMValueRef get_env_ptr_raw();
@@ -377,6 +382,12 @@ static void register_labels_for_func(LLVMValueRef func);
 static uint8_t *get_current_active_labels();
 static uint8_t get_current_active_label_cnt(void);
 static void set_current_active_label_cnt(uint8_t current_active_label_cnt);
+
+static void register_idx_for_call_helper(void *ptr, uint8_t call_idx);
+static uint8_t get_idx_for_call_helper(void *ptr);
+static uint32_t *get_helper_tmp_shadow_offset(void *ptr);
+static LLVMType get_helper_out_type(void *ptr);
+static void set_helper_out_type(void *ptr, LLVMType type);
 
 #define GET_2_OPERANDS()                                \
     do {                                                \
@@ -1552,6 +1563,80 @@ static void set_current_active_label_cnt(uint8_t current_active_label_cnt) {
     }
 }
 
+/*
+typedef struct helper_aux_info {
+    void *ptr;
+    uint8_t idx;
+    uint32_t tmp_shadow_offset[1<<5];
+    LLVMType helper_output_type;
+    struct helper_aux_info *next;
+} helper_aux_info_t;
+static GHashTable *current_helper_aux_info = NULL;
+*/
+
+static void register_idx_for_call_helper(void *ptr, uint8_t call_idx) {
+    helper_aux_info_t *call_info = (helper_aux_info_t *)calloc(1, sizeof(helper_aux_info_t));
+    call_info->ptr = ptr;
+    call_info->idx = call_idx;
+    helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, ptr);
+    if (!info) {
+        g_hash_table_insert(current_helper_aux_info, ptr, call_info);
+    } else {
+        while (info->next) {
+            assert(info->ptr != ptr);
+            info = info->next;
+        }
+        assert(info->ptr != ptr);
+        info->next = call_info;
+    }
+}
+
+static uint8_t get_idx_for_call_helper(void *ptr) {
+    helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, ptr);
+    while (info) {
+        if (info->ptr == ptr) {
+            return info->idx;
+        }
+        info = info->next;
+    }
+    return current_call_idx++;
+}
+
+static uint32_t *get_helper_tmp_shadow_offset(void *ptr) {
+    static uint32_t dummy_tmp_shadow_offset[1<<5] = {0};
+    helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, ptr);
+    while (info) {
+        if (info->ptr == ptr) {
+            return info->tmp_shadow_offset;
+        }
+        info = info->next;
+    }
+    return dummy_tmp_shadow_offset;
+}
+
+static LLVMType get_helper_out_type(void *ptr) {
+    helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, ptr);
+    while (info) {
+        if (info->ptr == ptr) {
+            return info->helper_output_type;
+        }
+        info = info->next;
+    }
+    return LLVMInvalidType;
+}
+
+static void set_helper_out_type(void *ptr, LLVMType type) {
+    helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, ptr);
+    while (info) {
+        if (info->ptr == ptr) {
+            info->helper_output_type = type;
+            return;
+        }
+        info = info->next;
+    }
+    assert(0);
+}
+
 void translate_set_label(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
@@ -2009,14 +2094,15 @@ void translate_call(OpCodeType opc, void *ptr) {
 #endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef shadow_pointer = NULL;
+    uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(ptr);
     for (int i = 0; i < (1<<5); ++i) {
-        if (tmp_shadow_offset[current_call_idx][i]) {
+        if (tmp_shadow_offset[i]) {
             OperandType op;
             op.s.valid = 1;
             op.s.slot_type = SUB_SLOT_TMP;
             op.s.slot_idx = i;
             LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_tmp_llvmtype[i]);
-            LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[current_call_idx][i], 0);
+            LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
             if (!shadow_pointer) {
                 LLVMValueRef env_raw = get_env_ptr_raw();
                 LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
@@ -2032,8 +2118,8 @@ void translate_call(OpCodeType opc, void *ptr) {
 
     uint8_t env_idx = get_env_idx(ptr);
     char second_half_name[64];
-    sprintf(second_half_name, "func_%lx_call%d", current_func_offset, current_call_idx);
-    current_call_idx += 1;
+    uint8_t call_idx = get_idx_for_call_helper(ptr);
+    sprintf(second_half_name, "func_%lx_call%d", current_func_offset, call_idx);
     uint8_t noargs = get_helper_noargs(ptr);
     OperandType oarg;
     oarg.s.valid = 0;
@@ -2084,8 +2170,19 @@ void translate_call(OpCodeType opc, void *ptr) {
     }
 
     // Get the second half
-    LLVMValueRef second_half_func = get_or_add_func_with_qemuaot_cc(second_half_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT + noargs, 0, AlwaysInlineAttr);
-    register_labels_for_func(second_half_func);
+    uint8_t second_half_already_exists = 0;
+    LLVMValueRef second_half_func = LLVMGetNamedFunction(module, second_half_name);
+    if (!second_half_func) {
+        LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT + noargs, 0);
+        second_half_func = LLVMAddFunction(module, second_half_name, func_type);
+        LLVMAddAttributeAtIndex(second_half_func, -1, AlwaysInlineAttr);
+        LLVMAddAttributeAtIndex(second_half_func, -1, target_features_attr);
+        LLVMSetFunctionCallConv(second_half_func, QEMUAOT_CC);
+        register_labels_for_func(second_half_func);
+    } else {
+        second_half_already_exists = 1;
+    }
+
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnts = 0;
     uint8_t do_inline_helper = all_alias ? can_inline_helper(h, build_macro, bc_name) : 0;
@@ -2147,6 +2244,8 @@ void translate_call(OpCodeType opc, void *ptr) {
     }
 
     LLVMValueRef llvm_func_backup = llvm_func;
+    void *ptr_init = get_instr_buffer();
+    void *ptr_max = ptr_init + get_instr_buffer_size();
     // Check if we got remaining BBs
     do {
         llvm_func = llvm_func_backup;
@@ -2156,8 +2255,6 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
         uint8_t *current_active_labels = get_current_active_labels();
         uint8_t tgt_lbl = current_active_labels[0];
-        void *ptr_init = get_instr_buffer();
-        void *ptr_max = ptr_init + get_instr_buffer_size();
         void *ptr_tmp = NULL;
         for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
@@ -2175,11 +2272,11 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
     } while (1);
 
-    if (second_half_disabled) {
+    if (second_half_disabled || second_half_already_exists) {
         return;
     }
 
-    /// Setup the second-half function
+    /// Setup and finish the second-half function
     llvm_func = second_half_func;
     for (int j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
         LLVMValueRef param = LLVMGetParam(llvm_func, j);
@@ -2197,17 +2294,25 @@ void translate_call(OpCodeType opc, void *ptr) {
     setup_func_stack();
 
     // Get output from helper func
-    if (noargs && helper_output_type[current_call_idx] != LLVMInvalidType) {
+    LLVMType out_type = get_helper_out_type(ptr);
+    if (noargs && out_type != LLVMInvalidType) {
         LLVMValueRef param = LLVMGetParam(llvm_func, FIXED_VECTOR_PARAM_COUNT);
         if (oarg.s.slot_type == SUB_SLOT_TMP && has_alias(oarg)) {
             unregister_alias(oarg);
         }
-        if (helper_output_type[current_call_idx] < LLVMInt64) {
-            param = LLVMBuildTrunc(builder, param, llvm_int_types[helper_output_type[current_call_idx]], get_next_var_name());
+        if (out_type < LLVMInt64) {
+            param = LLVMBuildTrunc(builder, param, llvm_int_types[out_type], get_next_var_name());
         }
-        do_store(opc, param, helper_output_type[current_call_idx], oarg);
+        do_store(opc, param, out_type, oarg);
     } else {
         assert(!noargs);
+    }
+
+    // Start from the one after ptr
+    for (void *ptr_tmp = move_to_next(ptr); ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+        OpCodeType opc = get_opcode(ptr_tmp);
+        handle_single_instr(opc, ptr_tmp);
+        tmp_var_available = tmp_var_available_backup;
     }
 }
 
@@ -2231,13 +2336,30 @@ static void cleanup_func_resource() {
     xreg_valid = 0;
     tmp_valid = 0;
     xmm_valid = 0;
-    func_instr_cnt_remain = 0;
     memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
-    memset(tmp_shadow_offset, 0, sizeof(tmp_shadow_offset));
     memset(tmp_bits_type, 0, sizeof(tmp_bits_type));
-    memset(helper_output_type, 0, sizeof(helper_output_type));
-    memset(helper_output_slot, 0, sizeof(helper_output_slot));
     reset_tmp_mapping();
+
+    // Cleanup hash-tables
+    GHashTableIter iter;
+    gpointer key, value;
+
+#define FREE_HASH_TABLE(TABEL, ENTRY_TYPE)                              \
+    do {                                                                \
+        g_hash_table_iter_init(&iter, current_active_label_info);       \
+        while (g_hash_table_iter_next(&iter, &key, &value)) {           \
+            active_label_info_t *info = (active_label_info_t *)value;   \
+            while (info) {                                              \
+                active_label_info_t *next = info->next;                 \
+                free(info);                                             \
+                info = next;                                            \
+            }                                                           \
+            g_hash_table_iter_remove(&iter);                            \
+        }                                                               \
+    } while (0)
+
+    FREE_HASH_TABLE(current_active_label_info, active_label_info_t);
+    FREE_HASH_TABLE(current_helper_aux_info, helper_aux_info_t);
 }
 
 static void setup_func_stack() {
@@ -2324,9 +2446,11 @@ void handle_func(uint64_t val) {
     void *ptr_init = get_instr_buffer();
     void *ptr_max = ptr_init + get_instr_buffer_size();
     void *ptr;
+    OperandType helper_output_slot[BB_MAX_CNT] = {0};
+    void *helper_output_idx_ptr[BB_MAX_CNT] = {NULL};
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint8_t tmp_has_known_def[1<<5] = {0};
-    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), func_instr_cnt_remain += 1) {
+    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
         uint32_t slot_idx = 0;
         OperandType operand;
         OpCodeType opc = get_opcode(ptr);
@@ -2364,7 +2488,8 @@ void handle_func(uint64_t val) {
                 if (((opcmem_addr_nzidx[opc] > 0) && (slot_idx < opcmem_addr_nzidx[opc])) || ((opcmem_addr_nzidx[opc] == 0) && (slot_idx >= opcoc[opc]))) {
                     if (operand.s.slot_type == helper_output_slot[current_call_idx-1].s.slot_type &&
                         operand.s.slot_idx == helper_output_slot[current_call_idx-1].s.slot_idx) {
-                        helper_output_type[current_call_idx-1] = operand_type;
+                        set_helper_out_type(ptr, operand_type);
+                        helper_output_idx_ptr[current_call_idx-1] = ptr;
                         helper_output_slot[current_call_idx-1].s.valid = 0;
                     }
                 }
@@ -2383,10 +2508,13 @@ void handle_func(uint64_t val) {
                 }
                 if (operand.s.slot_type == SUB_SLOT_TMP) {
                     if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
-                        if (!tmp_has_known_def[operand.s.slot_idx] && tmp_shadow_offset[current_call_idx][operand.s.slot_idx] == 0) {
-                            tmp_shadow_offset[current_call_idx][operand.s.slot_idx] = shadow_call_offset;
-                            LLVMType t = func_tmp_llvmtype[operand.s.slot_idx];
-                            shadow_call_offset += (llvm_vector_elem_bit_counts[t*2] * llvm_vector_elem_bit_counts[t*2+1])/8;
+                        if (!tmp_has_known_def[operand.s.slot_idx]) {
+                            uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(ptr);
+                            if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
+                                tmp_shadow_offset[operand.s.slot_idx] = shadow_call_offset;
+                                LLVMType t = func_tmp_llvmtype[operand.s.slot_idx];
+                                shadow_call_offset += (llvm_vector_elem_bit_counts[t*2] * llvm_vector_elem_bit_counts[t*2+1])/8;
+                            }
                         }
                     }
                     if ((opc == call && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
@@ -2401,6 +2529,7 @@ void handle_func(uint64_t val) {
             if (!is_immo && oarg.s.valid) {
                 tmp_has_known_def[oarg.s.slot_idx] = 1;
             }
+            register_idx_for_call_helper(ptr, current_call_idx);
             current_call_idx += 1;
             assert(current_call_idx < BB_MAX_CNT);
         }
@@ -2410,13 +2539,13 @@ void handle_func(uint64_t val) {
     // Try to make a reasonable guess to make translate_call happy.
     if (current_call_idx > 0) {
         for (int i = 0; i < current_call_idx; ++i) {
-            if (helper_output_slot[i].s.valid && helper_output_type[i] == LLVMInvalidType) {
+            if (helper_output_slot[i].s.valid && get_helper_out_type(helper_output_idx_ptr[i]) == LLVMInvalidType) {
                 assert(helper_output_slot[i].s.slot_type == SUB_SLOT_TMP);
                 if (func_tmp_llvmtype[helper_output_slot[i].s.slot_idx] == LLVMInvalidType) {
                     //FIXME - guess that is i64
-                    helper_output_type[i] = LLVMInt64;
+                    set_helper_out_type(helper_output_idx_ptr[i], LLVMInt64);
                 } else {
-                    helper_output_type[i] = func_tmp_llvmtype[helper_output_slot[i].s.slot_idx];
+                    set_helper_out_type(helper_output_idx_ptr[i], func_tmp_llvmtype[helper_output_slot[i].s.slot_idx]);
                 }
                 helper_output_slot[i].s.valid = 0;
             }
@@ -2447,9 +2576,8 @@ void handle_func(uint64_t val) {
     ///
     */
 
-    current_call_idx = 0;
     // Handle each IR translation
-    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr), func_instr_cnt_remain -= 1) {
+    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
         OpCodeType opc = get_opcode(ptr);
         handle_single_instr(opc, ptr);
         tmp_var_available = tmp_var_available_backup;
@@ -2891,6 +3019,8 @@ void module_prolog() {
 
     current_active_label_info = g_hash_table_new(NULL, NULL);
     assert(current_active_label_info);
+    current_helper_aux_info = g_hash_table_new(NULL, NULL);
+    assert(current_helper_aux_info);
 }
 
 void module_epilog() {
