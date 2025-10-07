@@ -1563,17 +1563,6 @@ static void set_current_active_label_cnt(uint8_t current_active_label_cnt) {
     }
 }
 
-/*
-typedef struct helper_aux_info {
-    void *ptr;
-    uint8_t idx;
-    uint32_t tmp_shadow_offset[1<<5];
-    LLVMType helper_output_type;
-    struct helper_aux_info *next;
-} helper_aux_info_t;
-static GHashTable *current_helper_aux_info = NULL;
-*/
-
 static void register_idx_for_call_helper(void *ptr, uint8_t call_idx) {
     helper_aux_info_t *call_info = (helper_aux_info_t *)calloc(1, sizeof(helper_aux_info_t));
     call_info->ptr = ptr;
@@ -2380,11 +2369,11 @@ static void cleanup_func_resource() {
 
 #define FREE_HASH_TABLE(TABEL, ENTRY_TYPE)                              \
     do {                                                                \
-        g_hash_table_iter_init(&iter, current_active_label_info);       \
+        g_hash_table_iter_init(&iter, TABEL);                           \
         while (g_hash_table_iter_next(&iter, &key, &value)) {           \
-            active_label_info_t *info = (active_label_info_t *)value;   \
+            ENTRY_TYPE *info = (ENTRY_TYPE *)value;                     \
             while (info) {                                              \
-                active_label_info_t *next = info->next;                 \
+                ENTRY_TYPE *next = info->next;                          \
                 free(info);                                             \
                 info = next;                                            \
             }                                                           \
@@ -2484,6 +2473,7 @@ void handle_func(uint64_t val) {
     void *helper_output_idx_ptr[BB_MAX_CNT] = {NULL};
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint8_t tmp_has_known_def[1<<5] = {0};
+    void *latest_call_ptr = NULL;
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
         uint32_t slot_idx = 0;
         OperandType operand;
@@ -2522,8 +2512,9 @@ void handle_func(uint64_t val) {
                 if (((opcmem_addr_nzidx[opc] > 0) && (slot_idx < opcmem_addr_nzidx[opc])) || ((opcmem_addr_nzidx[opc] == 0) && (slot_idx >= opcoc[opc]))) {
                     if (operand.s.slot_type == helper_output_slot[current_call_idx-1].s.slot_type &&
                         operand.s.slot_idx == helper_output_slot[current_call_idx-1].s.slot_idx) {
-                        set_helper_out_type(ptr, operand_type);
-                        helper_output_idx_ptr[current_call_idx-1] = ptr;
+                        assert(latest_call_ptr);
+                        set_helper_out_type(latest_call_ptr, operand_type);
+                        helper_output_idx_ptr[current_call_idx-1] = latest_call_ptr;
                         helper_output_slot[current_call_idx-1].s.valid = 0;
                     }
                 }
@@ -2543,7 +2534,8 @@ void handle_func(uint64_t val) {
                 if (operand.s.slot_type == SUB_SLOT_TMP) {
                     if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
                         if (!tmp_has_known_def[operand.s.slot_idx]) {
-                            uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(ptr);
+                            assert(latest_call_ptr);
+                            uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(latest_call_ptr);
                             if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
                                 tmp_shadow_offset[operand.s.slot_idx] = shadow_call_offset;
                                 LLVMType t = func_tmp_llvmtype[operand.s.slot_idx];
@@ -2559,6 +2551,7 @@ void handle_func(uint64_t val) {
             slot_idx += 1;
         } while (1);
         if (opc == call) {
+            latest_call_ptr = ptr;
             memset(tmp_has_known_def, 0, sizeof(tmp_has_known_def));
             if (!is_immo && oarg.s.valid) {
                 tmp_has_known_def[oarg.s.slot_idx] = 1;
