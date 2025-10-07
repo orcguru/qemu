@@ -2209,7 +2209,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         all_alias = 0;
     }
     HelperType h = get_helper(ptr);
-    uint8_t second_half_disabled = (h == helper_call_ind || h == helper_jmp_ind || h == helper_ret_ind) ? 1 : 0;
+    uint8_t second_half_disabled = is_tail_call(h);
     char helper_func_name[64] = {0};
     char bc_name[64] = {0};
     if (all_alias) {
