@@ -2473,7 +2473,8 @@ void handle_func(uint64_t val) {
     void *helper_output_idx_ptr[BB_MAX_CNT] = {NULL};
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint8_t tmp_has_known_def[1<<5] = {0};
-    void *latest_call_ptr = NULL;
+    void *current_call_ptr = NULL;
+    void *prev_call_ptr = NULL;
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
         uint32_t slot_idx = 0;
         OperandType operand;
@@ -2489,6 +2490,9 @@ void handle_func(uint64_t val) {
                 assert(!is_immo && oarg.s.valid);
                 helper_output_slot[current_call_idx] = oarg;
             }
+            current_call_ptr = ptr;
+            register_idx_for_call_helper(current_call_ptr, current_call_idx);
+            helper_output_idx_ptr[current_call_idx] = ptr;
         }
         uint8_t is_vec = is_vector(ptr);
         LLVMType vtype = LLVMInvalidType;
@@ -2512,9 +2516,8 @@ void handle_func(uint64_t val) {
                 if (((opcmem_addr_nzidx[opc] > 0) && (slot_idx < opcmem_addr_nzidx[opc])) || ((opcmem_addr_nzidx[opc] == 0) && (slot_idx >= opcoc[opc]))) {
                     if (operand.s.slot_type == helper_output_slot[current_call_idx-1].s.slot_type &&
                         operand.s.slot_idx == helper_output_slot[current_call_idx-1].s.slot_idx) {
-                        assert(latest_call_ptr);
-                        set_helper_out_type(latest_call_ptr, operand_type);
-                        helper_output_idx_ptr[current_call_idx-1] = latest_call_ptr;
+                        assert(prev_call_ptr);
+                        set_helper_out_type(prev_call_ptr, operand_type);
                         helper_output_slot[current_call_idx-1].s.valid = 0;
                     }
                 }
@@ -2534,8 +2537,8 @@ void handle_func(uint64_t val) {
                 if (operand.s.slot_type == SUB_SLOT_TMP) {
                     if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
                         if (!tmp_has_known_def[operand.s.slot_idx]) {
-                            assert(latest_call_ptr);
-                            uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(latest_call_ptr);
+                            assert(current_call_ptr);
+                            uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(current_call_ptr);
                             if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
                                 tmp_shadow_offset[operand.s.slot_idx] = shadow_call_offset;
                                 LLVMType t = func_tmp_llvmtype[operand.s.slot_idx];
@@ -2551,12 +2554,11 @@ void handle_func(uint64_t val) {
             slot_idx += 1;
         } while (1);
         if (opc == call) {
-            latest_call_ptr = ptr;
+            prev_call_ptr = ptr;
             memset(tmp_has_known_def, 0, sizeof(tmp_has_known_def));
             if (!is_immo && oarg.s.valid) {
                 tmp_has_known_def[oarg.s.slot_idx] = 1;
             }
-            register_idx_for_call_helper(ptr, current_call_idx);
             current_call_idx += 1;
             assert(current_call_idx < BB_MAX_CNT);
         }
@@ -2568,6 +2570,7 @@ void handle_func(uint64_t val) {
         for (int i = 0; i < current_call_idx; ++i) {
             if (helper_output_slot[i].s.valid && get_helper_out_type(helper_output_idx_ptr[i]) == LLVMInvalidType) {
                 assert(helper_output_slot[i].s.slot_type == SUB_SLOT_TMP);
+                assert(helper_output_idx_ptr[i]);
                 if (func_tmp_llvmtype[helper_output_slot[i].s.slot_idx] == LLVMInvalidType) {
                     //FIXME - guess that is i64
                     set_helper_out_type(helper_output_idx_ptr[i], LLVMInt64);
@@ -3075,7 +3078,7 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    LLVMDumpModule(module);
+    //LLVMDumpModule(module);
 #if 0
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
