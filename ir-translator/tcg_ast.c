@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <glib.h>
 
-#define DEBUG                       1
+//#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
@@ -1564,6 +1564,9 @@ static void set_current_active_label_cnt(uint8_t current_active_label_cnt) {
 }
 
 static void register_idx_for_call_helper(void *ptr, uint8_t call_idx) {
+#ifdef DEBUG
+    printf("%s %lx call%d\n", __FUNCTION__, ptr, call_idx); fflush(NULL);
+#endif
     helper_aux_info_t *call_info = (helper_aux_info_t *)calloc(1, sizeof(helper_aux_info_t));
     call_info->ptr = ptr;
     call_info->idx = call_idx;
@@ -2090,7 +2093,25 @@ void translate_call(OpCodeType opc, void *ptr) {
             op.s.valid = 1;
             op.s.slot_type = SUB_SLOT_TMP;
             op.s.slot_idx = i;
-            LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_tmp_llvmtype[i]);
+            LLVMValueRef val = NULL;
+            if (has_alias(op)) {
+                OperandType alias = get_alias(op);
+                assert(alias.s.valid);
+                if (alias.s.slot_type == SUB_SLOT_XMM) {
+                    LLVMValueRef env_raw = get_env_ptr_raw();
+                    uint64_t xmm_offset = get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset;
+                    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+                    val = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                } else if (alias.s.slot_type == SUB_SLOT_ENV) {
+                    LLVMValueRef env_raw = get_env_ptr_raw();
+                    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], alias.s.offset, 0);
+                    val = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                } else {
+                    assert(0);
+                }
+            } else {
+                val = get_source_node_imm_or_stack(opc, 0, op, func_tmp_llvmtype[i]);
+            }
             LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
             if (!shadow_pointer) {
                 LLVMValueRef env_raw = get_env_ptr_raw();
@@ -2473,7 +2494,6 @@ void handle_func(uint64_t val) {
     void *helper_output_idx_ptr[BB_MAX_CNT] = {NULL};
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint8_t tmp_has_known_def[1<<5] = {0};
-    void *current_call_ptr = NULL;
     void *prev_call_ptr = NULL;
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
         uint32_t slot_idx = 0;
@@ -2490,8 +2510,7 @@ void handle_func(uint64_t val) {
                 assert(!is_immo && oarg.s.valid);
                 helper_output_slot[current_call_idx] = oarg;
             }
-            current_call_ptr = ptr;
-            register_idx_for_call_helper(current_call_ptr, current_call_idx);
+            register_idx_for_call_helper(ptr, current_call_idx);
             helper_output_idx_ptr[current_call_idx] = ptr;
         }
         uint8_t is_vec = is_vector(ptr);
@@ -2537,8 +2556,8 @@ void handle_func(uint64_t val) {
                 if (operand.s.slot_type == SUB_SLOT_TMP) {
                     if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
                         if (!tmp_has_known_def[operand.s.slot_idx]) {
-                            assert(current_call_ptr);
-                            uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(current_call_ptr);
+                            assert(prev_call_ptr);
+                            uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(prev_call_ptr);
                             if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
                                 tmp_shadow_offset[operand.s.slot_idx] = shadow_call_offset;
                                 LLVMType t = func_tmp_llvmtype[operand.s.slot_idx];
