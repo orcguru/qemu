@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <glib.h>
 
-#define DEBUG                       1
+//#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
@@ -1483,12 +1483,18 @@ void translate_st(OpCodeType opc, void *ptr) {
 
     LLVMValueRef addr_val = NULL;
 
-    if (!is_vec && operand1.s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operand1)) {
-        OperandType alias = get_alias(operand1);
+    if (!is_vec && ((operand1.s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operand1)) || operand1.s.slot_type == SUB_SLOT_XMM)) {
+        OperandType alias;
+        if (operand1.s.slot_type == SUB_SLOT_TMP) {
+            alias = get_alias(operand1);
+        } else {
+            alias = operand1;
+        }
         uint32_t is_imm;
         OperandType offset = get_operand(ptr, 2, &is_imm);
-        assert(is_imm);
-        alias.s.offset += offset.i;
+        if (is_imm) {
+            alias.s.offset += offset.i;
+        }
         assert((alias.s.offset * 8) % llvm_vector_elem_bit_counts[OPC_OUTPUT_T*2+1] == 0);
 
         OperandType out = alias;
@@ -1501,9 +1507,17 @@ void translate_st(OpCodeType opc, void *ptr) {
         if (operand1.s.slot_type == SUB_SLOT_TMP && has_alias(operand1)) {
             operand1 = get_alias(operand1);
         }
-        assert(operand1.s.valid && operand1.s.slot_type == SUB_SLOT_ENV);
         LLVMValueRef env_raw = get_env_ptr_raw();
-        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], operand1.s.offset, 0);
+        LLVMValueRef off = NULL;
+        if (operand1.s.slot_type == SUB_SLOT_XMM) {
+            assert(operand1.s.offset == 0);
+            uint64_t xmm_offset = get_xmm_offset(operand1.s.slot_idx/2) + 16*(operand1.s.slot_idx%2);
+            off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+        } else if (operand1.s.slot_type == SUB_SLOT_ENV) {
+            off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], operand1.s.offset, 0);
+        } else {
+            assert(0);
+        }
         addr_val = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
         LLVMValueRef addr_ptr = LLVMBuildIntToPtr(builder, addr_val, LLVMPointerType(llvm_int_types[is_vec ? vtype : OPC_OUTPUT_T], 0), get_next_var_name());
         LLVMBuildStore(builder, val, addr_ptr);

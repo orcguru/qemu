@@ -5,7 +5,7 @@
 #include <string.h>
 #include "tcg_ast.h"
 
-#define DEBUG           1
+//#define DEBUG           1
 #define SET_SLOT(IDX)                               \
     do {                                            \
         s##IDX = get_mapped_slot(s##IDX);    \
