@@ -5,7 +5,7 @@
 #include <string.h>
 #include "tcg_ast.h"
 
-//#define DEBUG           1
+#define DEBUG           1
 #define SET_SLOT(IDX)                               \
     do {                                            \
         s##IDX = get_mapped_slot(s##IDX);    \
@@ -61,6 +61,7 @@ XMMReg lookup_xmm(uint64_t offset) {
             x.xmm_idx = idx * 2 + 1;
             x.xmm_offset = delta - 0x10;
         }
+#if 0
     } else if (xmm_offsets[15] <= off && off < (xmm_offsets[15] + 0x20)) {
         if ((off - xmm_offsets[15]) < 0x10) {
             x.xmm_idx = xmmt;
@@ -69,6 +70,7 @@ XMMReg lookup_xmm(uint64_t offset) {
             x.xmm_idx = ymmt_h;
             x.xmm_offset = (off - (xmm_offsets[15] + 0x10));
         }
+#endif
     }
     return x;
 }
@@ -82,7 +84,9 @@ OperandType get_mapped_slot(OperandType slot) {
         assert(slot.s.slot_idx < (1<<6));
         if (tmpl_map[slot.s.slot_idx] == 0xff) {
             assert(tmp_idx < (1<<5));
-            //printf("register loc%d as %d\n", slot.s.slot_idx, tmp_idx);
+#ifdef DEBUG
+            printf("register loc%d as %d\n", slot.s.slot_idx, tmp_idx); fflush(NULL);
+#endif
             tmpl_map[slot.s.slot_idx] = tmp_idx;
             tmp_idx += 1;
         }
@@ -93,7 +97,9 @@ OperandType get_mapped_slot(OperandType slot) {
         assert(slot.s.slot_idx < (1<<6));
         if (tmpt_map[slot.s.slot_idx] == 0xff) {
             assert(tmp_idx < (1<<5));
-            //printf("register tmp%d as %d\n", slot.s.slot_idx, tmp_idx);
+#ifdef DEBUG
+            printf("register tmp%d as %d\n", slot.s.slot_idx, tmp_idx); fflush(NULL);
+#endif
             tmpt_map[slot.s.slot_idx] = tmp_idx;
             tmp_idx += 1;
         }
