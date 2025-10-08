@@ -329,7 +329,6 @@ bswap32_i64                     bswap32_i64
 bswap64_i64                     bswap64_i64
 call                            call
 call_direct                     call_direct
-call_ind                        call_ind
 cc_compute_all                  cc_compute_all
 cc_compute_c                    cc_compute_c
 cc_compute_nz                   cc_compute_nz
@@ -2673,7 +2672,6 @@ xsetbv                          xsetbv
 {xsave}                         { HANDLE_COLUMN; yylval->oh.h = helper_xsave; return SYMBOL; }
 {xsaveopt}                      { HANDLE_COLUMN; yylval->oh.h = helper_xsaveopt; return SYMBOL; }
 {xsetbv}                        { HANDLE_COLUMN; yylval->oh.h = helper_xsetbv; return SYMBOL; }
-{call_ind}                      { HANDLE_COLUMN; yylval->oh.h = helper_call_ind; return SYMBOL; }
 {jmp_ind}                       { HANDLE_COLUMN; yylval->oh.h = helper_jmp_ind; return SYMBOL; }
 {ret_ind}                       { HANDLE_COLUMN; yylval->oh.h = helper_ret_ind; return SYMBOL; }
 {iret_ind}                      { HANDLE_COLUMN; yylval->oh.h = helper_iret_ind; return SYMBOL; }

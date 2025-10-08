@@ -2031,10 +2031,9 @@ static uint8_t can_inline_helper(HelperType h, const char *build_macro, const ch
 }
 
 static uint8_t is_tail_call(HelperType h) {
-    if (h == helper_ret_ind || h == helper_call_ind || h == helper_icebp ||
+    if (h == helper_ret_ind || h == helper_icebp || h == helper_raise_interrupt ||
         h == helper_iret_ind || h == helper_jmp_ind || h == helper_ljmp_protected ||
-        h == helper_lret_protected || h == helper_pause || h == helper_raise_exception ||
-        h == helper_raise_interrupt) {
+        h == helper_lret_protected || h == helper_pause || h == helper_raise_exception) {
         return 1;
     }
     return 0;

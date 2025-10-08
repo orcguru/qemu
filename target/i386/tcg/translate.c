@@ -2404,7 +2404,7 @@ gen_eob(DisasContext *s, int mode)
             assert(s->eip_next_tl_set);
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
             tcg_gen_mov_i64(cpu_eip, s->last_rip_mov_src);
-            gen_helper_call_ind(tcg_env, s->last_rip_mov_src);
+            gen_helper_jmp_ind(tcg_env, s->last_rip_mov_src);
         } else if (s->base.jmp_type == TR_IS_RET) {
             assert(s->last_rip_mov);
             tcg_gen_mov_i64(cpu_eip, s->last_rip_mov_src);

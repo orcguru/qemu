@@ -1154,7 +1154,6 @@ typedef enum {
     X(helper_xsave) \
     X(helper_xsaveopt) \
     X(helper_xsetbv) \
-    X(helper_call_ind) \
     X(helper_jmp_ind) \
     X(helper_ret_ind) \
     X(helper_iret_ind) \
