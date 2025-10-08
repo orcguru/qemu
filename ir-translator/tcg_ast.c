@@ -2684,16 +2684,6 @@ void handle_func(uint64_t val) {
 
     setup_func_stack();
 
-    /*
-    /// Add helper_dump_registers
-    uint8_t buf[16];
-    OHType h;
-    h.h = helper_dump_registers;
-    create_helper_env(buf, h, 0, 0);
-    translate_call(call, buf);
-    ///
-    */
-
     // Handle each IR translation
     LLVMValueRef llvm_func_backup = llvm_func;
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {

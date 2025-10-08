@@ -609,6 +609,7 @@ divw_AX                         divw_AX
 dppd_xmm                        dppd_xmm
 dpps_xmm                        dpps_xmm
 dpps_ymm                        dpps_ymm
+dump_registers                  dump_registers
 dump_load                       dump_load
 dump_store                      dump_store
 dupm_vec                        dupm_vec
@@ -2676,6 +2677,7 @@ xsetbv                          xsetbv
 {jmp_ind}                       { HANDLE_COLUMN; yylval->oh.h = helper_jmp_ind; return SYMBOL; }
 {ret_ind}                       { HANDLE_COLUMN; yylval->oh.h = helper_ret_ind; return SYMBOL; }
 {iret_ind}                      { HANDLE_COLUMN; yylval->oh.h = helper_iret_ind; return SYMBOL; }
+{dump_registers}                { HANDLE_COLUMN; yylval->oh.h = helper_dump_registers; return SYMBOL; }
 {dump_load}                     { HANDLE_COLUMN; yylval->oh.h = helper_dump_load; return SYMBOL; }
 {dump_store}                    { HANDLE_COLUMN; yylval->oh.h = helper_dump_store; return SYMBOL; }
 
