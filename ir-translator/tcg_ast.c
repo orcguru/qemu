@@ -238,15 +238,6 @@
         translate_brcond_i64(brcond_i64, buf); \
     } while (0)
 
-#define CREATE_CALL_RET_IND(OP)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.h = helper_ret_ind;                 \
-        create_helper_env_slot(buf, tmp_opc, 0, 0, OP); \
-        translate_call(call, buf);                  \
-    } while (0)
-
 #define CREATE_LD_ENV_XMM(OPC, OUT, ALIAS)           \
     do {                                            \
         uint8_t buf[16];                            \
@@ -1388,7 +1379,6 @@ void translate_ret(OpCodeType opc, void *ptr) {
     LLVMSetTailCall(call_inst, 1);
 
     CREATE_LABEL(new_label);
-    CREATE_CALL_RET_IND(operand0);
 }
 
 void translate_rotr(OpCodeType opc, void *ptr) {
@@ -2031,7 +2021,7 @@ static uint8_t can_inline_helper(HelperType h, const char *build_macro, const ch
 }
 
 static uint8_t is_tail_call(HelperType h) {
-    if (h == helper_ret_ind || h == helper_icebp || h == helper_raise_interrupt ||
+    if (h == helper_icebp || h == helper_raise_interrupt ||
         h == helper_iret_ind || h == helper_jmp_ind || h == helper_ljmp_protected ||
         h == helper_lret_protected || h == helper_pause || h == helper_raise_exception) {
         return 1;

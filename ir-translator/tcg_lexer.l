@@ -1213,7 +1213,6 @@ rems_i64                        rems_i64
 remu_i32                        remu_i32
 remu_i64                        remu_i64
 ret                             ret
-ret_ind                         ret_ind
 rotl_i32                        rotl_i32
 rotl_i64                        rotl_i64
 rotli_vec                       rotli_vec
@@ -2673,7 +2672,6 @@ xsetbv                          xsetbv
 {xsaveopt}                      { HANDLE_COLUMN; yylval->oh.h = helper_xsaveopt; return SYMBOL; }
 {xsetbv}                        { HANDLE_COLUMN; yylval->oh.h = helper_xsetbv; return SYMBOL; }
 {jmp_ind}                       { HANDLE_COLUMN; yylval->oh.h = helper_jmp_ind; return SYMBOL; }
-{ret_ind}                       { HANDLE_COLUMN; yylval->oh.h = helper_ret_ind; return SYMBOL; }
 {iret_ind}                      { HANDLE_COLUMN; yylval->oh.h = helper_iret_ind; return SYMBOL; }
 {dump_registers}                { HANDLE_COLUMN; yylval->oh.h = helper_dump_registers; return SYMBOL; }
 {dump_load}                     { HANDLE_COLUMN; yylval->oh.h = helper_dump_load; return SYMBOL; }
