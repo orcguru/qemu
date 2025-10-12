@@ -48,27 +48,6 @@ void helper_divb_AL(CPUX86State *env, target_ulong t0)
     env->regs[R_EAX] = (env->regs[R_EAX] & ~0xffff) | (r << 8) | q;
 }
 
-#ifdef AOT
-void __attribute__((qemuaot)) helper_A_divb_AL(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, target_ulong t0)
-{
-    unsigned int num, den, q, r;
-
-    num = (rax & 0xffff);
-    den = (t0 & 0xff);
-    if (den == 0) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    q = (num / den);
-    if (q > 0xff) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    q &= 0xff;
-    r = (num % den) & 0xff;
-    rax = (rax & ~0xffff) | (r << 8) | q;
-    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
-}
-#endif
-
 void helper_idivb_AL(CPUX86State *env, target_ulong t0)
 {
     int num, den, q, r;
@@ -86,26 +65,6 @@ void helper_idivb_AL(CPUX86State *env, target_ulong t0)
     r = (num % den) & 0xff;
     env->regs[R_EAX] = (env->regs[R_EAX] & ~0xffff) | (r << 8) | q;
 }
-
-#ifdef AOT
-void __attribute__((qemuaot)) helper_A_idivb_AL(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, target_ulong t0)
-{
-    int num, den, q, r;
-    num = (int16_t)rax;
-    den = (int8_t)t0;
-    if (den == 0) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    q = (num / den);
-    if (q != (int8_t)q) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    q &= 0xff;
-    r = (num % den) & 0xff;
-    rax = (rax & ~0xffff) | (r << 8) | q;
-    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
-}
-#endif
 
 void helper_divw_AX(CPUX86State *env, target_ulong t0)
 {
@@ -164,27 +123,6 @@ void helper_divl_EAX(CPUX86State *env, target_ulong t0)
     env->regs[R_EDX] = (uint32_t)r;
 }
 
-#ifdef AOT
-void __attribute__((qemuaot)) helper_A_divl_EAX(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, target_ulong t0)
-{
-    unsigned int den, r;
-    uint64_t num, q;
-    num = ((uint32_t)rax) | ((uint64_t)((uint32_t)rdx) << 32);
-    den = t0;
-    if (den == 0) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    q = (num / den);
-    r = (num % den);
-    if (q > 0xffffffff) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    rax = (uint32_t)q;
-    rdx = (uint32_t)r;
-    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
-}
-#endif
-
 void helper_idivl_EAX(CPUX86State *env, target_ulong t0)
 {
     int den, r;
@@ -203,28 +141,6 @@ void helper_idivl_EAX(CPUX86State *env, target_ulong t0)
     env->regs[R_EAX] = (uint32_t)q;
     env->regs[R_EDX] = (uint32_t)r;
 }
-
-#ifdef AOT
-void __attribute__((qemuaot)) helper_A_idivl_EAX(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, target_ulong t0)
-{
-    int den, r;
-    int64_t num, q;
-
-    num = ((uint32_t)rax) | ((uint64_t)((uint32_t)rdx) << 32);
-    den = t0;
-    if (den == 0) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    q = (num / den);
-    r = (num % den);
-    if (q != (int32_t)q) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    rax = (uint32_t)q;
-    rdx = (uint32_t)r;
-    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
-}
-#endif
 
 /* bcd */
 
@@ -464,24 +380,6 @@ void helper_divq_EAX(CPUX86State *env, target_ulong t0)
     env->regs[R_EDX] = r1;
 }
 
-#ifdef AOT
-void __attribute__((qemuaot,flatten)) helper_A_divq_EAX(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, target_ulong t0)
-{
-    uint64_t r0, r1;
-    if (t0 == 0) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    r0 = rax;
-    r1 = rdx;
-    if (div64(&r0, &r1, t0)) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    rax = r0;
-    rdx = r1;
-    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
-}
-#endif
-
 void helper_idivq_EAX(CPUX86State *env, target_ulong t0)
 {
     uint64_t r0, r1;
@@ -497,25 +395,6 @@ void helper_idivq_EAX(CPUX86State *env, target_ulong t0)
     env->regs[R_EAX] = r0;
     env->regs[R_EDX] = r1;
 }
-
-#ifdef AOT
-void __attribute__((qemuaot,flatten)) helper_A_idivq_EAX(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long lr, target_ulong t0)
-{
-    uint64_t r0, r1;
-
-    if (t0 == 0) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    r0 = rax;
-    r1 = rdx;
-    if (idiv64(&r0, &r1, t0)) {
-        return raise_exception_ra_A(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, EXCP00_DIVZ, GETPC());
-    }
-    rax = r0;
-    rdx = r1;
-    return helper_A_return(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, lr);
-}
-#endif
 #endif
 
 #if TARGET_LONG_BITS == 32
