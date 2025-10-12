@@ -64,4 +64,6 @@ typedef struct helper_func {
   uint64_t addr;
 } helper_func_t;
 
+typedef unsigned long __attribute__((__vector_size__(16))) v2long;
+
 #endif /* TCG_AOT_H */
