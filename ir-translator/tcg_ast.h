@@ -1159,6 +1159,8 @@ typedef enum {
     X(helper_dump_load) \
     X(helper_dump_store) \
     X(helper_dump_registers) \
+    X(helper_jit) \
+    X(jmp_ind_callback) \
     X(HELPER_MAX)
 
 typedef enum {
