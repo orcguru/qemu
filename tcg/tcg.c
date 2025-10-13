@@ -7370,3 +7370,15 @@ void tcg_expand_vec_op(TCGOpcode o, TCGType t, unsigned e, TCGArg a0, ...)
     g_assert_not_reached();
 }
 #endif
+
+#ifdef AOT
+#include "tcg/tcg-aot.h"
+helper_func_t helper_funcs[2000];
+size_t helper_funcs_count = 0;
+void register_for_aot_helper(const char *name, uint64_t addr)
+{
+    helper_funcs[helper_funcs_count].name = name;
+    helper_funcs[helper_funcs_count].addr = addr;
+    helper_funcs_count += 1;
+}
+#endif

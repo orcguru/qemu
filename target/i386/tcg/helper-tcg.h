@@ -22,6 +22,10 @@
 
 #include "qemu/host-utils.h"
 
+#ifdef AOT
+#define REG_EXT(R, E)  ((R & 0xffffffff00000000UL) | (E & 0x00000000ffffffffUL))
+#endif
+
 /* Maximum instruction code size */
 #define TARGET_MAX_INSN_SIZE 16
 
