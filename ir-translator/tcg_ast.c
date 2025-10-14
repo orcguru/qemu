@@ -548,6 +548,10 @@ static LLVMBasicBlockRef get_bb(const char *name) {
     return NULL;
 }
 
+static const char* get_riscv64_data_layout() {
+    return "e-m:e-p:64:64-i64:64-i128:128-n64-S128";
+}
+
 static void create_module(const char *module_name) {
     context = LLVMGetGlobalContext();
     NoInlineAttr = LLVMCreateEnumAttribute(context, LLVMNoInlineAttribute, 0);
@@ -559,6 +563,9 @@ static void create_module(const char *module_name) {
     target_features_attr = LLVMCreateStringAttribute(context, attr_key, attr_key_len, attr_value, attr_value_len);
     module = LLVMModuleCreateWithNameInContext(module_name, context);
 
+    const char* data_layout_str = get_riscv64_data_layout();
+    LLVMTargetDataRef target_data = LLVMCreateTargetData(data_layout_str);
+    LLVMSetModuleDataLayout(module, target_data);
     LLVMSetTarget(module, "riscv64-unknown-linux-gnu");
 }
 
