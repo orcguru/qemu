@@ -796,7 +796,7 @@ void translate_bswap32_i64(OpCodeType opc, void *ptr) {
     CREATE_SHL(tmp1, tmp1, 8);
     CREATE_OR(operand0, tmp0, tmp1);
     CREATE_SHL(tmp1, operand0, 48);
-    CREATE_SHL(tmp0, operand0, 16);
+    CREATE_SHR(tmp0, operand0, 16);
 
     AttributeType attr = get_attribute(ptr);
     assert(attr.attr_type == SUB_ATTR_SWAP);
