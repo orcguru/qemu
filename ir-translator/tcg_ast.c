@@ -1198,6 +1198,7 @@ void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
     AttributeType attr = get_attribute(ptr);
     assert(attr.attr_type == SUB_ATTR_STORAGE);
     AttrSrcInfo a0, a1, a2;
+    (void)a0;
     GET_STORAGE_ATTR();
     assert(a2.p.storage.size == SRC16B);
     LLVMType out_type = LLVMVector2xi64;
@@ -1229,6 +1230,7 @@ void translate_qemu_ld(OpCodeType opc, void *ptr) {
     AttributeType attr = get_attribute(ptr);
     assert(attr.attr_type == SUB_ATTR_STORAGE);
     AttrSrcInfo a0, a1, a2;
+    (void)a0;
     GET_STORAGE_ATTR();
     assert(a2.p.storage.size <= SRC8B);
     LLVMType out_type = (a2.p.storage.size - SRC1B) + LLVMInt8;
@@ -1264,6 +1266,7 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
     AttributeType attr = get_attribute(ptr);
     assert(attr.attr_type == SUB_ATTR_STORAGE);
     AttrSrcInfo a0, a1, a2;
+    (void)a0;
     GET_STORAGE_ATTR();
     assert(a2.p.storage.size == SRC16B);
     LLVMType out_type = LLVMVector2xi64;
@@ -1301,6 +1304,7 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
     AttributeType attr = get_attribute(ptr);
     assert(attr.attr_type == SUB_ATTR_STORAGE);
     AttrSrcInfo a0, a1, a2;
+    (void)a0;
     GET_STORAGE_ATTR();
     assert(a2.p.storage.size <= SRC8B);
     LLVMType out_type = (a2.p.storage.size - SRC1B) + LLVMInt8;
@@ -1937,7 +1941,6 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     if (!intrinsic_func) {
         intrinsic_func = LLVMAddFunction(module, "llvm.vector.insert.nxv1i64.v2i64", intrinsic_func_type2);
     }
-    OperandType param_in_env;
     for (int i = FIXED_PARAM_COUNT; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
         uint64_t env_xmm_offset = get_xmm_offset((i - FIXED_PARAM_COUNT)/2) + 16 * ((i - FIXED_PARAM_COUNT) % 2);
         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xmm_offset, 0);
@@ -2187,7 +2190,6 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
     HelperType h = get_helper(ptr);
-    uint8_t env_idx = get_env_idx(ptr);
     char *second_half_name = "jmp_ind_callback";
     uint32_t is_imm = 0;
     OperandType operand = get_operand(ptr, 0, &is_imm);
@@ -2350,10 +2352,10 @@ void translate_call(OpCodeType opc, void *ptr) {
         all_alias = 0;
     }
     uint8_t second_half_disabled = is_tail_call(h);
-    char helper_func_name[64] = {0};
+    char helper_func_name[256] = {0};
     char bc_name[256] = {0};
     if (all_alias) {
-        char element[128];
+        char element[256];
         sprintf(element, " -DFUNC_RET=%s -DHELPER_NAME=helper_%s_%s", second_half_name, helper_str[h], second_half_name);
         strcat(build_macro, element);
         sprintf(bc_name, "helper_templates/helper_%s_%s.bc", helper_str[h], second_half_name);
@@ -3330,7 +3332,7 @@ void parse_tcg_instructions(const char *filename) {
         return;
     }
 
-    TcgContext ctx = {0};
+    TcgContext ctx;
     yyscan_t scanner;
     yylex_init(&scanner);
     yyset_in(source_file, scanner);

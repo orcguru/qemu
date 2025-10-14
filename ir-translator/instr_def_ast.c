@@ -15,8 +15,8 @@ static uint32_t fields_next_capacity = 512;
 static uint32_t fields_capacity = 0;
 static uint32_t fields_idx = 0;
 static uint32_t *fields_is_not_slot = NULL;
-static char **fields_type_list = NULL;
-static char **fields_name_list = NULL;
+static const char **fields_type_list = NULL;
+static const char **fields_name_list = NULL;
 static uint32_t *instr_def_field_offset = NULL;
 static uint32_t *instr_def_field_cnt = NULL;
 static OpCodeType *instr_def_default_opc = NULL;
@@ -31,16 +31,16 @@ static uint8_t *instr_def_with_noargs = NULL;
 static uint8_t instr_noargs_info = 0;
 static uint8_t *instr_def_with_label = NULL;
 static uint8_t instr_label_info = 0;
-static char **instr_def = NULL;
+static const char **instr_def = NULL;
 static uint32_t instr_def_idx = 0;
 static uint32_t last_fields_idx = 0;
 
 static void get_more_space() {
     fields_is_not_slot = reallocarray(fields_is_not_slot, fields_next_capacity, sizeof(uint32_t));
     assert(fields_is_not_slot);
-    fields_type_list = reallocarray(fields_type_list, fields_next_capacity, sizeof(char *));
+    fields_type_list = reallocarray(fields_type_list, fields_next_capacity, sizeof(const char *));
     assert(fields_type_list);
-    fields_name_list = reallocarray(fields_name_list, fields_next_capacity, sizeof(char *));
+    fields_name_list = reallocarray(fields_name_list, fields_next_capacity, sizeof(const char *));
     assert(fields_name_list);
     instr_def_field_offset = reallocarray(instr_def_field_offset, fields_next_capacity, sizeof(uint32_t));
     assert(instr_def_field_offset);
@@ -58,7 +58,7 @@ static void get_more_space() {
     assert(instr_def_with_noargs);
     instr_def_with_label = reallocarray(instr_def_with_label, fields_next_capacity, sizeof(OpCodeType));
     assert(instr_def_with_label);
-    instr_def = reallocarray(instr_def, fields_next_capacity, sizeof(char *));
+    instr_def = reallocarray(instr_def, fields_next_capacity, sizeof(const char *));
     assert(instr_def);
     fields_capacity = fields_next_capacity;
     fields_next_capacity *= 2;
@@ -143,7 +143,7 @@ void gen_api() {
     printf("    switch (iptr->instr_type_ext) {\n");
 
     for (uint32_t j = 0; j < instr_def_idx; ++j) {
-    char *instr = instr_def[j];
+    const char *instr = instr_def[j];
     printf("    case %s_ext:\n", instr);
     printf("    %s *i_%s = (%s *)ptr;\n", instr, instr, instr);
     uint32_t s_idx = 0;
@@ -197,7 +197,7 @@ void gen_api() {
     printf("    switch (iptr->instr_type_ext) {\n");
 
     for (uint32_t j = 0; j < instr_def_idx; ++j) {
-    char *instr = instr_def[j];
+    const char *instr = instr_def[j];
     printf("    case %s_ext:\n", instr);
     printf("    ptr += sizeof(%s);\n", instr);
     printf("    break;\n");
@@ -218,7 +218,7 @@ void gen_api() {
     printf("    switch (iptr->instr_type_ext) {\n");
 
     for (uint32_t j = 0; j < instr_def_idx; ++j) {
-        char *instr = instr_def[j];
+        const char *instr = instr_def[j];
         printf("    case %s_ext:\n", instr);
         if (instr_def_default_opc[j] != -1) {
             printf("    return %d;\n", instr_def_default_opc[j]);
@@ -240,7 +240,7 @@ void gen_api() {
     printf("    switch (iptr->instr_type_ext) {\n");
 
     for (uint32_t j = 0; j < instr_def_idx; ++j) {
-        char *instr = instr_def[j];
+        const char *instr = instr_def[j];
         printf("    case %s_ext:\n", instr);
         if (instr_def_with_helper[j] == 0) {
             printf("    assert(0);\n");
@@ -266,7 +266,7 @@ void gen_api() {
     printf("    switch (iptr->instr_type_ext) {\n");
 
     for (uint32_t j = 0; j < instr_def_idx; ++j) {
-        char *instr = instr_def[j];
+        const char *instr = instr_def[j];
         printf("    case %s_ext:\n", instr);
         if (instr_def_with_ves[j] == 0) {
             printf("    assert(0);\n");
@@ -289,7 +289,7 @@ void gen_api() {
     printf("    switch (iptr->instr_type_ext) {\n");
 
     for (uint32_t j = 0; j < instr_def_idx; ++j) {
-        char *instr = instr_def[j];
+        const char *instr = instr_def[j];
         printf("    case %s_ext:\n", instr);
         if (instr_def_with_relop[j] == 0) {
             printf("    assert(0);\n");
@@ -312,7 +312,7 @@ void gen_api() {
     printf("    switch (iptr->instr_type_ext) {\n");
 
     for (uint32_t j = 0; j < instr_def_idx; ++j) {
-        char *instr = instr_def[j];
+        const char *instr = instr_def[j];
         printf("    case %s_ext:\n", instr);
         if (instr_def_with_helper[j] == 0) {
             printf("    assert(0);\n");
@@ -337,7 +337,7 @@ void gen_api() {
     printf("    switch (iptr->instr_type_ext) {\n");
 
     for (uint32_t j = 0; j < instr_def_idx; ++j) {
-        char *instr = instr_def[j];
+        const char *instr = instr_def[j];
         printf("    case %s_ext:\n", instr);
         if (instr_def_with_label[j] == 0) {
             printf("    assert(0);\n");
@@ -381,12 +381,12 @@ void gen_api() {
     printf("    switch (iptr->instr_type_ext) {\n");
 
     for (uint32_t j = 0; j < instr_def_idx; ++j) {
-        char *instr = instr_def[j];
+        const char *instr = instr_def[j];
         printf("    case %s_ext:\n", instr);
         if (instr_def_with_ves[j] == 0) {
             printf("    return 0;\n");
         } else {
-            printf("    return 1;\n", instr);
+            printf("    return 1;\n");
         }
     }
 
@@ -404,7 +404,7 @@ void gen_api() {
     printf("    switch (iptr->instr_type_ext) {\n");
 
     for (uint32_t j = 0; j < instr_def_idx; ++j) {
-        char *instr = instr_def[j];
+        const char *instr = instr_def[j];
         char *env = strstr(instr, "_ENV");
         if (env) {
             printf("    case %s_ext:\n", instr);
