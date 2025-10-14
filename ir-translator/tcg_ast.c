@@ -360,6 +360,7 @@ static GHashTable *current_helper_aux_info = NULL;
 
 static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, OperandType out);
 static LLVMValueRef get_env_ptr_raw();
+static void set_env_ptr_raw(LLVMValueRef env_stack);
 static OperandType get_env_ptr(OpCodeType opc);
 static OperandType get_shadow_stack_pointer(OpCodeType opc);
 static void set_shadow_stack_pointer(OpCodeType opc, OperandType val);
@@ -606,6 +607,19 @@ static LLVMValueRef get_env_ptr_raw() {
     const char *constraint_string = "=r";
     LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_function_type, asm_string, constraint_string, /* has_side_effects */ 1, /* is_align_stack */ 0);
     return LLVMBuildCall2(builder, asm_function_type, inline_asm, NULL, 0, get_next_var_name());
+}
+
+static void set_env_ptr_raw(LLVMValueRef env_stack) {
+    LLVMTypeRef asm_param_types[] = { llvm_int_types[OPC_ADDR_T] };
+    LLVMTypeRef asm_function_type = LLVMFunctionType(LLVMVoidType(), asm_param_types, 1, 0);
+    //FIXME: handle AArch64 as well
+    char asm_string[128];
+    sprintf(asm_string, "mv x25, $0");
+    const char *constraint_string = "r,~{x25}";
+    LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_function_type, asm_string, constraint_string, /* has_side_effects */ 1, /* is_align_stack */ 0);
+    LLVMValueRef call_args[] = { env_stack };
+    LLVMBuildCall2(builder, asm_function_type, inline_asm, call_args, 1, "");
+    return;
 }
 
 static OperandType get_env_ptr(OpCodeType opc) {
@@ -1872,7 +1886,6 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     if (param_cnt) {
         for (int i = 0; i < param_cnt; ++i) {
             if (i == env_idx) {
-                LLVMValueRef env_raw = get_env_ptr_raw();
                 LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
                 call_args[idx_with_env] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
                 idx_with_env += 1;
@@ -1886,7 +1899,6 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
             } else if (is_imm[i] == 0 && operands[i].s.valid && operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[i])) {
                 OperandType alias = get_alias(operands[i]);
                 assert(alias.s.valid);
-                LLVMValueRef env_raw = get_env_ptr_raw();
                 uint64_t xmm_offset = get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset;
                 LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
                 call_args[idx_with_env] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
@@ -1899,7 +1911,6 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     } else {
         if (env_idx != 0xff) {
             assert(env_idx == 0);
-            LLVMValueRef env_raw = get_env_ptr_raw();
             LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
             call_args[idx_with_env] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
             idx_with_env += 1;
@@ -1909,6 +1920,12 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
     LLVMValueRef helper_addr = LLVMGetParam(trampoline, (FIXED_VECTOR_PARAM_COUNT + (param_cnt - reuse_cnt)));
     LLVMValueRef the_helper = LLVMBuildIntToPtr(builder, helper_addr, LLVMPointerType(helper_type, 0), get_next_var_name());
+    LLVMValueRef env_alloca = NULL;
+    if (do_return) {
+        env_alloca = LLVMBuildAlloca(builder, llvm_int_types[OPC_ADDR_T], "env_alloca");
+        LLVMSetAlignment(env_alloca, 8);
+        LLVMBuildStore(builder, env_raw, env_alloca);
+    }
     LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, the_helper, call_args, idx_with_env, with_ret ? get_next_var_name() : "");
     if (!do_return) {
         LLVMSetTailCall(call_helper_inst, 1);
@@ -1917,6 +1934,9 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         assert(last_active_bb);
         LLVMPositionBuilderAtEnd(builder, last_active_bb);
         return trampoline;
+    } else {
+        env_raw = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], env_alloca, get_next_var_name());
+        set_env_ptr_raw(env_raw);
     }
 
     // Load all fixed from ENV
