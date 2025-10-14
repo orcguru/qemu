@@ -549,7 +549,7 @@ static LLVMBasicBlockRef get_bb(const char *name) {
 }
 
 static const char* get_riscv64_data_layout() {
-    return "e-m:e-p:64:64-i64:64-i128:128-n64-S128";
+    return "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128";
 }
 
 static void create_module(const char *module_name) {
