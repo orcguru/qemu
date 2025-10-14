@@ -2351,7 +2351,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     }
     uint8_t second_half_disabled = is_tail_call(h);
     char helper_func_name[64] = {0};
-    char bc_name[64] = {0};
+    char bc_name[256] = {0};
     if (all_alias) {
         char element[128];
         sprintf(element, " -DFUNC_RET=%s -DHELPER_NAME=helper_%s_%s", second_half_name, helper_str[h], second_half_name);
