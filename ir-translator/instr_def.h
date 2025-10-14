@@ -121,15 +121,15 @@ typedef struct __attribute__((packed)) {
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :5;
     uint64_t imm;
-    uint8_t relop           :6;
-    uint8_t label           :2;
+    uint16_t relop          :6;
+    uint16_t label          :8;
 } Instr1B21;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
     uint16_t opc            :8;
-    uint16_t label          :2;
+    uint16_t label          :8;
 } Instr1B2;
 
 typedef struct __attribute__((packed)) {

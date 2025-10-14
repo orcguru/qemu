@@ -1349,37 +1349,7 @@ void translate_ret(OpCodeType opc, void *ptr) {
     CREATE_BRCOND(loc610, 0, ne, new_label);
 
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT];
-    for (int i = 0; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
-        if (fixed_vector_param_in_stack[i]) {
-            OperandType param_in_stack;
-            if (i < FIXED_PARAM_COUNT) {
-                param_in_stack.s.valid = 1;
-                param_in_stack.s.slot_type = SUB_SLOT_XREG;
-                param_in_stack.s.slot_idx = i;
-                call_args[i] = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
-            } else {
-                param_in_stack.s.valid = 1;
-                param_in_stack.s.slot_type = SUB_SLOT_XMM;
-                param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
-                param_in_stack.s.offset = 0;
-                LLVMValueRef vec = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
-
-                LLVMTypeRef ret_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
-                LLVMTypeRef param_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
-                LLVMTypeRef intrinsic_types[] = {ret_type, param_type, LLVMInt64Type()};
-                LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 3, 0);
-                LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, "llvm.vector.insert.nxv1i64.v2i64");
-                if (!intrinsic_func) {
-                    intrinsic_func = LLVMAddFunction(module, "llvm.vector.insert.nxv1i64.v2i64", intrinsic_func_type);
-                }
-                LLVMValueRef index_0 = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
-                LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(ret_type), vec, index_0};
-                call_args[i] = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, intrinsic_call_args, 3, get_next_var_name());
-            }
-        } else {
-            call_args[i] = LLVMGetParam(llvm_func, i);
-        }
-    }
+    collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, NULL, NULL, 0);
     LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0);
     LLVMValueRef ret_target = get_source_node_imm_or_stack(opc, 0, loc608, OPC_ADDR_T);
     LLVMValueRef ret_target_ptr = LLVMBuildIntToPtr(builder, ret_target, LLVMPointerType(func_type, 0), get_next_var_name());
@@ -2627,7 +2597,7 @@ static void setup_func_stack() {
                 LLVMSetAlignment(alloca_inst, 8);
                 func_xreg_alloca[x] = alloca_inst;
                 func_xreg_llvmtype[x] = fixed_vector_param_llvmtypes[x];
-                LLVMSetAlignment(LLVMBuildStore(builder, LLVMGetParam(llvm_func, x), alloca_inst), 8);
+                LLVMBuildStore(builder, LLVMGetParam(llvm_func, x), alloca_inst);
                 fixed_vector_param_in_stack[x] = 1;
             }
         }
