@@ -2530,6 +2530,29 @@ void translate_call(OpCodeType opc, void *ptr) {
         assert(!noargs);
     }
 
+    // Reload tmp_shadow_offset[this call][non-zero offset] contents
+    shadow_pointer = NULL;
+    for (int i = 0; i < (1<<5); ++i) {
+        if (tmp_shadow_offset[i]) {
+            OperandType op;
+            op.s.valid = 1;
+            op.s.slot_type = SUB_SLOT_TMP;
+            op.s.slot_idx = i;
+            LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
+            if (!shadow_pointer) {
+                LLVMValueRef env_raw = get_env_ptr_raw();
+                LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
+                LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
+                shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name());
+            }
+            LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name());
+            LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name());
+            LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name());
+            LLVMBuildStore(builder, val, get_stack_alloca(op));
+        }
+    }
+
     // Start from the one after ptr
     for (void *ptr_tmp = move_to_next(ptr); ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
         OpCodeType opc = get_opcode(ptr_tmp);
