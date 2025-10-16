@@ -316,7 +316,7 @@ static const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 static const char *xmm_tmp_stack_names[2] = {NULL};
 #endif
 static const char *tmp_stack_names[1<<5] = {NULL};
-static const char *ir_var_name[('z'-'a'+1)*(('z'-'a'+1)+('Z'-'A'+1))] = {NULL};
+static const char *ir_var_name[('z'-'a'+1)*(('z'-'a'+1)+('Z'-'A'+1)+('9'-'0'+1))] = {NULL};
 static int ir_var_name_idx = 0;
 static LLVMTypeRef llvm_int_types[LLVMMAXType] = {NULL};
 static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
@@ -2295,36 +2295,20 @@ void translate_call(OpCodeType opc, void *ptr) {
             op.s.valid = 1;
             op.s.slot_type = SUB_SLOT_TMP;
             op.s.slot_idx = i;
-            LLVMValueRef val = NULL;
-            if (has_alias(op)) {
-                OperandType alias = get_alias(op);
-                assert(alias.s.valid);
-                if (alias.s.slot_type == SUB_SLOT_XMM) {
+            if (!has_alias(op)) {
+                LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_tmp_llvmtype[i]);
+                LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
+                if (!shadow_pointer) {
                     LLVMValueRef env_raw = get_env_ptr_raw();
-                    uint64_t xmm_offset = get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset;
-                    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
-                    val = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
-                } else if (alias.s.slot_type == SUB_SLOT_ENV) {
-                    LLVMValueRef env_raw = get_env_ptr_raw();
-                    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], alias.s.offset, 0);
-                    val = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
-                } else {
-                    assert(0);
+                    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
+                    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                    LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
+                    shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name());
                 }
-            } else {
-                val = get_source_node_imm_or_stack(opc, 0, op, func_tmp_llvmtype[i]);
+                LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name());
+                LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name());
+                LLVMBuildStore(builder, val, shadow_p);
             }
-            LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
-            if (!shadow_pointer) {
-                LLVMValueRef env_raw = get_env_ptr_raw();
-                LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
-                LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
-                LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
-                shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name());
-            }
-            LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name());
-            LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name());
-            LLVMBuildStore(builder, val, shadow_p);
         }
     }
 
@@ -2538,18 +2522,20 @@ void translate_call(OpCodeType opc, void *ptr) {
             op.s.valid = 1;
             op.s.slot_type = SUB_SLOT_TMP;
             op.s.slot_idx = i;
-            LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
-            if (!shadow_pointer) {
-                LLVMValueRef env_raw = get_env_ptr_raw();
-                LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
-                LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
-                LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
-                shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name());
+            if (!has_alias(op)) {
+                LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
+                if (!shadow_pointer) {
+                    LLVMValueRef env_raw = get_env_ptr_raw();
+                    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
+                    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name());
+                    LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name());
+                    shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name());
+                }
+                LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name());
+                LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name());
+                LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name());
+                LLVMBuildStore(builder, val, get_stack_alloca(op));
             }
-            LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name());
-            LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name());
-            LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name());
-            LLVMBuildStore(builder, val, get_stack_alloca(op));
         }
     }
 
@@ -2786,6 +2772,7 @@ void handle_func(uint64_t val) {
                 if (operand.s.slot_type == SUB_SLOT_TMP) {
                     if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
                         if (!tmp_has_known_def[operand.s.slot_idx]) {
+                            // At this stage, we do not have alias information yet, so we need to check later
                             assert(prev_call_ptr);
                             uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(prev_call_ptr);
                             if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
@@ -3249,17 +3236,24 @@ void module_prolog() {
         snprintf(tmp_name_buf[i], sizeof(tmp_name_buf[i]), "tmp%d.stack", i);
         tmp_stack_names[i] = tmp_name_buf[i];
     }
-    static char ir_var_name_buffer[('z'-'a'+1)*(('z'-'a'+1)+('Z'-'A'+1))][3];
+    static char ir_var_name_buffer[('z'-'a'+1)*(('z'-'a'+1)+('Z'-'A'+1)+('9'-'0'+1))][3];
     for (char c1 = 'a'; c1 <= 'z'; ++c1) {
         for (char c2 = 'a'; c2 <= 'z'; ++c2) {
-            int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1)) + (c2 - 'a');
+            int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + (c2 - 'a');
             ir_var_name_buffer[idx][0] = c1;
             ir_var_name_buffer[idx][1] = c2;
             ir_var_name_buffer[idx][2] = 0;
             ir_var_name[idx] = ir_var_name_buffer[idx];
         }
         for (char c2 = 'A'; c2 <= 'Z'; ++c2) {
-            int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1)) + ('z' - 'a' + 1) + (c2 - 'A');
+            int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + ('z' - 'a' + 1) + (c2 - 'A');
+            ir_var_name_buffer[idx][0] = c1;
+            ir_var_name_buffer[idx][1] = c2;
+            ir_var_name_buffer[idx][2] = 0;
+            ir_var_name[idx] = ir_var_name_buffer[idx];
+        }
+        for (char c2 = '0'; c2 <= '9'; ++c2) {
+            int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + ('z' - 'a' + 1) + ('Z' - 'A' + 1) + (c2 - '0');
             ir_var_name_buffer[idx][0] = c1;
             ir_var_name_buffer[idx][1] = c2;
             ir_var_name_buffer[idx][2] = 0;
