@@ -3529,20 +3529,6 @@ static void tcg_target_qemu_prologue(TCGContext *s)
 #define CONTEXT_CC_SRC    TCG_REG_X0
 #define CONTEXT_CC_DST    TCG_REG_X1
 #define CONTEXT_CC_OP     TCG_REG_X2
-#define CONTEXT_PARAM0    TCG_REG_X3
-
-#define CALL_KERNEL_NO_RET                                                         \
-    tcg_out_insn(&s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, helper >> 0, 0);      \
-    tcg_out_insn(&s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, helper >> 16, 16);    \
-    tcg_out_insn(&s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, helper >> 32, 32);    \
-    tcg_out_insn(&s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, helper >> 48, 48);    \
-    tcg_out_insn(&s, 3207, BR, TCG_REG_TMP0);                                      \
-    inst_count += 5;
-
-#define PAD_TAIL_BLOCK                        \
-    for (; inst_count < 70; ++inst_count) {   \
-      tcg_out32(&s, 0xd4200000);               \
-    }
 
 static void tcg_target_qemu_aot_prologue(TCGContext *s)
 {
@@ -3653,36 +3639,6 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_insn(s, 3314, LDP, TCG_REG_FP, TCG_REG_LR,
                  TCG_REG_SP, PUSH_SIZE, 0, 1);
     tcg_out_insn(s, 3207, RET, TCG_REG_LR);
-}
-
-static void tcg_setup_syscall_trampoline(uint64_t trampoline_addr, uint64_t helper)
-{
-    TCGContext s;
-    s.code_ptr = (tcg_insn_unit *)trampoline_addr;
-    int inst_count = 0;
-
-    tcg_out_insn(&s, 3314, STP, CONTEXT_RAX, CONTEXT_RCX, TCG_AREG0, 0, 0, 0);
-    tcg_out_insn(&s, 3314, STP, CONTEXT_RDX, CONTEXT_RBX, TCG_AREG0, 16, 0, 0);
-    tcg_out_insn(&s, 3314, STP, CONTEXT_RSP, CONTEXT_RBP, TCG_AREG0, 32, 0, 0);
-    tcg_out_insn(&s, 3314, STP, CONTEXT_RSI, CONTEXT_RDI, TCG_AREG0, 48, 0, 0);
-    tcg_out_insn(&s, 3314, STP, CONTEXT_R8, CONTEXT_R9, TCG_AREG0, 64, 0, 0);
-    tcg_out_insn(&s, 3314, STP, CONTEXT_R10, CONTEXT_R11, TCG_AREG0, 80, 0, 0);
-    tcg_out_insn(&s, 3314, STP, CONTEXT_R12, CONTEXT_R13, TCG_AREG0, 96, 0, 0);
-    tcg_out_insn(&s, 3314, STP, CONTEXT_R14, CONTEXT_R15, TCG_AREG0, 112, 0, 0);
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_CC_SRC, TCG_AREG0, (16*8 + 24));
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_CC_DST, TCG_AREG0, (16*8 + 16));
-    tcg_out_st(&s, TCG_TYPE_I32, CONTEXT_CC_OP, TCG_AREG0, (16*8 + 40));
-    tcg_out_st(&s, TCG_TYPE_I64, TCG_REG_X5, TCG_AREG0, (16*8));
-    inst_count += 12;
-
-    tcg_out_mov(&s, TCG_TYPE_REG, TCG_REG_X0, TCG_AREG0);
-    tcg_out_mov(&s, TCG_TYPE_REG, TCG_REG_LR, TCG_REG_X3);
-    tcg_out_mov(&s, TCG_TYPE_REG, TCG_REG_X1, TCG_REG_X4);
-    inst_count += 3;
-
-    CALL_KERNEL_NO_RET
-
-    PAD_TAIL_BLOCK
 }
 #endif
 

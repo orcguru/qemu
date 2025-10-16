@@ -3162,19 +3162,6 @@ void tcg_register_jit(const void *buf, size_t buf_size)
 #define CONTEXT_CC_DST    TCG_REG_T0
 #define CONTEXT_CC_OP     TCG_REG_T1
 
-#define CALL_KERNEL_NO_RET                                                         \
-    tcg_out_opc_jump(&s, OPC_JAL, TCG_REG_T2, 12);                                 \
-    tcg_out32(&s, (helper & 0xffffffff));                                          \
-    tcg_out32(&s, ((helper >> 32) & 0xffffffff));                                  \
-    tcg_out_ld(&s, TCG_TYPE_I64, TCG_REG_T2, TCG_REG_T2, 0);                       \
-    tcg_out_opc_imm(&s, OPC_JALR, TCG_REG_ZERO, TCG_REG_T2, 0);                    \
-    inst_count += 5;
-
-#define PAD_TAIL_BLOCK                        \
-    for (; inst_count < 70; ++inst_count) {   \
-      tcg_out32(&s, 0x00000063);               \
-    }
-
 static void tcg_target_qemu_aot_prologue(TCGContext *s)
 {
     int i;
@@ -3232,42 +3219,5 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
 
     tcg_out_opc_imm(s, OPC_ADDI, TCG_REG_SP, TCG_REG_SP, FRAME_SIZE);
     tcg_out_opc_imm(s, OPC_JALR, TCG_REG_ZERO, TCG_REG_RA, 0);
-}
-
-static void tcg_setup_syscall_trampoline(uint64_t trampoline_addr, uint64_t helper)
-{
-    TCGContext s;
-    s.code_ptr = (tcg_insn_unit *)trampoline_addr;
-    int inst_count = 0;
-
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_RAX, TCG_AREG0, 0);  // rax
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_RCX, TCG_AREG0, 1 * 8);   // rcx
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_RDX, TCG_AREG0, 2 * 8);   // rdx
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_RBX, TCG_AREG0, 3 * 8);   // rbx
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_RSP, TCG_AREG0, 4 * 8);   // rsp
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_RBP, TCG_AREG0, 5 * 8);   // rbp
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_RSI, TCG_AREG0, 6 * 8);   // rsi
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_RDI, TCG_AREG0, 7 * 8);   // rdi
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_R8, TCG_AREG0, 8 * 8);   // r8
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_R9, TCG_AREG0, 9 * 8);  // r9
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_R10, TCG_AREG0, 10 * 8);  // r10
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_R11, TCG_AREG0, 11 * 8);  // r11
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_R12, TCG_AREG0, 12 * 8);  // r12
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_R13, TCG_AREG0, 13 * 8);  // r13
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_R14, TCG_AREG0, 14 * 8);  // r14
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_R15, TCG_AREG0, 15 * 8);  // r15
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_CC_SRC, TCG_AREG0, 19 * 8);  // cc_src
-    tcg_out_st(&s, TCG_TYPE_I64, CONTEXT_CC_DST, TCG_AREG0, 18 * 8);  // cc_dst
-    tcg_out_st(&s, TCG_TYPE_I32, CONTEXT_CC_OP, TCG_AREG0, 21 * 8);  // cc_op
-    tcg_out_st(&s, TCG_TYPE_I64, TCG_REG_A2, TCG_AREG0, (16*8));
-    inst_count += 20;
-
-    tcg_out_mov(&s, TCG_TYPE_REG, TCG_REG_RA, TCG_REG_A0);
-    tcg_out_mov(&s, TCG_TYPE_REG, TCG_REG_A0, TCG_AREG0);
-    inst_count += 2;
-
-    CALL_KERNEL_NO_RET
-
-    PAD_TAIL_BLOCK
 }
 #endif

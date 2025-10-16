@@ -68,7 +68,6 @@ static void tcg_target_init(TCGContext *s);
 static void tcg_target_qemu_prologue(TCGContext *s);
 #ifdef AOT
 static void tcg_target_qemu_aot_prologue(TCGContext *s);
-static void tcg_setup_syscall_trampoline(uint64_t trampoline_addr, uint64_t helper);
 #endif
 static bool patch_reloc(tcg_insn_unit *code_ptr, int type,
                         intptr_t value, intptr_t addend);
@@ -1863,28 +1862,10 @@ static void tcg_context_init(unsigned max_threads)
     tcg_env = temp_tcgv_ptr(ts);
 }
 
-#ifdef AOT
-#define HELPER_BASE_ADDR    0x600010000UL
-#define SINGLE_HELPER_SIZE  280
-#define HELPER_SIZE         (16 * SINGLE_HELPER_SIZE)
-
-extern void helper_syscall(void);
-
-static void tcg_aot_trampoline_init()
-{
-    uint64_t helper_trampoline_root = (uintptr_t)mmap((void *)HELPER_BASE_ADDR, HELPER_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANONYMOUS|MAP_FIXED|MAP_PRIVATE, -1, 0);
-    assert(helper_trampoline_root == HELPER_BASE_ADDR);
-    tcg_setup_syscall_trampoline(helper_trampoline_root, (uint64_t)helper_syscall);
-}
-#endif
-
 void tcg_init(size_t tb_size, int splitwx, unsigned max_threads)
 {
     tcg_context_init(max_threads);
     tcg_region_init(tb_size, splitwx, max_threads);
-#ifdef AOT
-    tcg_aot_trampoline_init();
-#endif
 }
 
 /*
