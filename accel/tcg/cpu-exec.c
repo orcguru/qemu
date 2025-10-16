@@ -435,7 +435,7 @@ cpu_tb_exec(CPUState *cpu, TranslationBlock *itb, int *tb_exit)
     }
 
     qemu_thread_jit_execute();
-    ret = tcg_qemu_tb_exec(cpu_env(cpu), tb_ptr);
+    ret = tcg_qemu_tb_exec(cpu_env(cpu), tb_ptr, 0);
     cpu->neg.can_do_io = true;
     qemu_plugin_disable_mem_helpers(cpu);
     /*
@@ -947,7 +947,7 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
 #ifdef AOT
             uint64_t entry = tb_aot_lookup_host_addr(s.pc);
             assert(entry);
-            tcg_qemu_aot_exec(cpu_env(cpu), (void *)entry, s.pc);
+            tcg_qemu_aot_exec(cpu_env(cpu), (void *)entry, (void *)s.pc);
 #else
             tb = tb_lookup(cpu, s);
             if (tb == NULL) {
