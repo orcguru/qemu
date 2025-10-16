@@ -231,6 +231,13 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
     return g_hash_table_lookup_qemuaot(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, (unsigned long)tb_ctx.aot_htable, target_addr, jmp_ind_callback, trampoline_helper_jit);
 }
 
+void register_for_aot_helper(const char *name, uint64_t addr);
+void register_for_aot_helper_jmp_ind(void) __attribute__((weak,constructor));
+void register_for_aot_helper_jmp_ind()
+{
+    register_for_aot_helper("helper_jmp_ind", (uint64_t)helper_jmp_ind);
+}
+
 #define MAX_PID                 4194304
 int last_dump_valid[MAX_PID+1] = {0};
 CPUX86State **last_env = NULL;
