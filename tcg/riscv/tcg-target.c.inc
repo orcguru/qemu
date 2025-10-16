@@ -3161,6 +3161,7 @@ void tcg_register_jit(const void *buf, size_t buf_size)
 #define CONTEXT_CC_SRC    TCG_REG_A5
 #define CONTEXT_CC_DST    TCG_REG_T0
 #define CONTEXT_CC_OP     TCG_REG_T1
+#define CONTEXT_RIP       TCG_REG_A0
 
 static void tcg_target_qemu_aot_prologue(TCGContext *s)
 {
@@ -3183,6 +3184,7 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     /* Call generated code */
     tcg_out_mov(s, TCG_TYPE_PTR, TCG_AREG0, tcg_target_call_iarg_regs[0]);
     tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_RA, tcg_target_call_iarg_regs[1]);
+    tcg_out_mov(s, TCG_TYPE_PTR, CONTEXT_RIP, tcg_target_call_iarg_regs[2]);
 
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RAX, TCG_AREG0, 0);  // rax
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RCX, TCG_AREG0, 1 * 8);   // rcx
@@ -3203,6 +3205,37 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_SRC, TCG_AREG0, 19 * 8);  // cc_src
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_DST, TCG_AREG0, 18 * 8);  // cc_dst
     tcg_out_ld(s, TCG_TYPE_I32, CONTEXT_CC_OP, TCG_AREG0, 21 * 8);  // cc_op
+    // Vectors
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V2, TCG_AREG0, 0x360 + 0*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V3, TCG_AREG0, 0x360 + 1*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V4, TCG_AREG0, 0x360 + 2*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V5, TCG_AREG0, 0x360 + 3*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V6, TCG_AREG0, 0x360 + 4*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V7, TCG_AREG0, 0x360 + 5*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V8, TCG_AREG0, 0x360 + 6*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V9, TCG_AREG0, 0x360 + 7*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V10, TCG_AREG0, 0x360 + 8*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V11, TCG_AREG0, 0x360 + 9*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V12, TCG_AREG0, 0x360 + 10*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V13, TCG_AREG0, 0x360 + 11*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V14, TCG_AREG0, 0x360 + 12*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V15, TCG_AREG0, 0x360 + 13*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V16, TCG_AREG0, 0x360 + 14*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V17, TCG_AREG0, 0x360 + 15*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V18, TCG_AREG0, 0x360 + 16*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V19, TCG_AREG0, 0x360 + 17*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V20, TCG_AREG0, 0x360 + 18*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V21, TCG_AREG0, 0x360 + 19*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V22, TCG_AREG0, 0x360 + 20*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V23, TCG_AREG0, 0x360 + 21*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V24, TCG_AREG0, 0x360 + 22*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V25, TCG_AREG0, 0x360 + 23*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V26, TCG_AREG0, 0x360 + 24*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V27, TCG_AREG0, 0x360 + 25*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V28, TCG_AREG0, 0x360 + 26*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V29, TCG_AREG0, 0x360 + 27*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V30, TCG_AREG0, 0x360 + 28*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V31, TCG_AREG0, 0x360 + 29*16);
 
     tcg_out_opc_imm(s, OPC_JALR, TCG_REG_ZERO, TCG_REG_RA, 0);
 

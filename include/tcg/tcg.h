@@ -966,7 +966,7 @@ static inline size_t tcg_current_code_size(TCGContext *s)
 #ifdef CONFIG_TCG_INTERPRETER
 uintptr_t tcg_qemu_tb_exec(CPUArchState *env, const void *tb_ptr);
 #else
-typedef uintptr_t tcg_prologue_fn(CPUArchState *env, const void *tb_ptr);
+typedef uintptr_t tcg_prologue_fn(CPUArchState *env, const void *tb_ptr, const void *rip);
 extern tcg_prologue_fn *tcg_qemu_tb_exec;
 #endif
 
