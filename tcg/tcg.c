@@ -7358,8 +7358,18 @@ helper_func_t helper_funcs[2000];
 size_t helper_funcs_count = 0;
 void register_for_aot_helper(const char *name, uint64_t addr)
 {
-    helper_funcs[helper_funcs_count].name = name;
-    helper_funcs[helper_funcs_count].addr = addr;
-    helper_funcs_count += 1;
+    int found = 0;
+    for (int i = 0; i < helper_funcs_count; ++i) {
+        if (strcmp(name, helper_funcs[i].name) == 0) {
+            found = 1;
+            break;
+        }
+    }
+    if (!found) {
+        assert(helper_funcs_count < 2000);
+        helper_funcs[helper_funcs_count].name = name;
+        helper_funcs[helper_funcs_count].addr = addr;
+        helper_funcs_count += 1;
+    }
 }
 #endif
