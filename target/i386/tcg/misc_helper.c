@@ -249,6 +249,17 @@ void register_for_aot_helper_jit()
     register_for_aot_helper("helper_jit", (uint64_t)helper_jit);
 }
 
+void helper_iret_ind(CPUX86State *env)
+{
+    assert(0);
+}
+
+void register_for_aot_helper_iret_ind(void) __attribute__((weak,constructor));
+void register_for_aot_helper_iret_ind()
+{
+    register_for_aot_helper("helper_iret_ind", (uint64_t)helper_iret_ind);
+}
+
 #define MAX_PID                 4194304
 int last_dump_valid[MAX_PID+1] = {0};
 CPUX86State **last_env = NULL;
