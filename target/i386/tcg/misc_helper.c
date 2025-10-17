@@ -267,7 +267,7 @@ uintptr_t last_shadow_stack = 0;
 const char *x64_reg_name[16] = {"RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15"};
 unsigned long dump_cnt = 0;
 
-void helper_dump_registers(CPUX86State *env)
+void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
 {
     uint64_t *shadow_stack_pointer_ptr = (uint64_t *)((unsigned long)env - 8);
     uint64_t shadow_stack_pointer_lower_bound = *(uint64_t *)((unsigned long)env - 16);
@@ -285,13 +285,53 @@ void helper_dump_registers(CPUX86State *env)
         last_env[pid] = (CPUX86State *)calloc(sizeof(CPUX86State), 1);
         assert(last_env[pid]);
     }
+#define DUMP_FULL_REGISTERS         \
+    do {                            \
+        qemu_log_mask(LOG_AOT, "pid=%d FUNC=%lx RIP=%016lx RAX=%016lx RCX=%016lx RDX=%016lx RBX=%016lx RSP=%016lx RBP=%016lx RSI=%016lx RDI=%016lx R8=%016lx R9=%016lx R10=%016lx R11=%016lx R12=%016lx R13=%016lx R14=%016lx R15=%016lx CC_SRC=%016lx CC_DST=%016lx CC_OP=%08x CC_SRC2=%016lx"   \
+                     " XMM0=%016lx-%016lx YMM0_H=%016lx-%016lx"   \
+                     " XMM1=%016lx-%016lx YMM1_H=%016lx-%016lx"   \
+                     " XMM2=%016lx-%016lx YMM2_H=%016lx-%016lx"   \
+                     " XMM3=%016lx-%016lx YMM3_H=%016lx-%016lx"   \
+                     " XMM4=%016lx-%016lx YMM4_H=%016lx-%016lx"   \
+                     " XMM5=%016lx-%016lx YMM5_H=%016lx-%016lx"   \
+                     " XMM6=%016lx-%016lx YMM6_H=%016lx-%016lx"   \
+                     " XMM7=%016lx-%016lx YMM7_H=%016lx-%016lx"   \
+                     " XMM8=%016lx-%016lx YMM8_H=%016lx-%016lx"   \
+                     " XMM9=%016lx-%016lx YMM9_H=%016lx-%016lx"   \
+                     " XMM10=%016lx-%016lx YMM10_H=%016lx-%016lx"   \
+                     " XMM11=%016lx-%016lx YMM11_H=%016lx-%016lx"   \
+                     " XMM12=%016lx-%016lx YMM12_H=%016lx-%016lx"   \
+                     " XMM13=%016lx-%016lx YMM13_H=%016lx-%016lx"   \
+                     " XMM14=%016lx-%016lx YMM14_H=%016lx-%016lx"   \
+                     " XMM15=%016lx-%016lx YMM15_H=%016lx-%016lx"   \
+                     " SS=%016lx\n",   \
+                     pid, func_offset, env->eip, env->regs[0], env->regs[1], env->regs[2], env->regs[3], env->regs[4], env->regs[5], env->regs[6], env->regs[7], env->regs[8], env->regs[9], env->regs[10], env->regs[11], env->regs[12], env->regs[13], env->regs[14], env->regs[15], env->cc_src, env->cc_dst, env->cc_op, env->cc_src2,   \
+                     env->xmm_regs[0]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[0]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[0]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[0]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[1]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[1]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[1]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[1]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[2]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[2]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[2]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[2]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[3]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[3]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[3]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[3]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[4]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[4]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[4]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[4]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[5]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[5]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[5]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[5]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[6]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[6]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[6]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[6]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[7]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[7]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[7]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[7]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[8]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[8]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[8]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[8]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[9]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[9]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[9]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[9]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[10]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[10]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[10]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[10]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[11]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[11]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[11]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[11]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[12]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[12]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[12]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[12]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[13]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[13]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[13]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[13]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[14]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[14]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[14]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[14]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     env->xmm_regs[15]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[15]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[15]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[15]._x_ZMMReg[1]._q_XMMReg[1],   \
+                     shadow_stack_pointer_ptr[0]);                    \
+    } while (0)
+
     if (last_dump_valid[pid] != 0x55aa) {
-        qemu_log_mask(LOG_AOT, "pid=%d RIP=%016lx RAX=%016lx RCX=%016lx RDX=%016lx RBX=%016lx RSP=%016lx RBP=%016lx RSI=%016lx RDI=%016lx R8=%016lx R9=%016lx R10=%016lx R11=%016lx R12=%016lx R13=%016lx R14=%016lx R15=%016lx CC_SRC=%016lx CC_DST=%016lx CC_OP=%08x CC_SRC2=%016lx XMM0=%016lx-%016lx XMM1=%016lx-%016lx XMM2=%016lx-%016lx XMM3=%016lx-%016lx XMM4=%016lx-%016lx XMM5=%016lx-%016lx XMM6=%016lx-%016lx XMM7=%016lx-%016lx XMM8=%016lx-%016lx XMM9=%016lx-%016lx XMM10=%016lx-%016lx SS=%016lx\n", pid, env->eip, env->regs[0], env->regs[1], env->regs[2], env->regs[3], env->regs[4], env->regs[5], env->regs[6], env->regs[7], env->regs[8], env->regs[9], env->regs[10], env->regs[11], env->regs[12], env->regs[13], env->regs[14], env->regs[15], env->cc_src, env->cc_dst, env->cc_op, env->cc_src2, env->xmm_regs[0]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[0]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[1]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[1]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[2]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[2]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[3]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[3]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[4]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[4]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[5]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[5]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[6]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[6]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[7]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[7]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[8]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[8]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[9]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[9]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[10]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[10]._x_ZMMReg[0]._q_XMMReg[1], shadow_stack_pointer_ptr[0]);
+        DUMP_FULL_REGISTERS;
         last_dump_valid[pid] = 0x55aa;
     } else {
         char *msg_buffer = (char *)calloc(4096, 1);
         assert(msg_buffer);
-        sprintf(msg_buffer, "pid=%d .RIP=%016lx", pid, env->eip);
+        sprintf(msg_buffer, "pid=%d FUNC=%lx .RIP=%016lx", pid, func_offset, env->eip);
         for (int i = 0; i <= 15; ++i) {
             if (env->regs[i] != last_env[pid]->regs[i]) {
                 char buf[128] = {0};
@@ -319,11 +359,17 @@ void helper_dump_registers(CPUX86State *env)
             sprintf(buf, " CC_SRC2=%016lx", env->cc_src2);
             strcat(msg_buffer, buf);
         }
-        for (int i = 0; i <= 10; ++i) {
+        for (int i = 0; i <= 15; ++i) {
             if (env->xmm_regs[i]._x_ZMMReg[0]._q_XMMReg[0] != last_env[pid]->xmm_regs[i]._x_ZMMReg[0]._q_XMMReg[0] ||
                 env->xmm_regs[i]._x_ZMMReg[0]._q_XMMReg[1] != last_env[pid]->xmm_regs[i]._x_ZMMReg[0]._q_XMMReg[1]) {
                 char buf[128] = {0};
                 sprintf(buf, " X%d=%016lx-%016lx", i, env->xmm_regs[i]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[i]._x_ZMMReg[0]._q_XMMReg[1]);
+                strcat(msg_buffer, buf);
+            }
+            if (env->xmm_regs[i]._x_ZMMReg[1]._q_XMMReg[0] != last_env[pid]->xmm_regs[i]._x_ZMMReg[1]._q_XMMReg[0] ||
+                env->xmm_regs[i]._x_ZMMReg[1]._q_XMMReg[1] != last_env[pid]->xmm_regs[i]._x_ZMMReg[1]._q_XMMReg[1]) {
+                char buf[128] = {0};
+                sprintf(buf, " Y%d_H=%016lx-%016lx", i, env->xmm_regs[i]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[i]._x_ZMMReg[1]._q_XMMReg[1]);
                 strcat(msg_buffer, buf);
             }
         }
@@ -336,7 +382,7 @@ void helper_dump_registers(CPUX86State *env)
         qemu_log_mask(LOG_AOT, "%s", msg_buffer);
         free(msg_buffer);
         if (dump_cnt % 10000 == 0) {
-            qemu_log_mask(LOG_AOT, "pid=%d RIP=%016lx RAX=%016lx RCX=%016lx RDX=%016lx RBX=%016lx RSP=%016lx RBP=%016lx RSI=%016lx RDI=%016lx R8=%016lx R9=%016lx R10=%016lx R11=%016lx R12=%016lx R13=%016lx R14=%016lx R15=%016lx CC_SRC=%016lx CC_DST=%016lx CC_OP=%08x CC_SRC2=%016lx XMM0=%016lx-%016lx XMM1=%016lx-%016lx XMM2=%016lx-%016lx XMM3=%016lx-%016lx XMM4=%016lx-%016lx XMM5=%016lx-%016lx XMM6=%016lx-%016lx XMM7=%016lx-%016lx XMM8=%016lx-%016lx XMM9=%016lx-%016lx XMM10=%016lx-%016lx SS=%016lx\n", pid, env->eip, env->regs[0], env->regs[1], env->regs[2], env->regs[3], env->regs[4], env->regs[5], env->regs[6], env->regs[7], env->regs[8], env->regs[9], env->regs[10], env->regs[11], env->regs[12], env->regs[13], env->regs[14], env->regs[15], env->cc_src, env->cc_dst, env->cc_op, env->cc_src2, env->xmm_regs[0]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[0]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[1]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[1]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[2]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[2]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[3]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[3]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[4]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[4]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[5]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[5]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[6]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[6]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[7]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[7]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[8]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[8]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[9]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[9]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[10]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[10]._x_ZMMReg[0]._q_XMMReg[1], shadow_stack_pointer_ptr[0]);
+            DUMP_FULL_REGISTERS;
         }
     }
     memcpy(last_env[pid], env, sizeof(CPUX86State));

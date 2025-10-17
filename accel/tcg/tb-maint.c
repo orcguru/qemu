@@ -987,7 +987,7 @@ uint64_t tb_aot_lookup_host_addr(uint64_t target_addr)
 
 void tb_aot_insert(uint64_t target_addr, uint64_t host_addr)
 {
-    qemu_log_mask(LOG_AOT, "%s %lx %016lx\n", __FUNCTION__, target_addr, host_addr);
+    //qemu_log_mask(LOG_AOT, "%s %lx %016lx\n", __FUNCTION__, target_addr, host_addr);
     // First check (lock-free)
     if (!g_hash_table_contains(tb_ctx.aot_htable, (gconstpointer)target_addr) || !tb_aot_lookup_host_addr(target_addr)) {
         qemu_mutex_lock(&tb_ctx.aot_lock);
