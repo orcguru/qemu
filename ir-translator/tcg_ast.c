@@ -3310,6 +3310,8 @@ void module_prolog() {
     assert(current_active_label_info);
     current_helper_aux_info = g_hash_table_new(NULL, NULL);
     assert(current_helper_aux_info);
+
+    helper_str[helper_memset] = "memset";
 }
 
 void module_epilog() {
@@ -3403,7 +3405,7 @@ int main(int argc, const char *argv[]) {
     }
     const char* features = "+m,+a,+f,+d,+v";
     target_machine = LLVMCreateTargetMachine(target, default_triple, "generic", features,
-                                             LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelDefault);
+                                             LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelLarge);
 
     module_prolog();
     parse_tcg_instructions(argv[1]);
