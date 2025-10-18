@@ -328,7 +328,6 @@ bswap32_i32                     bswap32_i32
 bswap32_i64                     bswap32_i64
 bswap64_i64                     bswap64_i64
 call                            call
-call_direct                     call_direct
 cc_compute_all                  cc_compute_all
 cc_compute_c                    cc_compute_c
 cc_compute_nz                   cc_compute_nz
@@ -1617,7 +1616,6 @@ xsetbv                          xsetbv
 {set_label}     { HANDLE_COLUMN; yylval->oh.o = set_label; return SETLABL; }
 {brcond_i64}    { HANDLE_COLUMN; yylval->oh.o = brcond_i64; return BRCOND; }
 {jmp_direct}    { HANDLE_COLUMN; yylval->oh.o = jmp_direct; return JMPDIR; }
-{call_direct}   { HANDLE_COLUMN; yylval->oh.o = call_direct; return CALLDIR; }
 {discard}       { HANDLE_COLUMN; yylval->oh.o = discard; return DISCARD; }
 {call}          { HANDLE_COLUMN; yylval->oh.o = call; return CALL; }
 {rotl_i32}      { HANDLE_COLUMN; yylval->oh.o = rotl_i32; return SYMBOL; }

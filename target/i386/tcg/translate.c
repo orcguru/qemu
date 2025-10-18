@@ -2383,7 +2383,8 @@ gen_eob(DisasContext *s, int mode)
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
             tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
-            tcg_gen_call_direct(s->rip_at_exit, s->eip_next_tl_val, s->eip_next_pc);
+            tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
+            tcg_gen_jmp_direct(s->rip_at_exit);
         } else {
             assert(0);
         }
@@ -2434,7 +2435,8 @@ gen_eob(DisasContext *s, int mode)
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
             tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
-            tcg_gen_call_direct(s->rip_at_exit, s->eip_next_tl_val, s->eip_next_pc);
+            tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
+            tcg_gen_jmp_direct(s->rip_at_exit);
         } else if (s->base.jmp_type == TR_IS_IRET) {
             // FIXME
             gen_helper_iret_ind(tcg_env);

@@ -215,22 +215,6 @@
         translate_set_label(tmp_opc.o, buf);  \
     } while (0)
 
-#define CREATE_PUSH_RET_ADDR(OP, RET)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.o = push_ret_addr;     \
-    create_scalar_slot_imm(buf, tmp_opc, OP, RET);  \
-    translate_push_ret_addr(tmp_opc.o, buf);    \
-    } while (0)
-
-#define CREATE_JMP_DIRECT(ADDR)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        create_jmpdirect(buf, ADDR);        \
-        translate_jmp_direct(jmp_direct, buf);  \
-    } while (0)
-
 #define CREATE_BRCOND(SLOT, I, ROP, LABEL)           \
     do {                                            \
         uint8_t buf[16];                            \
@@ -436,7 +420,7 @@ static void set_helper_out_type(void *ptr, LLVMType type);
     } while (0)
 
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc) {
-    if (opc == jmp_direct || opc == call_direct || opc == call) {
+    if (opc == jmp_direct || opc == call) {
         return 1;
     }
     return 0;
@@ -1762,22 +1746,6 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
     LLVMSetTailCall(call_inst, 1);
     LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
     LLVMBuildRetVoid(builder);
-}
-
-void translate_call_direct(OpCodeType opc, void *ptr) {
-#ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
-#endif
-    uint32_t is_imm0, is_imm1, is_imm2;
-    OperandType operand0, ret_delta_hex, call_delta_hex;
-    operand0 = get_operand(ptr, 0, &is_imm0);
-    assert(!is_imm0 && operand0.s.valid);
-    ret_delta_hex = get_operand(ptr, 1, &is_imm1);
-    call_delta_hex = get_operand(ptr, 2, &is_imm2);
-    assert(is_imm1 && is_imm2);
-
-    CREATE_PUSH_RET_ADDR(operand0, ret_delta_hex.i);
-    CREATE_JMP_DIRECT(call_delta_hex.i);
 }
 
 void translate_discard(OpCodeType opc, void *ptr) {
@@ -3169,9 +3137,6 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
         break;
     case jmp_direct:
         translate_jmp_direct(opc, ptr);
-        break;
-    case call_direct:
-        translate_call_direct(opc, ptr);
         break;
     case discard:
         translate_discard(opc, ptr);

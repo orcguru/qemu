@@ -6951,7 +6951,6 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
 
         switch (opc) {
 #ifdef AOT_IR
-        case INDEX_op_call_direct:
         case INDEX_op_jmp_direct:
         case INDEX_op_push_ret_addr:
         case INDEX_op_ret:

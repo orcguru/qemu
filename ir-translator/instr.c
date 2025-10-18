@@ -1194,7 +1194,6 @@ LLVMType opciosz[OPCODE_MAX][3] = {
     [bswap32_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [bswap32_i64] = {LLVMInt64, LLVMInt32, LLVMInt64},
     [bswap64_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
-    [call_direct] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [clz_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [clz_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [cmpsel_vec] = {LLVMVector16xi8, LLVMVector16xi8, LLVMVector16xi8},

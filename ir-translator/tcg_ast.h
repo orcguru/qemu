@@ -1197,7 +1197,6 @@ typedef enum {
     X(bswap32_i64)       \
     X(bswap64_i64)       \
     X(call)              \
-    X(call_direct)       \
     X(clz_i32)           \
     X(clz_i64)           \
     X(cmpsel_vec)        \
@@ -1747,7 +1746,6 @@ void translate_bswap64_i64(OpCodeType opc, void *ptr);
 void translate_set_label(OpCodeType opc, void *ptr);
 void translate_brcond_i64(OpCodeType opc, void *ptr);
 void translate_jmp_direct(OpCodeType opc, void *ptr);
-void translate_call_direct(OpCodeType opc, void *ptr);
 void translate_discard(OpCodeType opc, void *ptr);
 void translate_tail_call(OpCodeType opc, void *ptr);
 void translate_dump_call(OpCodeType opc, void *ptr, uint32_t is_dump_registers);

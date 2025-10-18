@@ -570,7 +570,6 @@ static inline void tcg_gen_trunc_ptr_i32(TCGv_i32 r, TCGv_ptr a)
 }
 
 #ifdef AOT_IR
-void tcg_gen_call_direct(unsigned long call_tgt, TCGv_i64 ret, unsigned long ret_tgt);
 void tcg_gen_jmp_direct(unsigned long tgt);
 void tcg_gen_push_ret_addr(TCGv_i64 x64_next_eip, unsigned long tgt);
 void tcg_gen_ret(TCGv_i64 ret_x64_addr);
