@@ -495,7 +495,7 @@ static LLVMValueRef get_stack_alloca(OperandType operand) {
 
 static OperandType get_tmp_and_do_alloc_with_init(LLVMType type, uint64_t val) {
     OperandType tmp = get_tmp_and_do_alloc(type);
-    LLVMValueRef constant = LLVMConstInt(llvm_int_types[type], 0x00ff00ff, 0);
+    LLVMValueRef constant = LLVMConstInt(llvm_int_types[type], val, 0);
     LLVMBuildStore(builder, constant, get_stack_alloca(tmp));
     return tmp;
 }
