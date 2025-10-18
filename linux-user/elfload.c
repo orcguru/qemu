@@ -3335,7 +3335,7 @@ static bool parse_elf_properties(const ImageSource *src,
 
 #ifdef AOT
 #include "tcg/tcg-aot.h"
-extern void *invoke_jitlink(const char *, uint64_t, uint64_t, void (*)(uint64_t, uint64_t), void *, size_t, int);
+extern void *invoke_jitlink(const char *, uint64_t, uint64_t, void (*)(uint64_t, uint64_t), void (*)(const char *, uint64_t), void *, size_t, int);
 extern helper_func_t helper_funcs[];
 extern size_t helper_funcs_count;
 extern int enable_llvm_debug;
@@ -3355,7 +3355,7 @@ static void load_aot_image(const char *image_name, struct image_info *info)
       perror("Failed fstat image_name\n");
       return;
     }
-    invoke_jitlink((const char *)aotnamebuf, info->start_code, (info->start_code + st.st_size), tb_aot_insert, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug);
+    invoke_jitlink((const char *)aotnamebuf, info->start_code, (info->start_code + st.st_size), tb_aot_insert, tb_aot_log, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug);
 }
 #endif
 

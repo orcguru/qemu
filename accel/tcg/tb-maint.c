@@ -1016,6 +1016,12 @@ void tb_aot_insert(uint64_t target_addr, uint64_t host_addr)
         qemu_mutex_unlock(&tb_ctx.aot_lock);
     }
 }
+
+void tb_aot_log(const char *name, uint64_t host_addr)
+{
+    qemu_log_mask(LOG_AOT, "%s %s %016lx\n", __FUNCTION__, name, host_addr);
+}
+
 #endif
 
 /*
