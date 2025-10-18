@@ -1373,6 +1373,8 @@ void translate_ret(OpCodeType opc, void *ptr) {
     LLVMValueRef ret_target_ptr = LLVMBuildIntToPtr(builder, ret_target, LLVMPointerType(func_type, 0), get_next_var_name());
     LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, ret_target_ptr, call_args, FIXED_VECTOR_PARAM_COUNT, "");
     LLVMSetTailCall(call_inst, 1);
+    LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
+    LLVMBuildRetVoid(builder);
 
     CREATE_LABEL(new_label);
 }
