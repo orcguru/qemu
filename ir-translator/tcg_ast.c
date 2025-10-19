@@ -3372,7 +3372,7 @@ int main(int argc, const char *argv[]) {
     }
     const char* features = "+m,+a,+f,+d,+v";
     target_machine = LLVMCreateTargetMachine(target, default_triple, "generic", features,
-                                             LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelLarge);
+                                             LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelDefault);
 
     module_prolog();
     parse_tcg_instructions(argv[1]);
