@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <glib.h>
 
-#define VERBOSE_VAR                   1
+//#define VERBOSE_VAR                   1
 //#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
@@ -301,7 +301,7 @@ static const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 static const char *xmm_tmp_stack_names[2] = {NULL};
 #endif
 static const char *tmp_stack_names[1<<5] = {NULL};
-static const char *ir_var_name[('z'-'a'+1)*(('z'-'a'+1)+('Z'-'A'+1)+('9'-'0'+1))] = {NULL};
+static const char *ir_var_name[(('z'-'a'+1)+('Z'-'A'+1))*(('z'-'a'+1)+('Z'-'A'+1)+('9'-'0'+1))] = {NULL};
 static int ir_var_name_idx = 0;
 static LLVMTypeRef llvm_int_types[LLVMMAXType] = {NULL};
 static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
@@ -319,6 +319,8 @@ static uint32_t br_count = 0;
 static uint64_t current_func_offset = 0;
 static uint8_t current_call_idx = 0;
 static uint32_t shadow_call_offset = 16;
+static void *call_accumulated[BB_MAX_CNT] = {NULL};
+static int call_accumulated_cnt = 0;
 static uint8_t xmmt_valid[2] = {0};
 static uint32_t xreg_valid = 0, tmp_valid = 0, xmm_valid = 0;
 static LLVMType tmp_bits_type[1<<5] = {0};
@@ -2454,9 +2456,12 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
     } while (1);
 
+    // Do register current call before process more calls
+    call_accumulated[call_accumulated_cnt++] = ptr;
+
     if (second_half_disabled || second_half_already_exists) {
 #ifdef DEBUG
-    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+        printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
         return;
     }
@@ -2495,27 +2500,31 @@ void translate_call(OpCodeType opc, void *ptr) {
 
     // Reload tmp_shadow_offset[this call][non-zero offset] contents
     shadow_pointer = NULL;
-    for (int i = 0; i < (1<<5); ++i) {
-        if (tmp_shadow_offset[i]) {
-            OperandType op;
-            op.s.valid = 1;
-            op.s.slot_type = SUB_SLOT_TMP;
-            op.s.slot_idx = i;
-            if (!has_alias(op)) {
-                LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
-                if (!shadow_pointer) {
-                    LLVMValueRef env_raw = get_env_ptr_raw();
-                    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
-                    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc]));
-                    LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc]));
-                    shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc]));
+    for (int c = 0; c < call_accumulated_cnt; ++c) {
+        assert(call_accumulated[c]);
+        tmp_shadow_offset = get_helper_tmp_shadow_offset(call_accumulated[c]);
+        for (int i = 0; i < (1<<5); ++i) {
+            if (tmp_shadow_offset[i]) {
+                OperandType op;
+                op.s.valid = 1;
+                op.s.slot_type = SUB_SLOT_TMP;
+                op.s.slot_idx = i;
+                if (!has_alias(op)) {
+                    LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
+                    if (!shadow_pointer) {
+                        LLVMValueRef env_raw = get_env_ptr_raw();
+                        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
+                        LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc]));
+                        LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc]));
+                        shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc]));
+                    }
+                    char var_name[128] = {0};
+                    sprintf(var_name, "cross_call_reload_tmp_%d_offset_%d", i, tmp_shadow_offset[i]);
+                    LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name(var_name));
+                    LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name(opcode_type_str[opc]));
+                    LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name(opcode_type_str[opc]));
+                    LLVMBuildStore(builder, val, get_stack_alloca(op));
                 }
-                char var_name[128] = {0};
-                sprintf(var_name, "cross_call_reload_tmp_%d_offset_%d", i, tmp_shadow_offset[i]);
-                LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name(var_name));
-                LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name(opcode_type_str[opc]));
-                LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name(opcode_type_str[opc]));
-                LLVMBuildStore(builder, val, get_stack_alloca(op));
             }
         }
     }
@@ -2575,6 +2584,8 @@ static void cleanup_func_resource() {
     xreg_valid = 0;
     tmp_valid = 0;
     xmm_valid = 0;
+    call_accumulated_cnt = 0;
+    memset(call_accumulated, 0, sizeof(call_accumulated));
     memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
     memset(tmp_bits_type, 0, sizeof(tmp_bits_type));
     reset_tmp_mapping();
@@ -2692,6 +2703,8 @@ void handle_func(uint64_t val) {
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint8_t tmp_has_known_def[1<<5] = {0};
     void *prev_call_ptr = NULL;
+    uint8_t tmp_def_valid[1<<5] = {0};
+    void *tmp_def_call_ptr[1<<5] = {NULL};
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
         uint32_t slot_idx = 0;
         OperandType operand;
@@ -2715,6 +2728,7 @@ void handle_func(uint64_t val) {
         if (is_vec) {
           vtype = get_llvm_vector_type(ptr);
         }
+        uint8_t tmp_def_valid_on_call = 0xff;
         do {
             uint32_t is_imm = 0;
             operand = get_operand(ptr, slot_idx, &is_imm);
@@ -2754,17 +2768,24 @@ void handle_func(uint64_t val) {
                     if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
                         if (!tmp_has_known_def[operand.s.slot_idx]) {
                             // At this stage, we do not have alias information yet, so we need to check later
-                            assert(prev_call_ptr);
-                            uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(prev_call_ptr);
+                            assert(tmp_def_call_ptr[operand.s.slot_idx]);
+#ifdef DEBUG
+                            printf("  register cross_call for ptr:%lx tmp:%d\n", tmp_def_call_ptr[operand.s.slot_idx], operand.s.slot_idx); fflush(NULL);
+#endif
+                            uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(tmp_def_call_ptr[operand.s.slot_idx]);
                             if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
                                 tmp_shadow_offset[operand.s.slot_idx] = shadow_call_offset;
-                                LLVMType t = func_tmp_llvmtype[operand.s.slot_idx];
-                                shadow_call_offset += (llvm_vector_elem_bit_counts[t*2] * llvm_vector_elem_bit_counts[t*2+1])/8;
+                                shadow_call_offset += 16;
                             }
                         }
                     }
                     if ((opc == call && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
                         tmp_has_known_def[operand.s.slot_idx] = 1;
+                        if (opc == call) {
+                          tmp_def_valid_on_call = operand.s.slot_idx;
+                        } else {
+                          tmp_def_valid[operand.s.slot_idx] = 1;
+                        }
                     }
                 }
             }
@@ -2778,6 +2799,15 @@ void handle_func(uint64_t val) {
             }
             current_call_idx += 1;
             assert(current_call_idx < BB_MAX_CNT);
+            for (int i = 0; i < (1<<5); ++i) {
+              if (tmp_def_valid[i]) {
+                tmp_def_call_ptr[i] = ptr;
+              }
+            }
+            memset(tmp_def_valid, 0, sizeof(tmp_def_valid));
+            if (tmp_def_valid_on_call != 0xff) {
+              tmp_def_valid[tmp_def_valid_on_call] = 1;
+            }
         }
     }
     tmp_var_available_backup = tmp_var_available;
@@ -2788,12 +2818,8 @@ void handle_func(uint64_t val) {
             if (helper_output_slot[i].s.valid && get_helper_out_type(helper_output_idx_ptr[i]) == LLVMInvalidType) {
                 assert(helper_output_slot[i].s.slot_type == SUB_SLOT_TMP);
                 assert(helper_output_idx_ptr[i]);
-                if (func_tmp_llvmtype[helper_output_slot[i].s.slot_idx] == LLVMInvalidType) {
-                    //FIXME - guess that is i64
-                    set_helper_out_type(helper_output_idx_ptr[i], LLVMInt64);
-                } else {
-                    set_helper_out_type(helper_output_idx_ptr[i], func_tmp_llvmtype[helper_output_slot[i].s.slot_idx]);
-                }
+                //FIXME - guess that is i64
+                set_helper_out_type(helper_output_idx_ptr[i], LLVMInt64);
                 helper_output_slot[i].s.valid = 0;
             }
         }
@@ -2849,6 +2875,7 @@ void handle_func(uint64_t val) {
 
 static void handle_single_instr(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
+  /*
     printf("handle_single_instr: %s ptr:%lx", opcode_type_str[opc], ptr); fflush(NULL);
     void *next = move_to_next(ptr);
     unsigned char *byte = (unsigned char *)ptr;
@@ -2857,6 +2884,7 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
         byte += 1;
     }
     printf("\n"); fflush(NULL);
+    */
 #endif
     switch (opc) {
     case addc1o_i32:
@@ -3214,7 +3242,7 @@ void module_prolog() {
         snprintf(tmp_name_buf[i], sizeof(tmp_name_buf[i]), "tmp%d.stack", i);
         tmp_stack_names[i] = tmp_name_buf[i];
     }
-    static char ir_var_name_buffer[('z'-'a'+1)*(('z'-'a'+1)+('Z'-'A'+1)+('9'-'0'+1))][3];
+    static char ir_var_name_buffer[(('z'-'a'+1)+('Z'-'A'+1))*(('z'-'a'+1)+('Z'-'A'+1)+('9'-'0'+1))][3];
     for (char c1 = 'a'; c1 <= 'z'; ++c1) {
         for (char c2 = 'a'; c2 <= 'z'; ++c2) {
             int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + (c2 - 'a');
@@ -3232,6 +3260,29 @@ void module_prolog() {
         }
         for (char c2 = '0'; c2 <= '9'; ++c2) {
             int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + ('z' - 'a' + 1) + ('Z' - 'A' + 1) + (c2 - '0');
+            ir_var_name_buffer[idx][0] = c1;
+            ir_var_name_buffer[idx][1] = c2;
+            ir_var_name_buffer[idx][2] = 0;
+            ir_var_name[idx] = ir_var_name_buffer[idx];
+        }
+    }
+    for (char c1 = 'A'; c1 <= 'Z'; ++c1) {
+        for (char c2 = 'a'; c2 <= 'z'; ++c2) {
+            int idx = (('z' - 'a' + 1) + c1 - 'A') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + (c2 - 'a');
+            ir_var_name_buffer[idx][0] = c1;
+            ir_var_name_buffer[idx][1] = c2;
+            ir_var_name_buffer[idx][2] = 0;
+            ir_var_name[idx] = ir_var_name_buffer[idx];
+        }
+        for (char c2 = 'A'; c2 <= 'Z'; ++c2) {
+            int idx = (('z' - 'a' + 1) + c1 - 'A') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + ('z' - 'a' + 1) + (c2 - 'A');
+            ir_var_name_buffer[idx][0] = c1;
+            ir_var_name_buffer[idx][1] = c2;
+            ir_var_name_buffer[idx][2] = 0;
+            ir_var_name[idx] = ir_var_name_buffer[idx];
+        }
+        for (char c2 = '0'; c2 <= '9'; ++c2) {
+            int idx = (('z' - 'a' + 1) + c1 - 'A') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + ('z' - 'a' + 1) + ('Z' - 'A' + 1) + (c2 - '0');
             ir_var_name_buffer[idx][0] = c1;
             ir_var_name_buffer[idx][1] = c2;
             ir_var_name_buffer[idx][2] = 0;
@@ -3293,7 +3344,7 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    LLVMDumpModule(module);
+    //LLVMDumpModule(module);
 #if 1
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
