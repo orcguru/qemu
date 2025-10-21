@@ -301,7 +301,7 @@ static const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 static const char *xmm_tmp_stack_names[2] = {NULL};
 #endif
 static const char *tmp_stack_names[1<<5] = {NULL};
-static const char *ir_var_name[(('z'-'a'+1)+('Z'-'A'+1))*(('z'-'a'+1)+('Z'-'A'+1)+('9'-'0'+1))] = {NULL};
+static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)] = {NULL};
 static int ir_var_name_idx = 0;
 static LLVMTypeRef llvm_int_types[LLVMMAXType] = {NULL};
 static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
@@ -3242,51 +3242,17 @@ void module_prolog() {
         snprintf(tmp_name_buf[i], sizeof(tmp_name_buf[i]), "tmp%d.stack", i);
         tmp_stack_names[i] = tmp_name_buf[i];
     }
-    static char ir_var_name_buffer[(('z'-'a'+1)+('Z'-'A'+1))*(('z'-'a'+1)+('Z'-'A'+1)+('9'-'0'+1))][3];
+    static char ir_var_name_buffer[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)][4];
     for (char c1 = 'a'; c1 <= 'z'; ++c1) {
         for (char c2 = 'a'; c2 <= 'z'; ++c2) {
-            int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + (c2 - 'a');
-            ir_var_name_buffer[idx][0] = c1;
-            ir_var_name_buffer[idx][1] = c2;
-            ir_var_name_buffer[idx][2] = 0;
-            ir_var_name[idx] = ir_var_name_buffer[idx];
-        }
-        for (char c2 = 'A'; c2 <= 'Z'; ++c2) {
-            int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + ('z' - 'a' + 1) + (c2 - 'A');
-            ir_var_name_buffer[idx][0] = c1;
-            ir_var_name_buffer[idx][1] = c2;
-            ir_var_name_buffer[idx][2] = 0;
-            ir_var_name[idx] = ir_var_name_buffer[idx];
-        }
-        for (char c2 = '0'; c2 <= '9'; ++c2) {
-            int idx = (c1 - 'a') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + ('z' - 'a' + 1) + ('Z' - 'A' + 1) + (c2 - '0');
-            ir_var_name_buffer[idx][0] = c1;
-            ir_var_name_buffer[idx][1] = c2;
-            ir_var_name_buffer[idx][2] = 0;
-            ir_var_name[idx] = ir_var_name_buffer[idx];
-        }
-    }
-    for (char c1 = 'A'; c1 <= 'Z'; ++c1) {
-        for (char c2 = 'a'; c2 <= 'z'; ++c2) {
-            int idx = (('z' - 'a' + 1) + c1 - 'A') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + (c2 - 'a');
-            ir_var_name_buffer[idx][0] = c1;
-            ir_var_name_buffer[idx][1] = c2;
-            ir_var_name_buffer[idx][2] = 0;
-            ir_var_name[idx] = ir_var_name_buffer[idx];
-        }
-        for (char c2 = 'A'; c2 <= 'Z'; ++c2) {
-            int idx = (('z' - 'a' + 1) + c1 - 'A') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + ('z' - 'a' + 1) + (c2 - 'A');
-            ir_var_name_buffer[idx][0] = c1;
-            ir_var_name_buffer[idx][1] = c2;
-            ir_var_name_buffer[idx][2] = 0;
-            ir_var_name[idx] = ir_var_name_buffer[idx];
-        }
-        for (char c2 = '0'; c2 <= '9'; ++c2) {
-            int idx = (('z' - 'a' + 1) + c1 - 'A') * (('z' - 'a' + 1) + ('Z' - 'A' + 1) + ('9' - '0' + 1)) + ('z' - 'a' + 1) + ('Z' - 'A' + 1) + (c2 - '0');
-            ir_var_name_buffer[idx][0] = c1;
-            ir_var_name_buffer[idx][1] = c2;
-            ir_var_name_buffer[idx][2] = 0;
-            ir_var_name[idx] = ir_var_name_buffer[idx];
+            for (char c3 = 'a'; c3 <= 'z'; ++c3) {
+                int idx = (c1 - 'a') * ('z' - 'a' + 1) * ('z' - 'a' + 1) + (c2 - 'a') * ('z' - 'a' + 1) + (c3 - 'a');
+                ir_var_name_buffer[idx][0] = c1;
+                ir_var_name_buffer[idx][1] = c2;
+                ir_var_name_buffer[idx][2] = c3;
+                ir_var_name_buffer[idx][3] = 0;
+                ir_var_name[idx] = ir_var_name_buffer[idx];
+            }
         }
     }
 
