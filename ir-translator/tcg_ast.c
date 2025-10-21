@@ -318,7 +318,7 @@ static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
 static uint32_t br_count = 0;
 static uint64_t current_func_offset = 0;
 static uint8_t current_call_idx = 0;
-static uint32_t shadow_call_offset = 16;
+static int32_t shadow_call_offset = 16;
 static void *call_accumulated[BB_MAX_CNT] = {NULL};
 static int call_accumulated_cnt = 0;
 static uint8_t xmmt_valid[2] = {0};
@@ -339,7 +339,7 @@ static GHashTable *current_active_label_info = NULL;
 typedef struct helper_aux_info {
     void *ptr;
     uint8_t idx;
-    uint32_t tmp_shadow_offset[1<<5];
+    int32_t tmp_shadow_offset[1<<5];
     LLVMType helper_output_type;
     struct helper_aux_info *next;
 } helper_aux_info_t;
@@ -369,7 +369,7 @@ static uint8_t get_current_active_label_cnt(LLVMValueRef func);
 static void set_current_active_label_cnt(uint8_t current_active_label_cnt);
 static void register_idx_for_call_helper(void *ptr, uint8_t call_idx);
 static uint8_t get_idx_for_call_helper(void *ptr);
-static uint32_t *get_helper_tmp_shadow_offset(void *ptr);
+static int32_t *get_helper_tmp_shadow_offset(void *ptr);
 static LLVMType get_helper_out_type(void *ptr);
 static void set_helper_out_type(void *ptr, LLVMType type);
 
@@ -1616,8 +1616,8 @@ static uint8_t get_idx_for_call_helper(void *ptr) {
     return current_call_idx++;
 }
 
-static uint32_t *get_helper_tmp_shadow_offset(void *ptr) {
-    static uint32_t dummy_tmp_shadow_offset[1<<5] = {0};
+static int32_t *get_helper_tmp_shadow_offset(void *ptr) {
+    static int32_t dummy_tmp_shadow_offset[1<<5] = {0};
     helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, ptr);
     while (info) {
         if (info->ptr == ptr) {
@@ -2267,7 +2267,7 @@ void translate_call(OpCodeType opc, void *ptr) {
 #endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef shadow_pointer = NULL;
-    uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(ptr);
+    int32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(ptr);
     for (int i = 0; i < (1<<5); ++i) {
         if (tmp_shadow_offset[i]) {
             OperandType op;
@@ -2772,9 +2772,9 @@ void handle_func(uint64_t val) {
 #ifdef DEBUG
                             printf("  register cross_call for ptr:%lx tmp:%d\n", tmp_def_call_ptr[operand.s.slot_idx], operand.s.slot_idx); fflush(NULL);
 #endif
-                            uint32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(tmp_def_call_ptr[operand.s.slot_idx]);
+                            int32_t *tmp_shadow_offset = get_helper_tmp_shadow_offset(tmp_def_call_ptr[operand.s.slot_idx]);
                             if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
-                                tmp_shadow_offset[operand.s.slot_idx] = shadow_call_offset;
+                                tmp_shadow_offset[operand.s.slot_idx] = (0 - shadow_call_offset);
                                 shadow_call_offset += 16;
                             }
                         }
