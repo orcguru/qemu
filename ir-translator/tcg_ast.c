@@ -20,7 +20,7 @@
 #include <glib.h>
 
 //#define VERBOSE_VAR                   1
-#define DEBUG                       1
+//#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
@@ -372,6 +372,7 @@ static uint8_t get_idx_for_call_helper(void *ptr);
 static int32_t *get_helper_tmp_shadow_offset(void *ptr);
 static LLVMType get_helper_out_type(void *ptr);
 static void set_helper_out_type(void *ptr, LLVMType type);
+static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm, OperandType operand, LLVMType tidx);
 
 #define GET_2_OPERANDS()                                \
     do {                                                \
@@ -629,7 +630,8 @@ static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, Operan
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
         CREATE_ADD(tmp, env, env_var_offset[out.s.slot_idx]);
-        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, func_tmp_alloca[tmp.s.slot_idx], LLVMPointerType(val_type, 0), get_next_var_name("store_env_ptr_offset"));
+        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T);
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(val_type, 0), get_next_var_name("store_env_ptr_offset"));
         LLVMBuildStore(builder, val, ptr);
     } else {
         LLVMType out_idx = get_stack_llvmtype(out);
@@ -686,13 +688,15 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
         CREATE_ADD(tmp, env, env_var_offset[operand.s.slot_idx]);
-        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, func_tmp_alloca[tmp.s.slot_idx], LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset"));
+        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T);
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset"));
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val"));
     } else if (operand.s.slot_type == SUB_SLOT_ENV) {
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
         CREATE_ADD(tmp, env, operand.s.offset);
-        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, func_tmp_alloca[tmp.s.slot_idx], LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset"));
+        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T);
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset"));
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val"));
     } else if (operand.s.slot_type == SUB_SLOT_XMM) {
         if (operand.s.offset) {
