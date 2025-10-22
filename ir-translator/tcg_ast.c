@@ -20,7 +20,7 @@
 #include <glib.h>
 
 //#define VERBOSE_VAR                   1
-//#define DEBUG                       1
+#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
@@ -1038,13 +1038,16 @@ void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
 
     if (operand1.s.slot_type == SUB_SLOT_ENV ||
         operand1.s.slot_type == SUB_SLOT_XMM) {
-        translate_mov(opc, ptr);
+        LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T);
+        do_store(opc, val, OPC_OUTPUT_T, operand0);
     } else if (operand1.s.slot_type == SUB_SLOT_TMP) {
         assert(has_alias(operand1) && is_imm);
         OperandType alias = get_alias(operand1);
         assert(alias.s.valid && alias.s.slot_type == SUB_SLOT_XMM);
         alias.s.offset += operand2.i;
         CREATE_LD_ENV_XMM(opc, operand0, alias);
+    } else {
+        assert(0);
     }
 }
 
@@ -1057,6 +1060,26 @@ void translate_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
     GET_2_OPERANDS_NOCHECK();
 
     LLVMValueRef src = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
+    src = api(builder, src, llvm_int_types[OPC_OUTPUT_T], get_next_var_name(opcode_type_str[opc]));
+    do_store(opc, src, OPC_OUTPUT_T, operand0);
+}
+
+void translate_ld_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    OperandType operand0, operand1;
+    GET_2_OPERANDS();
+
+    if (operand1.s.slot_type == SUB_SLOT_ENV ||
+        operand1.s.slot_type == SUB_SLOT_XMM) {
+        LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T);
+        do_store(opc, val, OPC_OUTPUT_T, operand0);
+    } else {
+        assert(0);
+    }
+
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand0, OPC_INPUT_T);
     src = api(builder, src, llvm_int_types[OPC_OUTPUT_T], get_next_var_name(opcode_type_str[opc]));
     do_store(opc, src, OPC_OUTPUT_T, operand0);
 }
@@ -3048,12 +3071,14 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
         translate_ld_env_xmm(opc, ptr);
         break;
     case extu_i32_i64:
-    case ld8u_i64:
-    case ld32u_i64:
         translate_ext(opc, ptr, LLVMBuildZExt);
         break;
+    case ld8u_i64:
+    case ld32u_i64:
+        translate_ld_ext(opc, ptr, LLVMBuildZExt);
+        break;
     case ld32s_i64:
-        translate_ext(opc, ptr, LLVMBuildSExt);
+        translate_ld_ext(opc, ptr, LLVMBuildSExt);
         break;
     case movcond_i32:
     case movcond_i64:
@@ -3310,7 +3335,7 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    //LLVMDumpModule(module);
+    LLVMDumpModule(module);
 #if 1
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
