@@ -3339,7 +3339,7 @@ void module_prolog() {
 }
 
 void module_epilog() {
-    LLVMDumpModule(module);
+    //LLVMDumpModule(module);
 #if 1
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
