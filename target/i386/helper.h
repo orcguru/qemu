@@ -213,6 +213,6 @@ DEF_HELPER_1(rdrand, tl, env)
 
 #ifdef AOT
 DEF_HELPER_FLAGS_2(dump_registers, TCG_CALL_NO_RWG, void, env, tl)
-DEF_HELPER_FLAGS_2(dump_load, TCG_CALL_NO_RWG, void, tl, tl)
-DEF_HELPER_FLAGS_2(dump_store, TCG_CALL_NO_RWG, void, tl, tl)
+DEF_HELPER_FLAGS_3(dump_load, TCG_CALL_NO_RWG, void, env, tl, tl)
+DEF_HELPER_FLAGS_3(dump_store, TCG_CALL_NO_RWG, void, env, tl, tl)
 #endif

@@ -394,12 +394,12 @@ void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
     ++dump_cnt;
 }
 
-void helper_dump_load(unsigned long addr, unsigned long val)
+void helper_dump_load(CPUX86State *env, unsigned long addr, unsigned long val)
 {
     qemu_log_mask(LOG_AOT, "LOAD A:%lx V:%lx\n", addr, val);
 }
 
-void helper_dump_store(unsigned long addr, unsigned long val)
+void helper_dump_store(CPUX86State *env, unsigned long addr, unsigned long val)
 {
     qemu_log_mask(LOG_AOT, "STORE A:%lx V:%lx\n", addr, val);
 }
