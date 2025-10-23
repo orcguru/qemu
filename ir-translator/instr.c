@@ -1336,6 +1336,7 @@ LLVMType opciosz[OPCODE_MAX][3] = {
     [xor_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [xor_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [xor_vec] = {LLVMVector16xi8, LLVMVector16xi8, LLVMVector16xi8},
+    [call] = {LLVMInt64, LLVMInt64, LLVMInt64},
 };
 
 uint8_t opcoc[OPCODE_MAX] = {

@@ -58,6 +58,7 @@
             ai.p.ves = get_llvm_vector_type(ptr) - LLVMVector16xi8; \
             create_vector_slot2(buf, tmp_opc, ai, OUT, IN); \
         } else {                                    \
+            assert(OPC_OUTPUT_T != LLVMInvalidType);  \
             tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? not_i64 : not_i32;      \
             create_scalar_slot2(buf, tmp_opc, OUT, IN); \
         }                                           \
@@ -76,6 +77,7 @@
             create_vector_slot3(buf, tmp_opc, ai, OUT, IN0, IN1); \
             translate_binary(tmp_opc.o, buf, LLVMBuildAnd);     \
         } else {                                    \
+            assert(OPC_OUTPUT_T != LLVMInvalidType);  \
             tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? not_i64 : not_i32;      \
             create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
             translate_binary(tmp_opc.o, buf, LLVMBuildAnd);     \
@@ -93,6 +95,7 @@
             ai.p.ves = get_llvm_vector_type(ptr) - LLVMVector16xi8; \
             create_vector_slot2_vimm(buf, tmp_opc, ai, OUT, IN0, IN1); \
         } else {                                    \
+            assert(OPC_OUTPUT_T != LLVMInvalidType);  \
             tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? xor_i64 : xor_i32;      \
             create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
         }                               \
@@ -103,6 +106,7 @@
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
         tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;      \
         create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
         translate_binary(tmp_opc.o, buf, LLVMBuildLShr);              \
@@ -112,6 +116,7 @@
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
         tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shr_i64 : shr_i32;      \
         create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
         translate_binary(tmp_opc.o, buf, LLVMBuildLShr);              \
@@ -121,6 +126,7 @@
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
         tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;      \
         create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
         translate_binary(tmp_opc.o, buf, LLVMBuildShl);              \
@@ -130,6 +136,7 @@
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
         tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? shl_i64 : shl_i32;      \
         create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
         translate_binary(tmp_opc.o, buf, LLVMBuildShl);              \
@@ -139,6 +146,7 @@
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
         tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? or_i64 : or_i32;      \
         create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
         translate_binary(tmp_opc.o, buf, LLVMBuildOr);              \
@@ -148,6 +156,7 @@
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
         tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? deposit_i64 : deposit_i32;      \
         create_scalar_slot3_imm2(buf, tmp_opc, OUT, IN0, IN1, OFS, LEN); \
         translate_deposit(tmp_opc.o, buf);    \
@@ -157,6 +166,7 @@
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
         tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sar_i64 : sar_i32;      \
         create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
         translate_binary(tmp_opc.o, buf, LLVMBuildAShr);              \
@@ -166,6 +176,7 @@
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
         tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? add_i64 : add_i32;      \
         create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
         translate_binary(tmp_opc.o, buf, LLVMBuildAdd);  \
@@ -175,6 +186,7 @@
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
         tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? sub_i64 : sub_i32;      \
         create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
         translate_binary(tmp_opc.o, buf, LLVMBuildSub);  \
@@ -184,6 +196,7 @@
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
         tmp_opc.o = OPC_OUTPUT_T == LLVMInt64 ? mov_i64 : mov_i32;      \
         create_scalar_slot2(buf, tmp_opc, OUT, IN); \
         translate_mov(tmp_opc.o, buf);  \
