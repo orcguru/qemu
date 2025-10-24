@@ -2572,6 +2572,8 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
     const char *k_platform, *k_base_platform;
     const int n = sizeof(elf_addr_t);
 
+    envc = 0;
+
     sp = p;
 
     /* Needs to be before we load the env/argc/... */
