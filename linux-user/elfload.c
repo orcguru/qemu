@@ -2435,7 +2435,7 @@ static abi_ulong setup_arg_pages(struct linux_binprm *bprm,
     if (info->exec_stack) {
         prot |= PROT_EXEC;
     }
-    error = target_mmap(0, size + guard, prot,
+    error = target_mmap(0x3ff69fc000, size + guard, prot,
                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (error == -1) {
         perror("mmap stack");
