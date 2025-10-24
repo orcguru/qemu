@@ -52,9 +52,16 @@ typedef enum {
     /* aliases */
     TCG_AREG0          = TCG_REG_S9,
     TCG_GUEST_BASE_REG = TCG_REG_S1,
+#ifndef AOT
     TCG_REG_TMP0       = TCG_REG_T6,
     TCG_REG_TMP1       = TCG_REG_T5,
     TCG_REG_TMP2       = TCG_REG_T4,
+#else
+    // TMP0 touched in tcg_target_qemu_aot_prologue
+    TCG_REG_TMP0       = TCG_REG_T3,
+    TCG_REG_TMP1       = TCG_REG_A4,
+    TCG_REG_TMP2       = TCG_REG_A3,
+#endif
 } TCGReg;
 
 #define TCG_REG_ZERO  TCG_REG_ZERO
