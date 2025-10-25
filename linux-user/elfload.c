@@ -2444,8 +2444,13 @@ static abi_ulong setup_arg_pages(struct linux_binprm *bprm,
         prot |= PROT_EXEC;
     }
 #ifdef FIX_RSP_FOR_TRACE
-    error = target_mmap(0x7FFFFF800000, size + guard, prot,
+#if defined(__aarch64__)
+    error = target_mmap(0x3FF7000000, size + guard, prot,
                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#elif defined(__riscv) && __riscv_xlen == 64
+    error = target_mmap(0x3FF7000000, size + guard, prot,
+                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#endif
 #else
     error = target_mmap(0, size + guard, prot,
                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -3991,8 +3996,11 @@ int load_elf_binary(struct linux_binprm *bprm, struct image_info *info)
        change some of these later */
     bprm->p = setup_arg_pages(bprm, info);
 #ifdef FIX_RSP_FOR_TRACE
-    bprm->p -= 0x35F0;
-    bprm->p += 0x810;
+#if defined(__aarch64__)
+    bprm->p -= 0x960;
+#elif defined(__riscv) && __riscv_xlen == 64
+    bprm->p -= 0x960;
+#endif
 #endif
 
     scratch = g_new0(char, TARGET_PAGE_SIZE);
