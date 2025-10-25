@@ -111,6 +111,31 @@ OperandType get_mapped_slot(OperandType slot) {
     }
 }
 
+OperandType get_original_slot_for_debug(OperandType tmp) {
+    OperandType ret;
+    ret.s.valid = 0;
+    if (!(tmp.s.valid && tmp.s.slot_type == SUB_SLOT_TMP)) {
+        return ret;
+    }
+    for (int i = 0; i < sizeof(tmpl_map)/sizeof(uint8_t); ++i) {
+        if (tmpl_map[i] == tmp.s.slot_idx) {
+            ret.s.valid = 1;
+            ret.s.slot_type = SUB_SLOT_TMPL;
+            ret.s.slot_idx = i;
+            return ret;
+        }
+    }
+    for (int i = 0; i < sizeof(tmpt_map)/sizeof(uint8_t); ++i) {
+        if (tmpt_map[i] == tmp.s.slot_idx) {
+            ret.s.valid = 1;
+            ret.s.slot_type = SUB_SLOT_TMPT;
+            ret.s.slot_idx = i;
+            return ret;
+        }
+    }
+    return ret;
+}
+
 void reset_tmp_mapping() {
     memset(tmpl_map, 0xff, sizeof(tmpl_map));
     memset(tmpt_map, 0xff, sizeof(tmpt_map));

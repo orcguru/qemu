@@ -1714,6 +1714,7 @@ void module_prolog(void);
 void module_epilog(void);
 void insert_instr(void *ptr_src, size_t sz);
 uint64_t get_xmm_offset(uint64_t idx);
+OperandType get_original_slot_for_debug(OperandType tmp);
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
