@@ -334,6 +334,8 @@ typedef struct mips_elf_abiflags_v0 {
 #define AT_BASE_PLATFORM    24  /* string identifying real platforms */
 #define AT_RANDOM           25  /* address of 16 random bytes */
 #define AT_HWCAP2           26  /* extension of AT_HWCAP */
+#define AT_RSEQ_FEATURE_SIZE    27
+#define AT_RSEQ_ALIGN           28
 #define AT_EXECFN           31  /* filename of the executable */
 #define AT_SYSINFO          32  /* address of kernel entry point */
 #define AT_SYSINFO_EHDR     33  /* address of kernel vdso */
@@ -341,6 +343,7 @@ typedef struct mips_elf_abiflags_v0 {
 #define AT_L1D_CACHESHAPE   35  /*   bits 0-3: cache associativity.  */
 #define AT_L2_CACHESHAPE    36  /*   bits 4-7: log2 of line size.  */
 #define AT_L3_CACHESHAPE    37  /*   val&~255: cache size.  */
+#define AT_MINSIGSTKSZ      51
 
 typedef struct dynamic{
   Elf32_Sword d_tag;
