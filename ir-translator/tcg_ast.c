@@ -333,7 +333,6 @@ static uint64_t current_func_offset = 0;
 static uint8_t current_call_idx = 0;
 static int32_t shadow_call_offset = 16;
 static void *call_accumulated[BB_MAX_CNT] = {NULL};
-static int call_accumulated_cnt = 0;
 static uint8_t xmmt_valid[2] = {0};
 static uint32_t xreg_valid = 0, tmp_valid = 0, xmm_valid = 0;
 static LLVMType tmp_bits_type[1<<5] = {0};
@@ -2492,9 +2491,6 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
     } while (1);
 
-    // Do register current call before process more calls
-    call_accumulated[call_accumulated_cnt++] = ptr;
-
     if (second_half_disabled || second_half_already_exists) {
 #ifdef DEBUG
         printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
@@ -2536,30 +2532,27 @@ void translate_call(OpCodeType opc, void *ptr) {
 
     // Reload tmp_shadow_offset[this call][non-zero offset] contents
     shadow_pointer = NULL;
-    for (int c = 0; c < call_accumulated_cnt; ++c) {
-        assert(call_accumulated[c]);
-        for (int i = 0; i < (1<<5); ++i) {
-            if (tmp_shadow_offset[i]) {
-                OperandType op;
-                op.s.valid = 1;
-                op.s.slot_type = SUB_SLOT_TMP;
-                op.s.slot_idx = i;
-                if (!has_alias(op)) {
-                    LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
-                    if (!shadow_pointer) {
-                        LLVMValueRef env_raw = get_env_ptr_raw();
-                        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
-                        LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                        LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                        shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                    }
-                    char var_name[128] = {0};
-                    sprintf(var_name, "cross_call_reload_tmp_%d_offset_%d", i, tmp_shadow_offset[i]);
-                    LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name(var_name, dummy_slot_for_debug));
-                    LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                    LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                    LLVMBuildStore(builder, val, get_stack_alloca(op));
+    for (int i = 0; i < (1<<5); ++i) {
+        if (tmp_shadow_offset[i]) {
+            OperandType op;
+            op.s.valid = 1;
+            op.s.slot_type = SUB_SLOT_TMP;
+            op.s.slot_idx = i;
+            if (!has_alias(op)) {
+                LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
+                if (!shadow_pointer) {
+                    LLVMValueRef env_raw = get_env_ptr_raw();
+                    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
+                    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                    LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                    shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
                 }
+                char var_name[128] = {0};
+                sprintf(var_name, "cross_call_reload_tmp_%d_offset_%d", i, tmp_shadow_offset[i]);
+                LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name(var_name, dummy_slot_for_debug));
+                LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                LLVMBuildStore(builder, val, get_stack_alloca(op));
             }
         }
     }
@@ -2619,7 +2612,6 @@ static void cleanup_func_resource() {
     xreg_valid = 0;
     tmp_valid = 0;
     xmm_valid = 0;
-    call_accumulated_cnt = 0;
     memset(call_accumulated, 0, sizeof(call_accumulated));
     memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
     memset(tmp_bits_type, 0, sizeof(tmp_bits_type));
@@ -2739,10 +2731,7 @@ void handle_func(uint64_t val) {
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint8_t tmp_has_known_def[1<<5] = {0};
     void *prev_call_ptr = NULL;
-    uint8_t tmp_def_valid[1<<5] = {0};
-    void *tmp_def_call_ptr[1<<5] = {NULL};
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
-        uint32_t slot_idx = 0;
         OperandType operand;
         OpCodeType opc = get_opcode(ptr);
         uint32_t noargs = 0;
@@ -2764,7 +2753,8 @@ void handle_func(uint64_t val) {
         if (is_vec) {
           vtype = get_llvm_vector_type(ptr);
         }
-        uint8_t tmp_def_valid_on_call = 0xff;
+        // Input arguments first
+        uint32_t slot_idx = opc == call ? noargs : opcoc[opc];
         do {
             uint32_t is_imm = 0;
             operand = get_operand(ptr, slot_idx, &is_imm);
@@ -2804,9 +2794,9 @@ void handle_func(uint64_t val) {
                     if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
                         if (!tmp_has_known_def[operand.s.slot_idx]) {
                             // At this stage, we do not have alias information yet, so we need to check later
-                            assert(tmp_def_call_ptr[operand.s.slot_idx]);
 #ifdef DEBUG
-                            printf("  register cross_call for ptr:%lx tmp:%d\n", tmp_def_call_ptr[operand.s.slot_idx], operand.s.slot_idx); fflush(NULL);
+                            OperandType orig_slot = get_original_slot_for_debug(operand);
+                            printf("  register cross_call tmp:%d orig:%s%d\n", operand.s.slot_idx, orig_slot.s.valid ? (orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp") : "NA", orig_slot.s.valid ? orig_slot.s.slot_idx : 0); fflush(NULL);
 #endif
                             if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
                                 tmp_shadow_offset[operand.s.slot_idx] = (0 - shadow_call_offset);
@@ -2816,16 +2806,72 @@ void handle_func(uint64_t val) {
                     }
                     if ((opc == call && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
                         tmp_has_known_def[operand.s.slot_idx] = 1;
-                        if (opc == call) {
-                          tmp_def_valid_on_call = operand.s.slot_idx;
-                        } else {
-                          tmp_def_valid[operand.s.slot_idx] = 1;
-                        }
                     }
                 }
             }
             slot_idx += 1;
         } while (1);
+
+        // FIXME: simplify with regard to above logic
+        // Handle output arg
+        slot_idx = 0;
+        if (opc == call ? noargs : opcoc[opc]) {
+            uint32_t is_imm = 0;
+            operand = get_operand(ptr, slot_idx, &is_imm);
+            // End-of-operands
+            if (!is_imm && !operand.s.valid) {
+                break;
+            }
+            uint32_t shifted_slot_bit = (1 << operand.s.slot_idx);
+            LLVMType operand_type = vtype == LLVMInvalidType ?
+                                (opcmem_addr_nzidx[opc] > 0 ?
+                                 ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_INPUT_T : OPC_ADDR_T) :
+                                 (slot_idx < opcoc[opc] ? OPC_OUTPUT_T : OPC_INPUT_T)) :
+                                vtype;
+            if (is_imm == 0 && current_call_idx > 0 && helper_output_slot[current_call_idx-1].s.valid) {
+                if (((opcmem_addr_nzidx[opc] > 0) && (slot_idx < opcmem_addr_nzidx[opc])) || ((opcmem_addr_nzidx[opc] == 0) && (slot_idx >= opcoc[opc]))) {
+                    if (operand.s.slot_type == helper_output_slot[current_call_idx-1].s.slot_type &&
+                        operand.s.slot_idx == helper_output_slot[current_call_idx-1].s.slot_idx) {
+                        assert(prev_call_ptr);
+                        set_helper_out_type(prev_call_ptr, operand_type);
+                        helper_output_slot[current_call_idx-1].s.valid = 0;
+                    }
+                }
+            }
+            if (is_imm == 0) {
+                if (operand.s.slot_type == SUB_SLOT_XREG) {
+                    xreg_valid |= shifted_slot_bit;
+                } else if (operand.s.slot_type == SUB_SLOT_TMP) {
+                    tmp_valid |= (1 << operand.s.slot_idx);
+                    tmp_var_available &= ~shifted_slot_bit;
+                    if (tmp_bits_type[operand.s.slot_idx] < operand_type) {
+                        tmp_bits_type[operand.s.slot_idx] = operand_type;
+                    }
+                } else if (operand.s.slot_type == SUB_SLOT_XMM) {
+                    xmm_valid |= shifted_slot_bit;
+                }
+                if (operand.s.slot_type == SUB_SLOT_TMP) {
+                    if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
+                        if (!tmp_has_known_def[operand.s.slot_idx]) {
+                            // At this stage, we do not have alias information yet, so we need to check later
+#ifdef DEBUG
+                            OperandType orig_slot = get_original_slot_for_debug(operand);
+                            printf("  register cross_call tmp:%d orig:%s%d\n", operand.s.slot_idx, orig_slot.s.valid ? (orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp") : "NA", orig_slot.s.valid ? orig_slot.s.slot_idx : 0); fflush(NULL);
+#endif
+                            if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
+                                tmp_shadow_offset[operand.s.slot_idx] = (0 - shadow_call_offset);
+                                shadow_call_offset += 16;
+                            }
+                        }
+                    }
+                    if ((opc == call && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
+                        tmp_has_known_def[operand.s.slot_idx] = 1;
+                    }
+                }
+            }
+            slot_idx += 1;
+        }
+
         if (opc == call) {
             prev_call_ptr = ptr;
             memset(tmp_has_known_def, 0, sizeof(tmp_has_known_def));
@@ -2834,15 +2880,6 @@ void handle_func(uint64_t val) {
             }
             current_call_idx += 1;
             assert(current_call_idx < BB_MAX_CNT);
-            for (int i = 0; i < (1<<5); ++i) {
-              if (tmp_def_valid[i]) {
-                tmp_def_call_ptr[i] = ptr;
-              }
-            }
-            memset(tmp_def_valid, 0, sizeof(tmp_def_valid));
-            if (tmp_def_valid_on_call != 0xff) {
-              tmp_def_valid[tmp_def_valid_on_call] = 1;
-            }
         }
     }
     tmp_var_available_backup = tmp_var_available;
