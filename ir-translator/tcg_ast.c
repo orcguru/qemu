@@ -1504,45 +1504,40 @@ void translate_st(OpCodeType opc, void *ptr) {
     if (is_vec) {
         vtype = get_llvm_vector_type(ptr);
     }
-
     LLVMValueRef val = get_source_node_imm_or_stack(opc, is_imm0, operand0, is_vec ? vtype : OPC_INPUT_T);
     if (!is_vec && OPC_EFFECTIVE_T < OPC_INPUT_T) {
         val = LLVMBuildTrunc(builder, val, llvm_int_types[OPC_EFFECTIVE_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     }
-
     LLVMValueRef addr_val = NULL;
-
-    if (!is_vec && ((operand1.s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operand1)) || operand1.s.slot_type == SUB_SLOT_XMM)) {
-        OperandType alias;
+    if ((operand1.s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operand1)) || operand1.s.slot_type == SUB_SLOT_XMM) {
+        OperandType alias = operand1;
         if (operand1.s.slot_type == SUB_SLOT_TMP) {
             alias = get_alias(operand1);
-        } else {
-            alias = operand1;
         }
         uint32_t is_imm;
         OperandType offset = get_operand(ptr, 2, &is_imm);
         if (is_imm) {
             alias.s.offset += offset.i;
         }
-        assert((alias.s.offset * 8) % llvm_vector_elem_bit_counts[OPC_OUTPUT_T*2+1] == 0);
-
-        OperandType out = alias;
-        out.s.offset = 0;
-        LLVMValueRef src_val = get_source_node_imm_or_stack(opc, 0, out, OPC_FIXED_TO_VECTOR(OPC_OUTPUT_T));
-        LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], (alias.s.offset * 8) / llvm_vector_elem_bit_counts[OPC_OUTPUT_T*2+1], 0);
-        val = LLVMBuildInsertElement(builder, src_val, val, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-        do_store(opc, val, OPC_FIXED_TO_VECTOR(OPC_OUTPUT_T), out);
+        if (!is_vec) {
+            assert((alias.s.offset * 8) % llvm_vector_elem_bit_counts[OPC_OUTPUT_T*2+1] == 0);
+            OperandType out = alias;
+            out.s.offset = 0;
+            LLVMValueRef src_val = get_source_node_imm_or_stack(opc, 0, out, OPC_FIXED_TO_VECTOR(OPC_OUTPUT_T));
+            LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], (alias.s.offset * 8) / llvm_vector_elem_bit_counts[OPC_OUTPUT_T*2+1], 0);
+            val = LLVMBuildInsertElement(builder, src_val, val, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+            do_store(opc, val, OPC_FIXED_TO_VECTOR(OPC_OUTPUT_T), out);
+        } else {
+            assert(alias.s.offset == 0);
+            do_store(opc, val, vtype, alias);
+        }
     } else {
         if (operand1.s.slot_type == SUB_SLOT_TMP && has_alias(operand1)) {
             operand1 = get_alias(operand1);
         }
         LLVMValueRef env_raw = get_env_ptr_raw();
         LLVMValueRef off = NULL;
-        if (operand1.s.slot_type == SUB_SLOT_XMM) {
-            assert(operand1.s.offset == 0);
-            uint64_t xmm_offset = get_xmm_offset(operand1.s.slot_idx/2) + 16*(operand1.s.slot_idx%2);
-            off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
-        } else if (operand1.s.slot_type == SUB_SLOT_ENV) {
+        if (operand1.s.slot_type == SUB_SLOT_ENV) {
             off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], operand1.s.offset, 0);
         } else {
             assert(0);
