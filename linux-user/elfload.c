@@ -3999,7 +3999,7 @@ int load_elf_binary(struct linux_binprm *bprm, struct image_info *info)
 #if defined(__aarch64__)
     bprm->p -= 0x960;
 #elif defined(__riscv) && __riscv_xlen == 64
-    bprm->p -= 0x960;
+    bprm->p -= 0x970;
 #endif
 #endif
 

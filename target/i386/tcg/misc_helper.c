@@ -265,6 +265,7 @@ int last_dump_valid[MAX_PID+1] = {0};
 CPUX86State **last_env = NULL;
 uintptr_t last_shadow_stack = 0;
 const char *x64_reg_name[16] = {"RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15"};
+const char *segment_base_name[6] = {"ES_BASE", "CS_BASE", "SS_BASE", "DS_BASE", "FS_BASE", "GS_BASE"};
 unsigned long dump_cnt = 0;
 
 void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
@@ -304,7 +305,7 @@ void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
                      " XMM13=%016lx-%016lx YMM13_H=%016lx-%016lx"   \
                      " XMM14=%016lx-%016lx YMM14_H=%016lx-%016lx"   \
                      " XMM15=%016lx-%016lx YMM15_H=%016lx-%016lx"   \
-                     " SS=%016lx\n",   \
+                     " SS=%016lx ES_BASE=%016lx CS_BASE=%016lx SS_BASE=%016lx DS_BASE=%016lx FS_BASE=%016lx GS_BASE=%016lx\n",   \
                      pid, func_offset, env->eip, env->regs[0], env->regs[1], env->regs[2], env->regs[3], env->regs[4], env->regs[5], env->regs[6], env->regs[7], env->regs[8], env->regs[9], env->regs[10], env->regs[11], env->regs[12], env->regs[13], env->regs[14], env->regs[15], env->cc_src, env->cc_dst, env->cc_op, env->cc_src2,   \
                      env->xmm_regs[0]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[0]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[0]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[0]._x_ZMMReg[1]._q_XMMReg[1],   \
                      env->xmm_regs[1]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[1]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[1]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[1]._x_ZMMReg[1]._q_XMMReg[1],   \
@@ -322,7 +323,7 @@ void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
                      env->xmm_regs[13]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[13]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[13]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[13]._x_ZMMReg[1]._q_XMMReg[1],   \
                      env->xmm_regs[14]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[14]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[14]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[14]._x_ZMMReg[1]._q_XMMReg[1],   \
                      env->xmm_regs[15]._x_ZMMReg[0]._q_XMMReg[0], env->xmm_regs[15]._x_ZMMReg[0]._q_XMMReg[1], env->xmm_regs[15]._x_ZMMReg[1]._q_XMMReg[0], env->xmm_regs[15]._x_ZMMReg[1]._q_XMMReg[1],   \
-                     shadow_stack_pointer_ptr[0]);                    \
+                     shadow_stack_pointer_ptr[0], env->segs[0].base, env->segs[1].base, env->segs[2].base, env->segs[3].base, env->segs[4].base, env->segs[5].base);   \
     } while (0)
 
     if (last_dump_valid[pid] != 0x55aa) {
@@ -377,6 +378,13 @@ void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
             char buf[128] = {0};
             sprintf(buf, " SS=%016lx", shadow_stack_pointer_ptr[0]);
             strcat(msg_buffer, buf);
+        }
+        for (int i = 0; i < 6; ++i) {
+            if (env->segs[i].base != last_env[pid]->segs[i].base) {
+                char buf[128] = {0};
+                sprintf(buf, " %s=%016lx", segment_base_name[i], env->segs[i].base);
+                strcat(msg_buffer, buf);
+            }
         }
         strcat(msg_buffer, "\n");
         qemu_log_mask(LOG_AOT, "%s", msg_buffer);
