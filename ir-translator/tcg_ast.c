@@ -2105,7 +2105,7 @@ static uint8_t do_link_helper(HelperType h, const char *build_macro, const char 
 }
 
 static uint8_t is_tail_call(HelperType h) {
-    if (h == helper_icebp || h == helper_raise_interrupt ||
+    if (h == helper_syscall || h == helper_icebp || h == helper_raise_interrupt ||
         h == helper_iret_ind || h == helper_jmp_ind || h == helper_ljmp_protected ||
         h == helper_lret_protected || h == helper_pause || h == helper_raise_exception) {
         return 1;
