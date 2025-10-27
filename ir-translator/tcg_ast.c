@@ -384,7 +384,7 @@ static void register_idx_for_call_helper(void *ptr, uint8_t call_idx);
 static uint8_t get_idx_for_call_helper(void *ptr);
 static LLVMType get_helper_out_type(void *ptr);
 static void set_helper_out_type(void *ptr, LLVMType type);
-static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm, OperandType operand, LLVMType tidx);
+static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm, OperandType operand, LLVMType tidx, int splat);
 
 #define GET_2_OPERANDS()                                \
     do {                                                \
@@ -651,7 +651,7 @@ static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, Operan
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
         CREATE_ADD(tmp, env, env_var_offset[out.s.slot_idx]);
-        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T);
+        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(val_type, 0), get_next_var_name("store_env_ptr_offset", out));
         LLVMBuildStore(builder, val, ptr);
     } else {
@@ -683,7 +683,7 @@ static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, Operan
     }
 }
 
-static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm, OperandType operand, LLVMType tidx) {
+static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm, OperandType operand, LLVMType tidx, int splat) {
     assert(tidx != LLVMInvalidType && tidx < LLVMMAXType);
     LLVMTypeRef type = llvm_int_types[tidx];
     LLVMValueRef ret = NULL;
@@ -692,16 +692,24 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
             ret = LLVMConstInt(type, operand.i, 0);
         } else {
             LLVMValueRef constants[16];
-            uint64_t val = operand.i;
-            uint8_t full_cnt = llvm_vector_elem_bit_counts[tidx*2], half_cnt = llvm_vector_elem_bit_counts[tidx*2]/2;
-            uint8_t bit_cnt = llvm_vector_elem_bit_counts[tidx*2+1];
-            for (int i = 0; i < full_cnt; i++) {
-                if (i == half_cnt) {
-                    val = operand.i;
+            uint8_t full_cnt = llvm_vector_elem_bit_counts[tidx*2];
+            if (splat) {
+                LLVMValueRef element_value = LLVMConstInt(llvm_int_types[OPC_VECTOR_TO_FIXED(tidx)], operand.i, 0);
+                for (int i = 0; i < full_cnt; i++) {
+                    constants[i] = element_value;
                 }
-                LLVMValueRef element_value = LLVMConstInt(llvm_int_types[OPC_VECTOR_TO_FIXED(tidx)], val & ((1UL<<bit_cnt)-1), 0);
-                constants[i] = element_value;
-                val = val >> bit_cnt;
+            } else {
+                uint64_t val = operand.i;
+                uint8_t half_cnt = llvm_vector_elem_bit_counts[tidx*2]/2;
+                uint8_t bit_cnt = llvm_vector_elem_bit_counts[tidx*2+1];
+                for (int i = 0; i < full_cnt; i++) {
+                    if (i == half_cnt) {
+                        val = operand.i;
+                    }
+                    LLVMValueRef element_value = LLVMConstInt(llvm_int_types[OPC_VECTOR_TO_FIXED(tidx)], val & ((1UL<<bit_cnt)-1), 0);
+                    constants[i] = element_value;
+                    val = val >> bit_cnt;
+                }
             }
             ret = LLVMConstVector(constants, full_cnt);
         }
@@ -709,14 +717,14 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
         CREATE_ADD(tmp, env, env_var_offset[operand.s.slot_idx]);
-        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T);
+        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset", operand));
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val", operand));
     } else if (operand.s.slot_type == SUB_SLOT_ENV) {
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
         CREATE_ADD(tmp, env, operand.s.offset);
-        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T);
+        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset", operand));
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val", operand));
     } else if (operand.s.slot_type == SUB_SLOT_XMM) {
@@ -767,8 +775,31 @@ void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
     if (is_vec) {
         vtype = get_llvm_vector_type(ptr);
     }
-    LLVMValueRef left = get_source_node_imm_or_stack(opc, is_imm_l, operand_l, is_vec ? vtype : OPC_INPUT_T);
-    LLVMValueRef right = get_source_node_imm_or_stack(opc, is_imm_r, operand_r, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef left = get_source_node_imm_or_stack(opc, is_imm_l, operand_l, is_vec ? vtype : OPC_INPUT_T, 0);
+    LLVMValueRef right = get_source_node_imm_or_stack(opc, is_imm_r, operand_r, is_vec ? vtype : OPC_INPUT_T, 0);
+    LLVMValueRef out_val = api(builder, left, right, get_next_var_name(opcode_type_str[opc], output));
+    do_store(opc, out_val, OPC_OUTPUT_T, output);
+}
+
+void translate_binary_splat_immediate(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    uint32_t is_imm_l, is_imm_r, is_imm_out;
+    OperandType operand_l, operand_r, output;
+    uint32_t idx = opcoc[opc];
+    output = get_operand(ptr, 0, &is_imm_out);
+    assert(!is_imm_out && output.s.valid);
+    operand_l = get_operand(ptr, idx, &is_imm_l);
+    operand_r = get_operand(ptr, idx + 1, &is_imm_r);
+    assert(is_imm_r);
+    uint8_t is_vec = is_vector(ptr);
+    LLVMType vtype = LLVMInvalidType;
+    if (is_vec) {
+        vtype = get_llvm_vector_type(ptr);
+    }
+    LLVMValueRef left = get_source_node_imm_or_stack(opc, is_imm_l, operand_l, is_vec ? vtype : OPC_INPUT_T, 0);
+    LLVMValueRef right = get_source_node_imm_or_stack(opc, is_imm_r, operand_r, is_vec ? vtype : OPC_INPUT_T, 1);
     LLVMValueRef out_val = api(builder, left, right, get_next_var_name(opcode_type_str[opc], output));
     do_store(opc, out_val, OPC_OUTPUT_T, output);
 }
@@ -790,8 +821,8 @@ void translate_add_i64(OpCodeType opc, void *ptr) {
             alias.s.offset += operand2.i;
             register_alias(operand0, alias);
         } else {
-            LLVMValueRef left = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
-            LLVMValueRef right = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T);
+            LLVMValueRef left = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T, 0);
+            LLVMValueRef right = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T, 0);
             LLVMValueRef add_val = LLVMBuildAdd(builder, left, right, get_next_var_name(opcode_type_str[opc], operand0));
             do_store(opc, add_val, OPC_OUTPUT_T, operand0);
         }
@@ -857,8 +888,8 @@ void translate_cmp_vec(OpCodeType opc, void *ptr) {
     GET_3_OPERANDS_NOCHECK();
     LLVMType vtype = get_llvm_vector_type(ptr);
 
-    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, vtype);
-    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, vtype);
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, vtype, 0);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, vtype, 0);
 
     RelopType r = get_relop(ptr);
     assert(r < RELOPMAX && llvm_predicate[r]);
@@ -868,8 +899,8 @@ void translate_cmp_vec(OpCodeType opc, void *ptr) {
     ones.i = 0xffffffffffffffffUL;
     zeros.i = 0;
 
-    LLVMValueRef vec_true = get_source_node_imm_or_stack(opc, 1, ones, vtype);
-    LLVMValueRef vec_false = get_source_node_imm_or_stack(opc, 1, zeros, vtype);
+    LLVMValueRef vec_true = get_source_node_imm_or_stack(opc, 1, ones, vtype, 0);
+    LLVMValueRef vec_false = get_source_node_imm_or_stack(opc, 1, zeros, vtype, 0);
 
     LLVMValueRef result = LLVMBuildSelect(builder, bool_vec, vec_true, vec_false, get_next_var_name(opcode_type_str[opc], operand0));
     do_store(opc, result, OPC_OUTPUT_T, operand0);
@@ -883,8 +914,8 @@ void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
 
-    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
-    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T);
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T, 0);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T, 0);
 
     LLVMValueRef bool1 = LLVMBuildICmp(builder, LLVMIntEQ, src1, LLVMConstInt(llvm_int_types[OPC_INPUT_T], 0, 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
 
@@ -968,7 +999,7 @@ void translate_dupm_vec(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
     LLVMType vtype = get_llvm_vector_type(ptr);
-    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, vtype);
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, vtype, 0);
     LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
     LLVMValueRef elem = LLVMBuildExtractElement(builder, src, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     uint8_t full_cnt = llvm_vector_elem_bit_counts[vtype*2];
@@ -1044,7 +1075,7 @@ void translate_mov(OpCodeType opc, void *ptr) {
         assert(operand0.s.slot_type == SUB_SLOT_TMP);
         register_alias(operand0, get_alias(operand1));
     } else {
-        LLVMValueRef src = get_source_node_imm_or_stack(opc, is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T);
+        LLVMValueRef src = get_source_node_imm_or_stack(opc, is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T, 0);
         if (OPC_EFFECTIVE_T < OPC_INPUT_T) {
             src = LLVMBuildTrunc(builder, src, llvm_int_types[OPC_EFFECTIVE_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
         }
@@ -1063,7 +1094,7 @@ void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
 
     if (operand1.s.slot_type == SUB_SLOT_ENV ||
         operand1.s.slot_type == SUB_SLOT_XMM) {
-        LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T);
+        LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T, 0);
         do_store(opc, val, OPC_OUTPUT_T, operand0);
     } else if (operand1.s.slot_type == SUB_SLOT_TMP) {
         assert(has_alias(operand1) && is_imm);
@@ -1084,7 +1115,7 @@ void translate_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
     OperandType operand0, operand1;
     GET_2_OPERANDS_NOCHECK();
 
-    LLVMValueRef src = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T, 0);
     src = api(builder, src, llvm_int_types[OPC_OUTPUT_T], get_next_var_name(opcode_type_str[opc], operand0));
     do_store(opc, src, OPC_OUTPUT_T, operand0);
 }
@@ -1098,13 +1129,13 @@ void translate_ld_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
 
     if (operand1.s.slot_type == SUB_SLOT_ENV ||
         operand1.s.slot_type == SUB_SLOT_XMM) {
-        LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T);
+        LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T, 0);
         do_store(opc, val, OPC_OUTPUT_T, operand0);
     } else {
         assert(0);
     }
 
-    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand0, OPC_INPUT_T);
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand0, OPC_INPUT_T, 0);
     src = api(builder, src, llvm_int_types[OPC_OUTPUT_T], get_next_var_name(opcode_type_str[opc], operand0));
     do_store(opc, src, OPC_OUTPUT_T, operand0);
 }
@@ -1116,7 +1147,7 @@ void translate_ld_vec(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
     LLVMType vtype = get_llvm_vector_type(ptr);
-    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, vtype);
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, vtype, 0);
     do_store(opc, src, vtype, operand0);
 }
 
@@ -1135,10 +1166,10 @@ void translate_movcond(OpCodeType opc, void *ptr) {
       vtype = get_llvm_vector_type(ptr);
     }
 
-    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T);
-    LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, is_vec ? vtype : OPC_INPUT_T);
-    LLVMValueRef v1 = get_source_node_imm_or_stack(opc, is_imm3, operand3, is_vec ? vtype : OPC_INPUT_T);
-    LLVMValueRef v2 = get_source_node_imm_or_stack(opc, is_imm4, operand4, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, is_vec ? vtype : OPC_INPUT_T, 0);
+    LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, is_vec ? vtype : OPC_INPUT_T, 0);
+    LLVMValueRef v1 = get_source_node_imm_or_stack(opc, is_imm3, operand3, is_vec ? vtype : OPC_INPUT_T, 0);
+    LLVMValueRef v2 = get_source_node_imm_or_stack(opc, is_imm4, operand4, is_vec ? vtype : OPC_INPUT_T, 0);
 
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
@@ -1161,8 +1192,8 @@ void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
     GET_3_OPERANDS();
     LLVMTypeRef t128 = LLVMInt128Type();
 
-    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T);
-    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, 0, operand2, OPC_INPUT_T);
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T, 0);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, 0, operand2, OPC_INPUT_T, 0);
     src1 = api(builder, src1, t128, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     src2 = api(builder, src2, t128, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef out = LLVMBuildMul(builder, src1, src2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -1179,7 +1210,7 @@ void translate_neg(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
 
-    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T);
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T, 0);
     LLVMValueRef zero = LLVMConstInt(llvm_int_types[OPC_INPUT_T], 0, 0);
     LLVMValueRef out = LLVMBuildSub(builder, zero, src, get_next_var_name(opcode_type_str[opc], operand0));
     do_store(opc, out, OPC_OUTPUT_T, operand0);
@@ -1193,8 +1224,8 @@ void translate_negsetcond_i64(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
 
-    LLVMValueRef arg1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
-    LLVMValueRef arg2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T);
+    LLVMValueRef arg1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T, 0);
+    LLVMValueRef arg2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T, 0);
 
     RelopType r = get_relop(ptr);
     assert(r < RELOPMAX && llvm_predicate[r]);
@@ -1225,10 +1256,10 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     func_hex = get_operand(ptr, 1, &is_imm1);
     assert(is_imm1);
 
-    LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(opc, is_imm0, operand0, OPC_INPUT_T);
+    LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(opc, is_imm0, operand0, OPC_INPUT_T, 0);
     OperandType ptr_val = get_shadow_stack_pointer(opc);
     CREATE_ADD(ptr_val, ptr_val, -8UL);
-    LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T);
+    LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
     LLVMValueRef shadow_ptr0 = LLVMBuildIntToPtr(builder, shadow_val0, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMBuildStore(builder, x64_ret_addr, shadow_ptr0);
 
@@ -1236,7 +1267,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     sprintf(func_name, "func_%lx", func_hex.i);
     LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0, NoInlineAttr), llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     CREATE_ADD(ptr_val, ptr_val, -8UL);
-    LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T);
+    LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
     LLVMValueRef shadow_ptr1 = LLVMBuildIntToPtr(builder, shadow_val1, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMBuildStore(builder, func_addr, shadow_ptr1);
 
@@ -1258,7 +1289,7 @@ void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
     assert(a2.p.storage.size == SRC16B);
     LLVMType out_type = LLVMVector2xi64;
 
-    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T);
+    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef result = LLVMBuildLoad2(builder, llvm_int_types[out_type], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     if (a1.p.storage.attr.alignment == ALIGN_16 ||
@@ -1291,7 +1322,7 @@ void translate_qemu_ld(OpCodeType opc, void *ptr) {
     LLVMType out_type = (a2.p.storage.size - SRC1B) + LLVMInt8;
     assert(out_type <= OPC_OUTPUT_T);
 
-    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T);
+    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef result = LLVMBuildLoad2(builder, llvm_int_types[out_type], pointer, get_next_var_name(opcode_type_str[opc], operand0));
     if (a1.p.storage.attr.alignment == ALIGN_16) {
@@ -1326,9 +1357,9 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
     assert(a2.p.storage.size == SRC16B);
     LLVMType out_type = LLVMVector2xi64;
 
-    LLVMValueRef val0 = get_source_node_imm_or_stack(opc, 0, operand0, OPC_INPUT_T);
-    LLVMValueRef val1 = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T);
-    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T);
+    LLVMValueRef val0 = get_source_node_imm_or_stack(opc, 0, operand0, OPC_INPUT_T, 0);
+    LLVMValueRef val1 = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T, 0);
+    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
 
     LLVMValueRef constants[2];
@@ -1365,8 +1396,8 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
     LLVMType out_type = (a2.p.storage.size - SRC1B) + LLVMInt8;
     assert(out_type <= OPC_OUTPUT_T);
 
-    LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, operand0, OPC_INPUT_T);
-    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T);
+    LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, operand0, OPC_INPUT_T, 0);
+    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     if (out_type < OPC_OUTPUT_T) {
         val = LLVMBuildTrunc(builder, val, llvm_int_types[out_type], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -1410,7 +1441,7 @@ void translate_ret(OpCodeType opc, void *ptr) {
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT];
     collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, NULL, NULL, 0);
     LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0);
-    LLVMValueRef ret_target = get_source_node_imm_or_stack(opc, 0, loc608, OPC_ADDR_T);
+    LLVMValueRef ret_target = get_source_node_imm_or_stack(opc, 0, loc608, OPC_ADDR_T, 0);
     LLVMValueRef ret_target_ptr = LLVMBuildIntToPtr(builder, ret_target, LLVMPointerType(func_type, 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, ret_target_ptr, call_args, FIXED_VECTOR_PARAM_COUNT, "");
     LLVMSetTailCall(call_inst, 1);
@@ -1460,8 +1491,8 @@ void translate_setcond_i64(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
 
-    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
-    LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T);
+    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T, 0);
+    LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, OPC_INPUT_T, 0);
 
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
@@ -1504,7 +1535,7 @@ void translate_st(OpCodeType opc, void *ptr) {
     if (is_vec) {
         vtype = get_llvm_vector_type(ptr);
     }
-    LLVMValueRef val = get_source_node_imm_or_stack(opc, is_imm0, operand0, is_vec ? vtype : OPC_INPUT_T);
+    LLVMValueRef val = get_source_node_imm_or_stack(opc, is_imm0, operand0, is_vec ? vtype : OPC_INPUT_T, 0);
     if (!is_vec && OPC_EFFECTIVE_T < OPC_INPUT_T) {
         val = LLVMBuildTrunc(builder, val, llvm_int_types[OPC_EFFECTIVE_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     }
@@ -1523,7 +1554,7 @@ void translate_st(OpCodeType opc, void *ptr) {
             assert((alias.s.offset * 8) % llvm_vector_elem_bit_counts[OPC_OUTPUT_T*2+1] == 0);
             OperandType out = alias;
             out.s.offset = 0;
-            LLVMValueRef src_val = get_source_node_imm_or_stack(opc, 0, out, OPC_FIXED_TO_VECTOR(OPC_OUTPUT_T));
+            LLVMValueRef src_val = get_source_node_imm_or_stack(opc, 0, out, OPC_FIXED_TO_VECTOR(OPC_OUTPUT_T), 0);
             LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], (alias.s.offset * 8) / llvm_vector_elem_bit_counts[OPC_OUTPUT_T*2+1], 0);
             val = LLVMBuildInsertElement(builder, src_val, val, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
             do_store(opc, val, OPC_FIXED_TO_VECTOR(OPC_OUTPUT_T), out);
@@ -1730,8 +1761,8 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
     uint32_t is_imm0, is_imm1;
     OperandType operand0, operand1;
     GET_2_OPERANDS_NOCHECK();
-    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm0, operand0, OPC_INPUT_T);
-    LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T);
+    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm0, operand0, OPC_INPUT_T, 0);
+    LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm1, operand1, OPC_INPUT_T, 0);
 
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
@@ -2124,13 +2155,13 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
                     param_in_stack.s.valid = 1;
                     param_in_stack.s.slot_type = SUB_SLOT_XREG;
                     param_in_stack.s.slot_idx = i;
-                    out_args[i] = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+                    out_args[i] = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i], 0);
                 } else {
                     param_in_stack.s.valid = 1;
                     param_in_stack.s.slot_type = SUB_SLOT_XMM;
                     param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
                     param_in_stack.s.offset = 0;
-                    LLVMValueRef vec = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i]);
+                    LLVMValueRef vec = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i], 0);
 
                     LLVMTypeRef ret_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
                     LLVMTypeRef param_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
@@ -2179,13 +2210,13 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
                     }
                 } else {
                     if (params[op_idx].s.slot_type == SUB_SLOT_ENVVAR) {
-                        out_args[i] = get_source_node_imm_or_stack(opc, 0, params[op_idx], OPC_ADDR_T);
+                        out_args[i] = get_source_node_imm_or_stack(opc, 0, params[op_idx], OPC_ADDR_T, 0);
                     } else if (params[op_idx].s.slot_type == SUB_SLOT_XREG) {
                         // Skipped, should be handled by trampoline
                         continue;
                     } else if (params[op_idx].s.slot_type == SUB_SLOT_TMP) {
                         assert(func_tmp_llvmtype[params[op_idx].s.slot_idx] <= LLVMInt64);
-                        out_args[i] = get_source_node_imm_or_stack(opc, 0, params[op_idx], func_tmp_llvmtype[params[op_idx].s.slot_idx]);
+                        out_args[i] = get_source_node_imm_or_stack(opc, 0, params[op_idx], func_tmp_llvmtype[params[op_idx].s.slot_idx], 0);
                         if (func_tmp_llvmtype[params[op_idx].s.slot_idx] < LLVMInt64) {
                             out_args[i] = LLVMBuildZExt(builder, out_args[i], llvm_int_types[LLVMInt64], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
                         }
@@ -2244,7 +2275,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     LLVMValueRef trampoline_addr = LLVMBuildPtrToInt(builder, trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnts = collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, NULL, NULL, 0);
-    call_args[call_arg_cnts++] = get_source_node_imm_or_stack(opc, 0, operand, OPC_ADDR_T);
+    call_args[call_arg_cnts++] = get_source_node_imm_or_stack(opc, 0, operand, OPC_ADDR_T, 0);
     call_args[call_arg_cnts++] = second_half_addr;
     call_args[call_arg_cnts++] = trampoline_addr;
     assert(call_arg_cnts <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
@@ -2305,7 +2336,7 @@ void translate_call(OpCodeType opc, void *ptr) {
             op.s.slot_type = SUB_SLOT_TMP;
             op.s.slot_idx = i;
             if (!has_alias(op)) {
-                LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_tmp_llvmtype[i]);
+                LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_tmp_llvmtype[i], 0);
                 LLVMValueRef shadow_off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], tmp_shadow_offset[i], 0);
                 if (!shadow_pointer) {
                     LLVMValueRef env_raw = get_env_ptr_raw();
@@ -2408,7 +2439,7 @@ void translate_call(OpCodeType opc, void *ptr) {
                 param_in_stack.s.slot_type = SUB_SLOT_XMM;
                 param_in_stack.s.slot_idx = xmmt + i;
                 param_in_stack.s.offset = 0;
-                LLVMValueRef vec_val = get_source_node_imm_or_stack(opc, 0, param_in_stack, LLVMVector2xi64);
+                LLVMValueRef vec_val = get_source_node_imm_or_stack(opc, 0, param_in_stack, LLVMVector2xi64, 0);
                 uint64_t xmm_offset = get_xmm_offset(param_in_stack.s.slot_idx/2) + 16*(param_in_stack.s.slot_idx%2);
                 LLVMTypeRef ret_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
                 LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
@@ -3200,7 +3231,7 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
         translate_binary(opc, ptr, LLVMBuildShl);
         break;
     case shli_vec:
-        translate_binary(opc, ptr, LLVMBuildShl);
+        translate_binary_splat_immediate(opc, ptr, LLVMBuildShl);
         break;
     case shr_i32:
     case shr_i64:

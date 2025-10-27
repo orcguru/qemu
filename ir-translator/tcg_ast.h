@@ -1755,5 +1755,6 @@ void translate_ld_env_xmm(OpCodeType opc, void *ptr);
 void translate_movcond(OpCodeType opc, void *ptr);
 void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api);
 void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api);
+void translate_binary_splat_immediate(OpCodeType opc, void *ptr, LLVM_BIN_API api);
 
 #endif
