@@ -1843,19 +1843,21 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     if (param_cnt) {
         for (int i = 0; i < param_cnt; ++i) {
             if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_XREG) {
-                char snippet[32] = {0};
+                char snippet[64] = {0};
                 sprintf(snippet, "_rsxreg%drd%d", operands[i].s.slot_idx, i);
                 strcat(trampoline_name, snippet);
                 reuse_cnt += 1;
             } else if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[i])) {
                 OperandType alias = get_alias(operands[i]);
                 assert(alias.s.valid);
+                char snippet[64] = {0};
                 if (alias.s.offset == 0) {
-                    char snippet[32] = {0};
                     sprintf(snippet, "_rsxmm%drd%d", alias.s.slot_idx, i);
-                    strcat(trampoline_name, snippet);
-                    reuse_cnt += 1;
+                } else {
+                    sprintf(snippet, "_rsxmm%doff%drd%d", alias.s.slot_idx, alias.s.offset, i);
                 }
+                strcat(trampoline_name, snippet);
+                reuse_cnt += 1;
             }
         }
     }
@@ -1924,6 +1926,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
 
     LLVMValueRef call_args[MAX_OPERANDS_COUNT] = {NULL};
     int idx_with_env = 0;
+    int idx_with_trampoline = 0;
     if (param_cnt) {
         for (int i = 0; i < param_cnt; ++i) {
             if (i == env_idx) {
@@ -1945,8 +1948,9 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
                 call_args[idx_with_env] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("env_ptr_offset", dummy_slot_for_debug));
                 idx_with_env += 1;
             } else {
-                call_args[idx_with_env] = LLVMGetParam(trampoline, FIXED_VECTOR_PARAM_COUNT + i);
+                call_args[idx_with_env] = LLVMGetParam(trampoline, FIXED_VECTOR_PARAM_COUNT + idx_with_trampoline);
                 idx_with_env += 1;
+                idx_with_trampoline += 1;
             }
         }
     } else {
@@ -1958,6 +1962,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         }
     }
     assert(idx_with_env < MAX_OPERANDS_COUNT);
+    assert(idx_with_trampoline == (param_cnt - reuse_cnt));
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
     LLVMValueRef helper_addr = LLVMGetParam(trampoline, (FIXED_VECTOR_PARAM_COUNT + (param_cnt - reuse_cnt)));
     LLVMValueRef the_helper = LLVMBuildIntToPtr(builder, helper_addr, LLVMPointerType(helper_type, 0), get_next_var_name("helper", dummy_slot_for_debug));
@@ -2192,15 +2197,8 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
                     OperandType alias = get_alias(params[op_idx]);
                     assert(alias.s.valid);
                     if (alias.s.slot_type == SUB_SLOT_XMM) {
-                        if (alias.s.offset == 0) {
-                            // Skipped, should be handled by trampoline
-                            continue;
-                        } else {
-                            LLVMValueRef env_raw = get_env_ptr_raw();
-                            uint64_t xmm_offset = get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset;
-                            LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
-                            out_args[i] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                        }
+                        // Skipped, should be handled by trampoline
+                        continue;
                     } else if (alias.s.slot_type == SUB_SLOT_ENV) {
                         LLVMValueRef env_raw = get_env_ptr_raw();
                         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], alias.s.offset, 0);
