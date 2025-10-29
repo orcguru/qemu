@@ -1274,6 +1274,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     set_shadow_stack_pointer(opc, ptr_val);
 }
 
+// FIXME: check alignment at runtime and dispatch to different cases for speed
 void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
@@ -1287,23 +1288,18 @@ void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
     (void)a0;
     GET_STORAGE_ATTR();
     assert(a2.p.storage.size == SRC16B);
-    LLVMType out_type = LLVMVector2xi64;
+    LLVMType out_type = LLVMInt64;
 
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef result = LLVMBuildLoad2(builder, llvm_int_types[out_type], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    if (a1.p.storage.attr.alignment == ALIGN_16 ||
-        a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
-        LLVMSetAlignment(result, 16);
-    } else if (a1.p.storage.attr.alignment == ALIGN_32) {
-        LLVMSetAlignment(result, 32);
-    }
-    LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
-    LLVMValueRef elem = LLVMBuildExtractElement(builder, result, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    do_store(opc, elem, OPC_OUTPUT_T, operand0);
-    index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 1, 0);
-    elem = LLVMBuildExtractElement(builder, result, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    do_store(opc, elem, OPC_OUTPUT_T, operand1);
+    do_store(opc, result, OPC_OUTPUT_T, operand0);
+    OperandType high_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
+    CREATE_ADD(high_addr, operand2, 8UL);
+    addr = get_source_node_imm_or_stack(opc, 0, high_addr, OPC_ADDR_T, 0);
+    pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    result = LLVMBuildLoad2(builder, llvm_int_types[out_type], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    do_store(opc, result, OPC_OUTPUT_T, operand1);
 }
 
 void translate_qemu_ld(OpCodeType opc, void *ptr) {
@@ -1342,6 +1338,7 @@ void translate_qemu_ld(OpCodeType opc, void *ptr) {
     do_store(opc, result, OPC_OUTPUT_T, operand0);
 }
 
+// FIXME: check alignment at runtime and dispatch to different cases for speed
 void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
@@ -1355,29 +1352,20 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
     (void)a0;
     GET_STORAGE_ATTR();
     assert(a2.p.storage.size == SRC16B);
-    LLVMType out_type = LLVMVector2xi64;
+    LLVMType out_type = LLVMInt64;
 
     LLVMValueRef val0 = get_source_node_imm_or_stack(opc, 0, operand0, OPC_INPUT_T, 0);
     LLVMValueRef val1 = get_source_node_imm_or_stack(opc, 0, operand1, OPC_INPUT_T, 0);
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-
-    LLVMValueRef constants[2];
-    LLVMValueRef element_value = LLVMConstInt(llvm_int_types[OPC_OUTPUT_T], 0, 0);
-    constants[0] = element_value;
-    constants[1] = element_value;
-    LLVMValueRef vec = LLVMConstVector(constants, 2);
-    LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
-    vec = LLVMBuildInsertElement(builder, vec, val0, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 1, 0);
-    vec = LLVMBuildInsertElement(builder, vec, val1, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMValueRef result = LLVMBuildStore(builder, vec, pointer);
-    if (a1.p.storage.attr.alignment == ALIGN_16 ||
-        a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
-        LLVMSetAlignment(result, 16);
-    } else if (a1.p.storage.attr.alignment == ALIGN_32) {
-        LLVMSetAlignment(result, 32);
-    }
+    LLVMValueRef result = LLVMBuildStore(builder, val0, pointer);
+    LLVMSetAlignment(result, 1);
+    OperandType high_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
+    CREATE_ADD(high_addr, operand2, 8UL);
+    addr = get_source_node_imm_or_stack(opc, 0, high_addr, OPC_ADDR_T, 0);
+    pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[out_type], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    result = LLVMBuildStore(builder, val1, pointer);
+    LLVMSetAlignment(result, 1);
 }
 
 void translate_qemu_st(OpCodeType opc, void *ptr) {
