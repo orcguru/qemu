@@ -385,6 +385,7 @@ static uint8_t get_idx_for_call_helper(void *ptr);
 static LLVMType get_helper_out_type(void *ptr);
 static void set_helper_out_type(void *ptr, LLVMType type);
 static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm, OperandType operand, LLVMType tidx, int splat);
+static LLVMTypeRef get_vector_parameter_type_for_arch();
 
 #define GET_2_OPERANDS()                                \
     do {                                                \
@@ -564,8 +565,12 @@ static LLVMBasicBlockRef get_bb(const char *name) {
     return NULL;
 }
 
-static const char* get_riscv64_data_layout() {
-    return "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128";
+static LLVMTypeRef get_vector_parameter_type_for_arch() {
+#if defined(__aarch64__)
+    return LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
+#elif defined(__riscv) && __riscv_xlen == 64
+    return LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+#endif
 }
 
 static void create_module(const char *module_name) {
@@ -573,16 +578,21 @@ static void create_module(const char *module_name) {
     NoInlineAttr = LLVMCreateEnumAttribute(context, LLVMNoInlineAttribute, 0);
     AlwaysInlineAttr = LLVMCreateEnumAttribute(context, LLVMAlwaysInlineAttribute, 0);
     const char *attr_key = "target-features";
+#if defined(__aarch64__)
+    const char *attr_value = "+neon";
+#elif defined(__riscv) && __riscv_xlen == 64
     const char *attr_value = "+m,+a,+f,+d,+v";
+#endif
     size_t attr_key_len = strlen(attr_key);
     size_t attr_value_len = strlen(attr_value);
     target_features_attr = LLVMCreateStringAttribute(context, attr_key, attr_key_len, attr_value, attr_value_len);
     module = LLVMModuleCreateWithNameInContext(module_name, context);
 
-    const char* data_layout_str = get_riscv64_data_layout();
-    LLVMTargetDataRef target_data = LLVMCreateTargetData(data_layout_str);
-    LLVMSetModuleDataLayout(module, target_data);
+#if defined(__aarch64__)
+    LLVMSetTarget(module, "aarch64-unknown-linux-gnu");
+#elif defined(__riscv) && __riscv_xlen == 64
     LLVMSetTarget(module, "riscv64-unknown-linux-gnu");
+#endif
 }
 
 static void register_alias(OperandType lval, OperandType rval) {
@@ -618,7 +628,11 @@ static LLVMValueRef get_env_ptr_raw() {
     LLVMTypeRef asm_function_type = LLVMFunctionType(asm_return_type, asm_param_types, 0, 0);
     //FIXME: handle AArch64 as well
     char asm_string[128];
+#if defined(__aarch64__)
+    sprintf(asm_string, "mov $0, x25");
+#elif defined(__riscv) && __riscv_xlen == 64
     sprintf(asm_string, "mv $0, x25");
+#endif
     const char *constraint_string = "=r";
     LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_function_type, asm_string, constraint_string, /* has_side_effects */ 1, /* is_align_stack */ 0);
     return LLVMBuildCall2(builder, asm_function_type, inline_asm, NULL, 0, get_next_var_name("env_ptr", dummy_slot_for_debug));
@@ -629,7 +643,11 @@ static void set_env_ptr_raw(LLVMValueRef env_stack) {
     LLVMTypeRef asm_function_type = LLVMFunctionType(LLVMVoidType(), asm_param_types, 1, 0);
     //FIXME: handle AArch64 as well
     char asm_string[128];
+#if defined(__aarch64__)
+    sprintf(asm_string, "mov x25, $0");
+#elif defined(__riscv) && __riscv_xlen == 64
     sprintf(asm_string, "mv x25, $0");
+#endif
     const char *constraint_string = "r,~{x25}";
     LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_function_type, asm_string, constraint_string, /* has_side_effects */ 1, /* is_align_stack */ 0);
     LLVMValueRef call_args[] = { env_stack };
@@ -1894,7 +1912,17 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
 
     // Store all vectors to ENV
     LLVMTypeRef ret_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
-    LLVMTypeRef param_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+#if defined(__aarch64__)
+    for (int i = FIXED_PARAM_COUNT; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
+        LLVMValueRef vec_val = LLVMGetParam(trampoline, i);
+        uint64_t xmm_offset = get_xmm_offset((i - FIXED_PARAM_COUNT)/2) + 16 * ((i - FIXED_PARAM_COUNT) % 2);
+        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+        LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("spill_vec_addr", dummy_slot_for_debug));
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(ret_type, 0), get_next_var_name("spill_vec_ptr", dummy_slot_for_debug));
+        LLVMBuildStore(builder, vec_val, ptr);
+    }
+#elif defined(__riscv) && __riscv_xlen == 64
+    LLVMTypeRef param_type = get_vector_parameter_type_for_arch();
     LLVMTypeRef intrinsic_types[] = {param_type, LLVMInt64Type()};
     LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 2, 0);
     LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, "llvm.vector.extract.v2i64.nxv1i64");
@@ -1911,6 +1939,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(ret_type, 0), get_next_var_name("spill_vec_ptr", dummy_slot_for_debug));
         LLVMBuildStore(builder, vec_val, ptr);
     }
+#endif
 
     LLVMValueRef call_args[MAX_OPERANDS_COUNT] = {NULL};
     int idx_with_env = 0;
@@ -1987,7 +2016,16 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     }
 
     // Load all vectors from ENV
-    ret_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+#if defined(__aarch64__)
+    for (int i = FIXED_PARAM_COUNT; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
+        uint64_t env_xmm_offset = get_xmm_offset((i - FIXED_PARAM_COUNT)/2) + 16 * ((i - FIXED_PARAM_COUNT) % 2);
+        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xmm_offset, 0);
+        LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("reload_vec_addr", dummy_slot_for_debug));
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[LLVMVector2xi64], 0), get_next_var_name("reload_vec_ptr", dummy_slot_for_debug));
+        return_args[i] = LLVMBuildLoad2(builder, llvm_int_types[LLVMVector2xi64], ptr, get_next_var_name("reload_vec_val", dummy_slot_for_debug));
+    }
+#elif defined(__riscv) && __riscv_xlen == 64
+    ret_type = get_vector_parameter_type_for_arch();
     param_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
     LLVMTypeRef intrinsic_types2[] = {ret_type, param_type, LLVMInt64Type()};
     LLVMTypeRef intrinsic_func_type2 = LLVMFunctionType(ret_type, intrinsic_types2, 3, 0);
@@ -2004,6 +2042,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(ret_type), vec_elem, index_0};
         return_args[i] = LLVMBuildCall2(builder, intrinsic_func_type2, intrinsic_func, intrinsic_call_args, 3, get_next_var_name("reload_vec_val", dummy_slot_for_debug));
     }
+#endif
 
     LLVMTypeRef next_type = LLVMGlobalGetValueType(next_func);
     LLVMValueRef next_addr = LLVMGetParam(trampoline, (FIXED_VECTOR_PARAM_COUNT + (param_cnt - reuse_cnt) + 1));
@@ -2058,7 +2097,17 @@ static LLVMValueRef get_trampoline_for_jmp_ind_callback() {
 
     // Store all vectors to ENV
     LLVMTypeRef ret_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
-    LLVMTypeRef param_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+#if defined(__aarch64__)
+    for (int i = FIXED_PARAM_COUNT; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
+        LLVMValueRef vec_val = LLVMGetParam(trampoline, i);
+        uint64_t xmm_offset = get_xmm_offset((i - FIXED_PARAM_COUNT)/2) + 16 * ((i - FIXED_PARAM_COUNT) % 2);
+        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+        LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("spill_vec_addr", dummy_slot_for_debug));
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(ret_type, 0), get_next_var_name("spill_vec_ptr", dummy_slot_for_debug));
+        LLVMBuildStore(builder, vec_val, ptr);
+    }
+#elif defined(__riscv) && __riscv_xlen == 64
+    LLVMTypeRef param_type = get_vector_parameter_type_for_arch();
     LLVMTypeRef intrinsic_types[] = {param_type, LLVMInt64Type()};
     LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 2, 0);
     LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, "llvm.vector.extract.v2i64.nxv1i64");
@@ -2075,6 +2124,7 @@ static LLVMValueRef get_trampoline_for_jmp_ind_callback() {
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(ret_type, 0), get_next_var_name("spill_vec_ptr", dummy_slot_for_debug));
         LLVMBuildStore(builder, vec_val, ptr);
     }
+#endif
 
     // Get and call the helper
     LLVMValueRef call_args[2] = {NULL};
@@ -2099,7 +2149,11 @@ static uint8_t do_link_helper(HelperType h, const char *build_macro, const char 
     FILE *check_fp = fopen(bc_name, "r");
     if (!check_fp) {
         char cmd[512] = {0};
+#if defined(__aarch64__)
+        sprintf(cmd, "clang -c %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, helper_str[h], bc_name);
+#elif defined(__riscv) && __riscv_xlen == 64
         sprintf(cmd, "clang -c %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, helper_str[h], bc_name);
+#endif
         int rc = system(cmd);
         if (rc) {
             printf("Build command %s failed\n", cmd);
@@ -2155,8 +2209,10 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
                     param_in_stack.s.slot_idx = i - FIXED_PARAM_COUNT;
                     param_in_stack.s.offset = 0;
                     LLVMValueRef vec = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[i], 0);
-
-                    LLVMTypeRef ret_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+#if defined(__aarch64__)
+                    out_args[i] = vec;
+#elif defined(__riscv) && __riscv_xlen == 64
+                    LLVMTypeRef ret_type = get_vector_parameter_type_for_arch();
                     LLVMTypeRef param_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
                     LLVMTypeRef intrinsic_types[] = {ret_type, param_type, LLVMInt64Type()};
                     LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 3, 0);
@@ -2167,6 +2223,7 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
                     LLVMValueRef index_0 = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
                     LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(ret_type), vec, index_0};
                     out_args[i] = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, intrinsic_call_args, 3, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+#endif
                 }
             } else {
                 out_args[i] = LLVMGetParam(llvm_func, i);
@@ -2683,8 +2740,11 @@ static void setup_func_stack() {
                 func_xmm_alloca[i] = alloca_inst;
                 func_xmm_llvmtype[i] = fixed_vector_param_llvmtypes[XREG_MAX + i];
                 LLVMSetAlignment(alloca_inst, 16);
+#if defined(__aarch64__)
+                LLVMBuildStore(builder, LLVMGetParam(llvm_func, FIXED_PARAM_COUNT + i), func_xmm_alloca[i]);
+#elif defined(__riscv) && __riscv_xlen == 64
                 LLVMTypeRef ret_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
-                LLVMTypeRef param_type = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+                LLVMTypeRef param_type = get_vector_parameter_type_for_arch();
                 LLVMTypeRef intrinsic_types[] = {param_type, LLVMInt64Type()};
                 LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 2, 0);
                 LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, "llvm.vector.extract.v2i64.nxv1i64");
@@ -2695,6 +2755,7 @@ static void setup_func_stack() {
                 LLVMValueRef call_args[] = {LLVMGetParam(llvm_func, FIXED_PARAM_COUNT + i), index_0};
                 LLVMValueRef call_inst = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, call_args, 2, get_next_var_name("stack", dummy_slot_for_debug));
                 LLVMBuildStore(builder, call_inst, func_xmm_alloca[i]);
+#endif
                 fixed_vector_param_in_stack[FIXED_PARAM_COUNT + i] = 1;
             }
         }
@@ -3278,7 +3339,7 @@ void module_prolog() {
     builder = LLVMCreateBuilder();
 
     // Parameter setup (same for all functions)
-    LLVMTypeRef vscale_i64 = LLVMScalableVectorType(LLVMInt64Type(), 1); // <vscale x 1 x i64>
+    LLVMTypeRef vscale_i64 = get_vector_parameter_type_for_arch();
     const char *base_names[20] = {
         "rax", "rcx", "rdx", "rbx",
         "rsp", "rbp", "rsi", "rdi",
@@ -3472,20 +3533,36 @@ int main(int argc, const char *argv[]) {
     }
 
     sprintf(output_file, "%s.o", argv[1]);
+#if defined(__aarch64__)
+    LLVMInitializeAArch64TargetInfo();
+    LLVMInitializeAArch64Target();
+    LLVMInitializeAArch64TargetMC();
+    LLVMInitializeAArch64AsmPrinter();
+    LLVMInitializeAArch64AsmParser();
+#elif defined(__riscv) && __riscv_xlen == 64
     LLVMInitializeRISCVTargetInfo();
     LLVMInitializeRISCVTarget();
     LLVMInitializeRISCVTargetMC();
     LLVMInitializeRISCVAsmPrinter();
     LLVMInitializeRISCVAsmParser();
+#endif
 
     char *error_msg = NULL;
+#if defined(__aarch64__)
+    const char *default_triple = "aarch64-unknown-linux-gnu";
+#elif defined(__riscv) && __riscv_xlen == 64
     const char *default_triple = "riscv64-unknown-linux-gnu";
+#endif
     LLVMTargetRef target;
     if (LLVMGetTargetFromTriple(default_triple, &target, &error_msg)) {
         printf("Failed to get target from triple %s\n", error_msg);
         return -1;
     }
+#if defined(__aarch64__)
+    const char* features = "+neon";
+#elif defined(__riscv) && __riscv_xlen == 64
     const char* features = "+m,+a,+f,+d,+v";
+#endif
     target_machine = LLVMCreateTargetMachine(target, default_triple, "generic", features,
                                              LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelDefault);
 
