@@ -2445,7 +2445,7 @@ static abi_ulong setup_arg_pages(struct linux_binprm *bprm,
     }
 #ifdef FIX_RSP_FOR_TRACE
 #if defined(__aarch64__)
-    error = target_mmap(0x3FF7000000, size + guard, prot,
+    error = target_mmap(0x3ff69fc000, size + guard, prot,
                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #elif defined(__riscv) && __riscv_xlen == 64
     error = target_mmap(0x3FF7000000, size + guard, prot,
@@ -3997,7 +3997,7 @@ int load_elf_binary(struct linux_binprm *bprm, struct image_info *info)
     bprm->p = setup_arg_pages(bprm, info);
 #ifdef FIX_RSP_FOR_TRACE
 #if defined(__aarch64__)
-    bprm->p -= 0x960;
+    bprm->p += 0x900;
 #elif defined(__riscv) && __riscv_xlen == 64
     bprm->p -= 0x970;
 #endif
