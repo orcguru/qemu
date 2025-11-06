@@ -33,17 +33,17 @@ void reset_instr_buffer() {
 }
 
 void register_xmm(uint64_t idx, uint64_t offset) {
-    assert(idx < 15);
+    assert(idx < 16);
     xmm_offsets[idx] = (uint16_t)offset;
 }
 
 uint64_t get_xmm_offset(uint64_t idx) {
-    assert(idx <= 15);
+    assert(idx < 16);
     return xmm_offsets[idx];
 }
 
 void register_xmm_tmp(uint64_t offset) {
-    xmm_offsets[15] = (uint16_t)offset;
+    assert(0);
 }
 
 XMMReg lookup_xmm(uint64_t offset) {
@@ -51,7 +51,7 @@ XMMReg lookup_xmm(uint64_t offset) {
     XMMReg x;
     x.xmm_idx = NON_XMM;
     x.xmm_offset = 0;
-    if (xmm_offsets[0] <= off && off < (xmm_offsets[14] + 0x20)) {
+    if (xmm_offsets[0] <= off && off < (xmm_offsets[15] + 0x20)) {
         uint16_t idx = (off - xmm_offsets[0]) / 0x40;
         uint16_t delta = (off - xmm_offsets[0]) % 0x40;
         if (delta < 0x10) {
@@ -61,16 +61,6 @@ XMMReg lookup_xmm(uint64_t offset) {
             x.xmm_idx = idx * 2 + 1;
             x.xmm_offset = delta - 0x10;
         }
-#if 0
-    } else if (xmm_offsets[15] <= off && off < (xmm_offsets[15] + 0x20)) {
-        if ((off - xmm_offsets[15]) < 0x10) {
-            x.xmm_idx = xmmt;
-            x.xmm_offset = (off - xmm_offsets[15]);
-        } else {
-            x.xmm_idx = ymmt_h;
-            x.xmm_offset = (off - (xmm_offsets[15] + 0x10));
-        }
-#endif
     }
     return x;
 }

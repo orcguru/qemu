@@ -1498,6 +1498,8 @@ typedef enum {
     X(ymm13_h) \
     X(xmm14) \
     X(ymm14_h) \
+    X(xmm15) \
+    X(ymm15_h) \
     X(NON_XMM)
 
 typedef enum {
