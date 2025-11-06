@@ -1,23 +1,24 @@
 LEX = flex
 BISON = bison
-ARCH := $(shell uname -m)
-ifeq ($(ARCH), aarch64)
+ARCH_HOST := $(shell uname -m)
+ARCH_TARGET = $(shell uname -m)
+ifeq ($(ARCH_TARGET), aarch64)
     LLVM_PATH = /home/felix/Install/llvm
-else ifeq ($(ARCH), riscv64)
+else ifeq ($(ARCH_TARGET), riscv64)
     LLVM_PATH = /home/felix/Install/llvm_riscv
 endif
 CFLAGS = -O2 -g -Wall -I/usr/include/glib-2.0 -I$(LLVM_PATH)/include
-ifeq ($(ARCH), aarch64)
+ifeq ($(ARCH_HOST), aarch64)
     CFLAGS += -I/usr/lib64/glib-2.0/include
-else ifeq ($(ARCH), riscv64)
+else ifeq ($(ARCH_HOST), riscv64)
     CFLAGS += -I/usr/lib/riscv64-linux-gnu/glib-2.0/include
 endif
 LDFLAGS := $(shell $(LLVM_PATH)/bin/llvm-config --ldflags --libs all | tr -d '\n')
 LDFLAGS += -lffi -lz -lstdc++ -lm -ltinfo -lzstd -lglib-2.0
 
-ifeq ($(ARCH), aarch64)
+ifeq ($(ARCH_HOST), aarch64)
     LDFLAGS += -L/usr/lib64
-else ifeq ($(ARCH), riscv64)
+else ifeq ($(ARCH_HOST), riscv64)
     LDFLAGS += -L/usr/lib/riscv64-linux-gnu
 endif
 

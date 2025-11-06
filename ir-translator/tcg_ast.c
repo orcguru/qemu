@@ -19,9 +19,9 @@
 #include <stdbool.h>
 #include <glib.h>
 
-#define BUILD_RISCV_ON_AARCH        1
+//#define BUILD_RISCV_ON_AARCH        1
 //#define VERBOSE_VAR                 1
-#define DEBUG                       1
+//#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_EFFECTIVE_T     opciosz[opc][1]
@@ -730,7 +730,7 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
                 }
             }
             ret = LLVMConstVector(constants, full_cnt);
-#if defined(__riscv) && __riscv_xlen == 64
+#if defined(__riscv) && __riscv_xlen == 64 || defined(BUILD_RISCV_ON_AARCH)
             LLVMTypeRef ret_type = llvm_int_types[tidx];
             LLVMTypeRef param_type = LLVMVectorType(llvm_int_types[OPC_VECTOR_TO_FIXED(tidx)], llvm_vector_elem_bit_counts[tidx*2]);
             LLVMTypeRef intrinsic_types[] = {ret_type, param_type, llvm_int_types[OPC_ADDR_T]};
@@ -1053,13 +1053,10 @@ void translate_dupm_vec(OpCodeType opc, void *ptr) {
     LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, vtype, 0);
     LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
     LLVMValueRef first_element = LLVMBuildExtractElement(builder, src, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMTypeRef element_type = LLVMGetElementType(LLVMTypeOf(src));
-    LLVMTypeRef single_element_vector_type = LLVMVectorType(element_type, 1);
-    LLVMValueRef single_element_vector = LLVMBuildInsertElement(builder, LLVMGetUndef(single_element_vector_type), first_element, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMTypeRef vec_type = LLVMTypeOf(src);
+    LLVMValueRef single_element_vector = LLVMBuildInsertElement(builder, LLVMGetUndef(llvm_int_types[vtype]), first_element, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     unsigned base_num_elements = llvm_vector_elem_bit_counts[vtype*2]/2;
-    LLVMValueRef zero_mask = LLVMGetUndef(LLVMVectorType(llvm_int_types[OPC_ADDR_T], base_num_elements));
-    LLVMValueRef splat_vector = LLVMBuildShuffleVector(builder, single_element_vector, LLVMGetUndef(single_element_vector_type), zero_mask, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef zero_mask = LLVMGetUndef(llvm_int_types[vtype]);
+    LLVMValueRef splat_vector = LLVMBuildShuffleVector(builder, single_element_vector, LLVMGetUndef(llvm_int_types[vtype]), zero_mask, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     do_store(opc, splat_vector, OPC_OUTPUT_T, operand0);
 #endif
 }
@@ -2687,7 +2684,7 @@ static void setup_func_stack() {
         }
     }
     if (xmm_valid) {
-        for (int i = 0; i < (1<<5)-2; ++i) {
+        for (int i = 0; i < (1<<5); ++i) {
             if (xmm_valid & (1 << i)) {
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + i]], fixed_vector_stack_names[XREG_MAX + i]);
                 func_xmm_alloca[i] = alloca_inst;
@@ -2697,17 +2694,6 @@ static void setup_func_stack() {
                 fixed_vector_param_in_stack[FIXED_PARAM_COUNT + i] = 1;
             }
         }
-#if 0
-        for (int i = (1<<5)-2; i < (1<<5); ++i) {
-            if (xmm_valid & (1 << i)) {
-                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[LLVMVector2xi64], xmm_tmp_stack_names[i-((1<<5)-2)]);
-                func_xmm_alloca[i] = alloca_inst;
-                func_xmm_llvmtype[i] = LLVMVector2xi64;
-                LLVMSetAlignment(alloca_inst, 16);
-                xmmt_valid[i%2] = 1;
-            }
-        }
-#endif
     }
 }
 
@@ -3404,7 +3390,7 @@ void module_prolog() {
 
 void module_epilog() {
     //LLVMDumpModule(module);
-#if 0
+#if 1
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
         if (LLVMIsAFunction(function)) {
