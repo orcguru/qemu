@@ -3633,6 +3633,8 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V27, TCG_AREG0, 0x6a0 + 1*16);
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V28, TCG_AREG0, 0x6e0 + 0*16);
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V29, TCG_AREG0, 0x6e0 + 1*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V30, TCG_AREG0, 0x720 + 0*16);
+    tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V31, TCG_AREG0, 0x720 + 1*16);
 
     tcg_out_insn(s, 3207, BR, TCG_REG_TMP0);
 
