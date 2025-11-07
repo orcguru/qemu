@@ -29,6 +29,7 @@
 #define OPC_ADDR_T          LLVMInt64
 #define OPC_FIXED_TO_VECTOR(T)      (T + 4)
 #define OPC_VECTOR_TO_FIXED(T)      (T - 4)
+#define OPC_DUAL_VECTOR_TO_FIXED(T)      (T - 8)
 #define WITH_FIXED_VEC_CONTEXT      1
 #define WITHOUT_FIXED_VEC_CONTEXT   0
 #define MAX_OPERANDS_COUNT          16
@@ -290,7 +291,6 @@ extern const char *helper_str[];
 extern LLVMType helper_vec_type[HELPER_MAX];
 extern const char *xmmreg_str[];
 extern uint8_t inline_helper_enabled[HELPER_MAX];
-extern uint8_t can_do_helper_inline[HELPER_MAX];
 extern uint64_t xreg_offsets[XREG_MAX];
 
 static LLVMAttributeRef target_features_attr = NULL;
@@ -311,13 +311,14 @@ static LLVMType fixed_vector_param_llvmtypes[FIXED_VECTOR_PARAM_COUNT] = {0};
 static uint8_t fixed_vector_param_in_stack[FIXED_VECTOR_PARAM_COUNT] = {0};
 static const char *fixed_vector_arg_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 static const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
+// FIXME: put xmm_tmp in stack?
 #if 0
 static const char *xmm_tmp_stack_names[2] = {NULL};
 #endif
 static const char *tmp_stack_names[1<<5] = {NULL};
 static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)] = {NULL};
 static int ir_var_name_idx = 0;
-static LLVMTypeRef llvm_int_types[LLVMMAXType] = {NULL};
+static LLVMTypeRef llvm_int_types[LLVMMAXType] = {0};
 static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
 static LLVMValueRef func_xreg_alloca[1 << 5] = {NULL};
 static LLVMValueRef func_tmp_alloca[1 << 5] = {NULL};
@@ -334,7 +335,6 @@ static uint64_t current_func_offset = 0;
 static uint8_t current_call_idx = 0;
 static int32_t shadow_call_offset = 16;
 static void *call_accumulated[BB_MAX_CNT] = {NULL};
-static uint8_t xmmt_valid[2] = {0};
 static uint32_t xreg_valid = 0, tmp_valid = 0, xmm_valid = 0;
 static LLVMType tmp_bits_type[1<<5] = {0};
 static char output_file[128] = {0};
@@ -2422,30 +2422,6 @@ void translate_call(OpCodeType opc, void *ptr) {
     int call_arg_cnts = 0;
     uint8_t do_inline_helper = (all_alias && helper_vec_type[h] != LLVMInvalidType && inline_helper_enabled[h]) ? do_link_helper(h, build_macro, bc_name) : 0;
     if (!do_inline_helper) {
-#if 0
-        // TODO: how do we handle xmm_tmp? trampoline does not have enough vector slots, so we have to dump it before hand
-        LLVMValueRef env_raw = NULL;
-        for (int i = 0; i < 2; ++i) {
-            if (xmmt_valid[i]) {
-                OperandType param_in_stack;
-                param_in_stack.s.valid = 1;
-                param_in_stack.s.slot_type = SUB_SLOT_XMM;
-                param_in_stack.s.slot_idx = xmmt + i;
-                param_in_stack.s.offset = 0;
-                LLVMValueRef vec_val = get_source_node_imm_or_stack(opc, 0, param_in_stack, LLVMVector2xi64, 0);
-                uint64_t xmm_offset = get_xmm_offset(param_in_stack.s.slot_idx/2) + 16*(param_in_stack.s.slot_idx%2);
-                LLVMTypeRef ret_type = LLVMVectorType(LLVMInt64Type(), 2); // <2 x i64>
-                LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
-                if (!env_raw) {
-                    env_raw = get_env_ptr_raw();
-                }
-                LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(ret_type, 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                LLVMBuildStore(builder, vec_val, ptr);
-            }
-        }
-#endif
-
         // Get the helper
         LLVMValueRef helper_func = LLVMGetNamedFunction(module, helper_str[h]);
         if (!helper_func) {
@@ -2469,15 +2445,135 @@ void translate_call(OpCodeType opc, void *ptr) {
         LLVMSetInstructionCallConv(call_trampoline_inst, QEMUAOT_CC);
         LLVMBuildRetVoid(builder);
     } else {
-        call_arg_cnts = collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, operands, is_imm, op_cnt);
-        assert(call_arg_cnts <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
-        LLVMValueRef helper = LLVMGetNamedFunction(module, helper_func_name);
-        assert(helper);
-        LLVMTypeRef helper_type = LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, call_arg_cnts, 0);
-        LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper, call_args, call_arg_cnts, "");
-        LLVMSetTailCall(call_helper_inst, 1);
-        LLVMSetInstructionCallConv(call_helper_inst, QEMUAOT_CC);
-        LLVMBuildRetVoid(builder);
+        if (helper_vec_type[h] < LLVMVector32xi8) {
+            // Invoke XMM
+            call_arg_cnts = collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, operands, is_imm, op_cnt);
+            assert(call_arg_cnts <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
+            LLVMValueRef helper = LLVMGetNamedFunction(module, helper_func_name);
+            assert(helper);
+            LLVMTypeRef helper_type = LLVMFunctionType(LLVMVoidType(), fixed_vector_param_types, call_arg_cnts, 0);
+            LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper, call_args, call_arg_cnts, "");
+            LLVMSetTailCall(call_helper_inst, 1);
+            LLVMSetInstructionCallConv(call_helper_inst, QEMUAOT_CC);
+            LLVMBuildRetVoid(builder);
+        } else {
+            // Invoke YMM, need aggregate on riscv64
+#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+            // NOT FOR FIXED-VECTOR
+            assert(0);
+#endif
+            LLVMValueRef constants[32];
+            LLVMType t = helper_vec_type[h];
+            int cnt = llvm_vector_elem_bit_counts[t*2];
+            for (int i = 0; i < cnt; i++) {
+                LLVMValueRef element_value = LLVMConstInt(llvm_int_types[OPC_DUAL_VECTOR_TO_FIXED(t)], i, 0);
+                constants[i] = element_value;
+            }
+            LLVMValueRef mask_fixed = LLVMConstVector(constants, cnt);
+            LLVMTypeRef ret_type = llvm_int_types[t];
+            LLVMTypeRef param_type = LLVMVectorType(llvm_int_types[OPC_DUAL_VECTOR_TO_FIXED(t)], cnt);
+            LLVMTypeRef intrinsic_types[] = {ret_type, param_type, llvm_int_types[OPC_ADDR_T]};
+            LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 3, 0);
+            char intrinsic_func_name[128] = {0};
+            sprintf(intrinsic_func_name, "llvm.vector.insert.nxv%di%d.v%di%d", llvm_vector_elem_bit_counts[t*2]/2, llvm_vector_elem_bit_counts[t*2+1], llvm_vector_elem_bit_counts[t*2], llvm_vector_elem_bit_counts[t*2+1]);
+            LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, intrinsic_func_name);
+            if (!intrinsic_func) {
+                intrinsic_func = LLVMAddFunction(module, intrinsic_func_name, intrinsic_func_type);
+            }
+            LLVMValueRef index_0 = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
+            LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(ret_type), mask_fixed, index_0};
+            LLVMValueRef mask_scalable = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, intrinsic_call_args, 3, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+
+            LLVMTypeRef call_args_types[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
+            for (call_arg_cnts = 0; call_arg_cnts < FIXED_PARAM_COUNT; ++call_arg_cnts) {
+                if (fixed_vector_param_in_stack[call_arg_cnts]) {
+                    OperandType param_in_stack;
+                    param_in_stack.s.valid = 1;
+                    param_in_stack.s.slot_type = SUB_SLOT_XREG;
+                    param_in_stack.s.slot_idx = call_arg_cnts;
+                    call_args[call_arg_cnts] = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[call_arg_cnts], 0);
+                } else {
+                    call_args[call_arg_cnts] = LLVMGetParam(llvm_func, call_arg_cnts);
+                }
+                call_args_types[call_arg_cnts] = fixed_vector_param_types[call_arg_cnts];
+            }
+            for (call_arg_cnts = FIXED_PARAM_COUNT; call_arg_cnts < (FIXED_PARAM_COUNT + 16); ++call_arg_cnts) {
+                int vec_elem_idx1 = FIXED_PARAM_COUNT + 2 * (call_arg_cnts - FIXED_PARAM_COUNT);
+                int vec_elem_idx2 = FIXED_PARAM_COUNT + 2 * (call_arg_cnts - FIXED_PARAM_COUNT) + 1;
+                LLVMValueRef vec1 = NULL;
+                LLVMValueRef vec2 = NULL;
+                if (fixed_vector_param_in_stack[vec_elem_idx1]) {
+                    OperandType param_in_stack;
+                    param_in_stack.s.valid = 1;
+                    param_in_stack.s.slot_type = SUB_SLOT_XMM;
+                    param_in_stack.s.slot_idx = vec_elem_idx1 - FIXED_PARAM_COUNT;
+                    param_in_stack.s.offset = 0;
+                    vec1 = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[vec_elem_idx1], 0);
+                } else {
+                    vec1 = LLVMGetParam(llvm_func, vec_elem_idx1);
+                }
+                if (fixed_vector_param_in_stack[vec_elem_idx2]) {
+                    OperandType param_in_stack;
+                    param_in_stack.s.valid = 1;
+                    param_in_stack.s.slot_type = SUB_SLOT_XMM;
+                    param_in_stack.s.slot_idx = vec_elem_idx2 - FIXED_PARAM_COUNT;
+                    param_in_stack.s.offset = 0;
+                    vec2 = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[vec_elem_idx2], 0);
+                } else {
+                    vec2 = LLVMGetParam(llvm_func, vec_elem_idx2);
+                }
+                call_args[call_arg_cnts] = LLVMBuildShuffleVector(builder, vec1, vec2, mask_scalable, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                call_args_types[call_arg_cnts] = ret_type;
+            }
+            if (op_cnt) {
+                for (int op_idx = 0; op_idx < op_cnt; ++op_idx) {
+                    if (is_imm[op_idx]) {
+                        call_args[call_arg_cnts] = LLVMConstInt(llvm_int_types[OPC_ADDR_T], operands[op_idx].i, 0);
+                    } else {
+                        assert(operands[op_idx].s.slot_type != SUB_SLOT_XMM);
+                        if (operands[op_idx].s.slot_type == SUB_SLOT_TMP && has_alias(operands[op_idx])) {
+                            OperandType alias = get_alias(operands[op_idx]);
+                            assert(alias.s.valid);
+                            if (alias.s.slot_type == SUB_SLOT_XMM) {
+                                // FIXME
+                                assert(0);
+                            } else if (alias.s.slot_type == SUB_SLOT_ENV) {
+                                LLVMValueRef env_raw = get_env_ptr_raw();
+                                LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], alias.s.offset, 0);
+                                call_args[call_arg_cnts] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                            } else {
+                                assert(0);
+                            }
+                        } else {
+                            if (operands[op_idx].s.slot_type == SUB_SLOT_ENVVAR) {
+                                call_args[call_arg_cnts] = get_source_node_imm_or_stack(opc, 0, operands[op_idx], OPC_ADDR_T, 0);
+                            } else if (operands[op_idx].s.slot_type == SUB_SLOT_XREG) {
+                                // FIXME
+                                assert(0);
+                            } else if (operands[op_idx].s.slot_type == SUB_SLOT_TMP) {
+                                assert(func_tmp_llvmtype[operands[op_idx].s.slot_idx] <= LLVMInt64);
+                                call_args[call_arg_cnts] = get_source_node_imm_or_stack(opc, 0, operands[op_idx], func_tmp_llvmtype[operands[op_idx].s.slot_idx], 0);
+                                if (func_tmp_llvmtype[operands[op_idx].s.slot_idx] < LLVMInt64) {
+                                    call_args[call_arg_cnts] = LLVMBuildZExt(builder, call_args[call_arg_cnts], llvm_int_types[LLVMInt64], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                                }
+                            } else {
+                                assert(0);
+                            }
+                        }
+                    }
+                    call_args_types[call_arg_cnts] = LLVMInt64Type();
+                    call_arg_cnts += 1;
+                }
+            }
+            assert(call_arg_cnts <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
+            LLVMValueRef helper = LLVMGetNamedFunction(module, helper_func_name);
+            assert(helper);
+            LLVMTypeRef helper_type = LLVMFunctionType(LLVMVoidType(), call_args_types, call_arg_cnts, 0);
+            LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper, call_args, call_arg_cnts, "");
+            LLVMSetTailCall(call_helper_inst, 1);
+            LLVMSetInstructionCallConv(call_helper_inst, QEMUAOT_CC);
+            LLVMBuildRetVoid(builder);
+        }
     }
 
     LLVMValueRef llvm_func_backup = llvm_func;
@@ -2626,8 +2722,6 @@ static void cleanup_func_resource() {
     br_count = 0;
     current_call_idx = 0;
     shadow_call_offset = 16;
-    xmmt_valid[0] = 0;
-    xmmt_valid[1] = 0;
     xreg_valid = 0;
     tmp_valid = 0;
     xmm_valid = 0;
@@ -3341,6 +3435,10 @@ void module_prolog() {
     llvm_int_types[LLVMVector8xi16] = LLVMScalableVectorType(LLVMInt16Type(), 4);
     llvm_int_types[LLVMVector4xi32] = LLVMScalableVectorType(LLVMInt32Type(), 2);
     llvm_int_types[LLVMVector2xi64] = LLVMScalableVectorType(LLVMInt64Type(), 1);
+    llvm_int_types[LLVMVector32xi8] = LLVMScalableVectorType(LLVMInt8Type(), 16);
+    llvm_int_types[LLVMVector16xi16] = LLVMScalableVectorType(LLVMInt16Type(), 8);
+    llvm_int_types[LLVMVector8xi32] = LLVMScalableVectorType(LLVMInt32Type(), 4);
+    llvm_int_types[LLVMVector4xi64] = LLVMScalableVectorType(LLVMInt64Type(), 2);
 #endif
 
     llvm_vector_elem_bit_counts[LLVMInt8*2] = 1;
@@ -3359,6 +3457,16 @@ void module_prolog() {
     llvm_vector_elem_bit_counts[LLVMVector4xi32*2+1] = 32;
     llvm_vector_elem_bit_counts[LLVMVector2xi64*2] = 2;
     llvm_vector_elem_bit_counts[LLVMVector2xi64*2+1] = 64;
+#if (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
+    llvm_vector_elem_bit_counts[LLVMVector32xi8*2] = 32;
+    llvm_vector_elem_bit_counts[LLVMVector32xi8*2+1] = 8;
+    llvm_vector_elem_bit_counts[LLVMVector16xi16*2] = 16;
+    llvm_vector_elem_bit_counts[LLVMVector16xi16*2+1] = 16;
+    llvm_vector_elem_bit_counts[LLVMVector8xi32*2] = 8;
+    llvm_vector_elem_bit_counts[LLVMVector8xi32*2+1] = 32;
+    llvm_vector_elem_bit_counts[LLVMVector4xi64*2] = 4;
+    llvm_vector_elem_bit_counts[LLVMVector4xi64*2+1] = 64;
+#endif
 
     env_var_offset[cc_src2] = 160;
     env_var_offset[es_base] = 192;

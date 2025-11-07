@@ -10,18 +10,18 @@ if ($#ARGV < 1) {
   exit 1;
 }
 my %prefixMap = (
-  "q" => ["unsigned long", "v2ulong"],
-  "l" => ["unsigned int", "v4uint"],
-  "w" => ["unsigned short", "v8ushort"],
-  "b" => ["unsigned char", "v16uchar"]
+  "q" => ["unsigned long", "v4ulong"],
+  "l" => ["unsigned int", "v8uint"],
+  "w" => ["unsigned short", "v16ushort"],
+  "b" => ["unsigned char", "v32uchar"]
 );
 my %typeMap = (
-  "v2ulong" => "LLVMVector2xi64",
-  "v4uint" => "LLVMVector4xi32",
-  "v8ushort" => "LLVMVector8xi16",
-  "v16uchar" => "LLVMVector16xi8",
+  "v4ulong" => "LLVMVector4xi64",
+  "v8uint" => "LLVMVector8xi32",
+  "v16ushort" => "LLVMVector16xi16",
+  "v32uchar" => "LLVMVector32xi8",
 );
-my $path = "$ARGV[0].helper_xmm";
+my $path = "$ARGV[0].helper_ymm";
 `rm -rf $path`;
 `mkdir -p $path`;
 open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
@@ -62,7 +62,7 @@ while (<FD>) {
     } elsif ($funcName =~ /\shelper_([^\(\s]+)[\s\(]/) {
       $shortFuncName = $1;
     }
-    if ($shortFuncName ne "" and (not $shortFuncName =~ /^A_/) and ($shortFuncName =~ /_xmm$/)) {
+    if ($shortFuncName ne "" and (not $shortFuncName =~ /^A_/) and ($shortFuncName =~ /_ymm$/)) {
       my $def = &GetText($fullStart, $fullStop, $ARGV[0]);
       $def = &UpdateFunc($def, $shortFuncName);
       if ($def ne "") {
@@ -98,8 +98,8 @@ sub GetText
 sub UpdateFunc
 {
   my ($funcStr, $funcShortName) = @_;
-  $funcStr =~ s/_xmm\s*\(\s*ZMMReg/_xmm\(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip__EXTRACT_HELPER_CALL_PARAM__, ZMMReg/;
-  $funcStr =~ s/_xmm\s*\(\s*CPUX86State\s*\*env\s*,\n?\s*/_xmm\(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip__EXTRACT_HELPER_CALL_PARAM__, /;
+  $funcStr =~ s/_ymm\s*\(\s*ZMMReg/_ymm\(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip__EXTRACT_HELPER_CALL_PARAM__, ZMMReg/;
+  $funcStr =~ s/_ymm\s*\(\s*CPUX86State\s*\*env\s*,\n?\s*/_ymm\(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip__EXTRACT_HELPER_CALL_PARAM__, /;
   my @fields = split("_ZMMReg", $funcStr);
   my $out = "";
   my %prefix = ();
@@ -119,7 +119,7 @@ sub UpdateFunc
   my $p = $sortedKeys[$#sortedKeys];
   my $entry = $prefixMap{$p};
   foreach my $k (keys %prefixMap) {
-    $out = $out."typedef $prefixMap{$k}->[0] __attribute__((__vector_size__(16))) $prefixMap{$k}->[1];\n";
+    $out = $out."typedef $prefixMap{$k}->[0] __attribute__((__vector_size__(32))) $prefixMap{$k}->[1];\n";
   }
   $out = $out."typedef unsigned long uintptr_t;\n";
   $out = $out."typedef unsigned long target_ulong;\n";
@@ -170,7 +170,7 @@ sub UpdateFunc
     }
     $out = $out."#define $fields[1] ARGUMENT$i\n";
   }
-  $funcStr = $splits[0].", $uniq_vec_type xmm0, $uniq_vec_type ymm0_h, $uniq_vec_type xmm1, $uniq_vec_type ymm1_h, $uniq_vec_type xmm2, $uniq_vec_type ymm2_h, $uniq_vec_type xmm3, $uniq_vec_type ymm3_h, $uniq_vec_type xmm4, $uniq_vec_type ymm4_h, $uniq_vec_type xmm5, $uniq_vec_type ymm5_h, $uniq_vec_type xmm6, $uniq_vec_type ymm6_h, $uniq_vec_type xmm7, $uniq_vec_type ymm7_h, $uniq_vec_type xmm8, $uniq_vec_type ymm8_h, $uniq_vec_type xmm9, $uniq_vec_type ymm9_h, $uniq_vec_type xmm10, $uniq_vec_type ymm10_h, $uniq_vec_type xmm11, $uniq_vec_type ymm11_h, $uniq_vec_type xmm12, $uniq_vec_type ymm12_h, $uniq_vec_type xmm13, $uniq_vec_type ymm13_h, $uniq_vec_type xmm14, $uniq_vec_type ymm14_h, $uniq_vec_type xmm15, $uniq_vec_type ymm15_h$additional_params";
+  $funcStr = $splits[0].", $uniq_vec_type ymm0, $uniq_vec_type ymm1, $uniq_vec_type ymm2, $uniq_vec_type ymm3, $uniq_vec_type ymm4, $uniq_vec_type ymm5, $uniq_vec_type ymm6, $uniq_vec_type ymm7, $uniq_vec_type ymm8, $uniq_vec_type ymm9, $uniq_vec_type ymm10, $uniq_vec_type ymm11, $uniq_vec_type ymm12, $uniq_vec_type ymm13, $uniq_vec_type ymm14, $uniq_vec_type ymm15$additional_params";
   foreach my $i (1 .. $#sub_splits) {
     $funcStr = $funcStr.")".$sub_splits[$i];
   }
@@ -193,15 +193,15 @@ sub UpdateFunc
   
   # Add call to helper_A_return
   if ($var eq "") {
-    $funcStr =~ s/}\s*$/return FUNC_RET(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);\n}/;
+    $funcStr =~ s/}\s*$/return FUNC_RET(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, ymm0, ymm1, ymm2, ymm3, ymm4, ymm5, ymm6, ymm7, ymm8, ymm9, ymm10, ymm11, ymm12, ymm13, ymm14, ymm15);\n}/;
   } else {
-    $funcStr =~ s/}\s*$/return FUNC_RET(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h, $var);\n}/;
+    $funcStr =~ s/}\s*$/return FUNC_RET(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, ymm0, ymm1, ymm2, ymm3, ymm4, ymm5, ymm6, ymm7, ymm8, ymm9, ymm10, ymm11, ymm12, ymm13, ymm14, ymm15, $var);\n}/;
   }
 
   if ($var eq "") {
-    $out = $out."extern __attribute__((qemuaot)) void FUNC_RET(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long cc_src, unsigned long cc_dst, unsigned int cc_op, unsigned long rip, v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong ymm1_h, v2ulong xmm2, v2ulong ymm2_h, v2ulong xmm3, v2ulong ymm3_h, v2ulong xmm4, v2ulong ymm4_h, v2ulong xmm5, v2ulong ymm5_h, v2ulong xmm6, v2ulong ymm6_h, v2ulong xmm7, v2ulong ymm7_h, v2ulong xmm8, v2ulong ymm8_h, v2ulong xmm9, v2ulong ymm9_h, v2ulong xmm10, v2ulong ymm10_h, v2ulong xmm11, v2ulong ymm11_h, v2ulong xmm12, v2ulong ymm12_h, v2ulong xmm13, v2ulong ymm13_h, v2ulong xmm14, v2ulong ymm14_h, v2ulong xmm15, v2ulong ymm15_h);\n";
+    $out = $out."extern __attribute__((qemuaot)) void FUNC_RET(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long cc_src, unsigned long cc_dst, unsigned int cc_op, unsigned long rip, v4ulong ymm0, v4ulong ymm1, v4ulong ymm2, v4ulong ymm3, v4ulong ymm4, v4ulong ymm5, v4ulong ymm6, v4ulong ymm7, v4ulong ymm8, v4ulong ymm9, v4ulong ymm10, v4ulong ymm11, v4ulong ymm12, v4ulong ymm13, v4ulong ymm14, v4ulong ymm15);\n";
   } else {
-    $out = $out."extern __attribute__((qemuaot)) void FUNC_RET(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long cc_src, unsigned long cc_dst, unsigned int cc_op, unsigned long rip, v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong ymm1_h, v2ulong xmm2, v2ulong ymm2_h, v2ulong xmm3, v2ulong ymm3_h, v2ulong xmm4, v2ulong ymm4_h, v2ulong xmm5, v2ulong ymm5_h, v2ulong xmm6, v2ulong ymm6_h, v2ulong xmm7, v2ulong ymm7_h, v2ulong xmm8, v2ulong ymm8_h, v2ulong xmm9, v2ulong ymm9_h, v2ulong xmm10, v2ulong ymm10_h, v2ulong xmm11, v2ulong ymm11_h, v2ulong xmm12, v2ulong ymm12_h, v2ulong xmm13, v2ulong ymm13_h, v2ulong xmm14, v2ulong ymm14_h, v2ulong xmm15, v2ulong ymm15_h, $type $var);\n";
+    $out = $out."extern __attribute__((qemuaot)) void FUNC_RET(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long cc_src, unsigned long cc_dst, unsigned int cc_op, unsigned long rip, v4ulong ymm0, v4ulong ymm1, v4ulong ymm2, v4ulong ymm3, v4ulong ymm4, v4ulong ymm5, v4ulong ymm6, v4ulong ymm7, v4ulong ymm8, v4ulong ymm9, v4ulong ymm10, v4ulong ymm11, v4ulong ymm12, v4ulong ymm13, v4ulong ymm14, v4ulong ymm15, $type $var);\n";
   }
 
   $out = $out."__attribute__((qemuaot,always_inline)) ";
