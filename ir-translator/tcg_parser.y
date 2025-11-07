@@ -93,6 +93,7 @@ SYMBOL SLOT                                                             { insert
 | SYMBOL SLOT COMMA SLOT COMMA SLOT                                     { insert_instr(instr_buf, create_scalar_slot3(instr_buf, $1, $2, $4, $6)); }
 | SYMBOL SLOT COMMA SLOT COMMA IMMX                                     { insert_instr(instr_buf, create_scalar_slot2_imm(instr_buf, $1, $2, $4, $6)); }
 | SYMBOL SLOT COMMA SLOT COMMA IMMX COMMA RELOP                         { insert_instr(instr_buf, create_scalar_slot2_imm_relop(instr_buf, $1, $2, $4, $6, $8)); }
+| SYMBOL SLOT COMMA SLOT COMMA SLOT COMMA RELOP                         { insert_instr(instr_buf, create_scalar_slot3_relop(instr_buf, $1, $2, $4, $6, $8)); }
 | SYMBOL SLOT COMMA SLOT COMMA SLOT COMMA TSTREL                        { insert_instr(instr_buf, create_scalar_slot3_relop(instr_buf, $1, $2, $4, $6, $8)); }
 | SYMBOL SLOT COMMA SLOT COMMA IMMX COMMA TSTREL                        { insert_instr(instr_buf, create_scalar_slot2_imm_relop(instr_buf, $1, $2, $4, $6, $8)); }
 | SYMBOL SLOT COMMA SLOT COMMA SLOT COMMA IMMX                          { insert_instr(instr_buf, create_scalar_slot3_imm(instr_buf, $1, $2, $4, $6, $8)); }
@@ -103,6 +104,7 @@ SYMBOL SLOT                                                             { insert
 | SYMBOL SLOT COMMA SLOT COMMA IMMX COMMA SLOT COMMA IMMX COMMA RELOP               { insert_instr(instr_buf, create_scalar_slot2_imm_slot_imm_relop(instr_buf, $1, $2, $4, $6, $8, $10, $12)); }
 | SYMBOL SLOT COMMA SLOT COMMA IMMX COMMA IMMX COMMA SLOT COMMA RELOP               { insert_instr(instr_buf, create_scalar_slot2_imm2_slot_relop(instr_buf, $1, $2, $4, $6, $8, $10, $12)); }
 | SYMBOL SLOT COMMA SLOT COMMA IMMX COMMA SLOT COMMA SLOT COMMA TSTREL              { insert_instr(instr_buf, create_scalar_slot2_imm_slot2_relop(instr_buf, $1, $2, $4, $6, $8, $10, $12)); }
+| SYMBOL SLOT COMMA SLOT COMMA IMMX COMMA IMMX COMMA IMMX COMMA RELOP               { insert_instr(instr_buf, create_scalar_slot2_imm3_relop(instr_buf, $1, $2, $4, $6, $8, $10, $12)); }
 | DISCARD SLOT                                                                      { insert_instr(instr_buf, create_scalar_slot(instr_buf, $1, $2)); };
 
 vector:
@@ -121,6 +123,7 @@ CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT               
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT             { insert_instr(instr_buf, create_helper_slot4(instr_buf, $2, $4, $6, $8, $10, $12, $14)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT  { insert_instr(instr_buf, create_helper_slot5(instr_buf, $2, $4, $6, $8, $10, $12, $14, $16)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT COMMA IMMX             { insert_instr(instr_buf, create_helper_slot3_imm(instr_buf, $2, $4, $6, $8, $10, $12, $14)); }
+| CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT COMMA IMMX COMMA IMMX  { insert_instr(instr_buf, create_helper_slot3_imm2(instr_buf, $2, $4, $6, $8, $10, $12, $14, $16)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA IMMX COMMA IMMX                         { insert_instr(instr_buf, create_helper_env_imm2(instr_buf, $2, $4, $6, $10, $12)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT COMMA SLOT COMMA IMMX   { insert_instr(instr_buf, create_helper_env_slot3_imm(instr_buf, $2, $4, $6, $10, $12, $14, $16)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA IMMX COMMA IMMX             { insert_instr(instr_buf, create_helper_slot2_imm2(instr_buf, $2, $4, $6, $8, $10, $12, $14)); }
@@ -136,6 +139,7 @@ CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT               
 
 branch:
 BRCOND SLOT COMMA IMMX COMMA RELOP COMMA LABEL      { insert_instr(instr_buf, create_branch_condition(instr_buf, $2, $4, $6, $8)); }
+| BRCOND SLOT COMMA SLOT COMMA RELOP COMMA LABEL      { insert_instr(instr_buf, create_branch_condition_slot(instr_buf, $2, $4, $6, $8)); }
 | BRCOND SLOT COMMA IMMX COMMA TSTREL COMMA LABEL   { insert_instr(instr_buf, create_branch_condition(instr_buf, $2, $4, $6, $8)); }
 | CALLDIR SLOT COMMA IMMX COMMA IMMX                { insert_instr(instr_buf, create_slot_imm2(instr_buf, $1, $2, $4, $6)); }
 | JMPDIR IMMX                                       { insert_instr(instr_buf, create_jmpdirect(instr_buf, $2)); }

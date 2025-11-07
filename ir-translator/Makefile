@@ -1,7 +1,7 @@
 LEX = flex
 BISON = bison
 ARCH_HOST := $(shell uname -m)
-ARCH_TARGET = $(shell uname -m)
+ARCH_TARGET := $(shell uname -m)
 ifeq ($(ARCH_TARGET), aarch64)
     LLVM_PATH = /home/felix/Install/llvm
 else ifeq ($(ARCH_TARGET), riscv64)

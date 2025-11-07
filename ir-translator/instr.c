@@ -5,8 +5,8 @@
 #include <string.h>
 #include "tcg_ast.h"
 
-//#define DEBUG                     1
 //#define BUILD_RISCV_ON_AARCH      1
+//#define DEBUG                     1
 #define SET_SLOT(IDX)                               \
     do {                                            \
         s##IDX = get_mapped_slot(s##IDX);    \
@@ -299,7 +299,7 @@ void insert_instr(void *ptr_src, size_t sz) {
  */
 size_t create_scalar_slot2(void *ptr, OHType op, OperandType s0, OperandType s1) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr4B *i = (Instr4B *)ptr;
     i->instr_type = SIZEXB;
@@ -313,7 +313,7 @@ size_t create_scalar_slot2(void *ptr, OHType op, OperandType s0, OperandType s1)
 
 size_t create_scalar_slot2_attr(void *ptr, OHType op, OperandType s0, OperandType s1, AttrSrcInfo a0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr4B *i = (Instr4B *)ptr;
     i->instr_type = SIZEXB;
@@ -329,7 +329,7 @@ size_t create_scalar_slot2_attr(void *ptr, OHType op, OperandType s0, OperandTyp
 
 size_t create_scalar_slot2_attr2(void *ptr, OHType op, OperandType s0, OperandType s1, AttrSrcInfo a0, AttrSrcInfo a1) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr4B *i = (Instr4B *)ptr;
     i->instr_type = SIZEXB;
@@ -346,7 +346,7 @@ size_t create_scalar_slot2_attr2(void *ptr, OHType op, OperandType s0, OperandTy
 
 size_t create_jmpdirect(void *ptr, uint64_t val) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[jmp_direct]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[jmp_direct]); fflush(NULL);
 #endif
     if (likely(val < (1<<5))) {
         Instr2B *i = (Instr2B *)ptr;
@@ -367,7 +367,7 @@ size_t create_jmpdirect(void *ptr, uint64_t val) {
 
 size_t create_scalar_slot_imm(void *ptr, OHType op, OperandType s0, uint64_t i0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     if (likely((uint64_t)((long)((int32_t)i0)) == i0)) {
         Instr2B4 *i = (Instr2B4 *)ptr;
@@ -390,7 +390,7 @@ size_t create_scalar_slot_imm(void *ptr, OHType op, OperandType s0, uint64_t i0)
 
 size_t create_scalar_slot2_imm(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B44 *i = (Instr1B44 *)ptr;
     i->instr_type = SIZEXB;
@@ -406,7 +406,7 @@ size_t create_scalar_slot2_imm(void *ptr, OHType op, OperandType s0, OperandType
 // Ignore num which is used as mmuidx for now.
 size_t create_scalar_slot2_attr3_num(void *ptr, OHType op, OperandType s0, OperandType s1, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr4B *i = (Instr4B *)ptr;
     i->instr_type = SIZEXB;
@@ -422,7 +422,7 @@ size_t create_scalar_slot2_attr3_num(void *ptr, OHType op, OperandType s0, Opera
 
 size_t create_scalar_slot3(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B4 *i = (Instr1B4 *)ptr;
     i->instr_type = SIZEXB;
@@ -436,7 +436,7 @@ size_t create_scalar_slot3(void *ptr, OHType op, OperandType s0, OperandType s1,
 
 size_t create_vector_slot_env_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, uint64_t i0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     XMMReg x = lookup_xmm(i0);
     if (x.xmm_idx != NON_XMM) {
@@ -463,7 +463,7 @@ size_t create_vector_slot_env_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandT
 
 size_t create_scalar_slot2_imm2(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0, uint64_t i1) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B41I2 *i = (Instr1B41I2 *)ptr;
     i->instr_type = SIZEXB;
@@ -480,7 +480,7 @@ size_t create_scalar_slot2_imm2(void *ptr, OHType op, OperandType s0, OperandTyp
 
 size_t create_scalar_slot_env_imm(void *ptr, OHType op, OperandType s0, uint64_t i0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     XMMReg x = lookup_xmm(i0);
     if (x.xmm_idx != NON_XMM) {
@@ -506,7 +506,7 @@ size_t create_scalar_slot_env_imm(void *ptr, OHType op, OperandType s0, uint64_t
 
 size_t create_branch_condition(void *ptr, OperandType s0, uint64_t i0, uint8_t relop, uint8_t label) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[brcond_i64]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[brcond_i64]); fflush(NULL);
 #endif
     Instr1B21 *i = (Instr1B21 *)ptr;
     i->instr_type = SIZEXB;
@@ -519,9 +519,24 @@ size_t create_branch_condition(void *ptr, OperandType s0, uint64_t i0, uint8_t r
     return sizeof(*i);
 }
 
+size_t create_branch_condition_slot(void *ptr, OperandType s0, OperandType s1, uint8_t relop, uint8_t label) {
+#ifdef DEBUG
+    printf("%s %s ", __FUNCTION__, opcode_type_str[brcond_i64]); fflush(NULL);
+#endif
+    Instr1B143 *i = (Instr1B143 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B143_ext;
+    i->opc = brcond_i64;
+    SET_SLOT(0);
+    SET_SLOT(1);
+    i->relop = relop;
+    i->label = label;
+    return sizeof(*i);
+}
+
 size_t create_setlabel(void *ptr, OHType op, uint8_t label) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B2 *i = (Instr1B2 *)ptr;
     i->instr_type = SIZEXB;
@@ -533,7 +548,7 @@ size_t create_setlabel(void *ptr, OHType op, uint8_t label) {
 
 size_t create_helper_slot4(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH4 *i = (Instr1BH4 *)ptr;
     i->instr_type = SIZEXB;
@@ -551,7 +566,7 @@ size_t create_helper_slot4(void *ptr, OHType h, uint16_t cflags, uint8_t noargs,
 
 size_t create_vector_slot3(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1BV4 *i = (Instr1BV4 *)ptr;
     i->instr_type = SIZEXB;
@@ -566,7 +581,7 @@ size_t create_vector_slot3(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0,
 
 size_t create_vector_slot5_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, uint8_t relop) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1BV8 *i = (Instr1BV8 *)ptr;
     i->instr_type = SIZEXB;
@@ -584,7 +599,7 @@ size_t create_vector_slot5_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandTy
 
 size_t create_helper_slot5(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH141 *i = (Instr1BH141 *)ptr;
     i->instr_type = SIZEXB;
@@ -603,7 +618,7 @@ size_t create_helper_slot5(void *ptr, OHType h, uint16_t cflags, uint8_t noargs,
 
 size_t create_vector_slot_vimm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, uint64_t vi0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1BV21 *i = (Instr1BV21 *)ptr;
     i->instr_type = SIZEXB;
@@ -619,7 +634,7 @@ size_t create_vector_slot_vimm(void *ptr, OHType op, AttrSrcInfo ai, OperandType
 // Ignore num which is used as mmuidx for now.
 size_t create_scalar_slot3_attr3_num(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B41 *i = (Instr1B41 *)ptr;
     i->instr_type = SIZEXB;
@@ -636,7 +651,7 @@ size_t create_scalar_slot3_attr3_num(void *ptr, OHType op, OperandType s0, Opera
 
 size_t create_vector_slot2_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t i0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1BV4I *i = (Instr1BV4I *)ptr;
     i->instr_type = SIZEXB;
@@ -652,7 +667,7 @@ size_t create_vector_slot2_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandType
 
 size_t create_slot_imm2(void *ptr, OHType op, OperandType s0, uint64_t i0, uint64_t i1) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B24 *i = (Instr1B24 *)ptr;
     i->instr_type = SIZEXB;
@@ -668,7 +683,7 @@ size_t create_slot_imm2(void *ptr, OHType op, OperandType s0, uint64_t i0, uint6
 
 size_t create_vector_slot2(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1BV4S2 *i = (Instr1BV4S2 *)ptr;
     i->instr_type = SIZEXB;
@@ -682,7 +697,7 @@ size_t create_vector_slot2(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0,
 
 size_t create_vector_slot3_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, uint8_t relop) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1BV41 *i = (Instr1BV41 *)ptr;
     i->instr_type = SIZEXB;
@@ -698,7 +713,7 @@ size_t create_vector_slot3_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandTy
 
 size_t create_helper_env_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, uint32_t i0) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH24I_ENV0 *i = (Instr1BH24I_ENV0 *)ptr;
     i->instr_type = SIZEXB;
@@ -711,7 +726,7 @@ size_t create_helper_env_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noarg
 
 size_t create_scalar_slot(void *ptr, OHType op, OperandType s0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B2S *i = (Instr1B2S *)ptr;
     i->instr_type = SIZEXB;
@@ -723,7 +738,7 @@ size_t create_scalar_slot(void *ptr, OHType op, OperandType s0) {
 
 size_t create_scalar_slot3_imm(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2, uint64_t i0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B41I *i = (Instr1B41I *)ptr;
     i->instr_type = SIZEXB;
@@ -739,7 +754,7 @@ size_t create_scalar_slot3_imm(void *ptr, OHType op, OperandType s0, OperandType
 
 size_t create_vector_slot2_vimm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t vi0) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1BV48 *i = (Instr1BV48 *)ptr;
     i->instr_type = SIZEXB;
@@ -754,7 +769,7 @@ size_t create_vector_slot2_vimm(void *ptr, OHType op, AttrSrcInfo ai, OperandTyp
 
 size_t create_scalar_slot2_imm_slot2_relop(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0, OperandType s2, OperandType s3, RelopType r) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B422 *i = (Instr1B422 *)ptr;
     i->instr_type = SIZEXB;
@@ -765,14 +780,14 @@ size_t create_scalar_slot2_imm_slot2_relop(void *ptr, OHType op, OperandType s0,
     SET_SLOT(1);
     SET_SLOT(2);
     SET_SLOT(3);
-    assert(i0 < (1<<16));
+    assert(i0 < (1UL<<32));
     i->imm = i0;
     return sizeof(*i);
 }
 
 size_t create_scalar_slot3_imm2(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2, uint64_t i0, uint64_t i1) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B411 *i = (Instr1B411 *)ptr;
     i->instr_type = SIZEXB;
@@ -790,7 +805,7 @@ size_t create_scalar_slot3_imm2(void *ptr, OHType op, OperandType s0, OperandTyp
 
 size_t create_scalar_imm_env_imm(void *ptr, OHType op, uint64_t i0, uint64_t i1) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     XMMReg x = lookup_xmm(i1);
     if (x.xmm_idx != NON_XMM) {
@@ -818,7 +833,7 @@ size_t create_scalar_imm_env_imm(void *ptr, OHType op, uint64_t i0, uint64_t i1)
 
 size_t create_helper_env_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH21_ENV0 *i = (Instr1BH21_ENV0 *)ptr;
     i->instr_type = SIZEXB;
@@ -832,7 +847,7 @@ size_t create_helper_env_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noar
 
 size_t create_helper_slot_env(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH21_ENV1 *i = (Instr1BH21_ENV1 *)ptr;
     i->instr_type = SIZEXB;
@@ -846,7 +861,7 @@ size_t create_helper_slot_env(void *ptr, OHType h, uint16_t cflags, uint8_t noar
 
 size_t create_scalar_slot2_imm_slot_imm_relop(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0, OperandType s2, uint64_t i1, RelopType r) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B4111 *i = (Instr1B4111 *)ptr;
     i->instr_type = SIZEXB;
@@ -865,7 +880,7 @@ size_t create_scalar_slot2_imm_slot_imm_relop(void *ptr, OHType op, OperandType 
 
 size_t create_scalar_slot5_relop(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, RelopType r) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B8 *i = (Instr1B8 *)ptr;
     i->instr_type = SIZEXB;
@@ -882,7 +897,7 @@ size_t create_scalar_slot5_relop(void *ptr, OHType op, OperandType s0, OperandTy
 
 size_t create_helper_slot3_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, uint32_t i0) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH4I *i = (Instr1BH4I *)ptr;
     i->instr_type = SIZEXB;
@@ -898,9 +913,29 @@ size_t create_helper_slot3_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noa
     return sizeof(*i);
 }
 
+size_t create_helper_slot3_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, uint32_t i0, uint32_t i1) {
+#ifdef DEBUG
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
+#endif
+    Instr1BH4I1 *i = (Instr1BH4I1 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH4I1_ext;
+    i->helper_l = (uint8_t)h.h;
+    i->helper_h = h.h >> 8;
+    assert(noargs == 1);
+    SET_SLOT(0);
+    SET_SLOT(1);
+    SET_SLOT(2);
+    assert(i0 < (1 << 8) || (i0 & 0xffffff80) == 0xffffff80);
+    i->imm0 = i0;
+    assert(i1 < (1 << 8) || (i1 & 0xffffff80) == 0xffffff80);
+    i->imm1 = i1;
+    return sizeof(*i);
+}
+
 size_t create_helper_env_slot3_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, uint32_t i0) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH4I_ENV0 *i = (Instr1BH4I_ENV0 *)ptr;
     i->instr_type = SIZEXB;
@@ -918,7 +953,7 @@ size_t create_helper_env_slot3_imm(void *ptr, OHType h, uint16_t cflags, uint8_t
 
 size_t create_scalar_slot2_imm_relop(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0, RelopType r) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B42 *i = (Instr1B42 *)ptr;
     i->instr_type = SIZEXB;
@@ -926,7 +961,7 @@ size_t create_scalar_slot2_imm_relop(void *ptr, OHType op, OperandType s0, Opera
     i->opc = op.o;
     SET_SLOT(0);
     SET_SLOT(1);
-    assert(i0 < (1<<16));
+    assert(i0 < (1UL<<32));
     i->imm = i0;
     i->relop = r;
     return sizeof(*i);
@@ -934,7 +969,7 @@ size_t create_scalar_slot2_imm_relop(void *ptr, OHType op, OperandType s0, Opera
 
 size_t create_helper_env(void *ptr, OHType h, uint16_t cflags, uint8_t noargs) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH2_ENV0 *i = (Instr1BH2_ENV0 *)ptr;
     i->instr_type = SIZEXB;
@@ -946,7 +981,7 @@ size_t create_helper_env(void *ptr, OHType h, uint16_t cflags, uint8_t noargs) {
 
 size_t create_helper_env_imm_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, uint32_t i0, OperandType s0) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH21S_ENV0 *i = (Instr1BH21S_ENV0 *)ptr;
     i->instr_type = SIZEXB;
@@ -962,7 +997,7 @@ size_t create_helper_env_imm_slot(void *ptr, OHType h, uint16_t cflags, uint8_t 
 
 size_t create_scalar_slot_imm_slot(void *ptr, OHType op, OperandType s0, uint64_t i0, OperandType s1) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B281 *i = (Instr1B281 *)ptr;
     i->instr_type = SIZEXB;
@@ -976,7 +1011,7 @@ size_t create_scalar_slot_imm_slot(void *ptr, OHType op, OperandType s0, uint64_
 
 size_t create_helper_slot3(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH4S3 *i = (Instr1BH4S3 *)ptr;
     i->instr_type = SIZEXB;
@@ -993,7 +1028,7 @@ size_t create_helper_slot3(void *ptr, OHType h, uint16_t cflags, uint8_t noargs,
 
 size_t create_helper_env_slot3(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH4S3_ENV0 *i = (Instr1BH4S3_ENV0 *)ptr;
     i->instr_type = SIZEXB;
@@ -1010,7 +1045,7 @@ size_t create_helper_env_slot3(void *ptr, OHType h, uint16_t cflags, uint8_t noa
 
 size_t create_scalar_slot2_imm2_slot_relop(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0, uint64_t i1, OperandType s2, RelopType r) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B4112 *i = (Instr1B4112 *)ptr;
     i->instr_type = SIZEXB;
@@ -1027,9 +1062,29 @@ size_t create_scalar_slot2_imm2_slot_relop(void *ptr, OHType op, OperandType s0,
     return sizeof(*i);
 }
 
+size_t create_scalar_slot2_imm3_relop(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0, uint64_t i1, uint64_t i2, RelopType r) {
+#ifdef DEBUG
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
+#endif
+    Instr1B41122 *i = (Instr1B41122 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B41122_ext;
+    i->opc = op.o;
+    SET_SLOT(0);
+    SET_SLOT(1);
+    assert(i0 < (1<<8));
+    i->imm0 = i0;
+    assert(i1 < (1<<8));
+    i->imm1 = i1;
+    assert(i2 < (1<<8));
+    i->imm2 = i2;
+    i->relop = r;
+    return sizeof(*i);
+}
+
 size_t create_helper_slot2_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0, uint32_t i1) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH412 *i = (Instr1BH412 *)ptr;
     i->instr_type = SIZEXB;
@@ -1048,7 +1103,7 @@ size_t create_helper_slot2_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t no
 
 size_t create_helper_slot2_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH41 *i = (Instr1BH41 *)ptr;
     i->instr_type = SIZEXB;
@@ -1065,7 +1120,7 @@ size_t create_helper_slot2_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noa
 
 size_t create_helper_env_slot2_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH41_ENV0 *i = (Instr1BH41_ENV0 *)ptr;
     i->instr_type = SIZEXB;
@@ -1082,7 +1137,7 @@ size_t create_helper_env_slot2_imm(void *ptr, OHType h, uint16_t cflags, uint8_t
 
 size_t create_scalar_slot3_relop(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2, RelopType r) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B41R *i = (Instr1B41R *)ptr;
     i->instr_type = SIZEXB;
@@ -1097,7 +1152,7 @@ size_t create_scalar_slot3_relop(void *ptr, OHType op, OperandType s0, OperandTy
 
 size_t create_helper_env_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, uint32_t i0, uint32_t i1) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH24_ENV0 *i = (Instr1BH24_ENV0 *)ptr;
     i->instr_type = SIZEXB;
@@ -1114,7 +1169,7 @@ size_t create_helper_env_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noar
 
 size_t create_helper_env_slot_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH211_ENV0 *i = (Instr1BH211_ENV0 *)ptr;
     i->instr_type = SIZEXB;
@@ -1130,7 +1185,7 @@ size_t create_helper_env_slot_imm(void *ptr, OHType h, uint16_t cflags, uint8_t 
 
 size_t create_scalar_imm_slot_imm(void *ptr, OHType op, uint64_t i0, OperandType s0, uint64_t i1) {
 #ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]);
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
     Instr1B1111 *i = (Instr1B1111 *)ptr;
     i->instr_type = SIZEXB;
@@ -1146,7 +1201,7 @@ size_t create_scalar_imm_slot_imm(void *ptr, OHType op, uint64_t i0, OperandType
 
 size_t create_helper_env_slot2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH4S_ENV0 *i = (Instr1BH4S_ENV0 *)ptr;
     i->instr_type = SIZEXB;
@@ -1161,7 +1216,7 @@ size_t create_helper_env_slot2(void *ptr, OHType h, uint16_t cflags, uint8_t noa
 
 size_t create_helper_slot_env_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1) {
 #ifdef DEBUG
-    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]);
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
     Instr1BH4S_ENV1 *i = (Instr1BH4S_ENV1 *)ptr;
     i->instr_type = SIZEXB;

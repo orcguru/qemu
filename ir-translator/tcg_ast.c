@@ -975,6 +975,7 @@ void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
     LLVMBuildBr(builder, bb_ctz_merge);
 
     LLVMPositionBuilderAtEnd(builder, bb_ctz_merge);
+    last_active_bb = bb_ctz_merge;
     LLVMValueRef phi = LLVMBuildPhi(builder, llvm_int_types[OPC_OUTPUT_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef phi_incoming_values[] = {src2, call_result};
     LLVMBasicBlockRef phi_incoming_blocks[] = {bb_ctz_is_zero, bb_ctz_not_zero};
