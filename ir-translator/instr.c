@@ -7,6 +7,7 @@
 
 //#define BUILD_RISCV_ON_AARCH      1
 //#define DEBUG                     1
+#define STACK_INDEX_SHIFT           6
 #define SET_SLOT(IDX)                               \
     do {                                            \
         s##IDX = get_mapped_slot(s##IDX);    \
@@ -74,7 +75,7 @@ OperandType get_mapped_slot(OperandType slot) {
     if (slot.s.slot_type == SUB_SLOT_TMPL) {
         assert(slot.s.slot_idx < (1<<6));
         if (tmpl_map[slot.s.slot_idx] == 0xff) {
-            assert(tmp_idx < (1<<5));
+            assert(tmp_idx < (1<<STACK_INDEX_SHIFT));
 #ifdef DEBUG
             printf("register loc%d as %d\n", slot.s.slot_idx, tmp_idx); fflush(NULL);
 #endif
@@ -87,7 +88,7 @@ OperandType get_mapped_slot(OperandType slot) {
     } else if (slot.s.slot_type == SUB_SLOT_TMPT) {
         assert(slot.s.slot_idx < (1<<6));
         if (tmpt_map[slot.s.slot_idx] == 0xff) {
-            assert(tmp_idx < (1<<5));
+            assert(tmp_idx < (1<<STACK_INDEX_SHIFT));
 #ifdef DEBUG
             printf("register tmp%d as %d\n", slot.s.slot_idx, tmp_idx); fflush(NULL);
 #endif

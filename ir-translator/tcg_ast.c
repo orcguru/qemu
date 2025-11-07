@@ -35,6 +35,7 @@
 #define MAX_OPERANDS_COUNT          16
 #define BB_MAX_CNT                  128
 #define QEMUAOT_CC                  124
+#define STACK_INDEX_SHIFT           6
 
 #define DEBUG_VALUE_TYPE(v)                                     \
     do {                                                        \
@@ -315,31 +316,31 @@ static const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 #if 0
 static const char *xmm_tmp_stack_names[2] = {NULL};
 #endif
-static const char *tmp_stack_names[1<<5] = {NULL};
+static const char *tmp_stack_names[1<<STACK_INDEX_SHIFT] = {NULL};
 static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)] = {NULL};
 static int ir_var_name_idx = 0;
 static LLVMTypeRef llvm_int_types[LLVMMAXType] = {0};
 static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
-static LLVMValueRef func_xreg_alloca[1 << 5] = {NULL};
-static LLVMValueRef func_tmp_alloca[1 << 5] = {NULL};
-static LLVMValueRef func_xmm_alloca[1 << 5] = {NULL};
-static LLVMType func_xreg_llvmtype[1 << 5] = {0};
-static LLVMType func_tmp_llvmtype[1 << 5] = {0};
-static LLVMType func_xmm_llvmtype[1 << 5] = {0};
+static LLVMValueRef func_xreg_alloca[1<<STACK_INDEX_SHIFT] = {NULL};
+static LLVMValueRef func_tmp_alloca[1<<STACK_INDEX_SHIFT] = {NULL};
+static LLVMValueRef func_xmm_alloca[1<<STACK_INDEX_SHIFT] = {NULL};
+static LLVMType func_xreg_llvmtype[1<<STACK_INDEX_SHIFT] = {0};
+static LLVMType func_tmp_llvmtype[1<<STACK_INDEX_SHIFT] = {0};
+static LLVMType func_xmm_llvmtype[1<<STACK_INDEX_SHIFT] = {0};
 static uint32_t env_var_offset[ENVVarMAX] = {0};
-static OperandType alias_tmp[1<<5] = {0};
-static uint32_t tmp_var_available = 0, tmp_var_available_backup = 0;
+static OperandType alias_tmp[1<<STACK_INDEX_SHIFT] = {0};
+static uint64_t tmp_var_available = 0, tmp_var_available_backup = 0;
 static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
 static uint32_t br_count = 0;
 static uint64_t current_func_offset = 0;
 static uint8_t current_call_idx = 0;
 static int32_t shadow_call_offset = 16;
 static void *call_accumulated[BB_MAX_CNT] = {NULL};
-static uint32_t xreg_valid = 0, tmp_valid = 0, xmm_valid = 0;
-static LLVMType tmp_bits_type[1<<5] = {0};
+static uint64_t xreg_valid = 0, tmp_valid = 0, xmm_valid = 0;
+static LLVMType tmp_bits_type[1<<STACK_INDEX_SHIFT] = {0};
 static char output_file[128] = {0};
 static OperandType dummy_slot_for_debug;
-static int32_t tmp_shadow_offset[1<<5] = {0};
+static int32_t tmp_shadow_offset[1<<STACK_INDEX_SHIFT] = {0};
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
 
@@ -446,10 +447,10 @@ static uint8_t is_opc_end_of_control_flow(OpCodeType opc) {
 
 static uint8_t get_next_spare_tmp_var() {
     uint8_t ret = 0xff;
-    for (uint8_t i = 0; i < (1<<5); ++i) {
-        if (tmp_var_available & (1<<i)) {
+    for (uint8_t i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
+        if (tmp_var_available & (1UL<<i)) {
             ret = i;
-            tmp_var_available &= ~(1<<i);
+            tmp_var_available &= ~(1UL<<i);
             break;
         }
     }
@@ -2323,7 +2324,7 @@ void translate_call(OpCodeType opc, void *ptr) {
 #endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef shadow_pointer = NULL;
-    for (int i = 0; i < (1<<5); ++i) {
+    for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
         if (tmp_shadow_offset[i]) {
             OperandType op;
             op.s.valid = 1;
@@ -2648,7 +2649,7 @@ void translate_call(OpCodeType opc, void *ptr) {
 
     // Reload tmp_shadow_offset[this call][non-zero offset] contents
     shadow_pointer = NULL;
-    for (int i = 0; i < (1<<5); ++i) {
+    for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
         if (tmp_shadow_offset[i]) {
             OperandType op;
             op.s.valid = 1;
@@ -2713,7 +2714,7 @@ static void cleanup_func_resource() {
     printf("%s\n", __FUNCTION__); fflush(NULL);
 #endif
     reset_instr_buffer();
-    for (int i = 0; i < (1<<5); ++i) {
+    for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
         alias_tmp[i].i = 0;
     }
     tmp_var_available = 0;
@@ -2757,7 +2758,7 @@ static void cleanup_func_resource() {
 static void setup_func_stack() {
     if (xreg_valid) {
         for (XRegType x = 0; x < XREG_MAX; ++x) {
-            if (xreg_valid & (1 << x)) {
+            if (xreg_valid & (1UL<<x)) {
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, fixed_vector_param_types[x], fixed_vector_stack_names[x]);
                 LLVMSetAlignment(alloca_inst, 8);
                 func_xreg_alloca[x] = alloca_inst;
@@ -2768,8 +2769,8 @@ static void setup_func_stack() {
         }
     }
     if (tmp_valid) {
-        for (int i = 0; i < (1<<5); ++i) {
-            if (tmp_valid & (1 << i)) {
+        for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
+            if (tmp_valid & (1UL<<i)) {
                 assert(tmp_bits_type[i]);
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[tmp_bits_type[i]], tmp_stack_names[i]);
                 func_tmp_alloca[i] = alloca_inst;
@@ -2779,8 +2780,8 @@ static void setup_func_stack() {
         }
     }
     if (xmm_valid) {
-        for (int i = 0; i < (1<<5); ++i) {
-            if (xmm_valid & (1 << i)) {
+        for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
+            if (xmm_valid & (1UL<<i)) {
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + i]], fixed_vector_stack_names[XREG_MAX + i]);
                 func_xmm_alloca[i] = alloca_inst;
                 func_xmm_llvmtype[i] = fixed_vector_param_llvmtypes[XREG_MAX + i];
@@ -2814,14 +2815,14 @@ void handle_func(uint64_t val) {
 #endif
     current_func_offset = val;
     ir_var_name_idx = 0;
-    tmp_var_available = 0xffffffff;
+    tmp_var_available = -1UL;
     void *ptr_init = get_instr_buffer();
     void *ptr_max = ptr_init + get_instr_buffer_size();
     void *ptr;
     OperandType helper_output_slot[BB_MAX_CNT] = {0};
     void *helper_output_idx_ptr[BB_MAX_CNT] = {NULL};
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
-    uint8_t tmp_has_known_def[1<<5] = {0};
+    uint8_t tmp_has_known_def[1<<STACK_INDEX_SHIFT] = {0};
     void *prev_call_ptr = NULL;
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
         OperandType operand;
@@ -2854,7 +2855,7 @@ void handle_func(uint64_t val) {
             if (!is_imm && !operand.s.valid) {
                 break;
             }
-            uint32_t shifted_slot_bit = (1 << operand.s.slot_idx);
+            uint64_t shifted_slot_bit = (1UL<<operand.s.slot_idx);
             LLVMType operand_type = vtype == LLVMInvalidType ?
                                 (opcmem_addr_nzidx[opc] > 0 ?
                                  ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_INPUT_T : OPC_ADDR_T) :
@@ -2874,7 +2875,7 @@ void handle_func(uint64_t val) {
                 if (operand.s.slot_type == SUB_SLOT_XREG) {
                     xreg_valid |= shifted_slot_bit;
                 } else if (operand.s.slot_type == SUB_SLOT_TMP) {
-                    tmp_valid |= (1 << operand.s.slot_idx);
+                    tmp_valid |= (1UL<<operand.s.slot_idx);
                     tmp_var_available &= ~shifted_slot_bit;
                     if (tmp_bits_type[operand.s.slot_idx] < operand_type) {
                         tmp_bits_type[operand.s.slot_idx] = operand_type;
@@ -2914,7 +2915,7 @@ void handle_func(uint64_t val) {
             if (!is_imm && !operand.s.valid) {
                 break;
             }
-            uint32_t shifted_slot_bit = (1 << operand.s.slot_idx);
+            uint64_t shifted_slot_bit = (1UL<<operand.s.slot_idx);
             LLVMType operand_type = vtype == LLVMInvalidType ?
                                 (opcmem_addr_nzidx[opc] > 0 ?
                                  ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_INPUT_T : OPC_ADDR_T) :
@@ -2934,7 +2935,7 @@ void handle_func(uint64_t val) {
                 if (operand.s.slot_type == SUB_SLOT_XREG) {
                     xreg_valid |= shifted_slot_bit;
                 } else if (operand.s.slot_type == SUB_SLOT_TMP) {
-                    tmp_valid |= (1 << operand.s.slot_idx);
+                    tmp_valid |= (1UL<<operand.s.slot_idx);
                     tmp_var_available &= ~shifted_slot_bit;
                     if (tmp_bits_type[operand.s.slot_idx] < operand_type) {
                         tmp_bits_type[operand.s.slot_idx] = operand_type;
@@ -3381,7 +3382,7 @@ void module_prolog() {
     }
     static char extra_name_buf[32][16];
     static char stack_name_buf[FIXED_VECTOR_PARAM_COUNT][16];
-    static char tmp_name_buf[1<<5][16];
+    static char tmp_name_buf[1<<STACK_INDEX_SHIFT][16];
     for (int i = 0; i < (FIXED_VECTOR_PARAM_COUNT - FIXED_PARAM_COUNT)/2; ++i) {
         int idx = FIXED_PARAM_COUNT + i * 2;
         fixed_vector_param_types[idx] = vscale_i64;
@@ -3404,7 +3405,7 @@ void module_prolog() {
     xmm_tmp_stack_names[0] = "xmmt";
     xmm_tmp_stack_names[1] = "ymmt_h";
 #endif
-    for (int i = 0; i < (1<<5); ++i) {
+    for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
         snprintf(tmp_name_buf[i], sizeof(tmp_name_buf[i]), "tmp%d.stack", i);
         tmp_stack_names[i] = tmp_name_buf[i];
     }
