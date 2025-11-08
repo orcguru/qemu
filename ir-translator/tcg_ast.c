@@ -35,7 +35,8 @@
 #define MAX_OPERANDS_COUNT          16
 #define BB_MAX_CNT                  128
 #define QEMUAOT_CC                  124
-#define STACK_INDEX_SHIFT           6
+#define REGISTER_INDEX_SHIFT        5 
+#define STACK_INDEX_SHIFT           10
 
 #define DEBUG_VALUE_TYPE(v)                                     \
     do {                                                        \
@@ -321,22 +322,25 @@ static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)] = {NULL};
 static int ir_var_name_idx = 0;
 static LLVMTypeRef llvm_int_types[LLVMMAXType] = {0};
 static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
-static LLVMValueRef func_xreg_alloca[1<<STACK_INDEX_SHIFT] = {NULL};
+static LLVMValueRef func_xreg_alloca[1<<REGISTER_INDEX_SHIFT] = {NULL};
 static LLVMValueRef func_tmp_alloca[1<<STACK_INDEX_SHIFT] = {NULL};
-static LLVMValueRef func_xmm_alloca[1<<STACK_INDEX_SHIFT] = {NULL};
-static LLVMType func_xreg_llvmtype[1<<STACK_INDEX_SHIFT] = {0};
+static LLVMValueRef func_xmm_alloca[1<<REGISTER_INDEX_SHIFT] = {NULL};
+static LLVMType func_xreg_llvmtype[1<<REGISTER_INDEX_SHIFT] = {0};
 static LLVMType func_tmp_llvmtype[1<<STACK_INDEX_SHIFT] = {0};
-static LLVMType func_xmm_llvmtype[1<<STACK_INDEX_SHIFT] = {0};
+static LLVMType func_xmm_llvmtype[1<<REGISTER_INDEX_SHIFT] = {0};
 static uint32_t env_var_offset[ENVVarMAX] = {0};
 static OperandType alias_tmp[1<<STACK_INDEX_SHIFT] = {0};
-static uint64_t tmp_var_available = 0, tmp_var_available_backup = 0;
 static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
 static uint32_t br_count = 0;
 static uint64_t current_func_offset = 0;
 static uint8_t current_call_idx = 0;
 static int32_t shadow_call_offset = 16;
 static void *call_accumulated[BB_MAX_CNT] = {NULL};
-static uint64_t xreg_valid = 0, tmp_valid = 0, xmm_valid = 0;
+static uint32_t xreg_valid = 0, xmm_valid = 0;
+static uint8_t tmp_valid_non_zero = 0;
+static uint64_t tmp_valid[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
+static uint64_t tmp_var_available[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
+static uint64_t tmp_var_available_backup[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
 static LLVMType tmp_bits_type[1<<STACK_INDEX_SHIFT] = {0};
 static char output_file[128] = {0};
 static OperandType dummy_slot_for_debug;
@@ -445,16 +449,38 @@ static uint8_t is_opc_end_of_control_flow(OpCodeType opc) {
     return 0;
 }
 
-static uint8_t get_next_spare_tmp_var() {
-    uint8_t ret = 0xff;
-    for (uint8_t i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
-        if (tmp_var_available & (1UL<<i)) {
+static uint8_t tmp_available_test(uint64_t *ptr, uint16_t idx) {
+    int group_idx = idx / (8*sizeof(uint64_t));
+    int element_idx = idx % (8*sizeof(uint64_t));
+    if (ptr[group_idx] & (1UL<<element_idx)) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+static void tmp_available_clear(uint64_t *ptr, uint16_t idx) {
+    int group_idx = idx / (8*sizeof(uint64_t));
+    int element_idx = idx % (8*sizeof(uint64_t));
+    ptr[group_idx] &= ~(1UL<<element_idx);
+}
+
+static void tmp_available_set(uint64_t *ptr, uint16_t idx) {
+    int group_idx = idx / (8*sizeof(uint64_t));
+    int element_idx = idx % (8*sizeof(uint64_t));
+    ptr[group_idx] |= (1UL<<element_idx);
+}
+
+static uint16_t get_next_spare_tmp_var() {
+    uint16_t ret = 0xffff;
+    for (uint16_t i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
+        if (tmp_available_test(tmp_var_available, i)) {
             ret = i;
-            tmp_var_available &= ~(1UL<<i);
+            tmp_available_clear(tmp_var_available, i);
             break;
         }
     }
-    assert(ret != 0xff);
+    assert(ret != 0xffff);
     return ret;
 }
 
@@ -2303,7 +2329,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
             handle_single_instr(opc, ptr_tmp);
-            tmp_var_available = tmp_var_available_backup;
+            memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
             if (is_opc_end_of_control_flow(opc)) {
                 break;
             }
@@ -2604,7 +2630,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
             handle_single_instr(opc, ptr_tmp);
-            tmp_var_available = tmp_var_available_backup;
+            memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
             if (is_opc_end_of_control_flow(opc)) {
                 break;
             }
@@ -2681,7 +2707,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     for (void *ptr_tmp = move_to_next(ptr); ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
         OpCodeType opc = get_opcode(ptr_tmp);
         handle_single_instr(opc, ptr_tmp);
-        tmp_var_available = tmp_var_available_backup;
+        memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
         if (is_opc_end_of_control_flow(opc)) {
             while (get_current_active_label_cnt(second_half_func)) {
                 uint8_t *current_active_labels = get_current_active_labels(second_half_func);
@@ -2697,7 +2723,7 @@ void translate_call(OpCodeType opc, void *ptr) {
                 for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
                     OpCodeType opc = get_opcode(ptr_tmp);
                     handle_single_instr(opc, ptr_tmp);
-                    tmp_var_available = tmp_var_available_backup;
+                    memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
                     if (is_opc_end_of_control_flow(opc)) {
                         break;
                     }
@@ -2720,16 +2746,17 @@ static void cleanup_func_resource() {
     for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
         alias_tmp[i].i = 0;
     }
-    tmp_var_available = 0;
-    tmp_var_available_backup = 0;
     ir_var_name_idx = 0;
     current_func_offset = 0;
     br_count = 0;
     current_call_idx = 0;
     shadow_call_offset = 16;
     xreg_valid = 0;
-    tmp_valid = 0;
     xmm_valid = 0;
+    tmp_valid_non_zero = 0;
+    memset(tmp_valid, 0, sizeof(tmp_valid));;
+    memset(tmp_var_available, 0, sizeof(tmp_var_available));
+    memset(tmp_var_available_backup, 0, sizeof(tmp_var_available_backup));
     memset(call_accumulated, 0, sizeof(call_accumulated));
     memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
     memset(tmp_bits_type, 0, sizeof(tmp_bits_type));
@@ -2771,9 +2798,9 @@ static void setup_func_stack() {
             }
         }
     }
-    if (tmp_valid) {
+    if (tmp_valid_non_zero) {
         for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
-            if (tmp_valid & (1UL<<i)) {
+            if (tmp_available_test(tmp_valid, i)) {
                 assert(tmp_bits_type[i]);
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[tmp_bits_type[i]], tmp_stack_names[i]);
                 func_tmp_alloca[i] = alloca_inst;
@@ -2783,7 +2810,7 @@ static void setup_func_stack() {
         }
     }
     if (xmm_valid) {
-        for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
+        for (int i = 0; i < (1<<REGISTER_INDEX_SHIFT); ++i) {
             if (xmm_valid & (1UL<<i)) {
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + i]], fixed_vector_stack_names[XREG_MAX + i]);
                 func_xmm_alloca[i] = alloca_inst;
@@ -2818,7 +2845,7 @@ void handle_func(uint64_t val) {
 #endif
     current_func_offset = val;
     ir_var_name_idx = 0;
-    tmp_var_available = -1UL;
+    memset(tmp_var_available, 0xff, sizeof(tmp_var_available));
     void *ptr_init = get_instr_buffer();
     void *ptr_max = ptr_init + get_instr_buffer_size();
     void *ptr;
@@ -2858,7 +2885,6 @@ void handle_func(uint64_t val) {
             if (!is_imm && !operand.s.valid) {
                 break;
             }
-            uint64_t shifted_slot_bit = (1UL<<operand.s.slot_idx);
             LLVMType operand_type = vtype == LLVMInvalidType ?
                                 (opcmem_addr_nzidx[opc] > 0 ?
                                  ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_INPUT_T : OPC_ADDR_T) :
@@ -2876,15 +2902,16 @@ void handle_func(uint64_t val) {
             }
             if (is_imm == 0) {
                 if (operand.s.slot_type == SUB_SLOT_XREG) {
-                    xreg_valid |= shifted_slot_bit;
+                    xreg_valid |= (1UL<<operand.s.slot_idx);
                 } else if (operand.s.slot_type == SUB_SLOT_TMP) {
-                    tmp_valid |= (1UL<<operand.s.slot_idx);
-                    tmp_var_available &= ~shifted_slot_bit;
+                    tmp_valid_non_zero = 1;
+                    tmp_available_set(tmp_valid, operand.s.slot_idx);
+                    tmp_available_clear(tmp_var_available, operand.s.slot_idx);
                     if (tmp_bits_type[operand.s.slot_idx] < operand_type) {
                         tmp_bits_type[operand.s.slot_idx] = operand_type;
                     }
                 } else if (operand.s.slot_type == SUB_SLOT_XMM) {
-                    xmm_valid |= shifted_slot_bit;
+                    xmm_valid |= (1UL<<operand.s.slot_idx);
                 }
                 if (operand.s.slot_type == SUB_SLOT_TMP) {
                     if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
@@ -2918,7 +2945,6 @@ void handle_func(uint64_t val) {
             if (!is_imm && !operand.s.valid) {
                 break;
             }
-            uint64_t shifted_slot_bit = (1UL<<operand.s.slot_idx);
             LLVMType operand_type = vtype == LLVMInvalidType ?
                                 (opcmem_addr_nzidx[opc] > 0 ?
                                  ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_INPUT_T : OPC_ADDR_T) :
@@ -2936,15 +2962,16 @@ void handle_func(uint64_t val) {
             }
             if (is_imm == 0) {
                 if (operand.s.slot_type == SUB_SLOT_XREG) {
-                    xreg_valid |= shifted_slot_bit;
+                    xreg_valid |= (1UL<<operand.s.slot_idx);
                 } else if (operand.s.slot_type == SUB_SLOT_TMP) {
-                    tmp_valid |= (1UL<<operand.s.slot_idx);
-                    tmp_var_available &= ~shifted_slot_bit;
+                    tmp_valid_non_zero = 1;
+                    tmp_available_set(tmp_valid, operand.s.slot_idx);
+                    tmp_available_clear(tmp_var_available, operand.s.slot_idx);
                     if (tmp_bits_type[operand.s.slot_idx] < operand_type) {
                         tmp_bits_type[operand.s.slot_idx] = operand_type;
                     }
                 } else if (operand.s.slot_type == SUB_SLOT_XMM) {
-                    xmm_valid |= shifted_slot_bit;
+                    xmm_valid |= (1UL<<operand.s.slot_idx);
                 }
                 if (operand.s.slot_type == SUB_SLOT_TMP) {
                     if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
@@ -2978,7 +3005,7 @@ void handle_func(uint64_t val) {
             assert(current_call_idx < BB_MAX_CNT);
         }
     }
-    tmp_var_available_backup = tmp_var_available;
+    memcpy(tmp_var_available_backup, tmp_var_available, sizeof(tmp_var_available_backup));
     // Some helper return type maybe not known to us (for example memset).
     // Try to make a reasonable guess to make translate_call happy.
     if (current_call_idx > 0) {
@@ -3012,7 +3039,7 @@ void handle_func(uint64_t val) {
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
         OpCodeType opc = get_opcode(ptr);
         handle_single_instr(opc, ptr);
-        tmp_var_available = tmp_var_available_backup;
+        memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
         if (is_opc_end_of_control_flow(opc)) {
             while (get_current_active_label_cnt(llvm_func_backup)) {
                 uint8_t *current_active_labels = get_current_active_labels(llvm_func_backup);
@@ -3028,7 +3055,7 @@ void handle_func(uint64_t val) {
                 for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
                     OpCodeType opc = get_opcode(ptr_tmp);
                     handle_single_instr(opc, ptr_tmp);
-                    tmp_var_available = tmp_var_available_backup;
+                    memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
                     if (is_opc_end_of_control_flow(opc)) {
                         break;
                     }

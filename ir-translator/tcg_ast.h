@@ -1624,7 +1624,7 @@ typedef struct __attribute__((packed)) {
 typedef struct {
     uint16_t valid     :1;
     uint16_t slot_type :3;
-    uint16_t slot_idx  :6;
+    uint16_t slot_idx  :10;
     uint16_t offset;
 } SlotT;
 

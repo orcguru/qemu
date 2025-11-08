@@ -1,106 +1,106 @@
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint8_t opc             :8;
+    uint8_t opc;
     int32_t imm;
 } Instr1B14;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint16_t opc            :8;
+    uint8_t opc;
     uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :6;
+    uint16_t slot0_idx      :10;
     uint64_t imm;
 } Instr1B28;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     int32_t imm;
 } Instr1B44;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint64_t imm;
 } Instr1B48;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
 } Instr1B4;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t xmm_idx        :6;
-    uint32_t xmm_offset     :4;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t xmm_idx        :6;
+    uint16_t xmm_offset     :4;
 } Instr1B4X;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t xmm_idx        :6;
-    uint32_t xmm_offset     :4;
+    uint8_t opc;
+    uint16_t es             :2;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t xmm_idx        :6;
+    uint16_t xmm_offset     :4;
 } Instr1BV4X;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t env_offset     :16;
+    uint8_t opc;
+    uint16_t es             :2;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t env_offset;
 } Instr1BV4XE;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t imm0           :8;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint8_t imm0;
     uint8_t imm1;
 } Instr1B41I2;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
     uint8_t imm0;
     uint8_t imm1;
 } Instr1B411;
@@ -108,18 +108,18 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint16_t opc            :8;
+    uint8_t opc;
     uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :6;
+    uint16_t slot0_idx      :10;
     uint16_t env_offset;
 } Instr1B22;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint16_t opc            :8;
+    uint8_t opc;
     uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :6;
+    uint16_t slot0_idx      :10;
     uint64_t imm;
     uint16_t relop          :6;
     uint16_t label          :8;
@@ -129,18 +129,18 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
     uint8_t opc;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t relop          :6;
-    uint32_t label          :8;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t relop          :6;
+    uint16_t label          :8;
 } Instr1B143;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint16_t opc            :8;
+    uint8_t opc;
     uint16_t label          :8;
 } Instr1B2;
 
@@ -150,97 +150,97 @@ typedef struct __attribute__((packed)) {
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
-    uint32_t slot3_type     :2;
-    uint32_t slot3_idx      :6;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
+    uint16_t slot3_type     :2;
+    uint16_t slot3_idx      :10;
 } Instr1BH4;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint8_t opc;
+    uint16_t es             :2;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
 } Instr1BV4S2;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint8_t slot2_idx       :6;
+    uint8_t opc;
+    uint16_t es             :2;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
 } Instr1BV4;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint64_t opc            :8;
-    uint64_t es             :2;
-    uint64_t slot0_type     :2;
-    uint64_t slot0_idx      :6;
-    uint64_t slot1_type     :2;
-    uint64_t slot1_idx      :6;
-    uint64_t slot2_type     :2;
-    uint64_t slot2_idx      :6;
-    uint64_t slot3_type     :2;
-    uint64_t slot3_idx      :6;
-    uint64_t slot4_type     :2;
-    uint64_t slot4_idx      :6;
-    uint64_t relop          :6;
+    uint8_t opc;
+    uint16_t es             :2;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
+    uint16_t slot3_type     :2;
+    uint16_t slot3_idx      :10;
+    uint16_t slot4_type     :2;
+    uint16_t slot4_idx      :10;
+    uint8_t relop           :6;
 } Instr1BV8;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
     uint8_t helper_l;
-    uint32_t helper_h       :3;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
-    uint32_t slot3_type     :2;
-    uint16_t slot3_idx      :6;
+    uint8_t helper_h        :3;
+    uint8_t noargs          :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
+    uint16_t slot3_type     :2;
+    uint16_t slot3_idx      :10;
     uint16_t slot4_type     :2;
-    uint16_t slot4_idx      :6;
+    uint16_t slot4_idx      :10;
 } Instr1BH141;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint16_t opc            :8;
+    uint8_t opc;
     uint16_t es             :2;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :6;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
     uint8_t imm;
 } Instr1BV21;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
-    uint8_t attr_type       :2;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
+    uint16_t attr_type      :2;
     /*
     struct {
         uint32_t atomic :1;
@@ -255,37 +255,37 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint8_t opc;
+    uint16_t es             :2;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint8_t imm;
 } Instr1BV4I;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint8_t opc             :8;
+    uint8_t opc;
     uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :6;
-    uint16_t imm0           :8;
+    uint16_t slot0_idx      :10;
+    uint8_t imm0;
     int32_t imm1;
 } Instr1B24;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint16_t slot2_idx      :6;
-    uint16_t relop          :6;
+    uint8_t opc;
+    uint16_t es             :2;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
+    uint8_t relop           :6;
 } Instr1BV41;
 
 typedef struct __attribute__((packed)) {
@@ -304,56 +304,56 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint16_t opc            :8;
+    uint8_t opc;
     uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :6;
+    uint16_t slot0_idx      :10;
 } Instr1B2S;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
     uint8_t imm;
 } Instr1B41I;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t es             :2;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint8_t opc;
+    uint16_t es             :2;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint64_t imm;
 } Instr1BV48;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t relop          :6;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint8_t opc;
+    uint8_t relop           :6;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint32_t imm;
     uint16_t slot2_type     :2;
-    uint16_t slot2_idx      :6;
+    uint16_t slot2_idx      :10;
     uint16_t slot3_type     :2;
-    uint16_t slot3_idx      :6;
+    uint16_t slot3_idx      :10;
 } Instr1B422;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint8_t opc             :8;
+    uint8_t opc;
     uint32_t imm;
     uint16_t xmm_idx        :6;
     uint16_t xmm_offset     :4;
@@ -362,7 +362,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint8_t opc             :8;
+    uint8_t opc;
     uint32_t imm;
     uint16_t env_offset;
 } Instr1B142E;
@@ -372,8 +372,8 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type_ext  :6;
     uint16_t helper         :11;
     uint16_t noargs         :1;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :6;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
 } Instr1BH21_ENV0;
 
 typedef struct __attribute__((packed)) {
@@ -381,21 +381,21 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type_ext  :6;
     uint16_t helper         :11;
     uint16_t noargs         :1;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :6;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
 } Instr1BH21_ENV1;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint8_t imm0;
-    uint8_t slot2_type      :2;
-    uint8_t slot2_idx       :6;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
     uint8_t imm1;
     uint8_t relop           :6;
 } Instr1B4111;
@@ -403,18 +403,18 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint64_t opc            :8;
-    uint64_t slot0_type     :2;
-    uint64_t slot0_idx      :6;
-    uint64_t slot1_type     :2;
-    uint64_t slot1_idx      :6;
-    uint64_t slot2_type     :2;
-    uint64_t slot2_idx      :6;
-    uint64_t slot3_type     :2;
-    uint64_t slot3_idx      :6;
-    uint64_t slot4_type     :2;
-    uint64_t slot4_idx      :6;
-    uint64_t relop          :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
+    uint16_t slot3_type     :2;
+    uint16_t slot3_idx      :10;
+    uint16_t slot4_type     :2;
+    uint16_t slot4_idx      :10;
+    uint8_t relop           :6;
 } Instr1B8;
 
 typedef struct __attribute__((packed)) {
@@ -423,27 +423,27 @@ typedef struct __attribute__((packed)) {
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
-    uint32_t imm            :8;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
+    uint8_t imm;
 } Instr1BH4I;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
     uint8_t helper_l;
-    uint32_t helper_h       :3;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
+    uint8_t helper_h        :3;
+    uint8_t noargs          :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
     uint8_t imm0;
     uint8_t imm1;
 } Instr1BH4I1;
@@ -452,12 +452,12 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
     uint8_t helper_l;
-    uint32_t helper_h       :3;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint8_t helper_h        :3;
+    uint8_t noargs          :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint8_t imm0;
     uint8_t imm1;
     uint8_t imm2;
@@ -467,14 +467,14 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
     uint8_t helper_l;
-    uint32_t helper_h       :3;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
+    uint8_t helper_h        :3;
+    uint8_t noargs          :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
     uint8_t imm;
 } Instr1BH4I_ENV0;
 
@@ -482,63 +482,63 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
     uint8_t helper_l;
-    uint32_t helper_h       :3;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
+    uint8_t helper_h        :3;
+    uint8_t noargs          :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
 } Instr1BH4S3;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
     uint8_t helper_l;
-    uint32_t helper_h       :3;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
+    uint8_t helper_h        :3;
+    uint8_t noargs          :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
 } Instr1BH4S3_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t relop          :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint8_t relop           :6;
     uint32_t imm;
 } Instr1B42;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t helper         :11;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint16_t helper         :11;
+    uint16_t noargs         :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint8_t imm;
 } Instr1BH41;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t helper         :11;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint16_t helper         :11;
+    uint16_t noargs         :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint8_t imm;
 } Instr1BH41_ENV0;
 
@@ -548,59 +548,59 @@ typedef struct __attribute__((packed)) {
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t imm            :4;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :6;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
 } Instr1BH21S_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint16_t opc            :8;
+    uint8_t opc;
     uint16_t slot0_type     :2;
-    uint16_t slot0_idx      :6;
+    uint16_t slot0_idx      :10;
     uint64_t imm;
-    uint8_t slot1_type      :2;
-    uint8_t slot1_idx       :6;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
 } Instr1B281;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint8_t imm0;
     uint8_t imm1;
     uint16_t slot2_type     :2;
-    uint16_t slot2_idx      :6;
-    uint16_t relop          :6;
+    uint16_t slot2_idx      :10;
+    uint8_t relop           :6;
 } Instr1B4112;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint8_t imm0;
     uint8_t imm1;
-    uint16_t imm2           :8;
-    uint16_t relop          :6;
+    uint8_t imm2;
+    uint8_t relop           :6;
 } Instr1B41122;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t helper         :11;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint16_t helper         :11;
+    uint16_t noargs         :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
     uint8_t imm0;
     uint16_t imm1;
 } Instr1BH412;
@@ -608,13 +608,13 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint32_t slot2_type     :2;
-    uint32_t slot2_idx      :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
     uint8_t relop           :6;
 } Instr1B41R;
 
@@ -632,52 +632,52 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type_ext  :6;
     uint16_t helper         :11;
     uint16_t noargs         :1;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :6;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
     uint8_t imm;
 } Instr1BH211_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t helper         :11;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint16_t helper         :11;
+    uint16_t noargs         :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
 } Instr1BH4S_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint32_t helper         :11;
-    uint32_t noargs         :1;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
+    uint16_t helper         :11;
+    uint16_t noargs         :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
 } Instr1BH4S_ENV1;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
     uint8_t instr_type_ext  :6;
-    uint8_t opc             :8;
+    uint8_t opc;
     uint8_t imm0;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :6;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
     uint8_t imm1;
 } Instr1B1111;
 
 typedef struct __attribute__((packed)) {
     uint32_t instr_type     :1;
     uint32_t instr_type_ext :6;
-    uint32_t opc            :8;
-    uint32_t slot0_type     :2;
-    uint32_t slot0_idx      :6;
-    uint32_t slot1_type     :2;
-    uint32_t slot1_idx      :6;
-    uint8_t attr_type       :2;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t attr_type      :2;
     /*
     union {
         struct {
@@ -695,8 +695,8 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint16_t instr_type     :1;
     uint16_t instr_type_ext :6;
-    uint16_t opc            :8;
-    uint8_t slot0_type      :2;
-    uint8_t slot0_idx       :6;
+    uint8_t opc;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
     int32_t imm;
 } Instr2B4;
