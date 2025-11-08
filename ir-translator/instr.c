@@ -906,6 +906,7 @@ size_t create_helper_slot3_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noa
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
     assert(noargs == 0);
+    i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
@@ -924,6 +925,7 @@ size_t create_helper_slot3_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t no
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
     assert(noargs == 1);
+    i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
@@ -931,6 +933,28 @@ size_t create_helper_slot3_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t no
     i->imm0 = i0;
     assert(i1 < (1 << 8) || (i1 & 0xffffff80) == 0xffffff80);
     i->imm1 = i1;
+    return sizeof(*i);
+}
+
+size_t create_helper_slot2_imm3(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0, uint32_t i1, uint32_t i2) {
+#ifdef DEBUG
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
+#endif
+    Instr1BH4I11 *i = (Instr1BH4I11 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH4I11_ext;
+    i->helper_l = (uint8_t)h.h;
+    i->helper_h = h.h >> 8;
+    assert(noargs == 1);
+    i->noargs = noargs;
+    SET_SLOT(0);
+    SET_SLOT(1);
+    assert(i0 < (1 << 8) || (i0 & 0xffffff80) == 0xffffff80);
+    i->imm0 = i0;
+    assert(i1 < (1 << 8) || (i1 & 0xffffff80) == 0xffffff80);
+    i->imm1 = i1;
+    assert(i2 < (1 << 8) || (i2 & 0xffffff80) == 0xffffff80);
+    i->imm2 = i2;
     return sizeof(*i);
 }
 
@@ -944,6 +968,7 @@ size_t create_helper_env_slot3_imm(void *ptr, OHType h, uint16_t cflags, uint8_t
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
     assert(noargs == 0);
+    i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);

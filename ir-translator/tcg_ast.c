@@ -2392,6 +2392,9 @@ void translate_call(OpCodeType opc, void *ptr) {
     if (!op_cnt) {
         all_alias = 0;
     }
+#ifdef DEBUG
+    printf("%s_%s noargs:%d op_cnt:%d\n", helper_str[h], second_half_name, noargs, op_cnt); fflush(NULL);
+#endif
     uint8_t second_half_disabled = is_tail_call(h);
     char helper_func_name[256] = {0};
     char bc_name[256] = {0};
@@ -3040,7 +3043,6 @@ void handle_func(uint64_t val) {
 
 static void handle_single_instr(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
-  /*
     printf("handle_single_instr: %s ptr:%lx", opcode_type_str[opc], ptr); fflush(NULL);
     void *next = move_to_next(ptr);
     unsigned char *byte = (unsigned char *)ptr;
@@ -3049,7 +3051,6 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
         byte += 1;
     }
     printf("\n"); fflush(NULL);
-    */
 #endif
     switch (opc) {
     case addc1o_i32:
