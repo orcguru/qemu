@@ -33,7 +33,7 @@
 #define WITH_FIXED_VEC_CONTEXT      1
 #define WITHOUT_FIXED_VEC_CONTEXT   0
 #define MAX_OPERANDS_COUNT          16
-#define BB_MAX_CNT                  128
+#define BB_MAX_CNT                  256
 #define QEMUAOT_CC                  124
 #define REGISTER_INDEX_SHIFT        5 
 #define STACK_INDEX_SHIFT           10
@@ -318,7 +318,7 @@ static const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 static const char *xmm_tmp_stack_names[2] = {NULL};
 #endif
 static const char *tmp_stack_names[1<<STACK_INDEX_SHIFT] = {NULL};
-static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)] = {NULL};
+static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)] = {NULL};
 static int ir_var_name_idx = 0;
 static LLVMTypeRef llvm_int_types[LLVMMAXType] = {0};
 static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
@@ -335,7 +335,6 @@ static uint32_t br_count = 0;
 static uint64_t current_func_offset = 0;
 static uint8_t current_call_idx = 0;
 static int32_t shadow_call_offset = 16;
-static void *call_accumulated[BB_MAX_CNT] = {NULL};
 static uint32_t xreg_valid = 0, xmm_valid = 0;
 static uint8_t tmp_valid_non_zero = 0;
 static uint64_t tmp_valid[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
@@ -2757,7 +2756,6 @@ static void cleanup_func_resource() {
     memset(tmp_valid, 0, sizeof(tmp_valid));;
     memset(tmp_var_available, 0, sizeof(tmp_var_available));
     memset(tmp_var_available_backup, 0, sizeof(tmp_var_available_backup));
-    memset(call_accumulated, 0, sizeof(call_accumulated));
     memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
     memset(tmp_bits_type, 0, sizeof(tmp_bits_type));
     memset(tmp_shadow_offset, 0, sizeof(tmp_shadow_offset));
@@ -3437,16 +3435,19 @@ void module_prolog() {
         snprintf(tmp_name_buf[i], sizeof(tmp_name_buf[i]), "tmp%d.stack", i);
         tmp_stack_names[i] = tmp_name_buf[i];
     }
-    static char ir_var_name_buffer[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)][4];
+    static char ir_var_name_buffer[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)][5];
     for (char c1 = 'a'; c1 <= 'z'; ++c1) {
         for (char c2 = 'a'; c2 <= 'z'; ++c2) {
             for (char c3 = 'a'; c3 <= 'z'; ++c3) {
-                int idx = (c1 - 'a') * ('z' - 'a' + 1) * ('z' - 'a' + 1) + (c2 - 'a') * ('z' - 'a' + 1) + (c3 - 'a');
-                ir_var_name_buffer[idx][0] = c1;
-                ir_var_name_buffer[idx][1] = c2;
-                ir_var_name_buffer[idx][2] = c3;
-                ir_var_name_buffer[idx][3] = 0;
-                ir_var_name[idx] = ir_var_name_buffer[idx];
+                for (char c4 = 'a'; c4 <= 'z'; ++c4) {
+                    int idx = (c1 - 'a') * ('z' - 'a' + 1) * ('z' - 'a' + 1) * ('z' - 'a' + 1) + (c2 - 'a') * ('z' - 'a' + 1) * ('z' - 'a' + 1) + (c3 - 'a') * ('z' - 'a' + 1) + (c4 - 'a');
+                    ir_var_name_buffer[idx][0] = c1;
+                    ir_var_name_buffer[idx][1] = c2;
+                    ir_var_name_buffer[idx][2] = c3;
+                    ir_var_name_buffer[idx][3] = c4;
+                    ir_var_name_buffer[idx][4] = 0;
+                    ir_var_name[idx] = ir_var_name_buffer[idx];
+                }
             }
         }
     }
