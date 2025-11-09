@@ -617,6 +617,26 @@ size_t create_helper_slot5(void *ptr, OHType h, uint16_t cflags, uint8_t noargs,
     return sizeof(*i);
 }
 
+size_t create_helper_slot4_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3, uint32_t i0) {
+#ifdef DEBUG
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
+#endif
+    Instr1BH42 *i = (Instr1BH42 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH42_ext;
+    i->helper_l = (uint8_t)h.h;
+    i->helper_h = h.h >> 8;
+    assert(noargs < 2);
+    i->noargs = noargs;
+    SET_SLOT(0);
+    SET_SLOT(1);
+    SET_SLOT(2);
+    SET_SLOT(3);
+    assert(i0 < (1 << 8) || (i0 & 0xffffff80) == 0xffffff80);
+    i->imm = i0;
+    return sizeof(*i);
+}
+
 size_t create_vector_slot_vimm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, uint64_t vi0) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);

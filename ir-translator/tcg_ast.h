@@ -1581,7 +1581,8 @@ typedef enum {
     X(Instr1B143_ext) \
     X(Instr1BH4I1_ext) \
     X(Instr1B41122_ext) \
-    X(Instr1BH4I11_ext)
+    X(Instr1BH4I11_ext) \
+    X(Instr1BH42_ext)
 
 typedef enum {
     #define X(name) name,
@@ -1698,6 +1699,7 @@ size_t create_helper_slot3(void *ptr, OHType h, uint16_t cflags, uint8_t noargs,
 size_t create_helper_slot2_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0);
 size_t create_helper_slot4(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3);
 size_t create_helper_slot5(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4);
+size_t create_helper_slot4_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3, uint32_t i0);
 size_t create_helper_env_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, uint32_t i0, uint32_t i1);
 size_t create_helper_env_slot3_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, uint32_t i0);
 size_t create_helper_env_slot2_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0);
