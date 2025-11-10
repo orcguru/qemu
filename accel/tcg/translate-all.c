@@ -257,6 +257,9 @@ static int setjmp_gen_code(CPUArchState *env, TranslationBlock *tb,
     return tcg_gen_code(tcg_ctx, tb, pc);
 }
 
+extern uintptr_t branch_left;
+extern uintptr_t branch_right;
+
 /* Called with mmap_lock held for user mode emulation.  */
 TranslationBlock *tb_gen_code(CPUState *cpu, TCGTBCPUState s)
 {
@@ -320,6 +323,8 @@ TranslationBlock *tb_gen_code(CPUState *cpu, TCGTBCPUState s)
  restart_translate:
     trace_translate_block(tb, s.pc, tb->tc.ptr);
 
+    branch_left = -1;
+    branch_right = -1;
     gen_code_size = setjmp_gen_code(env, tb, s.pc, host_pc, &max_insns, &ti);
     if (unlikely(gen_code_size < 0)) {
         switch (gen_code_size) {
