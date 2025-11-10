@@ -301,7 +301,7 @@ TranslationBlock *tb_gen_code(CPUState *cpu, TCGTBCPUState s)
         cpu->exception_index = EXCP_INTERRUPT;
         cpu_loop_exit(cpu);
     }
-
+    memset(tb, 0, sizeof(TranslationBlock));
     gen_code_buf = tcg_ctx->code_gen_ptr;
     tb->tc.ptr = tcg_splitwx_to_rx(gen_code_buf);
     if (!(s.cflags & CF_PCREL)) {
@@ -325,6 +325,8 @@ TranslationBlock *tb_gen_code(CPUState *cpu, TCGTBCPUState s)
 
     branch_left = -1;
     branch_right = -1;
+    tb->jmp_target_addr[0] = 0;
+    tb->jmp_target_addr[1] = 0;
     gen_code_size = setjmp_gen_code(env, tb, s.pc, host_pc, &max_insns, &ti);
     if (unlikely(gen_code_size < 0)) {
         switch (gen_code_size) {

@@ -4655,6 +4655,14 @@ abi_ulong get_image_end_code(CPUState *cpu)
     return info->end_code;
 }
 
+abi_ulong get_image_entry(CPUState *cpu);
+abi_ulong get_image_entry(CPUState *cpu)
+{
+    TaskState *ts = (TaskState *)cpu->opaque;
+    struct image_info *info = ts->info;
+    return info->entry;
+}
+
 uint32_t get_hflags_for_codegen(CPUState *cpu);
 uint32_t get_hflags_for_codegen(CPUState *cpu)
 {

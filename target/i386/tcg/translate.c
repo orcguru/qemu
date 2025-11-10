@@ -2349,6 +2349,17 @@ static void gen_bnd_jmp(DisasContext *s)
     }
 }
 
+static void set_tb_jmp_target(TranslationBlock *tb, uintptr_t jmp_dest)
+{
+    if (!tb->jmp_target_addr[0]) {
+        tb->jmp_target_addr[0] = jmp_dest;
+    } else if (!tb->jmp_target_addr[1]) {
+        tb->jmp_target_addr[1] = jmp_dest;
+    } else {
+        assert(0);
+    }
+}
+
 /*
  * Generate an end of block, including common tasks such as generating
  * single step traps, resetting the RF flag, and handling the interrupt
@@ -2379,11 +2390,13 @@ gen_eob(DisasContext *s, int mode)
         assert(s->base.jmp_type != TR_IS_RET && s->base.jmp_type != INVALID_TYPE);
         if (s->base.jmp_type == TR_IS_JMP) {
             tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
+            set_tb_jmp_target(s->base.tb, s->rip_at_exit);
             tcg_gen_jmp_direct(s->rip_at_exit);
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
             tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
+            set_tb_jmp_target(s->base.tb, s->rip_at_exit);
             tcg_gen_jmp_direct(s->rip_at_exit);
         } else {
             assert(0);
@@ -2426,6 +2439,7 @@ gen_eob(DisasContext *s, int mode)
         assert(s->base.jmp_type != INVALID_TYPE);
         if (s->base.jmp_type == TR_IS_JMP) {
             tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
+            set_tb_jmp_target(s->base.tb, s->rip_at_exit);
             tcg_gen_jmp_direct(s->rip_at_exit);
         } else if (s->base.jmp_type == TR_IS_RET) {
             assert(s->last_rip_mov);
@@ -2436,6 +2450,7 @@ gen_eob(DisasContext *s, int mode)
             assert(s->eip_next_tl_set);
             tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
+            set_tb_jmp_target(s->base.tb, s->rip_at_exit);
             tcg_gen_jmp_direct(s->rip_at_exit);
         } else if (s->base.jmp_type == TR_IS_IRET) {
             // FIXME
@@ -4072,6 +4087,12 @@ static void i386_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
     case DISAS_EOB_RECHECK_TF:
     case DISAS_JUMP:
         assert(dc->base.jmp_type != INVALID_TYPE);
+        gen_eob(dc, dc->base.is_jmp);
+        break;
+    case DISAS_NEXT:
+        gen_update_cc_op(dc);
+        gen_update_eip_cur(dc);
+        dc->base.jmp_type = get_jmp();
         gen_eob(dc, dc->base.is_jmp);
         break;
 #else

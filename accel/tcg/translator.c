@@ -119,6 +119,8 @@ bool translator_use_goto_tb(DisasContextBase *db, vaddr dest)
     return translator_is_same_page(db, dest);
 }
 
+extern int ghash_contains_jmp_dest(uintptr_t jmp_dest);
+
 void translator_loop(CPUState *cpu, TranslationBlock *tb, int *max_insns,
                      vaddr pc, void *host_pc, const TranslatorOps *ops,
                      DisasContextBase *db)
@@ -155,6 +157,10 @@ void translator_loop(CPUState *cpu, TranslationBlock *tb, int *max_insns,
     db->plugin_enabled = plugin_enabled;
 
     while (true) {
+        // Exit if hit branch_dest
+        if (db->pc_first != db->pc_next && ghash_contains_jmp_dest(db->pc_next)) {
+            break;
+        }
         *max_insns = ++db->num_insns;
         ops->insn_start(db, cpu);
         db->insn_start = tcg_last_op();

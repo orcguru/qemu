@@ -993,10 +993,63 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
 uintptr_t branch_left = -1UL;
 uintptr_t branch_right = -1UL;
 uintptr_t pc_before = -1;
+GHashTable *bb_split_htable = NULL;
 extern uintptr_t x_load_addr;
 extern unsigned long get_image_start_code(CPUState *cpu);
 extern unsigned long get_image_end_code(CPUState *cpu);
+extern unsigned long get_image_entry(CPUState *cpu);
 extern uint32_t get_hflags_for_codegen(CPUState *cpu);
+
+typedef struct jmp_dest_record {
+    uintptr_t jmp_dest;
+    struct jmp_dest_record *next;
+} jmp_dest_record_t;
+
+int ghash_contains_jmp_dest(uintptr_t jmp_dest);
+int ghash_contains_jmp_dest(uintptr_t jmp_dest)
+{
+    jmp_dest_record_t *r = g_hash_table_lookup(bb_split_htable, (gconstpointer)jmp_dest);
+    while (r) {
+        if (r->jmp_dest == jmp_dest) {
+            return 1;
+        }
+        r = r->next;
+    }
+    return 0;
+}
+
+static void ghash_insert_jmp_dest(GHashTable *g, uintptr_t jmp_dest)
+{
+    jmp_dest_record_t *r = g_hash_table_lookup(g, (gconstpointer)jmp_dest);
+    if (!r) {
+        r = (jmp_dest_record_t *)malloc(sizeof(jmp_dest_record_t));
+        assert(r);
+        r->jmp_dest = jmp_dest;
+        r->next = NULL;
+        g_hash_table_insert(g, (gpointer)jmp_dest, (gpointer)r);
+    } else {
+        int found = 0;
+        jmp_dest_record_t *last = r;
+        jmp_dest_record_t *entry = r;
+        while (entry) {
+            if (entry->jmp_dest == jmp_dest) {
+                found = 1;
+                break;
+            }
+            last = entry;
+            entry = entry->next;
+        }
+        if (!found) {
+            assert(last);
+            assert(!last->next);
+            entry = (jmp_dest_record_t *)malloc(sizeof(jmp_dest_record_t));
+            assert(entry);
+            entry->jmp_dest = jmp_dest;
+            entry->next = NULL;
+            last->next = entry;
+        }
+    }
+}
 
 static void gen_tcg_ir(CPUState *cpu)
 {
@@ -1012,11 +1065,62 @@ static void gen_tcg_ir(CPUState *cpu)
     vaddr pc = start_code;
     x_load_addr = start_code;
 
-    // for jump to lock prefixed insn
+    // Initial loop collects branch destinations that need split
+    bb_split_htable = g_hash_table_new(NULL, NULL);
+    assert(bb_split_htable);
+    ghash_insert_jmp_dest(bb_split_htable, get_image_entry(cpu));
+
     uintptr_t last_branch_left = -1;
     uintptr_t last_branch_right = -1;
     uintptr_t pc_after = -1;
+    branch_left = -1;
+    branch_right = -1;
 
+    while (1) {
+        last_branch_left = branch_left;
+        last_branch_right = branch_right;
+        branch_left = -1;
+        branch_right = -1;
+        pc_before = (pc - x_load_addr);
+        TCGTBCPUState s;
+        s.pc = pc;
+        s.flags = flags;
+        s.cflags = cflags;
+        s.cs_base = cs_base;
+        TranslationBlock *tb = tb_gen_code(cpu, s);
+        if (tb->jmp_target_addr[0]) {
+            ghash_insert_jmp_dest(bb_split_htable, tb->jmp_target_addr[0]);
+        }
+        if (tb->jmp_target_addr[1]) {
+            ghash_insert_jmp_dest(bb_split_htable, tb->jmp_target_addr[1]);
+        }
+        pc += tb->size;
+        if (pc >= end_code) {
+            break;
+        }
+        pc_after = (pc - x_load_addr);
+        if (last_branch_left != -1 && last_branch_right != -1) {
+            if (last_branch_left == pc_before && (last_branch_right > pc_before && last_branch_right < pc_after)) {
+                pc -= (pc_after - last_branch_right);
+                branch_left = -1;
+                branch_right = -1;
+            } else if (last_branch_right == pc_before && (last_branch_left > pc_before && last_branch_left < pc_after)) {
+                pc -= (pc_after - last_branch_left);
+                branch_left = -1;
+                branch_right = -1;
+            }
+        }
+    }
+
+    // for jump to lock prefixed insn
+    last_branch_left = -1;
+    last_branch_right = -1;
+    pc_after = -1;
+    branch_left = -1;
+    branch_right = -1;
+
+    pc = start_code;
+    x_load_addr = start_code;
     while (1) {
         last_branch_left = branch_left;
         last_branch_right = branch_right;
