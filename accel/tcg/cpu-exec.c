@@ -946,9 +946,10 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
 
 #ifdef AOT
             uint64_t entry = tb_aot_lookup_host_addr(s.pc);
-            assert(entry);
-            tcg_qemu_aot_exec(cpu_env(cpu), (void *)entry, (void *)s.pc);
-#else
+            if (entry) {
+                tcg_qemu_aot_exec(cpu_env(cpu), (void *)entry, (void *)s.pc);
+            }
+#endif
             tb = tb_lookup(cpu, s);
             if (tb == NULL) {
                 CPUJumpCache *jc;
@@ -985,7 +986,6 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
             }
 
             cpu_loop_exec_tb(cpu, tb, s.pc, &last_tb, &tb_exit);
-#endif
 
             /* Try to align the host and virtual clocks
                if the guest is in advance */

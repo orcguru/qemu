@@ -70,7 +70,7 @@ static void do_interrupt_user(CPUX86State *env, int intno, int is_int,
     /* Since we emulate only user space, we cannot do more than
        exiting the emulation with the suitable exception and error
        code. So update EIP for INT 0x80 and EXCP_SYSCALL. */
-    if (is_int || intno == EXCP_SYSCALL) {
+    if (is_int || intno == EXCP_SYSCALL || intno == EXCP_TCGJIT) {
         env->eip = next_eip;
     }
 }

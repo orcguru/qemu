@@ -260,6 +260,9 @@ void cpu_loop(CPUX86State *env)
         case EXCP_VSYSCALL:
             emulate_vsyscall(env);
             break;
+        case EXCP_TCGJIT:
+            // dummy signal to hand over to TCG
+            break;
 #endif
         case EXCP0B_NOSEG:
         case EXCP0C_STACK:

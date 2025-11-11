@@ -240,7 +240,12 @@ void register_for_aot_helper_jmp_ind()
 
 void helper_jit(CPUX86State *env, unsigned long target)
 {
-    assert(0);
+    CPUState *cs = env_cpu(env);
+
+    cs->exception_index = EXCP_TCGJIT;
+    env->exception_is_int = 0;
+    env->exception_next_eip = target;
+    cpu_loop_exit(cs);
 }
 
 void register_for_aot_helper_jit(void) __attribute__((weak,constructor));
