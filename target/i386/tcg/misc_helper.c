@@ -53,82 +53,6 @@ void helper_into(CPUX86State *env, int next_eip_addend)
 
 void helper_cpuid(CPUX86State *env)
 {
-#ifdef AOT
-    uint32_t tmp32u = env->regs[R_EAX];
-    uint32_t eax = 0;
-    uint32_t ebx = 0;
-    uint32_t ecx = 0;
-    uint32_t edx = 0;
-    switch (tmp32u) {
-        case 0x0:
-            /* This spells out "AuthenticAMD" -- glibc:sysdeps/x86/cpu-features.c */
-            eax = 0xd;
-            ebx = 0x68747541;
-            ecx = 0x444d4163;
-            edx = 0x69746e65;
-            break;
-        case 0x1:
-            eax = 0x60fb1;
-            ebx = 0x40800;
-            ecx = 0x80002001;
-            edx = 0x178bfbfd;
-            break;
-        case 0x7:
-            eax = 0x0;
-            ebx = 0x0;
-            ecx = 0x0;
-            edx = 0x0;
-            break;
-        case 0xd:
-            eax = 0x0;
-            ebx = 0x0;
-            ecx = 0x0;
-            edx = 0x0;
-            break;
-        case 0x80000000:
-            eax = 0x8000000a;
-            ebx = 0x68747541;
-            ecx = 0x444d4163;
-            edx = 0x69746e65;
-            break;
-        case 0x80000001:
-            eax = 0x60fb1;
-            ebx = 0x0;
-            ecx = 0x7;
-            edx = 0x2193fbfd;
-            break;
-        case 0x80000007:
-            eax = 0x0;
-            ebx = 0x0;
-            ecx = 0x0;
-            edx = 0x0;
-            break;
-        case 0x80000008:
-            eax = 0x3028;
-            ebx = 0x0;
-            ecx = 0x2003;
-            edx = 0x0;
-            break;
-        case 0x80000005:
-            eax = 0x1ff01ff;
-            ebx = 0x1ff01ff;
-            ecx = 0x40020140;
-            edx = 0x40020140;
-            break;
-        case 0x80000006:
-            eax = 0x0;
-            ebx = 0x42004200;
-            ecx = 0x2008140;
-            edx = 0x808140;
-            break;
-        default:
-            break;
-    }
-    env->regs[R_EAX] = REG_EXT(env->regs[R_EAX], eax);
-    env->regs[R_EBX] = REG_EXT(env->regs[R_EBX], ebx);
-    env->regs[R_ECX] = REG_EXT(env->regs[R_ECX], ecx);
-    env->regs[R_EDX] = REG_EXT(env->regs[R_EDX], edx);
-#else
     uint32_t eax, ebx, ecx, edx;
 
     cpu_svm_check_intercept_param(env, SVM_EXIT_CPUID, 0, GETPC());
@@ -139,7 +63,6 @@ void helper_cpuid(CPUX86State *env)
     env->regs[R_EBX] = ebx;
     env->regs[R_ECX] = ecx;
     env->regs[R_EDX] = edx;
-#endif
 }
 
 void helper_rdtsc(CPUX86State *env)

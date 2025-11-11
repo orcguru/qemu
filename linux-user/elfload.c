@@ -2443,18 +2443,8 @@ static abi_ulong setup_arg_pages(struct linux_binprm *bprm,
     if (info->exec_stack) {
         prot |= PROT_EXEC;
     }
-#ifdef FIX_RSP_FOR_TRACE
-#if defined(__aarch64__)
-    error = target_mmap(0x3ff69fc000, size + guard, prot,
-                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-#elif defined(__riscv) && __riscv_xlen == 64
-    error = target_mmap(0x3FF7000000, size + guard, prot,
-                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-#endif
-#else
     error = target_mmap(0, size + guard, prot,
                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-#endif
     if (error == -1) {
         perror("mmap stack");
         exit(-1);
@@ -2590,10 +2580,6 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
     const char *k_platform, *k_base_platform;
     const int n = sizeof(elf_addr_t);
 
-#ifdef FIX_RSP_FOR_TRACE
-    envc = 0;
-#endif
-
     sp = p;
 
     /* Needs to be before we load the env/argc/... */
@@ -2613,7 +2599,6 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
         }
     }
 
-#ifndef FIX_RSP_FOR_TRACE
     u_base_platform = 0;
     k_base_platform = ELF_BASE_PLATFORM;
     if (k_base_platform) {
@@ -2629,7 +2614,6 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
             sp += len + 1;
         }
     }
-#endif
 
     u_platform = 0;
     k_platform = ELF_PLATFORM;
@@ -2659,15 +2643,7 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
     /*
      * Generate 16 random bytes for userspace PRNG seeding.
      */
-#ifdef FIX_RSP_FOR_TRACE
-    int *ptr = (int *)k_rand_bytes;
-    ptr[0] = 0x55aa;
-    ptr[1] = 0x55aa;
-    ptr[2] = 0x55aa;
-    ptr[3] = 0x55aa;
-#else
     qemu_guest_getrandom_nofail(k_rand_bytes, sizeof(k_rand_bytes));
-#endif
     if (STACK_GROWS_DOWN) {
         sp -= 16;
         u_rand_bytes = sp;
@@ -2679,16 +2655,10 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
         sp += 16;
     }
 
-#ifndef FIX_RSP_FOR_TRACE
     size = (DLINFO_ITEMS + 1) * 2;
-#else
-    size = (20 + 1) * 2;
-#endif
-#ifndef FIX_RSP_FOR_TRACE
     if (k_base_platform) {
         size += 2;
     }
-#endif
     if (k_platform) {
         size += 2;
     }
@@ -2698,10 +2668,8 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
 #ifdef DLINFO_ARCH_ITEMS
     size += DLINFO_ARCH_ITEMS * 2;
 #endif
-#ifndef FIX_RSP_FOR_TRACE
 #ifdef ELF_HWCAP2
     size += 2;
-#endif
 #endif
     info->auxv_len = size * n;
 
@@ -2745,34 +2713,6 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
     /* There must be exactly DLINFO_ITEMS entries here, or the assert
      * on info->auxv_len will trigger.
      */
-#ifdef FIX_RSP_FOR_TRACE
-    if (vdso_info) {
-        NEW_AUX_ENT(AT_SYSINFO_EHDR, vdso_info->load_addr);
-    }
-    NEW_AUX_ENT(AT_MINSIGSTKSZ, 0x5a0);
-    NEW_AUX_ENT(AT_HWCAP, (abi_ulong)0x00000000178bfbfdUL);
-    NEW_AUX_ENT(AT_PAGESZ, (abi_ulong)(TARGET_PAGE_SIZE));
-    NEW_AUX_ENT(AT_CLKTCK, (abi_ulong)0x64);
-    NEW_AUX_ENT(AT_PHDR, (abi_ulong)(info->load_addr + exec->e_phoff));
-    NEW_AUX_ENT(AT_PHENT, (abi_ulong)(sizeof (struct elf_phdr)));
-    NEW_AUX_ENT(AT_PHNUM, (abi_ulong)(exec->e_phnum));
-    NEW_AUX_ENT(AT_BASE, (abi_ulong)0);
-    NEW_AUX_ENT(AT_FLAGS, (abi_ulong)0);
-    NEW_AUX_ENT(AT_ENTRY, info->entry);
-    NEW_AUX_ENT(AT_UID, (abi_ulong) getuid());
-    NEW_AUX_ENT(AT_EUID, (abi_ulong) geteuid());
-    NEW_AUX_ENT(AT_GID, (abi_ulong) getgid());
-    NEW_AUX_ENT(AT_EGID, (abi_ulong) getegid());
-    NEW_AUX_ENT(AT_SECURE, (abi_ulong)0);
-    NEW_AUX_ENT(AT_RANDOM, (abi_ulong) u_rand_bytes);
-    NEW_AUX_ENT(AT_HWCAP2, (abi_ulong)0);
-    NEW_AUX_ENT(AT_EXECFN, info->file_string);
-    if (u_platform) {
-        NEW_AUX_ENT(AT_PLATFORM, u_platform);
-    }
-    NEW_AUX_ENT(AT_RSEQ_FEATURE_SIZE, 28);
-    NEW_AUX_ENT(AT_RSEQ_ALIGN, 32);
-#else
     NEW_AUX_ENT(AT_PHDR, (abi_ulong)(info->load_addr + exec->e_phoff));
     NEW_AUX_ENT(AT_PHENT, (abi_ulong)(sizeof (struct elf_phdr)));
     NEW_AUX_ENT(AT_PHNUM, (abi_ulong)(exec->e_phnum));
@@ -2803,7 +2743,6 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
     if (vdso_info) {
         NEW_AUX_ENT(AT_SYSINFO_EHDR, vdso_info->load_addr);
     }
-#endif
     NEW_AUX_ENT (AT_NULL, 0);
 #undef NEW_AUX_ENT
 
@@ -3995,13 +3934,6 @@ int load_elf_binary(struct linux_binprm *bprm, struct image_info *info)
     /* Do this so that we can load the interpreter, if need be.  We will
        change some of these later */
     bprm->p = setup_arg_pages(bprm, info);
-#ifdef FIX_RSP_FOR_TRACE
-#if defined(__aarch64__)
-    bprm->p += 0x900;
-#elif defined(__riscv) && __riscv_xlen == 64
-    bprm->p -= 0x970;
-#endif
-#endif
 
     scratch = g_new0(char, TARGET_PAGE_SIZE);
     if (STACK_GROWS_DOWN) {
