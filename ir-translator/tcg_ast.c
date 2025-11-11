@@ -16,6 +16,7 @@
 #include <llvm-c/Transforms/PassBuilder.h>
 #include <llvm-c/BitReader.h>
 #include <llvm-c/Linker.h>
+#include <llvm-c/Support.h>
 #include <stdbool.h>
 #include <glib.h>
 
@@ -3623,6 +3624,17 @@ int main(int argc, const char *argv[]) {
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
     const char *default_triple = "riscv64-unknown-linux-gnu";
 #endif
+
+#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+    const char *global_isel_args[] = {
+        "program_name",
+        "-global-isel",
+        "-aarch64-enable-global-isel-at-O=2",
+        NULL
+    };
+    LLVMParseCommandLineOptions(3, global_isel_args, "Enable GlobalISel at O2 for AArch64");
+#endif
+
     LLVMTargetRef target;
     if (LLVMGetTargetFromTriple(default_triple, &target, &error_msg)) {
         printf("Failed to get target from triple %s\n", error_msg);
