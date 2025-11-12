@@ -2430,10 +2430,10 @@ void translate_call(OpCodeType opc, void *ptr) {
     char bc_name[256] = {0};
     if (all_alias) {
         char element[256];
-        sprintf(element, " -DFUNC_RET=%s -DHELPER_NAME=helper_%s_%s", second_half_name, helper_str[h], second_half_name);
+        sprintf(element, " -DFUNC_RET=%s -DHELPER_NAME=%s_%s", second_half_name, helper_str[h], second_half_name);
         strcat(build_macro, element);
-        sprintf(bc_name, "helper_templates/helper_%s_%s.bc", helper_str[h], second_half_name);
-        sprintf(helper_func_name, "helper_%s_%s", helper_str[h], second_half_name);
+        sprintf(bc_name, "helper_templates/%s_%s.bc", helper_str[h], second_half_name);
+        sprintf(helper_func_name, "%s_%s", helper_str[h], second_half_name);
     }
 
     // Get the second half
