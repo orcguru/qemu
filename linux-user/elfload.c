@@ -3299,6 +3299,10 @@ static void load_aot_image(const char *image_name, struct image_info *info)
       perror("Failed fstat image_name\n");
       return;
     }
+    // log helper functions
+    for (int i = 0; i < helper_funcs_count; ++i) {
+      qemu_log_mask(LOG_AOT, "%s %016lx\n", helper_funcs[i].name, helper_funcs[i].addr);
+    }
     invoke_jitlink((const char *)aotnamebuf, info->start_code, (info->start_code + st.st_size), tb_aot_insert, tb_aot_log, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug);
 }
 #endif
