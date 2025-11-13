@@ -38,6 +38,15 @@
 #define QEMUAOT_CC                  124
 #define REGISTER_INDEX_SHIFT        5 
 #define STACK_INDEX_SHIFT           10
+#define XMM_COUNT                   15
+#define XMM_PARAM_DECLARE_COMMON    \
+      "v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong ymm1_h, v2ulong xmm2, v2ulong ymm2_h, v2ulong xmm3, v2ulong ymm3_h, v2ulong xmm4, v2ulong ymm4_h, v2ulong xmm5, v2ulong ymm5_h, v2ulong xmm6, v2ulong ymm6_h, v2ulong xmm7, v2ulong ymm7_h, v2ulong xmm8, v2ulong ymm8_h, v2ulong xmm9, v2ulong ymm9_h, v2ulong xmm10, v2ulong ymm10_h, v2ulong xmm11, v2ulong ymm11_h, v2ulong xmm12, v2ulong ymm12_h, v2ulong xmm13, v2ulong ymm13_h, v2ulong xmm14, v2ulong ymm14_h"
+#define XMM_PARAM_LIST              \
+      "xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h"
+#define YMM_PARAM_DECLARE_COMMON    \
+      "v4ulong ymm0, v4ulong ymm1, v4ulong ymm2, v4ulong ymm3, v4ulong ymm4, v4ulong ymm5, v4ulong ymm6, v4ulong ymm7, v4ulong ymm8, v4ulong ymm9, v4ulong ymm10, v4ulong ymm11, v4ulong ymm12, v4ulong ymm13, v4ulong ymm14"
+#define YMM_PARAM_LIST              \
+      "ymm0, ymm1, ymm2, ymm3, ymm4, ymm5, ymm6, ymm7, ymm8, ymm9, ymm10, ymm11, ymm12, ymm13, ymm14"
 
 #define DEBUG_VALUE_TYPE(v)                                     \
     do {                                                        \
@@ -287,6 +296,7 @@
 extern char *lineptr;
 extern const char *opcode_type_str[];
 extern const char *llvm_type_str[];
+extern const char *cvector_str[];
 extern LLVMType opciosz[OPCODE_MAX][3];
 extern uint8_t opcoc[OPCODE_MAX];
 extern uint8_t opcmem_addr_nzidx[OPCODE_MAX];
@@ -295,6 +305,7 @@ extern LLVMType helper_vec_type[HELPER_MAX];
 extern const char *xmmreg_str[];
 extern uint8_t inline_helper_enabled[HELPER_MAX];
 extern uint64_t xreg_offsets[XREG_MAX];
+extern CVectorType cvector_type_for_llvm_type[LLVMMAXType];
 
 static LLVMAttributeRef target_features_attr = NULL;
 static LLVMAttributeRef NoInlineAttr = NULL;
@@ -306,7 +317,7 @@ static LLVMBuilderRef builder = NULL;
 static LLVMValueRef llvm_func = NULL;
 static LLVMBasicBlockRef last_active_bb = NULL;
 #define FIXED_PARAM_COUNT           20
-#define FIXED_VECTOR_PARAM_COUNT   (20 + 16 * 2)
+#define FIXED_VECTOR_PARAM_COUNT   (20 + XMM_COUNT * 2)
 #define TRAMPOLINE_PARAM_COUNT      8
 static LLVMTypeRef fixed_vector_param_types[FIXED_VECTOR_PARAM_COUNT + TRAMPOLINE_PARAM_COUNT] = {NULL};
 static LLVMTypeRef *llvm_types_for_helpers = &fixed_vector_param_types[FIXED_VECTOR_PARAM_COUNT];
@@ -556,11 +567,13 @@ static const char *get_next_var_name(const char *tag, OperandType slot_name_for_
       OperandType orig_slot = get_original_slot_for_debug(slot_name_for_debug);
       if (orig_slot.s.valid) {
         sprintf(info, "%s%d", orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp", orig_slot.s.slot_idx);
+        assert(strlen(info) < sizeof(info));
         orig_slot_info = info;
       }
     }
     static char verbose_name[128] = {0};
     sprintf(verbose_name, "%s_%s_%s", tag, orig_slot_info, ir_var_name[ir_var_name_idx++]);
+    assert(strlen(verbose_name) < sizeof(verbose_name));
     return (const char *)verbose_name;
 #endif
 }
@@ -764,6 +777,7 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
             LLVMTypeRef intrinsic_func_type = LLVMFunctionType(ret_type, intrinsic_types, 3, 0);
             char intrinsic_func_name[128] = {0};
             sprintf(intrinsic_func_name, "llvm.vector.insert.nxv%di%d.v%di%d", llvm_vector_elem_bit_counts[tidx*2]/2, llvm_vector_elem_bit_counts[tidx*2+1], llvm_vector_elem_bit_counts[tidx*2], llvm_vector_elem_bit_counts[tidx*2+1]);
+            assert(strlen(intrinsic_func_name) < sizeof(intrinsic_func_name));
             LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, intrinsic_func_name);
             if (!intrinsic_func) {
                 intrinsic_func = LLVMAddFunction(module, intrinsic_func_name, intrinsic_func_type);
@@ -1337,6 +1351,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
 
     char func_name[64] = {0};
     sprintf(func_name, "func_%lx", func_hex.i);
+    assert(strlen(func_name) < sizeof(func_name));
     LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, fixed_vector_param_types, FIXED_VECTOR_PARAM_COUNT, 0, NoInlineAttr), llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     CREATE_ADD(ptr_val, ptr_val, -8UL);
     LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
@@ -1934,6 +1949,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     } else {
         sprintf(trampoline_name, "trampoline%s_r%d_param%d_env1_idx%d", do_return ? "" : "_noreturn", with_ret, param_cnt, env_idx);
     }
+    assert(strlen(trampoline_name) < sizeof(trampoline_name));
     // Collect information for fixed reuse pattern
     int reuse_cnt = 0;
     if (param_cnt) {
@@ -2176,12 +2192,13 @@ static LLVMValueRef get_trampoline_for_jmp_ind_callback() {
 static uint8_t do_link_helper(HelperType h, const char *build_macro, const char *bc_name) {
     FILE *check_fp = fopen(bc_name, "r");
     if (!check_fp) {
-        char cmd[512] = {0};
+        char cmd[4096] = {0};
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
         sprintf(cmd, "clang -c %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, helper_str[h], bc_name);
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
         sprintf(cmd, "clang -c %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, helper_str[h], bc_name);
 #endif
+        assert(strlen(cmd) < sizeof(cmd));
         int rc = system(cmd);
         if (rc) {
             printf("Build command %s failed\n", cmd);
@@ -2313,7 +2330,10 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     assert(is_imm == 0 && operand.s.valid);
 
     // Get the second half - jmp_ind_callback
-    uint8_t ret = do_link_helper(jmp_ind_callback, "", "helper_templates/jmp_ind_callback.bc");
+    char macro_def[4096] = {0};
+    sprintf(macro_def, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\" ", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
+    assert(strlen(macro_def) < sizeof(macro_def));
+    uint8_t ret = do_link_helper(jmp_ind_callback, macro_def, "helper_templates/jmp_ind_callback.bc");
     assert(ret);
     LLVMValueRef second_half_func = LLVMGetNamedFunction(module, second_half_name);
     assert(second_half_func);
@@ -2426,7 +2446,25 @@ void translate_call(OpCodeType opc, void *ptr) {
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     uint8_t op_cnt = 0;
     uint8_t all_alias = 1;
-    char build_macro[512] = {0};
+    char build_macro[4096] = {0};
+    if (cvector_type_for_llvm_type[helper_vec_type[h]] != vinvalid) {
+        if (cvector_type_for_llvm_type[helper_vec_type[h]] < v4ulong) {
+            sprintf(build_macro, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\" -DXMM_PARAM_DECLARE=\"", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
+            for (int i = 0; i < XMM_COUNT; ++i) {
+                char element[64] = {0};
+                sprintf(element, "%s xmm%d, %s ymm%d_h%s", cvector_str[cvector_type_for_llvm_type[helper_vec_type[h]]], i, cvector_str[cvector_type_for_llvm_type[helper_vec_type[h]]], i, i == (XMM_COUNT - 1) ? "\" " : ", ");
+                strcat(build_macro, element);
+            }
+        } else {
+            sprintf(build_macro, "-DYMM_PARAM_DECLARE_COMMON=\"%s\" -DYMM_PARAM_LIST=\"%s\" -DYMM_PARAM_DECLARE=\"", YMM_PARAM_DECLARE_COMMON, YMM_PARAM_LIST);
+            for (int i = 0; i < XMM_COUNT; ++i) {
+                char element[64] = {0};
+                sprintf(element, "%s ymm%d%s", cvector_str[cvector_type_for_llvm_type[helper_vec_type[h]]], i, i == (XMM_COUNT - 1) ? "\" " : ", ");
+                strcat(build_macro, element);
+            }
+        }
+    }
+
     do {
         operands[op_cnt] = get_operand(ptr, (op_cnt + noargs), &is_imm[op_cnt]);
         if (is_imm[op_cnt] == 0 && operands[op_cnt].s.valid == 0) {
@@ -2466,6 +2504,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         sprintf(bc_name, "helper_templates/%s_%s.bc", helper_str[h], second_half_name);
         sprintf(helper_func_name, "%s_%s", helper_str[h], second_half_name);
     }
+    assert(strlen(build_macro) < sizeof(build_macro));
 
     // Get the second half
     uint8_t second_half_already_exists = 0;

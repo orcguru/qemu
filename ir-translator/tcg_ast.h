@@ -1612,6 +1612,23 @@ typedef enum {
     #undef X
 } LLVMType;
 
+#define C_VECTOR_TYPE \
+    X(vinvalid) \
+    X(v2ulong) \
+    X(v4uint) \
+    X(v8ushort) \
+    X(v16uchar) \
+    X(v4ulong) \
+    X(v8uint) \
+    X(v16ushort) \
+    X(v32uchar)
+
+typedef enum {
+    #define X(name) name,
+    C_VECTOR_TYPE
+    #undef X
+} CVectorType;
+
 /// NOTICE: all immediate fields with signed type are signed-ext,
 /// otherwise zero-ext.
 typedef struct __attribute__((packed)) {

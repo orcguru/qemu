@@ -8,6 +8,7 @@
 //#define BUILD_RISCV_ON_AARCH      1
 //#define DEBUG                     1
 #define STACK_INDEX_SHIFT           10
+#define XMM_COUNT                   15
 #define SET_SLOT(IDX)                               \
     do {                                            \
         s##IDX = get_mapped_slot(s##IDX);    \
@@ -53,7 +54,7 @@ XMMReg lookup_xmm(uint64_t offset) {
     XMMReg x;
     x.xmm_idx = NON_XMM;
     x.xmm_offset = 0;
-    if (xmm_offsets[0] <= off && off < (xmm_offsets[15] + 0x20)) {
+    if (xmm_offsets[0] <= off && off < (xmm_offsets[XMM_COUNT-1] + 0x20)) {
         uint16_t idx = (off - xmm_offsets[0]) / 0x40;
         uint16_t delta = (off - xmm_offsets[0]) % 0x40;
         if (delta < 0x10) {
@@ -209,6 +210,12 @@ const char *llvm_type_str[] = {
 const char *xmmreg_str[] = {
     #define X(name) #name,
     XMM_REG_LIST
+    #undef X
+};
+
+const char *cvector_str[] = {
+    #define X(name) #name,
+    C_VECTOR_TYPE
     #undef X
 };
 
@@ -2058,4 +2065,15 @@ uint64_t xreg_offsets[XREG_MAX] = {
     [cc_dst] = 0x90,
     [cc_op] = 0xa8,
     [rip] = 0x80,
+};
+
+CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
+    [LLVMVector2xi64] = v2ulong,
+    [LLVMVector4xi32] = v4uint,
+    [LLVMVector8xi16] = v8ushort,
+    [LLVMVector16xi8] = v16uchar,
+    [LLVMVector4xi64] = v4ulong,
+    [LLVMVector8xi32] = v8uint,
+    [LLVMVector16xi16] = v16ushort,
+    [LLVMVector32xi8] = v32uchar,
 };
