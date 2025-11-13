@@ -8,7 +8,7 @@
 //#define BUILD_RISCV_ON_AARCH      1
 //#define DEBUG                     1
 #define STACK_INDEX_SHIFT           10
-#define XMM_COUNT                   15
+#define XMM_COUNT                   1
 #define SET_SLOT(IDX)                               \
     do {                                            \
         s##IDX = get_mapped_slot(s##IDX);    \
