@@ -38,18 +38,7 @@
 #define QEMUAOT_CC                  124
 #define REGISTER_INDEX_SHIFT        5 
 #define STACK_INDEX_SHIFT           10
-#define XMM_COUNT                   1
-
-#define XMM_PARAM_DECLARE_COMMON    \
-      "v2ulong xmm0, v2ulong ymm0_h"
-#define XMM_PARAM_LIST              \
-      "xmm0, ymm0_h"
-#define YMM_PARAM_DECLARE_COMMON    \
-      "v4ulong ymm0"
-#define YMM_PARAM_LIST              \
-      "ymm0"
-
-/*
+#define XMM_COUNT                   15
 #define XMM_PARAM_DECLARE_COMMON    \
       "v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong ymm1_h, v2ulong xmm2, v2ulong ymm2_h, v2ulong xmm3, v2ulong ymm3_h, v2ulong xmm4, v2ulong ymm4_h, v2ulong xmm5, v2ulong ymm5_h, v2ulong xmm6, v2ulong ymm6_h, v2ulong xmm7, v2ulong ymm7_h, v2ulong xmm8, v2ulong ymm8_h, v2ulong xmm9, v2ulong ymm9_h, v2ulong xmm10, v2ulong ymm10_h, v2ulong xmm11, v2ulong ymm11_h, v2ulong xmm12, v2ulong ymm12_h, v2ulong xmm13, v2ulong ymm13_h, v2ulong xmm14, v2ulong ymm14_h"
 #define XMM_PARAM_LIST              \
@@ -58,7 +47,6 @@
       "v4ulong ymm0, v4ulong ymm1, v4ulong ymm2, v4ulong ymm3, v4ulong ymm4, v4ulong ymm5, v4ulong ymm6, v4ulong ymm7, v4ulong ymm8, v4ulong ymm9, v4ulong ymm10, v4ulong ymm11, v4ulong ymm12, v4ulong ymm13, v4ulong ymm14"
 #define YMM_PARAM_LIST              \
       "ymm0, ymm1, ymm2, ymm3, ymm4, ymm5, ymm6, ymm7, ymm8, ymm9, ymm10, ymm11, ymm12, ymm13, ymm14"
-      */
 
 #define DEBUG_VALUE_TYPE(v)                                     \
     do {                                                        \
@@ -2346,6 +2334,20 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
                         // Skipped, should be handled by trampoline
                         continue;
                     } else if (alias.s.slot_type == SUB_SLOT_ENV) {
+                        int found = 0;
+                        for (int j = 0; j < op_idx; ++j) {
+                            if (params[j].s.slot_type == SUB_SLOT_TMP && has_alias_env(params[j])) {
+                                OperandType alias_candidate = get_alias(params[j]);
+                                assert(alias_candidate.s.valid);
+                                if (alias_candidate.s.offset == alias.s.offset) {
+                                    found = 1;
+                                    break;
+                                }
+                            }
+                        }
+                        if (found)
+                            // Skipped, should be handled by trampoline
+                            continue;
                         LLVMValueRef env_raw = get_env_ptr_raw();
                         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], alias.s.offset, 0);
                         out_args[i] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
