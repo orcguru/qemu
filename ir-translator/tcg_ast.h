@@ -1577,7 +1577,6 @@ typedef enum {
     X(Instr1BH4S_ENV0_ext) \
     X(Instr1BH4S_ENV1_ext) \
     X(Instr4B_ext) \
-    X(Instr2B4_ext) \
     X(Instr1B143_ext) \
     X(Instr1BH4I1_ext) \
     X(Instr1B41122_ext) \
@@ -1628,14 +1627,6 @@ typedef enum {
     C_VECTOR_TYPE
     #undef X
 } CVectorType;
-
-/// NOTICE: all immediate fields with signed type are signed-ext,
-/// otherwise zero-ext.
-typedef struct __attribute__((packed)) {
-    uint16_t instr_type   :1;
-    uint16_t opc          :8;
-    uint16_t imm          :7;
-} Instr2B;
 
 #include "instr_def.h"
 
