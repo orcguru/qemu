@@ -2675,7 +2675,7 @@ void translate_call(OpCodeType opc, void *ptr) {
                 }
                 call_args_types[call_arg_cnts] = fixed_vector_param_types[call_arg_cnts];
             }
-            for (call_arg_cnts = FIXED_PARAM_COUNT; call_arg_cnts < (FIXED_PARAM_COUNT + 16); ++call_arg_cnts) {
+            for (call_arg_cnts = FIXED_PARAM_COUNT; call_arg_cnts < (FIXED_PARAM_COUNT + XMM_COUNT); ++call_arg_cnts) {
                 int vec_elem_idx1 = FIXED_PARAM_COUNT + 2 * (call_arg_cnts - FIXED_PARAM_COUNT);
                 int vec_elem_idx2 = FIXED_PARAM_COUNT + 2 * (call_arg_cnts - FIXED_PARAM_COUNT) + 1;
                 LLVMValueRef vec1 = NULL;
