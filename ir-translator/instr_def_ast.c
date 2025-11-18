@@ -125,10 +125,12 @@ void gen_api() {
     printf("#include \"tcg_ast.h\"\n");
     printf("#include <assert.h>\n");
     printf("#include <stdio.h>\n");
+    printf("#include <string.h>\n");
     printf("\n");
     /// get_operand
     printf("OperandType get_operand(void *ptr, uint32_t idx, uint32_t *is_imm) {\n");
     printf("    OperandType ret;\n");
+    printf("    memset(&ret, 0, sizeof(ret));\n");
     printf("    ret.s.valid = 0;\n");
     printf("    *is_imm = 0;\n");
     printf("    Instr1B2 *iptr = (Instr1B2 *)ptr;\n");

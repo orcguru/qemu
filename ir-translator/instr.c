@@ -15,13 +15,14 @@
         i->slot##IDX##_type = s##IDX.s.slot_type;   \
         i->slot##IDX##_idx = s##IDX.s.slot_idx;     \
     } while (0)
+#define XMM_TMP_IDX                 16
 
 uint8_t instr_buf[64];
 static uint64_t tcg_next_capacity = (128 * 1024);
 static uint64_t tcg_instrs_capacity = 0;
 static size_t tcg_instrs_idx = 0;
 static uint8_t *tcg_instrs = NULL;
-static uint16_t xmm_offsets[16] = {0};
+static uint16_t xmm_offsets[17] = {0};
 
 void *get_instr_buffer() {
     return (void *)tcg_instrs;
@@ -41,15 +42,15 @@ void register_xmm(uint64_t idx, uint64_t offset) {
 }
 
 uint64_t get_xmm_offset(uint64_t idx) {
-    assert(idx < 16);
+    assert(idx <= 16);
     return xmm_offsets[idx];
 }
 
 void register_xmm_tmp(uint64_t offset) {
-    assert(0);
+    xmm_offsets[XMM_TMP_IDX] = (uint16_t)offset;
 }
 
-XMMReg lookup_xmm(uint64_t offset) {
+static XMMReg lookup_xmm(uint64_t offset) {
     uint16_t off = (uint16_t)offset;
     XMMReg x;
     x.xmm_idx = NON_XMM;
@@ -57,6 +58,35 @@ XMMReg lookup_xmm(uint64_t offset) {
     if (xmm_offsets[0] <= off && off < (xmm_offsets[XMM_COUNT-1] + 0x20)) {
         uint16_t idx = (off - xmm_offsets[0]) / 0x40;
         uint16_t delta = (off - xmm_offsets[0]) % 0x40;
+        if (delta < 0x10) {
+            x.xmm_idx = idx * 2;
+            x.xmm_offset = delta;
+        } else if (delta < 0x20) {
+            x.xmm_idx = idx * 2 + 1;
+            x.xmm_offset = delta - 0x10;
+        }
+    }
+    return x;
+}
+
+XMMReg lookup_xmm_map(uint64_t offset) {
+    uint16_t off = (uint16_t)offset;
+    XMMReg x;
+    x.xmm_idx = NON_XMM;
+    x.xmm_offset = 0;
+    if (xmm_offsets[0] <= off && off < (xmm_offsets[XMM_TMP_IDX - 1] + 0x20)) {
+        uint16_t idx = (off - xmm_offsets[0]) / 0x40;
+        uint16_t delta = (off - xmm_offsets[0]) % 0x40;
+        if (delta < 0x10) {
+            x.xmm_idx = idx * 2;
+            x.xmm_offset = delta;
+        } else if (delta < 0x20) {
+            x.xmm_idx = idx * 2 + 1;
+            x.xmm_offset = delta - 0x10;
+        }
+    } else if (xmm_offsets[XMM_TMP_IDX] <= off && off < (xmm_offsets[XMM_TMP_IDX] + 0x20)) {
+        uint16_t idx = XMM_TMP_IDX;
+        uint16_t delta = off - xmm_offsets[XMM_TMP_IDX];
         if (delta < 0x10) {
             x.xmm_idx = idx * 2;
             x.xmm_offset = delta;
@@ -2018,4 +2048,23 @@ CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
     [LLVMVector8xi32] = v8uint,
     [LLVMVector16xi16] = v16ushort,
     [LLVMVector32xi8] = v32uchar,
+};
+
+const char *ymm_str[NON_XMM] = {
+    [xmm0] = "ymm0",
+    [xmm1] = "ymm1",
+    [xmm2] = "ymm2",
+    [xmm3] = "ymm3",
+    [xmm4] = "ymm4",
+    [xmm5] = "ymm5",
+    [xmm6] = "ymm6",
+    [xmm7] = "ymm7",
+    [xmm8] = "ymm8",
+    [xmm9] = "ymm9",
+    [xmm10] = "ymm10",
+    [xmm11] = "ymm11",
+    [xmm12] = "ymm12",
+    [xmm13] = "ymm13",
+    [xmm14] = "ymm14",
+    [xmm15] = "ymm15",
 };

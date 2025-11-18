@@ -1500,6 +1500,8 @@ typedef enum {
     X(ymm14_h) \
     X(xmm15) \
     X(ymm15_h) \
+    X(xmm_tmp) \
+    X(ymm_tmp_h) \
     X(NON_XMM)
 
 typedef enum {
@@ -1509,7 +1511,7 @@ typedef enum {
 } XMMRegType;
 
 typedef struct {
-    uint16_t xmm_idx    :6;
+    uint16_t xmm_idx    :7;
     uint16_t xmm_offset :4;
 } XMMReg;
 
@@ -1669,6 +1671,7 @@ typedef struct {
 void register_xmm(uint64_t idx, uint64_t offset);
 void register_xmm_tmp(uint64_t offset);
 void reset_tmp_mapping();
+XMMReg lookup_xmm_map(uint64_t offset);
 
 size_t create_scalar_slot(void *ptr, OHType op, OperandType s0);
 size_t create_scalar_slot2(void *ptr, OHType op, OperandType s0, OperandType s1);

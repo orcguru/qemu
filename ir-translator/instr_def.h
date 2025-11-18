@@ -54,7 +54,7 @@ typedef struct __attribute__((packed)) {
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
-    uint16_t xmm_idx        :6;
+    uint16_t xmm_idx        :7;
     uint16_t xmm_offset     :4;
 } Instr1B4X;
 
@@ -65,7 +65,7 @@ typedef struct __attribute__((packed)) {
     uint16_t es             :2;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
-    uint16_t xmm_idx        :6;
+    uint16_t xmm_idx        :7;
     uint16_t xmm_offset     :4;
 } Instr1BV4X;
 
@@ -372,7 +372,7 @@ typedef struct __attribute__((packed)) {
     uint8_t instr_type_ext  :6;
     uint8_t opc;
     uint64_t imm;
-    uint16_t xmm_idx        :6;
+    uint16_t xmm_idx        :7;
     uint16_t xmm_offset     :4;
 } Instr1B142;
 

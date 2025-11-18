@@ -306,6 +306,7 @@ extern const char *xmmreg_str[];
 extern uint8_t inline_helper_enabled[HELPER_MAX];
 extern uint64_t xreg_offsets[XREG_MAX];
 extern CVectorType cvector_type_for_llvm_type[LLVMMAXType];
+extern const char *ymm_str[NON_XMM];
 
 static LLVMAttributeRef target_features_attr = NULL;
 static LLVMAttributeRef NoInlineAttr = NULL;
@@ -2326,8 +2327,10 @@ static int collect_arguments(OpCodeType opc, LLVMValueRef *out_args, int with_fi
             if (is_imm[op_idx]) {
                 out_args[i] = LLVMConstInt(llvm_int_types[OPC_ADDR_T], params[op_idx].i, 0);
             } else {
-                assert(params[op_idx].s.slot_type != SUB_SLOT_XMM);
-                if (params[op_idx].s.slot_type == SUB_SLOT_TMP && has_alias(params[op_idx])) {
+                if (params[op_idx].s.slot_type == SUB_SLOT_XMM) {
+                    // Skipped, should be handled by trampoline
+                    continue;
+                } else if (params[op_idx].s.slot_type == SUB_SLOT_TMP && has_alias(params[op_idx])) {
                     OperandType alias = get_alias(params[op_idx]);
                     assert(alias.s.valid);
                     if (alias.s.slot_type == SUB_SLOT_XMM) {
@@ -2468,6 +2471,32 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
 #endif
 }
 
+static void spill_vector(LLVMValueRef xmm_val, XMMRegType xmm_reg) {
+    char debug_name[64] = {0};
+#ifdef VERBOSE_VAR
+    sprintf(debug_name, "vector_spill_%s", xmmreg_str[xmm_reg]);
+#endif
+    LLVMValueRef env_raw = get_env_ptr_raw();
+    uint64_t xmm_offset = get_xmm_offset(xmm_reg/2) + 16*(xmm_reg%2);
+    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(debug_name, dummy_slot_for_debug));
+    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_vector_parameter_type_for_arch(), 0), get_next_var_name(debug_name, dummy_slot_for_debug));
+    LLVMBuildStore(builder, xmm_val, ptr);
+}
+
+static LLVMValueRef reload_vector(XMMRegType xmm_reg) {
+    char debug_name[64] = {0};
+#ifdef VERBOSE_VAR
+    sprintf(debug_name, "vector_reload_%s", xmmreg_str[xmm_reg]);
+#endif
+    LLVMValueRef env_raw = get_env_ptr_raw();
+    uint64_t xmm_offset = get_xmm_offset(xmm_reg/2) + 16*(xmm_reg%2);
+    LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(debug_name, dummy_slot_for_debug));
+    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_vector_parameter_type_for_arch(), 0), get_next_var_name(debug_name, dummy_slot_for_debug));
+    return LLVMBuildLoad2(builder, get_vector_parameter_type_for_arch(), ptr, get_next_var_name(debug_name, dummy_slot_for_debug));
+}
+
 void translate_call(OpCodeType opc, void *ptr) {
     HelperType h = get_helper(ptr);
     if (h == helper_jmp_ind) {
@@ -2517,8 +2546,6 @@ void translate_call(OpCodeType opc, void *ptr) {
     }
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
-    uint8_t op_cnt = 0;
-    uint8_t all_alias = 1;
     char build_macro[4096] = {0};
     if (cvector_type_for_llvm_type[helper_vec_type[h]] != vinvalid) {
         if (cvector_type_for_llvm_type[helper_vec_type[h]] < v4ulong) {
@@ -2538,6 +2565,128 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
     }
 
+    // Collect used xmm indexes, and xmm indexes that need be put into registers
+    XMMRegType used_xmm_regs[MAX_OPERANDS_COUNT];
+    int used_xmm_regs_cnt = 0;
+    XMMRegType touched_effective_xmm_regs[MAX_OPERANDS_COUNT];
+    int touched_effective_xmm_regs_cnt = 0;
+    uint8_t op_cnt = 0;
+    // Try to do vector register spill/reload only if the helper can be inlined
+    if (helper_vec_type[h] != LLVMInvalidType && inline_helper_enabled[h]) {
+        do {
+            operands[op_cnt] = get_operand(ptr, (op_cnt + noargs), &is_imm[op_cnt]);
+            if (is_imm[op_cnt] == 0 && operands[op_cnt].s.valid == 0) {
+                break;
+            }
+            if (is_imm[op_cnt] == 0 && operands[op_cnt].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[op_cnt])) {
+                OperandType alias = get_alias(operands[op_cnt]);
+                assert(alias.s.valid);
+                assert(alias.s.slot_idx % 2 == 0);
+                int found = 0;
+                for (int j = 0; j < used_xmm_regs_cnt; ++j) {
+                    if (used_xmm_regs[j] == alias.s.slot_idx) {
+                        found = 1;
+                        break;
+                    }
+                }
+                if (!found) {
+                    used_xmm_regs[used_xmm_regs_cnt] = alias.s.slot_idx;
+                    used_xmm_regs_cnt += 1;
+                }
+            } else if (is_imm[op_cnt] == 0 && operands[op_cnt].s.slot_type == SUB_SLOT_TMP && has_alias_env(operands[op_cnt])) {
+                OperandType alias = get_alias(operands[op_cnt]);
+                assert(alias.s.valid);
+                XMMReg equivalent_xmm = lookup_xmm_map(alias.s.offset);
+                if (equivalent_xmm.xmm_idx != NON_XMM && equivalent_xmm.xmm_offset == 0) {
+                    int found = 0;
+                    for (int j = 0; j < touched_effective_xmm_regs_cnt; ++j) {
+                        if (touched_effective_xmm_regs[j] == equivalent_xmm.xmm_idx) {
+                            found = 1;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        touched_effective_xmm_regs[touched_effective_xmm_regs_cnt] = equivalent_xmm.xmm_idx;
+                        touched_effective_xmm_regs_cnt += 1;
+                    }
+                }
+            }
+            op_cnt += 1;
+        } while (1);
+        assert(op_cnt <= MAX_OPERANDS_COUNT);
+    }
+
+    // Do vector register spill/reload if candidate helper can be inlined
+    XMMRegType spilled_xmm_regs[MAX_OPERANDS_COUNT];
+    XMMRegType passenger_xmm_regs[MAX_OPERANDS_COUNT];
+    int passenger_xmm_regs_cnt = 0;
+    int passenger_is_ymm = 0;
+    if (touched_effective_xmm_regs_cnt && ((used_xmm_regs_cnt + touched_effective_xmm_regs_cnt) <= XMM_COUNT)) {
+        XMMRegType free_xmm_regs[XMM_COUNT];
+        XMMRegType tmp = xmm0;
+        for (int i = 0; i < XMM_COUNT; ++i) {
+            free_xmm_regs[i] = tmp;
+            tmp += 2;
+        }
+        for (int i = 0; i < used_xmm_regs_cnt; ++i) {
+            for (int j = 0; j < XMM_COUNT; ++j) {
+                if (free_xmm_regs[j] == used_xmm_regs[i]) {
+                    free_xmm_regs[j] = NON_XMM;
+                    break;
+                }
+            }
+        }
+        for (int i = 0; i < touched_effective_xmm_regs_cnt; ++i) {
+            passenger_xmm_regs[passenger_xmm_regs_cnt] = touched_effective_xmm_regs[i];
+            XMMRegType candidate = NON_XMM;
+            for (int j = 0; j < XMM_COUNT; ++j) {
+                if (free_xmm_regs[j] != NON_XMM) {
+                    candidate = free_xmm_regs[j];
+                    free_xmm_regs[j] = NON_XMM;
+                    break;
+                }
+            }
+            assert(candidate != NON_XMM);
+            spilled_xmm_regs[passenger_xmm_regs_cnt] = candidate;
+            passenger_xmm_regs_cnt += 1;
+        }
+        if (helper_vec_type[h] >= LLVMVector32xi8) {
+            passenger_is_ymm = 1;
+        }
+    }
+
+    // FIXME: can we avoid spill in case inline failed?
+    for (int i = 0; i < passenger_xmm_regs_cnt; ++i) {
+        LLVMValueRef xmm_val = NULL;
+        if (fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i]]) {
+            OperandType param_in_stack;
+            param_in_stack.s.valid = 1;
+            param_in_stack.s.slot_type = SUB_SLOT_XMM;
+            param_in_stack.s.slot_idx = spilled_xmm_regs[i];
+            param_in_stack.s.offset = 0;
+            xmm_val = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + spilled_xmm_regs[i]], 0);
+        } else {
+            xmm_val = LLVMGetParam(llvm_func, (FIXED_PARAM_COUNT + spilled_xmm_regs[i]));
+        }
+        spill_vector(xmm_val, spilled_xmm_regs[i]);
+        if (passenger_is_ymm) {
+            if (fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1]) {
+                OperandType param_in_stack;
+                param_in_stack.s.valid = 1;
+                param_in_stack.s.slot_type = SUB_SLOT_XMM;
+                param_in_stack.s.slot_idx = spilled_xmm_regs[i] + 1;
+                param_in_stack.s.offset = 0;
+                xmm_val = get_source_node_imm_or_stack(opc, 0, param_in_stack, fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1], 0);
+            } else {
+                xmm_val = LLVMGetParam(llvm_func, (FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1));
+            }
+            spill_vector(xmm_val, spilled_xmm_regs[i] + 1);
+        }
+    }
+
+    // Collect build macros for inlined helper functions
+    int not_enough_vector_registers_to_inline = 0;
+    op_cnt = 0;
     do {
         operands[op_cnt] = get_operand(ptr, (op_cnt + noargs), &is_imm[op_cnt]);
         if (is_imm[op_cnt] == 0 && operands[op_cnt].s.valid == 0) {
@@ -2546,37 +2695,68 @@ void translate_call(OpCodeType opc, void *ptr) {
         if (is_imm[op_cnt]) {
             // Immediate value should be fine
         } else if (!(is_imm[op_cnt] == 0 && operands[op_cnt].s.slot_type == SUB_SLOT_TMP && has_alias(operands[op_cnt]))) {
-            all_alias = 0;
         } else {
             OperandType alias = get_alias(operands[op_cnt]);
             assert(alias.s.valid);
-            if (alias.s.slot_type != SUB_SLOT_XMM) {
-                all_alias = 0;
-            } else {
+            if (alias.s.slot_type == SUB_SLOT_XMM) {
                 char element[32];
-                sprintf(element, " -DARGUMENT%d=%s", op_cnt, xmmreg_str[alias.s.slot_idx]);
+                if (helper_vec_type[h] < LLVMVector32xi8) {
+                    // Invoke XMM
+                    sprintf(element, " -DARGUMENT%d=%s", op_cnt, xmmreg_str[alias.s.slot_idx]);
+                } else {
+                    // Invoke YMM, need aggregate on riscv64
+#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+                    // NOT FOR FIXED-VECTOR
+                    assert(0);
+#endif
+                    sprintf(element, " -DARGUMENT%d=%s", op_cnt, ymm_str[alias.s.slot_idx]);
+                }
                 strcat(build_macro, element);
+            } else if (alias.s.slot_type == SUB_SLOT_ENV) {
+                XMMReg equivalent_xmm = lookup_xmm_map(alias.s.offset);
+                if (equivalent_xmm.xmm_idx != NON_XMM && equivalent_xmm.xmm_offset == 0) {
+                    int idx = 0;
+                    for (; idx < passenger_xmm_regs_cnt; ++idx) {
+                        if (passenger_xmm_regs[idx] == equivalent_xmm.xmm_idx) {
+                            break;
+                        }
+                    }
+                    if (idx >= passenger_xmm_regs_cnt) {
+                        not_enough_vector_registers_to_inline = 1;
+                    } else {
+                        char element[32];
+                        if (!passenger_is_ymm) {
+                            // Invoke XMM
+                            sprintf(element, " -DARGUMENT%d=%s", op_cnt, xmmreg_str[spilled_xmm_regs[idx]]);
+                        } else {
+                            // Invoke YMM, need aggregate on riscv64
+#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+                            // NOT FOR FIXED-VECTOR
+                            assert(0);
+#endif
+                            sprintf(element, " -DARGUMENT%d=%s", op_cnt, ymm_str[spilled_xmm_regs[idx]]);
+                        }
+                        strcat(build_macro, element);
+                    }
+                } else {
+                    not_enough_vector_registers_to_inline = 1;
+                }
             }
         }
         op_cnt += 1;
     } while (1);
     assert(op_cnt <= MAX_OPERANDS_COUNT);
-    if (!op_cnt) {
-        all_alias = 0;
-    }
 #ifdef DEBUG
     printf("%s_%s noargs:%d op_cnt:%d\n", helper_str[h], second_half_name, noargs, op_cnt); fflush(NULL);
 #endif
     uint8_t second_half_disabled = is_tail_call(h);
     char helper_func_name[256] = {0};
     char bc_name[256] = {0};
-    if (all_alias) {
-        char element[256];
-        sprintf(element, " -DFUNC_RET=%s -DHELPER_NAME=%s_%s", second_half_name, helper_str[h], second_half_name);
-        strcat(build_macro, element);
-        sprintf(bc_name, "helper_templates/%s_%s.bc", helper_str[h], second_half_name);
-        sprintf(helper_func_name, "%s_%s", helper_str[h], second_half_name);
-    }
+    char element[256];
+    sprintf(element, " -DFUNC_RET=%s -DHELPER_NAME=%s_%s", second_half_name, helper_str[h], second_half_name);
+    strcat(build_macro, element);
+    sprintf(bc_name, "helper_templates/%s_%s.bc", helper_str[h], second_half_name);
+    sprintf(helper_func_name, "%s_%s", helper_str[h], second_half_name);
     assert(strlen(build_macro) < sizeof(build_macro));
 
     // Get the second half
@@ -2598,7 +2778,8 @@ void translate_call(OpCodeType opc, void *ptr) {
 
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnts = 0;
-    uint8_t do_inline_helper = (all_alias && helper_vec_type[h] != LLVMInvalidType && inline_helper_enabled[h]) ? do_link_helper(h, build_macro, bc_name) : 0;
+    uint8_t do_inline_helper = (helper_vec_type[h] != LLVMInvalidType && inline_helper_enabled[h] && !not_enough_vector_registers_to_inline) ? do_link_helper(h, build_macro, bc_name) : 0;
+    int did_inline_helper = 0;
     if (!do_inline_helper) {
         // Get the helper
         LLVMValueRef helper_func = LLVMGetNamedFunction(module, helper_str[h]);
@@ -2623,6 +2804,48 @@ void translate_call(OpCodeType opc, void *ptr) {
         LLVMSetInstructionCallConv(call_trampoline_inst, QEMUAOT_CC);
         LLVMBuildRetVoid(builder);
     } else {
+        did_inline_helper = 1;
+        for (int i = 0; i < passenger_xmm_regs_cnt; ++i) {
+            // Store passenger contents into spilled vector registers
+            LLVMValueRef xmm_val = reload_vector(passenger_xmm_regs[i]);
+            if (!func_xmm_alloca[spilled_xmm_regs[i]]) {
+                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]]], fixed_vector_stack_names[XREG_MAX + spilled_xmm_regs[i]]);
+                func_xmm_alloca[spilled_xmm_regs[i]] = alloca_inst;
+                func_xmm_llvmtype[spilled_xmm_regs[i]] = fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]];
+                LLVMSetAlignment(alloca_inst, 16);
+            }
+            LLVMBuildStore(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i]]);
+            fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i]] = 1;
+            if (passenger_is_ymm) {
+                xmm_val = reload_vector(passenger_xmm_regs[i] + 1);
+                if (!func_xmm_alloca[spilled_xmm_regs[i] + 1]) {
+                    LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1]], fixed_vector_stack_names[XREG_MAX + spilled_xmm_regs[i] + 1]);
+                    func_xmm_alloca[spilled_xmm_regs[i] + 1] = alloca_inst;
+                    func_xmm_llvmtype[spilled_xmm_regs[i] + 1] = fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1];
+                    LLVMSetAlignment(alloca_inst, 16);
+                }
+                LLVMBuildStore(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i] + 1]);
+                fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1] = 1;
+            }
+
+            // Update operands to point to loaded vector registers
+            for (int j = 0; j < op_cnt; ++j) {
+                if (is_imm[j] == 0 && operands[j].s.slot_type == SUB_SLOT_TMP && has_alias_env(operands[j])) {
+                    OperandType alias = get_alias(operands[j]);
+                    assert(alias.s.valid);
+                    XMMReg equivalent_xmm = lookup_xmm_map(alias.s.offset);
+                    if (equivalent_xmm.xmm_idx == passenger_xmm_regs[i] && equivalent_xmm.xmm_offset == 0) {
+                        OperandType new_xmm_slot;
+                        new_xmm_slot.s.valid = 1;
+                        new_xmm_slot.s.slot_type = SUB_SLOT_XMM;
+                        new_xmm_slot.s.slot_idx = spilled_xmm_regs[i];
+                        new_xmm_slot.s.offset = 0;
+                        operands[j] = new_xmm_slot;
+                    }
+                }
+            }
+        }
+
         if (helper_vec_type[h] < LLVMVector32xi8) {
             // Invoke XMM
             call_arg_cnts = collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, operands, is_imm, op_cnt);
@@ -2823,6 +3046,39 @@ void translate_call(OpCodeType opc, void *ptr) {
         assert(!noargs);
     }
 
+    // If did helper inline and we got passenger vectors, then do restore here
+    if (did_inline_helper && passenger_xmm_regs_cnt) {
+        for (int i = 0; i < passenger_xmm_regs_cnt; ++i) {
+            LLVMValueRef xmm_val = LLVMGetParam(llvm_func, (FIXED_PARAM_COUNT + spilled_xmm_regs[i]));
+            spill_vector(xmm_val, passenger_xmm_regs[i]);
+            if (passenger_is_ymm) {
+                xmm_val = LLVMGetParam(llvm_func, (FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1));
+                spill_vector(xmm_val, passenger_xmm_regs[i] + 1);
+            }
+
+            xmm_val = reload_vector(spilled_xmm_regs[i]);
+            if (!func_xmm_alloca[spilled_xmm_regs[i]]) {
+                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]]], fixed_vector_stack_names[XREG_MAX + spilled_xmm_regs[i]]);
+                func_xmm_alloca[spilled_xmm_regs[i]] = alloca_inst;
+                func_xmm_llvmtype[spilled_xmm_regs[i]] = fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]];
+                LLVMSetAlignment(alloca_inst, 16);
+            }
+            LLVMBuildStore(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i]]);
+            fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i]] = 1;
+            if (passenger_is_ymm) {
+                xmm_val = reload_vector(spilled_xmm_regs[i] + 1);
+                if (!func_xmm_alloca[spilled_xmm_regs[i] + 1]) {
+                    LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1]], fixed_vector_stack_names[XREG_MAX + spilled_xmm_regs[i] + 1]);
+                    func_xmm_alloca[spilled_xmm_regs[i] + 1] = alloca_inst;
+                    func_xmm_llvmtype[spilled_xmm_regs[i] + 1] = fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1];
+                    LLVMSetAlignment(alloca_inst, 16);
+                }
+                LLVMBuildStore(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i] + 1]);
+                fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1] = 1;
+            }
+        }
+    }
+
     // Reload tmp_shadow_offset[this call][non-zero offset] contents
     shadow_pointer = NULL;
     for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
@@ -2904,7 +3160,6 @@ static void cleanup_func_resource() {
     memset(tmp_valid, 0, sizeof(tmp_valid));;
     memset(tmp_var_available, 0, sizeof(tmp_var_available));
     memset(tmp_var_available_backup, 0, sizeof(tmp_var_available_backup));
-    memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
     memset(tmp_bits_type, 0, sizeof(tmp_bits_type));
     memset(tmp_shadow_offset, 0, sizeof(tmp_shadow_offset));
     reset_tmp_mapping();
@@ -2932,6 +3187,9 @@ static void cleanup_func_resource() {
 }
 
 static void setup_func_stack() {
+    memset(fixed_vector_param_in_stack, 0, sizeof(fixed_vector_param_in_stack));
+    memset(func_xmm_alloca, 0, sizeof(func_xmm_alloca));
+
     if (xreg_valid) {
         for (XRegType x = 0; x < XREG_MAX; ++x) {
             if (xreg_valid & (1UL<<x)) {
