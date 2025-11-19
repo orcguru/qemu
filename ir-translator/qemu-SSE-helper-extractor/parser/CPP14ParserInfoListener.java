@@ -913,13 +913,35 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterSimpleDeclaration(CPP14Parser.SimpleDeclarationContext ctx) { }
+	@Override public void enterSimpleDeclare1(CPP14Parser.SimpleDeclare1Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitSimpleDeclaration(CPP14Parser.SimpleDeclarationContext ctx) { }
+	@Override public void exitSimpleDeclare1(CPP14Parser.SimpleDeclare1Context ctx) {
+          if (ctx.declSpecifierSeq() == null && ctx.initDeclaratorList() != null && ctx.Asm() == null) {
+            if (ctx.initDeclaratorList().initDeclarator(1) == null) {
+              if (ctx.initDeclaratorList().initDeclarator(0).Asm() == null && ctx.initDeclaratorList().initDeclarator(0).initializer() != null) {
+                if (ctx.initDeclaratorList().initDeclarator(0).initializer().expressionList() != null) {
+                  System.out.println("<FUNCTION_CALL2>$$NAME_BEGIN:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).declarator().getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).declarator().getStart().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).initializer().LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).initializer().RightParen().getSymbol().getStopIndex()));
+                }
+              }
+            }
+          }
+        }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSimpleDeclare2(CPP14Parser.SimpleDeclare2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSimpleDeclare2(CPP14Parser.SimpleDeclare2Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

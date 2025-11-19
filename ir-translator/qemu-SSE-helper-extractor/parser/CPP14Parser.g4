@@ -329,8 +329,9 @@ aliasDeclaration:
 	Using Identifier attributeSpecifierSeq? Assign theTypeId Semi;
 
 simpleDeclaration:
-	declSpecifierSeq? initDeclaratorList? (Asm Volatile? LeftParen StringLiteral RightParen)? Semi
-	| attributeSpecifierSeq declSpecifierSeq? initDeclaratorList Semi;
+	declSpecifierSeq? initDeclaratorList? (Asm Volatile? LeftParen StringLiteral RightParen)? Semi  # simpleDeclare1
+	| attributeSpecifierSeq declSpecifierSeq? initDeclaratorList Semi                               # simpleDeclare2
+        ;
 
 staticAssertDeclaration:
 	Static_assert LeftParen constantExpression Comma StringLiteral RightParen Semi;
