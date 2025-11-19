@@ -471,7 +471,8 @@ asmDefinition: Asm Volatile? LeftParen (
         StringLiteral
         | StringLiteral (Colon | Doublecolon) StringLiteral LeftParen Identifier (Arrow Identifier)? RightParen
         | StringLiteral Colon (StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause) (Comma StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause))*)? Colon (StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause) (Comma StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause))*)? Colon StringLiteral
-        | StringLiteral Colon (StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause) (Comma StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause))*)? Colon (StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause) (Comma StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause))*)?
+        | StringLiteral Colon ((LeftBracket Identifier RightBracket)? StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause) (Comma (LeftBracket Identifier RightBracket)? StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause))*)? Colon ((LeftBracket Identifier RightBracket)? StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause) (Comma (LeftBracket Identifier RightBracket)? StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause))*)?
+        | StringLiteral Colon ((LeftBracket Identifier RightBracket)? StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause) (Comma (LeftBracket Identifier RightBracket)? StringLiteral (LeftParen Identifier RightParen | logicalOrExpression | initializerClause))*)?
         ) RightParen Semi;
 
 linkageSpecification:
@@ -522,7 +523,7 @@ declarator:
 	pointerDeclarator
 	| noPointerDeclarator parametersAndQualifiers trailingReturnType;
 
-pointerDeclarator: (pointerOperator Restrict? Const?)* noPointerDeclarator;
+pointerDeclarator: (pointerOperator Restrict? Const? attributeSpecifierSeq?)* noPointerDeclarator;
 
 noPointerDeclarator:
 	declaratorid attributeSpecifierSeq?
