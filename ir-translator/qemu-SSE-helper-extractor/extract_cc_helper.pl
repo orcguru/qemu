@@ -138,12 +138,12 @@ my $blank_info = "";
 my $bytes;
 foreach my $a (@sorted_addr) {
   my $txt = &GetText($current_pos, ($funcs{$addr_to_func{$a}}->{'FULL_START'} - 1), $ARGV[0]);
-  $blank_info = $blank_info.$txt;
+  $blank_info = $blank_info."\n".$txt;
   $current_pos = $funcs{$addr_to_func{$a}}->{'FULL_STOP'} + 1;
 }
 my $total_size = -s $ARGV[0];
 my $txt = &GetText($current_pos, ($total_size - 1), $ARGV[0]);
-$blank_info = $blank_info.$txt;
+$blank_info = $blank_info."\n".$txt;
 
 # Generate functions
 foreach my $f (keys %helpers) {
@@ -151,17 +151,13 @@ foreach my $f (keys %helpers) {
   print OUT "$blank_info\n\n";
   my @sub_funcs = ();
   my @sub_call_stack = ();
-  my %added_funcs = ();
   if (not exists $funcs{$f}) {
     die "$f not defined!\n";
   }
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     my $call_target = $funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'};
-    if (not exists $added_funcs{$call_target}) {
-      unshift @sub_funcs, $call_target;
-      $added_funcs{$call_target} = 1;
-      push @sub_call_stack, $call_target;
-    }
+    unshift @sub_funcs, $call_target;
+    push @sub_call_stack, $call_target;
   }
   while (@sub_call_stack > 0) {
     my @new_call_stack = ();
@@ -172,11 +168,8 @@ foreach my $f (keys %helpers) {
       }
       foreach my $e (keys %{$funcs{$c}->{'CALLS'}}) {
         my $call_target = $funcs{$c}->{'CALLS'}->{$e}->{'CALL_TARGET'};
-        if (not exists $added_funcs{$call_target}) {
-          unshift @sub_funcs, $call_target;
-          $added_funcs{$call_target} = 1;
-          push @new_call_stack, $call_target;
-        }
+        unshift @sub_funcs, $call_target;
+        push @new_call_stack, $call_target;
       }
     }
     @sub_call_stack = @new_call_stack;
