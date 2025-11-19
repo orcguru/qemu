@@ -93,9 +93,7 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitLambdaExpression(CPP14Parser.LambdaExpressionContext ctx) {
-          System.out.println("<LambdaDefinition>$$DECLARATOR_START:" + Integer.toString(ctx.lambdaIntroducer().getStart().getStartIndex()) + "$$DECLARATOR_STOP:" + Integer.toString(ctx.lambdaIntroducer().getStop().getStopIndex()) + "$$BODY_START:" + Integer.toString(ctx.compoundStatement().getStart().getStartIndex()) + "$$BODY_STOP:" + Integer.toString(ctx.compoundStatement().getStop().getStopIndex()));
-        }
+	@Override public void exitLambdaExpression(CPP14Parser.LambdaExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -197,13 +195,99 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterPostfixExpression(CPP14Parser.PostfixExpressionContext ctx) { }
+	@Override public void enterExpr7(CPP14Parser.Expr7Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitPostfixExpression(CPP14Parser.PostfixExpressionContext ctx) { }
+	@Override public void exitExpr7(CPP14Parser.Expr7Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterExpr6(CPP14Parser.Expr6Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitExpr6(CPP14Parser.Expr6Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterExpr5(CPP14Parser.Expr5Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitExpr5(CPP14Parser.Expr5Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterExpr4(CPP14Parser.Expr4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitExpr4(CPP14Parser.Expr4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterExpr3(CPP14Parser.Expr3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitExpr3(CPP14Parser.Expr3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterExpr2(CPP14Parser.Expr2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitExpr2(CPP14Parser.Expr2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterExpr1(CPP14Parser.Expr1Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitExpr1(CPP14Parser.Expr1Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterFuncCall(CPP14Parser.FuncCallContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitFuncCall(CPP14Parser.FuncCallContext ctx) {
+          System.out.println("<FUNCTION_CALL>$$NAME_BEGIN:" + Integer.toString(ctx.postfixExpression().getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(ctx.postfixExpression().getStart().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(ctx.LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(ctx.RightParen().getSymbol().getStopIndex()));
+        }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -599,30 +683,7 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-        @Override public void exitLabeledStatement(CPP14Parser.LabeledStatementContext ctx) {
-          if (ctx.Case() != null) {
-            if (ctx.statement() != null) {
-              if (ctx.statement().getStart() != null) {
-                if (ctx.statement().getStart().getText().equals("case") || ctx.statement().getStart().getText().equals("default")) {
-                  System.out.println("<CaseFallThrough>$$COLON_STOP:" + Integer.toString(ctx.Colon().getSymbol().getStopIndex()));
-                  return;
-                }
-              }
-            }
-            System.out.println("<Case>$$COLON_STOP:" + Integer.toString(ctx.Colon().getSymbol().getStopIndex()));
-          }
-          if (ctx.Default() != null) {
-            if (ctx.statement() != null) {
-              if (ctx.statement().getStart() != null) {
-                if (ctx.statement().getStart().getText().equals("case")) {
-                  System.out.println("<DefaultFallThrough>$$COLON_STOP:" + Integer.toString(ctx.Colon().getSymbol().getStopIndex()));
-                  return;
-                }
-              }
-            }
-            System.out.println("<Default>$$COLON_STOP:" + Integer.toString(ctx.Colon().getSymbol().getStopIndex()));
-          }
-        }
+        @Override public void exitLabeledStatement(CPP14Parser.LabeledStatementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -664,119 +725,13 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterIfS(CPP14Parser.IfSContext ctx) { }
+	@Override public void enterSelectionStatement(CPP14Parser.SelectionStatementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-        @Override public void exitIfS(CPP14Parser.IfSContext ctx) {
-          CPP14Parser.StatementContext sc0 = ctx.statement(0);
-          boolean c0 = false;
-          if (sc0.compoundStatement() != null) {
-            c0 = true;
-          }
-          int stmt0StartIndex = sc0.getStart().getStartIndex();
-          int stmt0StopIndex = sc0.getStop().getStopIndex();
-
-          boolean hasElse = false;
-          int elseStopIndex = 0;
-          CPP14Parser.StatementContext sc1;
-          if (ctx.Else() != null) {
-            sc1 = ctx.statement(1);
-            if (!sc1.getStart().getText().equals("if")) {
-              hasElse = true;
-              elseStopIndex = ctx.Else().getSymbol().getStopIndex();
-            }
-            //System.out.println(sc1.getStart().getText());
-          }
-          sc1 = ctx.statement(1);
-          int stmt1StartIndex = 0;
-          int stmt1StopIndex = 0;
-          boolean c1 = false;
-          if (sc1 != null) {
-            if (sc1.compoundStatement() != null) {
-              c1 = true;
-            }
-            stmt1StartIndex = sc1.getStart().getStartIndex();
-            stmt1StopIndex = sc1.getStop().getStopIndex();
-          }
-          System.out.println("<If>$$CONDITION:" + ctx.condition().getText() +
-                             "$$COND_STOP:" + Integer.toString(ctx.RightParen().getSymbol().getStopIndex()) +
-                             "$$STMT0_COMP:" + String.valueOf(c0) +
-                             "$$STMT0_START:" + Integer.toString(stmt0StartIndex) +
-                             "$$STMT0_STOP:" + Integer.toString(stmt0StopIndex) +
-                             "$$HAS_ELSE:" + String.valueOf(hasElse) +
-                             "$$ELSE_STOP:" + Integer.toString(elseStopIndex) +
-                             "$$STMT1_COMP:" + String.valueOf(c1) +
-                             "$$STMT1_START:" + Integer.toString(stmt1StartIndex) +
-                             "$$STMT1_STOP:" + Integer.toString(stmt1StopIndex));
-        }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterIf2S(CPP14Parser.If2SContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitIf2S(CPP14Parser.If2SContext ctx) {
-          CPP14Parser.StatementContext sc0 = ctx.statement(1);
-          boolean c0 = false;
-          if (sc0.compoundStatement() != null) {
-            c0 = true;
-          }
-          int stmt0StartIndex = sc0.getStart().getStartIndex();
-          int stmt0StopIndex = sc0.getStop().getStopIndex();
-
-          boolean hasElse = false;
-          int elseStopIndex = 0;
-          CPP14Parser.StatementContext sc1;
-          if (ctx.Else() != null) {
-            sc1 = ctx.statement(2);
-            if (!sc1.getStart().getText().equals("if")) {
-              hasElse = true;
-              elseStopIndex = ctx.Else().getSymbol().getStopIndex();
-            }
-            //System.out.println(sc1.getStart().getText());
-          }
-          sc1 = ctx.statement(2);
-          int stmt1StartIndex = 0;
-          int stmt1StopIndex = 0;
-          boolean c1 = false;
-          if (sc1 != null) {
-            if (sc1.compoundStatement() != null) {
-              c1 = true;
-            }
-            stmt1StartIndex = sc1.getStart().getStartIndex();
-            stmt1StopIndex = sc1.getStop().getStopIndex();
-          }
-          System.out.println("<If>$$CONDITION:" + ctx.condition().getText() +
-                             "$$COND_STOP:" + Integer.toString(ctx.RightParen().getSymbol().getStopIndex()) +
-                             "$$STMT0_COMP:" + String.valueOf(c0) +
-                             "$$STMT0_START:" + Integer.toString(stmt0StartIndex) +
-                             "$$STMT0_STOP:" + Integer.toString(stmt0StopIndex) +
-                             "$$HAS_ELSE:" + String.valueOf(hasElse) +
-                             "$$ELSE_STOP:" + Integer.toString(elseStopIndex) +
-                             "$$STMT1_COMP:" + String.valueOf(c1) +
-                             "$$STMT1_START:" + Integer.toString(stmt1StartIndex) +
-                             "$$STMT1_STOP:" + Integer.toString(stmt1StopIndex));
-        }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterSwitchS(CPP14Parser.SwitchSContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitSwitchS(CPP14Parser.SwitchSContext ctx) { }
+	@Override public void exitSelectionStatement(CPP14Parser.SelectionStatementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -1324,25 +1279,7 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-        @Override public void exitNamespaceDefinition(CPP14Parser.NamespaceDefinitionContext ctx) {
-          if (ctx.Identifier() != null) {
-            if (ctx.Identifier().getText().equals("llvm")) {
-              if (ctx.Inline() != null) {
-                System.out.println("<DEFINE_NAMESPACE_LLVM>$$BEGIN:" + Integer.toString(ctx.Inline().getSymbol().getStartIndex()) + "$$LBRACE_STOP:" + Integer.toString(ctx.LeftBrace().getSymbol().getStopIndex()));
-              } else {
-                System.out.println("<DEFINE_NAMESPACE_LLVM>$$BEGIN:" + Integer.toString(ctx.Namespace().getSymbol().getStartIndex()) + "$$LBRACE_STOP:" + Integer.toString(ctx.LeftBrace().getSymbol().getStopIndex()));
-              }
-            }
-          } else if (ctx.originalNamespaceName() != null) {
-            if (ctx.originalNamespaceName().Identifier().getText().equals("llvm")) {
-              if (ctx.Inline() != null) {
-                System.out.println("<DEFINE_NAMESPACE_LLVM>$$BEGIN:" + Integer.toString(ctx.Inline().getSymbol().getStartIndex()) + "$$LBRACE_STOP:" + Integer.toString(ctx.LeftBrace().getSymbol().getStopIndex()));
-              } else {
-                System.out.println("<DEFINE_NAMESPACE_LLVM>$$BEGIN:" + Integer.toString(ctx.Namespace().getSymbol().getStartIndex()) + "$$LBRACE_STOP:" + Integer.toString(ctx.LeftBrace().getSymbol().getStopIndex()));
-              }
-            }
-          }
-        }
+        @Override public void exitNamespaceDefinition(CPP14Parser.NamespaceDefinitionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -1402,18 +1339,7 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-        @Override public void exitUsingDirective(CPP14Parser.UsingDirectiveContext ctx) {
-          CPP14Parser.NamespaceNameContext nn = ctx.namespaceName();
-          if (nn.originalNamespaceName() != null) {
-            if (nn.originalNamespaceName().Identifier().getText().equals("llvm")) {
-              System.out.println("<USING_NAMESPACE_LLVM>$$SEMI_STOP:" + Integer.toString(ctx.Semi().getSymbol().getStopIndex()));
-            }
-          } else if (nn.namespaceAlias() != null) {
-            if (nn.namespaceAlias().Identifier().getText().equals("llvm")) {
-              System.out.println("<USING_NAMESPACE_LLVM>$$SEMI_STOP:" + Integer.toString(ctx.Semi().getSymbol().getStopIndex()));
-            }
-          }
-        }
+        @Override public void exitUsingDirective(CPP14Parser.UsingDirectiveContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

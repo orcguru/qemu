@@ -86,25 +86,26 @@ lambdaDeclarator:
 		attributeSpecifierSeq? trailingReturnType?;
 
 postfixExpression:
-	primaryExpression
-	| postfixExpression LeftBracket (expression | bracedInitList) RightBracket
-	| postfixExpression LeftParen expressionList? RightParen
+	primaryExpression                                                               # expr1
+	| postfixExpression LeftBracket (expression | bracedInitList) RightBracket      # expr2
+	| postfixExpression LeftParen expressionList? RightParen                        # funcCall
 	| (simpleTypeSpecifier | typeNameSpecifier) (
 		LeftParen expressionList? RightParen
 		| bracedInitList
-	)
+	)                                                                               # expr3
 	| postfixExpression (Dot | Arrow) (
 		Template? idExpression
 		| pseudoDestructorName
-	)
-	| postfixExpression (PlusPlus | MinusMinus)
+	)                                                                               # expr4
+	| postfixExpression (PlusPlus | MinusMinus)                                     # expr5
 	| (
 		Dynamic_cast
 		| Static_cast
 		| Reinterpret_cast
 		| Const_cast
-	) Less theTypeId Greater LeftParen expression RightParen
-	| typeIdOfTheTypeId LeftParen (expression | theTypeId) RightParen;
+	) Less theTypeId Greater LeftParen expression RightParen                        # expr6
+	| typeIdOfTheTypeId LeftParen (expression | theTypeId) RightParen               # expr7
+        ;
 /*
  add a middle layer to eliminate duplicated function declarations
  */
@@ -265,10 +266,9 @@ compoundStatement: LeftBrace statementSeq? RightBrace;
 statementSeq: statement+;
 
 selectionStatement:
-	If LeftParen condition RightParen statement (Else statement)?   # IfS
-	| If LeftParen statement condition RightParen statement (Else statement)?   # If2S
-	| Switch LeftParen condition RightParen statement               # SwitchS
-        ;
+	If LeftParen condition RightParen statement (Else statement)?
+	| If LeftParen statement condition RightParen statement (Else statement)?
+	| Switch LeftParen condition RightParen statement;
 
 condition:
 	expression
