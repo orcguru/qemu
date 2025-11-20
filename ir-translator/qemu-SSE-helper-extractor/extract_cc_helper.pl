@@ -145,37 +145,86 @@ my $total_size = -s $ARGV[0];
 my $txt = &GetText($current_pos, ($total_size - 1), $ARGV[0]);
 $blank_info = $blank_info."\n".$txt;
 
-# Generate functions
+# Collect information, and recursively mark function as final return
+my %sub_funcs = ();
+my %defined_funcs_total = ();
 foreach my $f (keys %helpers) {
-  open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
-  print OUT "$blank_info\n\n";
-  my @sub_funcs = ();
+  my @sf = ();
+  $sub_funcs{$f} = \@sf;
   my @sub_call_stack = ();
   if (not exists $funcs{$f}) {
     die "$f not defined!\n";
   }
+  $funcs{$f}->{'TAIL_RETURN'} = 1;
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     my $call_target = $funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'};
-    unshift @sub_funcs, $call_target;
+    my $hit = &call_hit_return($e, $funcs{$f});
+    if ($hit and $funcs{$f}->{'TAIL_RETURN'} and exists $funcs{$call_target}) {
+      $funcs{$call_target}->{'TAIL_RETURN'} = 1;
+    }
+    unshift @sf, $call_target;
+    if (exists $funcs{$call_target}) {
+      $defined_funcs_total{$call_target} = 1;
+    }
     push @sub_call_stack, $call_target;
   }
   while (@sub_call_stack > 0) {
     my @new_call_stack = ();
     foreach my $c (@sub_call_stack) {
       if (not exists $funcs{$c}) {
-        print "$c not defined!\n";
+        #print "$c not defined!\n";
         next;
       }
       foreach my $e (keys %{$funcs{$c}->{'CALLS'}}) {
         my $call_target = $funcs{$c}->{'CALLS'}->{$e}->{'CALL_TARGET'};
-        unshift @sub_funcs, $call_target;
+        my $hit = &call_hit_return($e, $funcs{$c});
+        if ($hit and $funcs{$c}->{'TAIL_RETURN'} and exists $funcs{$call_target}) {
+          $funcs{$call_target}->{'TAIL_RETURN'} = 1;
+        }
+        unshift @sf, $call_target;
+        if (exists $funcs{$call_target}) {
+          $defined_funcs_total{$call_target} = 1;
+        }
         push @new_call_stack, $call_target;
       }
     }
     @sub_call_stack = @new_call_stack;
   }
+}
+
+# Check that function as tail return is always tail return, and vise versa
+foreach my $f (keys %defined_funcs_total) {
+  my $expect_tail_return = 0;
+  if (exists $funcs{$f}->{'TAIL_RETURN'}) {
+    #print "FUNC $f is tail return\n";
+    $expect_tail_return = 1;
+  } else {
+    #print "FUNC $f is non-tail return\n";
+  }
+  foreach my $cf (keys %defined_funcs_total) {
+    foreach my $e (keys %{$funcs{$cf}->{'CALLS'}}) {
+      my $call_target = $funcs{$cf}->{'CALLS'}->{$e}->{'CALL_TARGET'};
+      if ($call_target eq $f) {
+        my $hit = &call_hit_return($e, $funcs{$cf});
+        if (not exists $funcs{$cf}->{'TAIL_RETURN'}) {
+          $hit = 0;
+        }
+        if ($hit != $expect_tail_return) {
+          die "Check $f non-uniform tail return\n";
+        }
+      }
+    }
+  }
+}
+
+# Handle function update for QEMUAOT calling convention
+
+# Generate functions
+foreach my $f (keys %helpers) {
+  open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
+  #print OUT "$blank_info\n\n";
   my %covered_sub_funcs = ();
-  foreach my $s (@sub_funcs) {
+  foreach my $s (@{$sub_funcs{$f}}) {
     if (not exists $covered_sub_funcs{$s}) {
       $covered_sub_funcs{$s} = 1;
       if (exists $funcs{$s}) {
@@ -185,6 +234,17 @@ foreach my $f (keys %helpers) {
   }
   print OUT "$funcs{$f}->{'FUNC_FULL'}\n";
   close OUT;
+}
+
+sub call_hit_return
+{
+  my ($call_loc, $func) = @_;
+  foreach my $r (keys %{$func->{'RETURNS'}}) {
+    if ($func->{'RETURNS'}->{$r}->{'RETURN_START'} < $call_loc and $func->{'RETURNS'}->{$r}->{'RETURN_STOP'} > $call_loc) {
+      return 1;
+    }
+  }
+  return 0;
 }
 
 sub lookup_func
