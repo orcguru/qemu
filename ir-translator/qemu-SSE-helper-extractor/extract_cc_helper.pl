@@ -414,7 +414,11 @@ sub gen_new_func
     }
   }
   my ($func_name, $arguments) = &get_func_name_parts($func, $external);
-  $new_func = "__attribute__((qemuaot)) ".$func_name."(";
+  if ($external) {
+    $new_func = "__attribute__((qemuaot,flatten)) ".$func_name."(";
+  } else {
+    $new_func = "__attribute__((qemuaot)) ".$func_name."(";
+  }
   foreach my $idx (0 .. $#qemuaot_gp_params) {
     my $p = $qemuaot_gp_params[$idx];
     $new_func = $new_func.$qemuaot_gp_params_map{$p};
