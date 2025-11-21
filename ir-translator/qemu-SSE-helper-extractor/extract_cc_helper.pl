@@ -334,11 +334,7 @@ foreach my $f (keys %helpers) {
     my $p = $qemuaot_gp_params[$idx];
     print OUT "$qemuaot_gp_params_map{$p} $p, ";
   }
-  if ($helpers{$f}) {
-    print OUT "$qemuaot_vec_declare, unsigned long ret_val, unsigned long helper, unsigned long func_secondary);\n";
-  } else {
-    print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
-  }
+  print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
   print OUT "extern __attribute__((qemuaot)) void FUNC_SECONDARY(";
   foreach my $idx (0 .. $#qemuaot_gp_params) {
     my $p = $qemuaot_gp_params[$idx];
