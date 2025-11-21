@@ -9,6 +9,7 @@ if ($#ARGV < 1) {
   print "Usage: ./script <antlr-in> <antlr-out>\n";
   exit 1;
 }
+# Value: does helper have return value or not
 my %helpers = (
   "helper_cc_compute_all" => 1,
   "helper_cc_compute_c" => 1,
@@ -67,6 +68,8 @@ while (<FD>) {
     $info{'CALLS'} = \%calls;
     my %returns = ();
     $info{'RETURNS'} = \%returns;
+    my %entries = ();
+    $info{'ENTRIES'} = \%entries;
     if (exists $funcs{$info{'FUNC_NAME'}}) {
       print "Duplicated function definition $info{'FUNC_NAME'}!\n";
       $info{'FUNC_NAME'} = $info{'FUNC_NAME'}."__DUPLICATED";
@@ -91,6 +94,7 @@ while (<FD>) {
     my @f2 = split(/:/, $fields[2]);
     my @f3 = split(/:/, $fields[3]);
     my @f4 = split(/:/, $fields[4]);
+    $info{'TYPE'} = "CALL";
     $info{'NAME_START'} = $f1[1];
     $info{'NAME_STOP'} = $f2[1];
     $info{'PAREN_START'} = $f3[1];
@@ -113,6 +117,7 @@ while (<FD>) {
     }
     my $func_idx = &lookup_func($info{'RETURN_START'});
     $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'RETURNS'}->{$info{'RETURN_START'}} = \%info;
+    $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'ENTRIES'}->{$info{'RETURN_START'}} = \%info;
   } elsif ($line =~ /^<RETURN_EXPR>/) {
     my @fields = split(/\$\$/, $line);
     my %info = ();
@@ -127,9 +132,20 @@ while (<FD>) {
     $info{'EXPR_STOP'} = $f4[1];
     my $func_idx = &lookup_func($info{'RETURN_START'});
     $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'RETURNS'}->{$info{'RETURN_START'}} = \%info;
+    $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'ENTRIES'}->{$info{'RETURN_START'}} = \%info;
   }
 }
 close FD;
+
+# Do insert call into ENTRIES if not hit return
+foreach my $f (keys %funcs) {
+  foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
+    my $hit = &call_hit_return($e, $funcs{$f});
+    if ($hit == 0) {
+      $funcs{$f}->{'ENTRIES'}->{$funcs{$f}->{'CALLS'}->{$e}->{'NAME_START'}} = $funcs{$f}->{'CALLS'}->{$e};
+    }
+  }
+}
 
 # Collect background info (-function)
 open FDIN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
@@ -153,7 +169,7 @@ foreach my $f (keys %helpers) {
   $sub_funcs{$f} = \@sf;
   my @sub_call_stack = ();
   if (not exists $funcs{$f}) {
-    die "$f not defined!\n";
+    die "$f not defined1!\n";
   }
   $funcs{$f}->{'TAIL_RETURN'} = 1;
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
@@ -217,23 +233,364 @@ foreach my $f (keys %defined_funcs_total) {
   }
 }
 
-# Handle function update for QEMUAOT calling convention
+my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "src1", "dst", "op", "rip");
+my %qemuaot_gp_params_map = (
+  "rax" => "unsigned long",
+  "rcx" => "unsigned long",
+  "rdx" => "unsigned long",
+  "rbx" => "unsigned long",
+  "rsp" => "unsigned long",
+  "rbp" => "unsigned long",
+  "rsi" => "unsigned long",
+  "rdi" => "unsigned long",
+  "r8" => "unsigned long",
+  "r9" => "unsigned long",
+  "r10" => "unsigned long",
+  "r11" => "unsigned long",
+  "r12" => "unsigned long",
+  "r13" => "unsigned long",
+  "r14" => "unsigned long",
+  "r15" => "unsigned long",
+  "src1" => "unsigned long",
+  "dst" => "unsigned long",
+  "op" => "unsigned int",
+  "rip" => "unsigned long",
+);
+my $qemuaot_vec_invoke = "xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h";
+my $qemuaot_vec_declare = "v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong ymm1_h, v2ulong xmm2, v2ulong ymm2_h, v2ulong xmm3, v2ulong ymm3_h, v2ulong xmm4, v2ulong ymm4_h, v2ulong xmm5, v2ulong ymm5_h, v2ulong xmm6, v2ulong ymm6_h, v2ulong xmm7, v2ulong ymm7_h, v2ulong xmm8, v2ulong ymm8_h, v2ulong xmm9, v2ulong ymm9_h, v2ulong xmm10, v2ulong ymm10_h, v2ulong xmm11, v2ulong ymm11_h, v2ulong xmm12, v2ulong ymm12_h, v2ulong xmm13, v2ulong ymm13_h, v2ulong xmm14, v2ulong ymm14_h, v2ulong xmm15, v2ulong ymm15_h";
 
 # Generate functions
 foreach my $f (keys %helpers) {
+  # Cleanup PARAM_MAP/PARAM_ARRAY among all functions to avoid interference
+  foreach my $c (keys %funcs) {
+    if (exists $funcs{$c}->{'PARAM_MAP'}) {
+      delete $funcs{$c}->{'PARAM_MAP'};
+    }
+    if (exists $funcs{$c}->{'PARAM_ARRAY'}) {
+      delete $funcs{$c}->{'PARAM_ARRAY'};
+    }
+  }
+
+  # Setup QEMUAOT CC parameter map in functions
+  my ($func_name, $arguments) = &get_func_name_parts($funcs{$f}, 1);
+  my %param_map = ();
+  my @param_array = ();
+  foreach my $idx (0 .. $#{$arguments}) {
+    my $a = $arguments->[$idx]->{'VAR_NAME'};
+    my %info = ();
+    $info{'IDX'} = $idx;
+    $info{'TYPE'} = $arguments->[$idx]->{'TYPE'};
+    $info{'ORIG'} = $a;
+    $info{'QEMUAOT'} = "NA";
+    if (exists $qemuaot_gp_params_map{$a}) {
+      $info{'QEMUAOT'} = $a;
+    }
+    $param_map{$a} = \%info;
+    push @param_array, \%info;
+  }
+  $funcs{$f}->{'PARAM_MAP'} = \%param_map;
+  $funcs{$f}->{'PARAM_ARRAY'} = \@param_array;
+
+  my @sub_call_stack = ();
+  foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
+    my $call_target = $funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'};
+    if (exists $funcs{$call_target}) {
+      &check_sub_func_for_param_map($f, $call_target, $e);
+      push @sub_call_stack, $call_target;
+    }
+  }
+  while (@sub_call_stack > 0) {
+    my @new_call_stack = ();
+    foreach my $c (@sub_call_stack) {
+      if (not exists $funcs{$c}) {
+        next;
+      }
+      foreach my $e (keys %{$funcs{$c}->{'CALLS'}}) {
+        my $call_target = $funcs{$c}->{'CALLS'}->{$e}->{'CALL_TARGET'};
+        if (exists $funcs{$call_target}) {
+          &check_sub_func_for_param_map($c, $call_target, $e);
+          push @new_call_stack, $call_target;
+        }
+      }
+    }
+    @sub_call_stack = @new_call_stack;
+  }
+
   open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
+  print OUT "typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;\n";
+  print OUT "extern __attribute__((qemuaot)) void FUNC_NORMAL_RET(";
+  foreach my $idx (0 .. $#qemuaot_gp_params) {
+    my $p = $qemuaot_gp_params[$idx];
+    print OUT "$qemuaot_gp_params_map{$p} $p, ";
+  }
+  if ($helpers{$f}) {
+    print OUT "$qemuaot_vec_declare, unsigned long ret_val);\n";
+  } else {
+    print OUT "$qemuaot_vec_declare);\n";
+  }
+  print OUT "extern __attribute__((qemuaot)) void FUNC_EXCEPTION_RET(";
+  foreach my $idx (0 .. $#qemuaot_gp_params) {
+    my $p = $qemuaot_gp_params[$idx];
+    print OUT "$qemuaot_gp_params_map{$p} $p, ";
+  }
+  if ($helpers{$f}) {
+    print OUT "$qemuaot_vec_declare, unsigned long ret_val, unsigned long helper, unsigned long func_secondary);\n";
+  } else {
+    print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
+  }
+  my $extern_func = &GetText($funcs{$f}->{'FULL_START'}, $funcs{$f}->{'NAME_STOP'}, $ARGV[0]);
+  print OUT "extern $extern_func;\n\n";
+
   #print OUT "$blank_info\n\n";
+
   my %covered_sub_funcs = ();
   foreach my $s (@{$sub_funcs{$f}}) {
     if (not exists $covered_sub_funcs{$s}) {
       $covered_sub_funcs{$s} = 1;
       if (exists $funcs{$s}) {
-        print OUT "$funcs{$s}->{'FUNC_FULL'}\n\n";
+        my $new_func = &gen_new_func($funcs{$s}, 0);
+        print OUT "$new_func\n\n";
       }
     }
   }
-  print OUT "$funcs{$f}->{'FUNC_FULL'}\n";
+  my $new_func = &gen_new_func($funcs{$f}, 1);
+  print OUT "$new_func\n\n";
   close OUT;
+}
+
+sub check_sub_func_for_param_map
+{
+  my ($parent, $child, $call) = @_;
+  my $param_list = &get_call_param_list($funcs{$parent}->{'CALLS'}->{$call}->{'PAREN_START'}, $funcs{$parent}->{'CALLS'}->{$call}->{'PAREN_STOP'});
+  foreach my $idx (0 .. $#{$param_list}) {
+    if (not exists $funcs{$parent}->{'PARAM_MAP'}->{$param_list->[$idx]}) {
+      $param_list->[$idx] = "NA";
+    } else {
+      $param_list->[$idx] = $funcs{$parent}->{'PARAM_MAP'}->{$param_list->[$idx]}->{'QEMUAOT'};
+    }
+  }
+  if (exists $funcs{$child}->{'PARAM_MAP'}) {
+    foreach my $idx (0 .. $#{$param_list}) {
+      if ($funcs{$child}->{'PARAM_ARRAY'}->[$idx]->{'QEMUAOT'} ne $param_list->[$idx]) {
+        $funcs{$child}->{'PARAM_ARRAY'}->[$idx]->{'QEMUAOT'} = "NA";
+      }
+    }
+  } else {
+    my ($func_name, $arguments) = &get_func_name_parts($funcs{$child}, 0);
+    my %param_map = ();
+    my @param_array = ();
+    foreach my $idx (0 .. $#{$arguments}) {
+      my $a = $arguments->[$idx]->{'VAR_NAME'};
+      my %info = ();
+      $info{'IDX'} = $idx;
+      $info{'TYPE'} = $arguments->[$idx]->{'TYPE'};
+      $info{'ORIG'} = $a;
+      $info{'QEMUAOT'} = $param_list->[$idx];
+      $param_map{$a} = \%info;
+      push @param_array, \%info;
+    }
+    $funcs{$child}->{'PARAM_MAP'} = \%param_map;
+    $funcs{$child}->{'PARAM_ARRAY'} = \@param_array;
+  }
+}
+
+# Handle function update for QEMUAOT calling convention
+sub gen_new_func
+{
+  my ($func, $external) = @_;
+  my $new_func = "";
+  my %update_param_name = ();
+  foreach my $k (keys %{$func->{'PARAM_MAP'}}) {
+    if ($func->{'PARAM_MAP'}->{$k}->{'QEMUAOT'} ne "NA") {
+      $update_param_name{$func->{'PARAM_MAP'}->{$k}->{'QEMUAOT'}} = $func->{'PARAM_MAP'}->{$k}->{'ORIG'};
+    }
+  }
+  my ($func_name, $arguments) = &get_func_name_parts($func, $external);
+  $new_func = "__attribute__((qemuaot)) ".$func_name."(";
+  foreach my $idx (0 .. $#qemuaot_gp_params) {
+    my $p = $qemuaot_gp_params[$idx];
+    $new_func = $new_func.$qemuaot_gp_params_map{$p};
+    if (exists $update_param_name{$p}) {
+      $new_func = $new_func." ".$update_param_name{$p};
+    } else {
+      $new_func = $new_func." ".$p;
+    }
+    $new_func = $new_func.", ";
+  }
+  $new_func = $new_func.$qemuaot_vec_declare;
+  foreach my $k (@{$func->{'PARAM_ARRAY'}}) {
+    if ($k->{'QEMUAOT'} eq "NA") {
+      $new_func = $new_func.", $k->{'TYPE'} $k->{'ORIG'}";
+    }
+  }
+  $new_func = $new_func.")";
+
+  # Sort list of calls/returns that need be patched
+  my @sorted_entries = sort {$a <=> $b} keys %{$func->{'ENTRIES'}};
+  my $current_pos = $func->{'NAME_STOP'} + 1;
+  foreach my $e (@sorted_entries) {
+    my $txt = &GetText($current_pos, ($e - 1), $ARGV[0]);
+    $new_func = $new_func.$txt;
+    if ($func->{'ENTRIES'}->{$e}->{'TYPE'} eq "CALL") {
+      my $call_target = $func->{'ENTRIES'}->{$e}->{'CALL_TARGET'};
+      if ((not exists $funcs{$call_target}) and (not $call_target =~ /builtin/)) {
+        # Not able to handle, redirect to runtime
+        # FIXME: what if this is assignment?
+        $new_func = $new_func."return FUNC_EXCEPTION_RET(";
+        foreach my $idx (0 .. $#qemuaot_gp_params) {
+          my $p = $qemuaot_gp_params[$idx];
+          if (exists $update_param_name{$p}) {
+            $new_func = $new_func.$update_param_name{$p};
+          } else {
+            $new_func = $new_func.$p;
+          }
+          $new_func = $new_func.", ";
+        }
+        $new_func = $new_func.$qemuaot_vec_invoke.")";
+      } else {
+        $new_func = $new_func.$call_target."(";
+        foreach my $idx (0 .. $#qemuaot_gp_params) {
+          my $p = $qemuaot_gp_params[$idx];
+          if (exists $update_param_name{$p}) {
+            $new_func = $new_func.$update_param_name{$p};
+          } else {
+            $new_func = $new_func.$p;
+          }
+          $new_func = $new_func.", ";
+        }
+        $new_func = $new_func.$qemuaot_vec_invoke;
+        my $param_list = &get_call_param_list($func->{'ENTRIES'}->{$e}->{'PAREN_START'}, $func->{'ENTRIES'}->{$e}->{'PAREN_STOP'});
+        foreach my $idx (0 .. $#{$funcs{$call_target}->{'PARAM_ARRAY'}}) {
+          if ($funcs{$call_target}->{'PARAM_ARRAY'}->[$idx]->{'QEMUAOT'} eq "NA") {
+            $new_func = $new_func.", ".$param_list->[$idx];
+          }
+        }
+        $new_func = $new_func.")";
+      }
+      $current_pos = $func->{'ENTRIES'}->{$e}->{'PAREN_STOP'} + 1;
+    } elsif ($func->{'ENTRIES'}->{$e}->{'TYPE'} eq "RETURN_VOID") {
+      die "Not expected return void!\n";
+    } elsif ($func->{'ENTRIES'}->{$e}->{'TYPE'} eq "RETURN_EXPR") {
+      my $is_call = 0;
+      my $call;
+      my $param_list;
+      foreach my $ck (keys %{$func->{'CALLS'}}) {
+        if ($ck > $func->{'ENTRIES'}->{$e}->{'RETURN_START'} and $ck < $func->{'ENTRIES'}->{$e}->{'RETURN_STOP'}) {
+          $is_call = 1;
+          $call = $func->{'CALLS'}->{$ck};
+          $param_list = &get_call_param_list($call->{'PAREN_START'}, $call->{'PAREN_STOP'});
+          if ((not exists $funcs{$call->{'CALL_TARGET'}}) and (not $call->{'CALL_TARGET'} =~ /builtin/)) {
+            die "$call->{'CALL_TARGET'} not defined2!\n";
+          }
+          last;
+        }
+      }
+      if (exists $func->{'TAIL_RETURN'}) {
+        $new_func = $new_func."return ";
+        if ($is_call) {
+          $new_func = $new_func.$call->{'CALL_TARGET'}."(";
+        } else {
+          $new_func = $new_func."FUNC_NORMAL_RET(";
+        }
+        foreach my $idx (0 .. $#qemuaot_gp_params) {
+          my $p = $qemuaot_gp_params[$idx];
+          if (exists $update_param_name{$p}) {
+            $new_func = $new_func.$update_param_name{$p};
+          } else {
+            $new_func = $new_func.$p;
+          }
+          $new_func = $new_func.", ";
+        }
+        $new_func = $new_func.$qemuaot_vec_invoke;
+        if ($is_call) {
+          foreach my $idx (0 .. $#{$funcs{$call->{'CALL_TARGET'}}->{'PARAM_ARRAY'}}) {
+            if ($funcs{$call->{'CALL_TARGET'}}->{'PARAM_ARRAY'}->[$idx]->{'QEMUAOT'} eq "NA") {
+              $new_func = $new_func.", ".$param_list->[$idx];
+            }
+          }
+        } else {
+          my $txt = &GetText($func->{'ENTRIES'}->{$e}->{'EXPR_START'}, $func->{'ENTRIES'}->{$e}->{'EXPR_STOP'}, $ARGV[0]);
+          $new_func = $new_func.", ".$txt;
+        }
+        $new_func = $new_func.");";
+      } else {
+        my $txt = &GetText($func->{'ENTRIES'}->{$e}->{'RETURN_START'}, $func->{'ENTRIES'}->{$e}->{'RETURN_STOP'}, $ARGV[0]);
+        $new_func = $new_func.$txt;
+      }
+      $current_pos = $func->{'ENTRIES'}->{$e}->{'RETURN_STOP'} + 1;
+    } else {
+      die "Unsupported entry!\n";
+    }
+  }
+  my $txt = &GetText($current_pos, $func->{'FULL_STOP'}, $ARGV[0]);
+  $new_func = $new_func.$txt;
+  return $new_func;
+}
+
+sub get_call_param_list
+{
+  my ($paren_start, $paren_stop) = @_;
+  my $str = &GetText($paren_start, $paren_stop, $ARGV[0]);
+  $str =~ s/^\s*\(\s*//;
+  $str =~ s/\s*\)\s*$//;
+  my @fields = split(/,/, $str);
+  foreach my $i (0 .. $#fields) {
+    $fields[$i] =~ s/^\s*//;
+    $fields[$i] =~ s/\s*$//;
+  }
+  return \@fields;
+}
+
+sub get_func_name_parts
+{
+  my ($func, $external) = @_;
+  my $str = "";
+  if (exists $func->{'TAIL_RETURN'}) {
+    $str = &GetText($func->{'NAME_START'}, $func->{'NAME_STOP'}, $ARGV[0]);
+    if ($external) {
+      $str =~ s/^$func->{'FUNC_NAME'}/HELPER_NAME/;
+      $str = "void ".$str;
+    } else {
+      $str = "static inline void ".$str;
+    }
+  } else {
+    $str = &GetText($func->{'FULL_START'}, $func->{'NAME_STOP'}, $ARGV[0]);
+  }
+  my @chars = split(//, $str);
+  my $idx = $#chars;
+  my $paren_cnt = 0;
+  while ($idx >= 0) {
+    if ($chars[$idx] eq ")") {
+      $paren_cnt = $paren_cnt + 1;
+    } elsif ($chars[$idx] eq "(") {
+      $paren_cnt = $paren_cnt - 1;
+      if ($paren_cnt == 0) {
+        last;
+      }
+    }
+    $idx = $idx - 1;
+  }
+  my @slice_head = @chars[0..($idx-1)];
+  my @slice_tail = @chars[$idx..$#chars];
+  my $head = join("", @slice_head);
+  my $tail = join("", @slice_tail);
+  $tail =~ s/^\(\s*//;
+  $tail =~ s/\s*\)\s*$//;
+  my @fields = split(/,/, $tail);
+  my @params = ();
+  foreach my $i (0 .. $#fields) {
+    $fields[$i] =~ s/^\s*//;
+    $fields[$i] =~ s/\s*$//;
+    my @sub_fields = split(/\s+/, $fields[$i]);
+    if (@sub_fields != 2) {
+      die "Complex type not supported yet!\n";
+    }
+    my %info = ();
+    $info{'TYPE'} = $sub_fields[0];
+    $info{'VAR_NAME'} = $sub_fields[1];
+    push @params, \%info;
+  }
+  return ($head, \@params);
 }
 
 sub call_hit_return
@@ -325,7 +682,7 @@ sub GetText
   if ($br != ($posEnd - $posStart + 1)) {
     die "Failed to read $cppFn\n";
   }
-  $ret = unpack "A*", $bytes;
+  $ret = unpack "a*", $bytes;
   close FDIN;
   return $ret;
 }

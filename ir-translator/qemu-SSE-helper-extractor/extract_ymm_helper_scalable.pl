@@ -90,7 +90,7 @@ sub GetText
   if ($br != ($posEnd - $posStart + 1)) {
     die "Failed to read $cppFn\n";
   }
-  $ret = unpack "A*", $bytes;
+  $ret = unpack "a*", $bytes;
   close FDIN;
   return $ret;
 }
