@@ -2477,8 +2477,16 @@ static void handle_cc_update(OpCodeType opc, uint32_t is_imm, OperandType val, O
     if (val.s.valid == target.s.valid && val.s.slot_type == target.s.slot_type && val.s.slot_idx == target.s.slot_idx) {
         return;
     }
-    LLVMValueRef src_val = get_source_node_imm_or_stack(opc, is_imm, val, OPC_INPUT_T, 0);
-    do_store(opc, src_val, OPC_OUTPUT_T, target);
+    LLVMValueRef src_val = get_source_node_imm_or_stack(opc, is_imm, val, target.s.slot_idx == cc_op ? LLVMInt32 : LLVMInt64, 0);
+    XRegType x = (XRegType)target.s.slot_idx;
+    if (!fixed_vector_param_in_stack[x]) {
+        LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, fixed_vector_param_types[x], fixed_vector_stack_names[x]);
+        LLVMSetAlignment(alloca_inst, 8);
+        func_xreg_alloca[x] = alloca_inst;
+        func_xreg_llvmtype[x] = fixed_vector_param_llvmtypes[x];
+        fixed_vector_param_in_stack[x] = 1;
+    }
+    LLVMBuildStore(builder, src_val, func_xreg_alloca[x]);
 }
 
 static void translate_cc_compute(OpCodeType opc, void *ptr) {
@@ -4304,13 +4312,15 @@ int main(int argc, const char *argv[]) {
 #endif
 
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+    /*
     const char *global_isel_args[] = {
         "program_name",
         "-global-isel",
-        "-aarch64-enable-global-isel-at-O=2",
+        "-aarch64-enable-global-isel-at-O=1",
         NULL
     };
-    LLVMParseCommandLineOptions(3, global_isel_args, "Enable GlobalISel at O2 for AArch64");
+    LLVMParseCommandLineOptions(3, global_isel_args, "Enable GlobalISel at O1 for AArch64");
+    */
 #endif
 
     LLVMTargetRef target;

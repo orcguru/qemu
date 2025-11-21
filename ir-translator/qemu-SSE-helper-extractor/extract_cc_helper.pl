@@ -411,7 +411,7 @@ sub gen_new_func
   }
   my ($func_name, $arguments) = &get_func_name_parts($func, $external);
   if ($external) {
-    $new_func = "__attribute__((qemuaot,flatten,always_inline)) ".$func_name."(";
+    $new_func = "__attribute__((qemuaot,always_inline)) ".$func_name."(";
   } else {
     $new_func = "__attribute__((qemuaot)) ".$func_name."(";
   }
