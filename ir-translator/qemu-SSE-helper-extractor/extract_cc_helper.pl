@@ -329,7 +329,7 @@ foreach my $f (keys %helpers) {
   } else {
     print OUT "$qemuaot_vec_declare);\n";
   }
-  print OUT "extern __attribute__((qemuaot)) void FUNC_EXCEPTION_RET(";
+  print OUT "extern __attribute__((qemuaot,noreturn)) void FUNC_EXCEPTION_RET(";
   foreach my $idx (0 .. $#qemuaot_gp_params) {
     my $p = $qemuaot_gp_params[$idx];
     print OUT "$qemuaot_gp_params_map{$p} $p, ";
