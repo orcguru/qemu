@@ -317,6 +317,7 @@ foreach my $f (keys %helpers) {
   }
 
   open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
+  print OUT "$blank_info\n\n";
   print OUT "typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;\n";
   print OUT "extern __attribute__((qemuaot)) void FUNC_NORMAL_RET(";
   foreach my $idx (0 .. $#qemuaot_gp_params) {
@@ -338,22 +339,29 @@ foreach my $f (keys %helpers) {
   } else {
     print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
   }
+  print OUT "extern __attribute__((qemuaot)) void FUNC_SECONDARY(";
+  foreach my $idx (0 .. $#qemuaot_gp_params) {
+    my $p = $qemuaot_gp_params[$idx];
+    print OUT "$qemuaot_gp_params_map{$p} $p, ";
+  }
+  if ($helpers{$f}) {
+    print OUT "$qemuaot_vec_declare, unsigned long ret_val);\n";
+  } else {
+    print OUT "$qemuaot_vec_declare);\n";
+  }
   my $extern_func = &GetText($funcs{$f}->{'FULL_START'}, $funcs{$f}->{'NAME_STOP'}, $ARGV[0]);
   print OUT "extern $extern_func;\n\n";
-
-  #print OUT "$blank_info\n\n";
-
   my %covered_sub_funcs = ();
   foreach my $s (@{$sub_funcs{$f}}) {
     if (not exists $covered_sub_funcs{$s}) {
       $covered_sub_funcs{$s} = 1;
       if (exists $funcs{$s}) {
-        my $new_func = &gen_new_func($funcs{$s}, 0);
+        my $new_func = &gen_new_func($funcs{$s}, 0, $f);
         print OUT "$new_func\n\n";
       }
     }
   }
-  my $new_func = &gen_new_func($funcs{$f}, 1);
+  my $new_func = &gen_new_func($funcs{$f}, 1, $f);
   print OUT "$new_func\n\n";
   close OUT;
 }
@@ -397,7 +405,7 @@ sub check_sub_func_for_param_map
 # Handle function update for QEMUAOT calling convention
 sub gen_new_func
 {
-  my ($func, $external) = @_;
+  my ($func, $external, $exception_exit) = @_;
   my $new_func = "";
   my %update_param_name = ();
   foreach my $k (keys %{$func->{'PARAM_MAP'}}) {
@@ -435,8 +443,7 @@ sub gen_new_func
       my $call_target = $func->{'ENTRIES'}->{$e}->{'CALL_TARGET'};
       if ((not exists $funcs{$call_target}) and (not $call_target =~ /builtin/)) {
         # Not able to handle, redirect to runtime
-        # FIXME: what if this is assignment?
-        $new_func = $new_func."return FUNC_EXCEPTION_RET(";
+        $new_func = $new_func."FUNC_EXCEPTION_RET(";
         foreach my $idx (0 .. $#qemuaot_gp_params) {
           my $p = $qemuaot_gp_params[$idx];
           if (exists $update_param_name{$p}) {
@@ -446,7 +453,7 @@ sub gen_new_func
           }
           $new_func = $new_func.", ";
         }
-        $new_func = $new_func.$qemuaot_vec_invoke.")";
+        $new_func = $new_func.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)FUNC_SECONDARY)";
       } else {
         $new_func = $new_func.$call_target."(";
         foreach my $idx (0 .. $#qemuaot_gp_params) {
@@ -485,37 +492,43 @@ sub gen_new_func
           last;
         }
       }
-      if (exists $func->{'TAIL_RETURN'}) {
-        $new_func = $new_func."return ";
-        if ($is_call) {
-          $new_func = $new_func.$call->{'CALL_TARGET'}."(";
-        } else {
-          $new_func = $new_func."FUNC_NORMAL_RET(";
+      if ($is_call and $call->{'CALL_TARGET'} =~ /builtin/) {
+        if (exists $func->{'TAIL_RETURN'}) {
+          die "Unexpected!\n";
         }
-        foreach my $idx (0 .. $#qemuaot_gp_params) {
-          my $p = $qemuaot_gp_params[$idx];
-          if (exists $update_param_name{$p}) {
-            $new_func = $new_func.$update_param_name{$p};
-          } else {
-            $new_func = $new_func.$p;
-          }
-          $new_func = $new_func.", ";
-        }
-        $new_func = $new_func.$qemuaot_vec_invoke;
-        if ($is_call) {
-          foreach my $idx (0 .. $#{$funcs{$call->{'CALL_TARGET'}}->{'PARAM_ARRAY'}}) {
-            if ($funcs{$call->{'CALL_TARGET'}}->{'PARAM_ARRAY'}->[$idx]->{'QEMUAOT'} eq "NA") {
-              $new_func = $new_func.", ".$param_list->[$idx];
-            }
-          }
-        } else {
-          my $txt = &GetText($func->{'ENTRIES'}->{$e}->{'EXPR_START'}, $func->{'ENTRIES'}->{$e}->{'EXPR_STOP'}, $ARGV[0]);
-          $new_func = $new_func.", ".$txt;
-        }
-        $new_func = $new_func.");";
-      } else {
         my $txt = &GetText($func->{'ENTRIES'}->{$e}->{'RETURN_START'}, $func->{'ENTRIES'}->{$e}->{'RETURN_STOP'}, $ARGV[0]);
         $new_func = $new_func.$txt;
+      } else {
+        if (exists $func->{'TAIL_RETURN'}) {
+          if ($is_call) {
+            my $txt = &handle_call_hit_return_expr($call, $func->{'ENTRIES'}->{$e}, \%update_param_name, $param_list);
+            $new_func = $new_func.$txt;
+          } else {
+            $new_func = $new_func."return ";
+            $new_func = $new_func."FUNC_NORMAL_RET(";
+            foreach my $idx (0 .. $#qemuaot_gp_params) {
+              my $p = $qemuaot_gp_params[$idx];
+              if (exists $update_param_name{$p}) {
+                $new_func = $new_func.$update_param_name{$p};
+              } else {
+                $new_func = $new_func.$p;
+              }
+              $new_func = $new_func.", ";
+            }
+            $new_func = $new_func.$qemuaot_vec_invoke;
+            my $txt = &GetText($func->{'ENTRIES'}->{$e}->{'EXPR_START'}, $func->{'ENTRIES'}->{$e}->{'EXPR_STOP'}, $ARGV[0]);
+            $new_func = $new_func.", (unsigned long)(".$txt.")";
+            $new_func = $new_func.");";
+          }
+        } else {
+          my $txt = "";
+          if ($is_call) {
+            $txt = &handle_call_hit_return_expr($call, $func->{'ENTRIES'}->{$e}, \%update_param_name, $param_list);
+          } else {
+            $txt = &GetText($func->{'ENTRIES'}->{$e}->{'RETURN_START'}, $func->{'ENTRIES'}->{$e}->{'RETURN_STOP'}, $ARGV[0]);
+          }
+          $new_func = $new_func.$txt;
+        }
       }
       $current_pos = $func->{'ENTRIES'}->{$e}->{'RETURN_STOP'} + 1;
     } else {
@@ -525,6 +538,47 @@ sub gen_new_func
   my $txt = &GetText($current_pos, $func->{'FULL_STOP'}, $ARGV[0]);
   $new_func = $new_func.$txt;
   return $new_func;
+}
+
+# FIXME: there could be multiple calls within one return_expr
+sub handle_call_hit_return_expr
+{
+  my ($call, $return, $update, $param_list) = @_;
+  my $str = "return ";
+  if ($call->{'NAME_START'} != $return->{'EXPR_START'}) {
+    if ($call->{'NAME_START'} < $return->{'EXPR_START'}) {
+      die "Unexpected call hit return_expr!\n";
+    }
+    my $sub = &GetText($return->{'EXPR_START'}, ($call->{'NAME_START'} - 1), $ARGV[0]);
+    $str = $str.$sub;
+  }
+  $str = $str.$call->{'CALL_TARGET'}."(";
+  foreach my $idx (0 .. $#qemuaot_gp_params) {
+    my $p = $qemuaot_gp_params[$idx];
+    if (exists $update->{$p}) {
+      $str = $str.$update->{$p};
+    } else {
+      $str = $str.$p;
+    }
+    $str = $str.", ";
+  }
+  $str = $str.$qemuaot_vec_invoke;
+  foreach my $idx (0 .. $#{$funcs{$call->{'CALL_TARGET'}}->{'PARAM_ARRAY'}}) {
+    if ($funcs{$call->{'CALL_TARGET'}}->{'PARAM_ARRAY'}->[$idx]->{'QEMUAOT'} eq "NA") {
+      $str = $str.", ".$param_list->[$idx];
+    }
+  }
+  $str = $str.")";
+  if ($call->{'PAREN_STOP'} != $return->{'EXPR_STOP'}) {
+    if ($call->{'PAREN_STOP'} > $return->{'EXPR_STOP'}) {
+      die "Unexpected call hit return_expr!\n";
+    }
+    my $sub = &GetText(($call->{'PAREN_STOP'} + 1), $return->{'EXPR_STOP'}, $ARGV[0]);
+    $str = $str.$sub;
+  }
+  my $sub = &GetText(($return->{'EXPR_STOP'} + 1), $return->{'RETURN_STOP'}, $ARGV[0]);
+  $str = $str.$sub;
+  return $str;
 }
 
 sub get_call_param_list
