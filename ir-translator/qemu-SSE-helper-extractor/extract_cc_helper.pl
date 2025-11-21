@@ -605,7 +605,7 @@ sub get_func_name_parts
       $str =~ s/^$func->{'FUNC_NAME'}/HELPER_NAME/;
       $str = "void ".$str;
     } else {
-      $str = "static inline void ".$str;
+      $str = "static __attribute__((always_inline)) void ".$str;
     }
   } else {
     $str = &GetText($func->{'FULL_START'}, $func->{'NAME_STOP'}, $ARGV[0]);
