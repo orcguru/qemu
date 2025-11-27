@@ -2692,10 +2692,10 @@ static void translate_cc_compute_outband(OpCodeType opc, void *ptr) {
     char helper_func_name[512] = {0};
     char bc_name[512] = {0};
     char element[512] = {0};
-    sprintf(element, " -DFUNC_NORMAL_RET=%s -DHELPER_NAME=%s%s_%s", second_half_name, helper_str[h], func_postfix, second_half_name);
+    sprintf(element, " -DHELPER_NAME=%s%s", helper_str[h], func_postfix);
     strcat(build_macro, element);
-    sprintf(bc_name, "helper_templates/%s%s_%s.bc", helper_str[h], func_postfix, second_half_name);
-    sprintf(helper_func_name, "%s%s_%s", helper_str[h], func_postfix, second_half_name);
+    sprintf(bc_name, "helper_templates/%s%s.bc", helper_str[h], func_postfix);
+    sprintf(helper_func_name, "%s%s", helper_str[h], func_postfix);
     assert(strlen(build_macro) < sizeof(build_macro));
 
     // Get the second half
@@ -2730,13 +2730,17 @@ static void translate_cc_compute_outband(OpCodeType opc, void *ptr) {
     LLVMValueRef trampoline = get_trampoline(helper_func, 1, 1, runtime_op_cnt, 0xff, runtime_operands, runtime_is_imm, second_half_func);
 
     // Generate the fast path inlined helper
-    sprintf(element, " -DFUNC_EXCEPTION_RET=%s -DFUNC_SECONDARY=%s", LLVMGetValueName(trampoline), second_half_name);
-    strcat(build_macro, element);
     char c_file[64] = {0};
     sprintf(c_file, "%s%s", helper_str[h], func_postfix);
     uint8_t do_inline_helper = do_link_helper(h, build_macro, bc_name, c_file);
     assert(do_inline_helper);
     call_arg_cnts = collect_arguments(opc, call_args, WITH_FIXED_VEC_CONTEXT, operands, is_imm, op_cnt);
+    LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    call_args[call_arg_cnts++] = second_half_addr;
+    if (h == helper_cc_compute_nz_outband) {
+        LLVMValueRef trampoline_addr = LLVMBuildPtrToInt(builder, trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        call_args[call_arg_cnts++] = trampoline_addr;
+    }
     assert(call_arg_cnts <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
     LLVMValueRef helper = LLVMGetNamedFunction(module, helper_func_name);
     assert(helper);
@@ -4389,6 +4393,20 @@ void module_epilog() {
         LLVMDisposePassBuilderOptions(options);
         LLVMDisposeTargetMachine(target_machine);
         exit(1);
+    }
+
+    // Remove helper_cc_compute_*_inband_*
+    LLVMValueRef currentFunction = LLVMGetFirstFunction(module);
+    while (currentFunction != NULL) {
+        const char* funcName = LLVMGetValueName(currentFunction);
+        LLVMValueRef deleteCandidate = NULL;
+        if (strstr(funcName, "_inband_")) {
+            deleteCandidate = currentFunction;
+        }
+        currentFunction = LLVMGetNextFunction(currentFunction);
+        if (deleteCandidate) {
+            LLVMDeleteFunction(deleteCandidate);
+        }
     }
 
     //LLVMDumpModule(module);

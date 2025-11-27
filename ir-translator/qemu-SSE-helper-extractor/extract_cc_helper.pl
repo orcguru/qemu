@@ -368,7 +368,7 @@ sub gen_template
   print OUT "$blank_info\n\n";
   print OUT "typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;\n";
   if ($bandmode eq "outband") {
-    print OUT "extern __attribute__((qemuaot)) void FUNC_NORMAL_RET(";
+    print OUT "typedef __attribute__((qemuaot)) void (*FUNC_NORMAL_RET)(";
     foreach my $idx (0 .. $#qemuaot_gp_params) {
       my $p = $custom_list[$idx];
       print OUT "$custom_map{$p} $p, ";
@@ -378,36 +378,28 @@ sub gen_template
     } else {
       print OUT "$qemuaot_vec_declare);\n";
     }
-    print OUT "extern __attribute__((qemuaot,noreturn)) void FUNC_EXCEPTION_RET(";
-    foreach my $idx (0 .. $#custom_list) {
-      my $p = $custom_list[$idx];
-      print OUT "$custom_map{$p} $p, ";
+    if ($f eq "helper_cc_compute_nz") {
+      print OUT "typedef __attribute__((qemuaot,noreturn)) void (*FUNC_EXCEPTION_RET)(";
+      foreach my $idx (0 .. $#custom_list) {
+        my $p = $custom_list[$idx];
+        print OUT "$custom_map{$p} $p, ";
+      }
+      print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
+      my $extern_func = &GetText($funcs{$f}->{'FULL_START'}, $funcs{$f}->{'NAME_STOP'}, $ARGV[0]);
+      print OUT "extern $extern_func;\n\n";
     }
-    print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
-    print OUT "extern __attribute__((qemuaot)) void FUNC_SECONDARY(";
-    foreach my $idx (0 .. $#custom_list) {
-      my $p = $custom_list[$idx];
-      print OUT "$custom_map{$p} $p, ";
-    }
-    if ($helpers{$f}) {
-      print OUT "$qemuaot_vec_declare, unsigned long ret_val);\n";
-    } else {
-      print OUT "$qemuaot_vec_declare);\n";
-    }
-    my $extern_func = &GetText($funcs{$f}->{'FULL_START'}, $funcs{$f}->{'NAME_STOP'}, $ARGV[0]);
-    print OUT "extern $extern_func;\n\n";
   }
   my %covered_sub_funcs = ();
   foreach my $s (@{$sub_funcs{$f}}) {
     if (not exists $covered_sub_funcs{$s}) {
       $covered_sub_funcs{$s} = 1;
       if (exists $funcs{$s}) {
-        my $new_func = &gen_new_func($funcs{$s}, 0, $f, \%custom_map, \@custom_list, $bandmode);
+        my $new_func = &gen_new_func($funcs{$s}, 0, $f, \%custom_map, \@custom_list, $bandmode, $f);
         print OUT "$new_func\n\n";
       }
     }
   }
-  my $new_func = &gen_new_func($funcs{$f}, 1, $f, \%custom_map, \@custom_list, $bandmode);
+  my $new_func = &gen_new_func($funcs{$f}, 1, $f, \%custom_map, \@custom_list, $bandmode, $f);
   print OUT "$new_func\n\n";
   close OUT;
   if ($bandmode eq "inband") {
@@ -454,7 +446,7 @@ sub check_sub_func_for_param_map
 # Handle function update for QEMUAOT calling convention
 sub gen_new_func
 {
-  my ($func, $external, $exception_exit, $custom_map, $custom_list, $bandmode) = @_;
+  my ($func, $external, $exception_exit, $custom_map, $custom_list, $bandmode, $parent_name) = @_;
   my $new_func = "";
   my %update_param_name = ();
   foreach my $k (keys %{$func->{'PARAM_MAP'}}) {
@@ -464,7 +456,11 @@ sub gen_new_func
   }
   my ($func_name, $arguments) = &get_func_name_parts($func, $external, $bandmode);
   if ($external) {
-    $new_func = "__attribute__((qemuaot,always_inline)) ".$func_name."(";
+    if ($bandmode eq "outband") {
+      $new_func = "__attribute__((qemuaot,always_inline,weak)) ".$func_name."(";
+    } else {
+      $new_func = "__attribute__((qemuaot,always_inline)) ".$func_name."(";
+    }
   } else {
     $new_func = "__attribute__((qemuaot)) ".$func_name."(";
   }
@@ -484,6 +480,12 @@ sub gen_new_func
       $new_func = $new_func.", $k->{'TYPE'} $k->{'ORIG'}";
     }
   }
+  if ($bandmode eq "outband") {
+    $new_func = $new_func.", unsigned long normal_return";
+    if ($parent_name eq "helper_cc_compute_nz") {
+      $new_func = $new_func.", unsigned long exception_return";
+    }
+  }
   $new_func = $new_func.")";
 
   # Sort list of calls/returns that need be patched
@@ -497,7 +499,7 @@ sub gen_new_func
       if ((not exists $funcs{$call_target}) and (not $call_target =~ /builtin/)) {
         if ($bandmode eq "outband") {
           # Not able to handle, redirect to runtime
-          $new_func = $new_func."FUNC_EXCEPTION_RET(";
+          $new_func = $new_func."((FUNC_EXCEPTION_RET)exception_return)(";
           foreach my $idx (0 .. $#{$custom_list}) {
             my $p = $custom_list->[$idx];
             if (exists $update_param_name{$p}) {
@@ -507,7 +509,7 @@ sub gen_new_func
             }
             $new_func = $new_func.", ";
           }
-          $new_func = $new_func.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)FUNC_SECONDARY)";
+          $new_func = $new_func.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)normal_return)";
         }
       } else {
         $new_func = $new_func.$call_target."(";
@@ -525,6 +527,12 @@ sub gen_new_func
         foreach my $idx (0 .. $#{$funcs{$call_target}->{'PARAM_ARRAY'}}) {
           if ($funcs{$call_target}->{'PARAM_ARRAY'}->[$idx]->{'QEMUAOT'} eq "NA") {
             $new_func = $new_func.", ".$param_list->[$idx];
+          }
+        }
+        if ($bandmode eq "outband") {
+          $new_func = $new_func.", normal_return";
+          if ($parent_name eq "helper_cc_compute_nz") {
+            $new_func = $new_func.", exception_return";
           }
         }
         $new_func = $new_func.")";
@@ -556,12 +564,12 @@ sub gen_new_func
       } else {
         if (exists $func->{'TAIL_RETURN'}) {
           if ($is_call) {
-            my $txt = &handle_call_hit_return_expr($call, $func->{'ENTRIES'}->{$e}, \%update_param_name, $param_list, $custom_list);
+            my $txt = &handle_call_hit_return_expr($call, $func->{'ENTRIES'}->{$e}, \%update_param_name, $param_list, $custom_list, $bandmode, $parent_name);
             $new_func = $new_func.$txt;
           } else {
             if ($bandmode eq "outband") {
               $new_func = $new_func."return ";
-              $new_func = $new_func."FUNC_NORMAL_RET(";
+              $new_func = $new_func."((FUNC_NORMAL_RET)normal_return)(";
               foreach my $idx (0 .. $#{$custom_list}) {
                 my $p = $custom_list->[$idx];
                 if (exists $update_param_name{$p}) {
@@ -583,7 +591,7 @@ sub gen_new_func
         } else {
           my $txt = "";
           if ($is_call) {
-            $txt = &handle_call_hit_return_expr($call, $func->{'ENTRIES'}->{$e}, \%update_param_name, $param_list, $custom_list);
+            $txt = &handle_call_hit_return_expr($call, $func->{'ENTRIES'}->{$e}, \%update_param_name, $param_list, $custom_list, $bandmode, $parent_name);
           } else {
             $txt = &GetText($func->{'ENTRIES'}->{$e}->{'RETURN_START'}, $func->{'ENTRIES'}->{$e}->{'RETURN_STOP'}, $ARGV[0]);
           }
@@ -603,7 +611,7 @@ sub gen_new_func
 # FIXME: there could be multiple calls within one return_expr
 sub handle_call_hit_return_expr
 {
-  my ($call, $return, $update, $param_list, $custom_list) = @_;
+  my ($call, $return, $update, $param_list, $custom_list, $bandmode, $parent_name) = @_;
   my $str = "return ";
   if ($call->{'NAME_START'} != $return->{'EXPR_START'}) {
     if ($call->{'NAME_START'} < $return->{'EXPR_START'}) {
@@ -626,6 +634,12 @@ sub handle_call_hit_return_expr
   foreach my $idx (0 .. $#{$funcs{$call->{'CALL_TARGET'}}->{'PARAM_ARRAY'}}) {
     if ($funcs{$call->{'CALL_TARGET'}}->{'PARAM_ARRAY'}->[$idx]->{'QEMUAOT'} eq "NA") {
       $str = $str.", ".$param_list->[$idx];
+    }
+  }
+  if ($bandmode eq "outband") {
+    $str = $str.", normal_return";
+    if ($parent_name eq "helper_cc_compute_nz") {
+      $str = $str.", exception_return";
     }
   }
   $str = $str.")";
