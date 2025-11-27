@@ -2631,6 +2631,8 @@ void tcg_gen_rotl_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
         TCGv_i64 t1 = tcg_temp_ebb_new_i64();
         tcg_gen_shl_i64(t0, arg1, arg2);
         tcg_gen_neg_i64(t1, arg2);
+        // Unspecified behavior for negative or out-of-range shifts.
+        tcg_gen_andi_i64(t1, t1, (64-1));
         tcg_gen_shr_i64(t1, arg1, t1);
         tcg_gen_or_i64(ret, t0, t1);
         tcg_temp_free_i64(t0);
@@ -2675,6 +2677,8 @@ void tcg_gen_rotr_i64(TCGv_i64 ret, TCGv_i64 arg1, TCGv_i64 arg2)
         TCGv_i64 t1 = tcg_temp_ebb_new_i64();
         tcg_gen_shr_i64(t0, arg1, arg2);
         tcg_gen_neg_i64(t1, arg2);
+        // Unspecified behavior for negative or out-of-range shifts.
+        tcg_gen_andi_i64(t1, t1, (64-1));
         tcg_gen_shl_i64(t1, arg1, t1);
         tcg_gen_or_i64(ret, t0, t1);
         tcg_temp_free_i64(t0);

@@ -140,7 +140,7 @@ OperandType get_original_slot_for_debug(OperandType tmp) {
     if (!(tmp.s.valid && tmp.s.slot_type == SUB_SLOT_TMP)) {
         return ret;
     }
-    for (int i = 0; i < sizeof(tmpl_map)/sizeof(uint8_t); ++i) {
+    for (int i = 0; i < sizeof(tmpl_map)/sizeof(uint16_t); ++i) {
         if (tmpl_map[i] == tmp.s.slot_idx) {
             ret.s.valid = 1;
             ret.s.slot_type = SUB_SLOT_TMPL;
@@ -148,7 +148,7 @@ OperandType get_original_slot_for_debug(OperandType tmp) {
             return ret;
         }
     }
-    for (int i = 0; i < sizeof(tmpt_map)/sizeof(uint8_t); ++i) {
+    for (int i = 0; i < sizeof(tmpt_map)/sizeof(uint16_t); ++i) {
         if (tmpt_map[i] == tmp.s.slot_idx) {
             ret.s.valid = 1;
             ret.s.slot_type = SUB_SLOT_TMPT;

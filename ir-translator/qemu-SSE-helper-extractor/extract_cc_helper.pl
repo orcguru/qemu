@@ -261,6 +261,42 @@ my $qemuaot_vec_declare = "v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong y
 
 # Generate functions
 foreach my $f (keys %helpers) {
+  my @empty = ();
+  &gen_template($f, \@empty, "inband");
+  &gen_template($f, \@empty, "outband");
+  if ($f eq "helper_cc_compute_all") {
+    my @custom = ();
+    unshift @custom, "op";
+    &gen_template($f, \@custom, "inband");
+    &gen_template($f, \@custom, "outband");
+    unshift @custom, "src1";
+    &gen_template($f, \@custom, "inband");
+    &gen_template($f, \@custom, "outband");
+  }
+}
+
+sub gen_template
+{
+  my ($f, $additional_param, $bandmode) = @_;
+  my %custom_map = ();
+  foreach my $m (keys %qemuaot_gp_params_map) {
+    $custom_map{$m} = $qemuaot_gp_params_map{$m};
+  }
+  foreach my $a (@{$additional_param}) {
+    if (exists $custom_map{$a}) {
+      $custom_map{"${a}_orig"} = $custom_map{$a};
+      delete $custom_map{$a};
+    }
+  }
+  my @custom_list = ();
+  foreach my $p (@qemuaot_gp_params) {
+    if (exists $custom_map{$p}) {
+      push @custom_list, $p;
+    } else {
+      push @custom_list, "${p}_orig";
+    }
+  }
+
   # Cleanup PARAM_MAP/PARAM_ARRAY among all functions to avoid interference
   foreach my $c (keys %funcs) {
     if (exists $funcs{$c}->{'PARAM_MAP'}) {
@@ -272,7 +308,7 @@ foreach my $f (keys %helpers) {
   }
 
   # Setup QEMUAOT CC parameter map in functions
-  my ($func_name, $arguments) = &get_func_name_parts($funcs{$f}, 1);
+  my ($func_name, $arguments) = &get_func_name_parts($funcs{$f}, 1, $bandmode);
   my %param_map = ();
   my @param_array = ();
   foreach my $idx (0 .. $#{$arguments}) {
@@ -282,7 +318,14 @@ foreach my $f (keys %helpers) {
     $info{'TYPE'} = $arguments->[$idx]->{'TYPE'};
     $info{'ORIG'} = $a;
     $info{'QEMUAOT'} = "NA";
-    if (exists $qemuaot_gp_params_map{$a}) {
+    my $match_additional = 0;
+    foreach my $addi (@{$additional_param}) {
+      if ($addi eq $a) {
+        $match_additional = 1;
+        last;
+      }
+    }
+    if ($match_additional == 0 and exists $custom_map{$a}) {
       $info{'QEMUAOT'} = $a;
     }
     $param_map{$a} = \%info;
@@ -295,7 +338,7 @@ foreach my $f (keys %helpers) {
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     my $call_target = $funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'};
     if (exists $funcs{$call_target}) {
-      &check_sub_func_for_param_map($f, $call_target, $e);
+      &check_sub_func_for_param_map($f, $call_target, $e, $bandmode);
       push @sub_call_stack, $call_target;
     }
   }
@@ -308,7 +351,7 @@ foreach my $f (keys %helpers) {
       foreach my $e (keys %{$funcs{$c}->{'CALLS'}}) {
         my $call_target = $funcs{$c}->{'CALLS'}->{$e}->{'CALL_TARGET'};
         if (exists $funcs{$call_target}) {
-          &check_sub_func_for_param_map($c, $call_target, $e);
+          &check_sub_func_for_param_map($c, $call_target, $e, $bandmode);
           push @new_call_stack, $call_target;
         }
       }
@@ -316,55 +359,65 @@ foreach my $f (keys %helpers) {
     @sub_call_stack = @new_call_stack;
   }
 
-  open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
+  my $file_postfix = "";
+  if (@{$additional_param} > 0) {
+    my $additional_cnt = @{$additional_param};
+    $file_postfix = "_ADD$additional_cnt";
+  }
+  open OUT, "> $path/${f}_$bandmode${file_postfix}.c" or die "Cannot open $path/${f}_$bandmode${file_postfix}.c for write!\n";
   print OUT "$blank_info\n\n";
   print OUT "typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;\n";
-  print OUT "extern __attribute__((qemuaot)) void FUNC_NORMAL_RET(";
-  foreach my $idx (0 .. $#qemuaot_gp_params) {
-    my $p = $qemuaot_gp_params[$idx];
-    print OUT "$qemuaot_gp_params_map{$p} $p, ";
+  if ($bandmode eq "outband") {
+    print OUT "extern __attribute__((qemuaot)) void FUNC_NORMAL_RET(";
+    foreach my $idx (0 .. $#qemuaot_gp_params) {
+      my $p = $custom_list[$idx];
+      print OUT "$custom_map{$p} $p, ";
+    }
+    if ($helpers{$f}) {
+      print OUT "$qemuaot_vec_declare, unsigned long ret_val);\n";
+    } else {
+      print OUT "$qemuaot_vec_declare);\n";
+    }
+    print OUT "extern __attribute__((qemuaot,noreturn)) void FUNC_EXCEPTION_RET(";
+    foreach my $idx (0 .. $#custom_list) {
+      my $p = $custom_list[$idx];
+      print OUT "$custom_map{$p} $p, ";
+    }
+    print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
+    print OUT "extern __attribute__((qemuaot)) void FUNC_SECONDARY(";
+    foreach my $idx (0 .. $#custom_list) {
+      my $p = $custom_list[$idx];
+      print OUT "$custom_map{$p} $p, ";
+    }
+    if ($helpers{$f}) {
+      print OUT "$qemuaot_vec_declare, unsigned long ret_val);\n";
+    } else {
+      print OUT "$qemuaot_vec_declare);\n";
+    }
+    my $extern_func = &GetText($funcs{$f}->{'FULL_START'}, $funcs{$f}->{'NAME_STOP'}, $ARGV[0]);
+    print OUT "extern $extern_func;\n\n";
   }
-  if ($helpers{$f}) {
-    print OUT "$qemuaot_vec_declare, unsigned long ret_val);\n";
-  } else {
-    print OUT "$qemuaot_vec_declare);\n";
-  }
-  print OUT "extern __attribute__((qemuaot,noreturn)) void FUNC_EXCEPTION_RET(";
-  foreach my $idx (0 .. $#qemuaot_gp_params) {
-    my $p = $qemuaot_gp_params[$idx];
-    print OUT "$qemuaot_gp_params_map{$p} $p, ";
-  }
-  print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
-  print OUT "extern __attribute__((qemuaot)) void FUNC_SECONDARY(";
-  foreach my $idx (0 .. $#qemuaot_gp_params) {
-    my $p = $qemuaot_gp_params[$idx];
-    print OUT "$qemuaot_gp_params_map{$p} $p, ";
-  }
-  if ($helpers{$f}) {
-    print OUT "$qemuaot_vec_declare, unsigned long ret_val);\n";
-  } else {
-    print OUT "$qemuaot_vec_declare);\n";
-  }
-  my $extern_func = &GetText($funcs{$f}->{'FULL_START'}, $funcs{$f}->{'NAME_STOP'}, $ARGV[0]);
-  print OUT "extern $extern_func;\n\n";
   my %covered_sub_funcs = ();
   foreach my $s (@{$sub_funcs{$f}}) {
     if (not exists $covered_sub_funcs{$s}) {
       $covered_sub_funcs{$s} = 1;
       if (exists $funcs{$s}) {
-        my $new_func = &gen_new_func($funcs{$s}, 0, $f);
+        my $new_func = &gen_new_func($funcs{$s}, 0, $f, \%custom_map, \@custom_list, $bandmode);
         print OUT "$new_func\n\n";
       }
     }
   }
-  my $new_func = &gen_new_func($funcs{$f}, 1, $f);
+  my $new_func = &gen_new_func($funcs{$f}, 1, $f, \%custom_map, \@custom_list, $bandmode);
   print OUT "$new_func\n\n";
   close OUT;
+  if ($bandmode eq "inband") {
+    `cp $path/${f}_$bandmode${file_postfix}.c $path/${f}${file_postfix}.c`;
+  }
 }
 
 sub check_sub_func_for_param_map
 {
-  my ($parent, $child, $call) = @_;
+  my ($parent, $child, $call, $bandmode) = @_;
   my $param_list = &get_call_param_list($funcs{$parent}->{'CALLS'}->{$call}->{'PAREN_START'}, $funcs{$parent}->{'CALLS'}->{$call}->{'PAREN_STOP'});
   foreach my $idx (0 .. $#{$param_list}) {
     if (not exists $funcs{$parent}->{'PARAM_MAP'}->{$param_list->[$idx]}) {
@@ -380,7 +433,7 @@ sub check_sub_func_for_param_map
       }
     }
   } else {
-    my ($func_name, $arguments) = &get_func_name_parts($funcs{$child}, 0);
+    my ($func_name, $arguments) = &get_func_name_parts($funcs{$child}, 0, $bandmode);
     my %param_map = ();
     my @param_array = ();
     foreach my $idx (0 .. $#{$arguments}) {
@@ -401,7 +454,7 @@ sub check_sub_func_for_param_map
 # Handle function update for QEMUAOT calling convention
 sub gen_new_func
 {
-  my ($func, $external, $exception_exit) = @_;
+  my ($func, $external, $exception_exit, $custom_map, $custom_list, $bandmode) = @_;
   my $new_func = "";
   my %update_param_name = ();
   foreach my $k (keys %{$func->{'PARAM_MAP'}}) {
@@ -409,15 +462,15 @@ sub gen_new_func
       $update_param_name{$func->{'PARAM_MAP'}->{$k}->{'QEMUAOT'}} = $func->{'PARAM_MAP'}->{$k}->{'ORIG'};
     }
   }
-  my ($func_name, $arguments) = &get_func_name_parts($func, $external);
+  my ($func_name, $arguments) = &get_func_name_parts($func, $external, $bandmode);
   if ($external) {
     $new_func = "__attribute__((qemuaot,always_inline)) ".$func_name."(";
   } else {
     $new_func = "__attribute__((qemuaot)) ".$func_name."(";
   }
-  foreach my $idx (0 .. $#qemuaot_gp_params) {
-    my $p = $qemuaot_gp_params[$idx];
-    $new_func = $new_func.$qemuaot_gp_params_map{$p};
+  foreach my $idx (0 .. $#{$custom_list}) {
+    my $p = $custom_list->[$idx];
+    $new_func = $new_func.$custom_map->{$p};
     if (exists $update_param_name{$p}) {
       $new_func = $new_func." ".$update_param_name{$p};
     } else {
@@ -442,22 +495,24 @@ sub gen_new_func
     if ($func->{'ENTRIES'}->{$e}->{'TYPE'} eq "CALL") {
       my $call_target = $func->{'ENTRIES'}->{$e}->{'CALL_TARGET'};
       if ((not exists $funcs{$call_target}) and (not $call_target =~ /builtin/)) {
-        # Not able to handle, redirect to runtime
-        $new_func = $new_func."FUNC_EXCEPTION_RET(";
-        foreach my $idx (0 .. $#qemuaot_gp_params) {
-          my $p = $qemuaot_gp_params[$idx];
-          if (exists $update_param_name{$p}) {
-            $new_func = $new_func.$update_param_name{$p};
-          } else {
-            $new_func = $new_func.$p;
+        if ($bandmode eq "outband") {
+          # Not able to handle, redirect to runtime
+          $new_func = $new_func."FUNC_EXCEPTION_RET(";
+          foreach my $idx (0 .. $#{$custom_list}) {
+            my $p = $custom_list->[$idx];
+            if (exists $update_param_name{$p}) {
+              $new_func = $new_func.$update_param_name{$p};
+            } else {
+              $new_func = $new_func.$p;
+            }
+            $new_func = $new_func.", ";
           }
-          $new_func = $new_func.", ";
+          $new_func = $new_func.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)FUNC_SECONDARY)";
         }
-        $new_func = $new_func.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)FUNC_SECONDARY)";
       } else {
         $new_func = $new_func.$call_target."(";
-        foreach my $idx (0 .. $#qemuaot_gp_params) {
-          my $p = $qemuaot_gp_params[$idx];
+        foreach my $idx (0 .. $#{$custom_list}) {
+          my $p = $custom_list->[$idx];
           if (exists $update_param_name{$p}) {
             $new_func = $new_func.$update_param_name{$p};
           } else {
@@ -501,29 +556,34 @@ sub gen_new_func
       } else {
         if (exists $func->{'TAIL_RETURN'}) {
           if ($is_call) {
-            my $txt = &handle_call_hit_return_expr($call, $func->{'ENTRIES'}->{$e}, \%update_param_name, $param_list);
+            my $txt = &handle_call_hit_return_expr($call, $func->{'ENTRIES'}->{$e}, \%update_param_name, $param_list, $custom_list);
             $new_func = $new_func.$txt;
           } else {
-            $new_func = $new_func."return ";
-            $new_func = $new_func."FUNC_NORMAL_RET(";
-            foreach my $idx (0 .. $#qemuaot_gp_params) {
-              my $p = $qemuaot_gp_params[$idx];
-              if (exists $update_param_name{$p}) {
-                $new_func = $new_func.$update_param_name{$p};
-              } else {
-                $new_func = $new_func.$p;
+            if ($bandmode eq "outband") {
+              $new_func = $new_func."return ";
+              $new_func = $new_func."FUNC_NORMAL_RET(";
+              foreach my $idx (0 .. $#{$custom_list}) {
+                my $p = $custom_list->[$idx];
+                if (exists $update_param_name{$p}) {
+                  $new_func = $new_func.$update_param_name{$p};
+                } else {
+                  $new_func = $new_func.$p;
+                }
+                $new_func = $new_func.", ";
               }
-              $new_func = $new_func.", ";
+              $new_func = $new_func.$qemuaot_vec_invoke;
+              my $txt = &GetText($func->{'ENTRIES'}->{$e}->{'EXPR_START'}, $func->{'ENTRIES'}->{$e}->{'EXPR_STOP'}, $ARGV[0]);
+              $new_func = $new_func.", (unsigned long)(".$txt.")";
+              $new_func = $new_func.");";
+            } else {
+              my $txt = &GetText($func->{'ENTRIES'}->{$e}->{'RETURN_START'}, $func->{'ENTRIES'}->{$e}->{'RETURN_STOP'}, $ARGV[0]);
+              $new_func = $new_func.$txt;
             }
-            $new_func = $new_func.$qemuaot_vec_invoke;
-            my $txt = &GetText($func->{'ENTRIES'}->{$e}->{'EXPR_START'}, $func->{'ENTRIES'}->{$e}->{'EXPR_STOP'}, $ARGV[0]);
-            $new_func = $new_func.", (unsigned long)(".$txt.")";
-            $new_func = $new_func.");";
           }
         } else {
           my $txt = "";
           if ($is_call) {
-            $txt = &handle_call_hit_return_expr($call, $func->{'ENTRIES'}->{$e}, \%update_param_name, $param_list);
+            $txt = &handle_call_hit_return_expr($call, $func->{'ENTRIES'}->{$e}, \%update_param_name, $param_list, $custom_list);
           } else {
             $txt = &GetText($func->{'ENTRIES'}->{$e}->{'RETURN_START'}, $func->{'ENTRIES'}->{$e}->{'RETURN_STOP'}, $ARGV[0]);
           }
@@ -543,7 +603,7 @@ sub gen_new_func
 # FIXME: there could be multiple calls within one return_expr
 sub handle_call_hit_return_expr
 {
-  my ($call, $return, $update, $param_list) = @_;
+  my ($call, $return, $update, $param_list, $custom_list) = @_;
   my $str = "return ";
   if ($call->{'NAME_START'} != $return->{'EXPR_START'}) {
     if ($call->{'NAME_START'} < $return->{'EXPR_START'}) {
@@ -553,8 +613,8 @@ sub handle_call_hit_return_expr
     $str = $str.$sub;
   }
   $str = $str.$call->{'CALL_TARGET'}."(";
-  foreach my $idx (0 .. $#qemuaot_gp_params) {
-    my $p = $qemuaot_gp_params[$idx];
+  foreach my $idx (0 .. $#{$custom_list}) {
+    my $p = $custom_list->[$idx];
     if (exists $update->{$p}) {
       $str = $str.$update->{$p};
     } else {
@@ -597,15 +657,28 @@ sub get_call_param_list
 
 sub get_func_name_parts
 {
-  my ($func, $external) = @_;
+  my ($func, $external, $bandmode) = @_;
   my $str = "";
   if (exists $func->{'TAIL_RETURN'}) {
-    $str = &GetText($func->{'NAME_START'}, $func->{'NAME_STOP'}, $ARGV[0]);
-    if ($external) {
-      $str =~ s/^$func->{'FUNC_NAME'}/HELPER_NAME/;
-      $str = "void ".$str;
+    if ($bandmode eq "outband") {
+      $str = &GetText($func->{'NAME_START'}, $func->{'NAME_STOP'}, $ARGV[0]);
+      if ($external) {
+        $str =~ s/^$func->{'FUNC_NAME'}/HELPER_NAME/;
+        $str = "void ".$str;
+      } else {
+        $str = "static __attribute__((always_inline)) void ".$str;
+      }
     } else {
-      $str = "static __attribute__((always_inline)) void ".$str;
+      $str = &GetText($func->{'FULL_START'}, $func->{'NAME_STOP'}, $ARGV[0]);
+      if ($external) {
+        $str =~ s/$func->{'FUNC_NAME'}/HELPER_NAME/;
+      } else {
+        if ($str =~ /static/) {
+          $str = "__attribute__((always_inline)) ".$str;
+        } else {
+          $str = "static __attribute__((always_inline)) ".$str;
+        }
+      }
     }
   } else {
     $str = &GetText($func->{'FULL_START'}, $func->{'NAME_STOP'}, $ARGV[0]);

@@ -262,6 +262,12 @@ typedef enum {
     X(helper_cc_compute_all) \
     X(helper_cc_compute_c) \
     X(helper_cc_compute_nz) \
+    X(helper_cc_compute_all_inband) \
+    X(helper_cc_compute_c_inband) \
+    X(helper_cc_compute_nz_inband) \
+    X(helper_cc_compute_all_outband) \
+    X(helper_cc_compute_c_outband) \
+    X(helper_cc_compute_nz_outband) \
     X(helper_clrsb_i32) \
     X(helper_clrsb_i64) \
     X(helper_clts) \
