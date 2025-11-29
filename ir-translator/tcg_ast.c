@@ -2666,6 +2666,7 @@ static void translate_cc_compute_inband(OpCodeType opc, void *ptr) {
         char build_macro[4096] = {0};
         char bc_name[256] = {0};
         char element[256] = {0};
+        sprintf(build_macro, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\"", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
         sprintf(element, " -DHELPER_NAME=%s_func_%lx_call%d", helper_str[h], current_func_offset, call_idx);
         strcat(build_macro, element);
         sprintf(bc_name, "helper_templates/%s_func_%lx_call%d.bc", helper_str[h], current_func_offset, call_idx);
@@ -2797,6 +2798,7 @@ static void translate_cc_compute_outband(OpCodeType opc, void *ptr) {
     char helper_func_name[512] = {0};
     char bc_name[512] = {0};
     char element[512] = {0};
+    sprintf(build_macro, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\"", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
     sprintf(element, " -DHELPER_NAME=%s", helper_str[h]);
     strcat(build_macro, element);
     sprintf(bc_name, "helper_templates/%s.bc", helper_str[h]);
