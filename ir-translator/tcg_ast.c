@@ -2655,7 +2655,6 @@ static void translate_cc_compute_inband(OpCodeType opc, void *ptr) {
     }
 
     char helper_func_name[256] = {0};
-    uint8_t call_idx = get_idx_for_call_helper(ptr);
     sprintf(helper_func_name, "%s_inband", helper_str[h]);
     LLVMValueRef helper = LLVMGetNamedFunction(module, helper_func_name);
     if (!helper) {
