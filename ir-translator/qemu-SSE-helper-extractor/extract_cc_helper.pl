@@ -10,10 +10,15 @@ if ($#ARGV < 1) {
   exit 1;
 }
 # Value: does helper have return value or not
-my %helpers = (
+my %helpers_ret = (
   "helper_cc_compute_all" => 1,
   "helper_cc_compute_c" => 1,
   "helper_cc_compute_nz" => 1,
+);
+my %helpers_bandmode = (
+  "helper_cc_compute_all" => "inband",
+  "helper_cc_compute_c" => "inband",
+  "helper_cc_compute_nz" => "outband",
 );
 my $path = "$ARGV[0].helper_cc";
 `rm -rf $path`;
@@ -164,7 +169,7 @@ $blank_info = $blank_info."\n".$txt;
 # Collect information, and recursively mark function as final return
 my %sub_funcs = ();
 my %defined_funcs_total = ();
-foreach my $f (keys %helpers) {
+foreach my $f (keys %helpers_ret) {
   my @sf = ();
   $sub_funcs{$f} = \@sf;
   my @sub_call_stack = ();
@@ -260,18 +265,15 @@ my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
 my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
 
 # Generate functions
-foreach my $f (keys %helpers) {
+foreach my $f (keys %helpers_bandmode) {
   my @empty = ();
-  &gen_template($f, \@empty, "inband");
-  &gen_template($f, \@empty, "outband");
+  &gen_template($f, \@empty, $helpers_bandmode{$f});
   if ($f eq "helper_cc_compute_all") {
     my @custom = ();
     unshift @custom, "op";
-    &gen_template($f, \@custom, "inband");
-    &gen_template($f, \@custom, "outband");
+    &gen_template($f, \@custom, $helpers_bandmode{$f});
     unshift @custom, "src1";
-    &gen_template($f, \@custom, "inband");
-    &gen_template($f, \@custom, "outband");
+    &gen_template($f, \@custom, $helpers_bandmode{$f});
   }
 }
 
@@ -364,7 +366,7 @@ sub gen_template
     my $additional_cnt = @{$additional_param};
     $file_postfix = "_ADD$additional_cnt";
   }
-  open OUT, "> $path/${f}_$bandmode${file_postfix}.c" or die "Cannot open $path/${f}_$bandmode${file_postfix}.c for write!\n";
+  open OUT, "> $path/${f}${file_postfix}.c" or die "Cannot open $path/${f}${file_postfix}.c for write!\n";
   print OUT "$blank_info\n\n";
   print OUT "typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;\n";
   if ($bandmode eq "outband") {
@@ -373,7 +375,7 @@ sub gen_template
       my $p = $custom_list[$idx];
       print OUT "$custom_map{$p} $p, ";
     }
-    if ($helpers{$f}) {
+    if ($helpers_ret{$f}) {
       print OUT "$qemuaot_vec_declare, unsigned long ret_val);\n";
     } else {
       print OUT "$qemuaot_vec_declare);\n";
@@ -402,9 +404,6 @@ sub gen_template
   my $new_func = &gen_new_func($funcs{$f}, 1, $f, \%custom_map, \@custom_list, $bandmode, $f);
   print OUT "$new_func\n\n";
   close OUT;
-  if ($bandmode eq "inband") {
-    `cp $path/${f}_$bandmode${file_postfix}.c $path/${f}${file_postfix}.c`;
-  }
 }
 
 sub check_sub_func_for_param_map
@@ -457,7 +456,7 @@ sub gen_new_func
   my ($func_name, $arguments) = &get_func_name_parts($func, $external, $bandmode);
   if ($external) {
     if ($bandmode eq "outband") {
-      $new_func = "__attribute__((qemuaot,noinline,weak)) ".$func_name."(";
+      $new_func = "__attribute__((qemuaot,always_inline,weak)) ".$func_name."(";
     } else {
       $new_func = "__attribute__((qemuaot,always_inline)) ".$func_name."(";
     }

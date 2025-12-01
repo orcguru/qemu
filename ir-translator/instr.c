@@ -1824,15 +1824,6 @@ LLVMType helper_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_cc_compute_all_ADD1] = {LLVMInt64, LLVMInt32},
     [helper_cc_compute_all_ADD2] = {LLVMInt64, LLVMInt64, LLVMInt32},
     [helper_cc_compute_c] = {LLVMInt64},
-    [helper_cc_compute_all_inband] = {LLVMInt64},
-    [helper_cc_compute_all_inband_ADD1] = {LLVMInt64, LLVMInt32},
-    [helper_cc_compute_all_inband_ADD2] = {LLVMInt64, LLVMInt64, LLVMInt32},
-    [helper_cc_compute_c_inband] = {LLVMInt64},
-    [helper_cc_compute_all_outband] = {LLVMInt64, LLVMInt64},
-    [helper_cc_compute_all_outband_ADD1] = {LLVMInt64, LLVMInt32, LLVMInt64},
-    [helper_cc_compute_all_outband_ADD2] = {LLVMInt64, LLVMInt64, LLVMInt32, LLVMInt64},
-    [helper_cc_compute_c_outband] = {LLVMInt64, LLVMInt64},
-    [helper_cc_compute_nz_outband] = {LLVMInt64, LLVMInt64},
     [helper_maskmov_xmm] = {LLVMInt64},
     [helper_shufps_xmm] = {LLVMInt32},
     [helper_shufpd_xmm] = {LLVMInt32},
@@ -1881,20 +1872,14 @@ LLVMType helper_return_type[HELPER_MAX] = {
     [helper_cc_compute_all_ADD2] = LLVMInt64,
     [helper_cc_compute_c] = LLVMInt64,
     [helper_cc_compute_nz] = LLVMInt64,
-    [helper_cc_compute_all_inband] = LLVMInt64,
-    [helper_cc_compute_all_inband_ADD1] = LLVMInt64,
-    [helper_cc_compute_all_inband_ADD2] = LLVMInt64,
-    [helper_cc_compute_c_inband] = LLVMInt64,
-    [helper_cc_compute_nz_inband] = LLVMInt64,
-    [helper_cc_compute_all_outband] = LLVMInt64,
-    [helper_cc_compute_all_outband_ADD1] = LLVMInt64,
-    [helper_cc_compute_all_outband_ADD2] = LLVMInt64,
-    [helper_cc_compute_c_outband] = LLVMInt64,
-    [helper_cc_compute_nz_outband] = LLVMInt64,
     [helper_movmskps_xmm] = LLVMInt32,
     [helper_movmskpd_xmm] = LLVMInt32,
     [helper_movmskps_ymm] = LLVMInt32,
     [helper_movmskpd_ymm] = LLVMInt32,
+};
+
+int helper_require_exception_path[HELPER_MAX] = {
+    [helper_cc_compute_nz] = 1,
 };
 
 // Information collected from extract_xmm_helper.pl

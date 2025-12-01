@@ -309,6 +309,7 @@ extern const char *ymm_str[NON_XMM];
 #define MAX_ADDED_ARGS              5
 extern LLVMType helper_arg_type[HELPER_MAX][MAX_ADDED_ARGS];
 extern LLVMType helper_return_type[HELPER_MAX];
+extern int helper_require_exception_path[HELPER_MAX];
 
 static LLVMAttributeRef target_features_attr = NULL;
 static LLVMAttributeRef NoInlineAttr = NULL;
@@ -471,8 +472,7 @@ static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr) {
         return 1;
     } else if (opc == call) {
         HelperType h = get_helper(ptr);
-        if (h == helper_cc_compute_all || h == helper_cc_compute_c || h == helper_cc_compute_nz ||
-            h == helper_cc_compute_all_inband || h == helper_cc_compute_c_inband || h == helper_cc_compute_nz_inband) {
+        if (h == helper_cc_compute_all || h == helper_cc_compute_c) {
             return 0;
         } else {
             return 1;
@@ -2618,21 +2618,17 @@ static void translate_cc_compute_inband(OpCodeType opc, void *ptr) {
             assert(initial_imm_idx == -1);
         }
     }
-    assert((h != helper_cc_compute_c && h != helper_cc_compute_c_inband) || (!is_imm[0] && !is_imm[1] && !is_imm[2] && !is_imm[3] &&
+    assert(h != helper_cc_compute_c || (!is_imm[0] && !is_imm[1] && !is_imm[2] && !is_imm[3] &&
            operands[0].s.valid && operands[0].s.slot_type == SUB_SLOT_XREG && operands[0].s.slot_idx == cc_dst &&
            operands[1].s.valid && operands[1].s.slot_type == SUB_SLOT_XREG && operands[1].s.slot_idx == cc_src &&
            operands[2].s.valid && operands[2].s.slot_type == SUB_SLOT_ENVVAR && operands[2].s.slot_idx == cc_src2 &&
            operands[3].s.valid && operands[3].s.slot_type == SUB_SLOT_XREG && operands[3].s.slot_idx == cc_op));
-    assert((h != helper_cc_compute_nz && h != helper_cc_compute_nz_inband) || (!is_imm[0] && !is_imm[1] && !is_imm[2] &&
-           operands[0].s.valid && operands[0].s.slot_type == SUB_SLOT_XREG && operands[0].s.slot_idx == cc_dst &&
-           operands[1].s.valid && operands[1].s.slot_type == SUB_SLOT_XREG && operands[1].s.slot_idx == cc_src &&
-           operands[2].s.valid && operands[2].s.slot_type == SUB_SLOT_XREG && operands[2].s.slot_idx == cc_op));
     int op_cnt = 0;
-    if (h == helper_cc_compute_c || h == helper_cc_compute_c_inband) {
+    if (h == helper_cc_compute_c) {
         operands[0] = operands[2];
         is_imm[0] = is_imm[2];
         op_cnt = 1;
-    } else if (h == helper_cc_compute_all || h == helper_cc_compute_all_inband) {
+    } else if (h == helper_cc_compute_all) {
         if (imm_cnt == 0) {
             operands[0] = operands[2];
             is_imm[0] = is_imm[2];
@@ -2660,16 +2656,16 @@ static void translate_cc_compute_inband(OpCodeType opc, void *ptr) {
 
     char helper_func_name[256] = {0};
     uint8_t call_idx = get_idx_for_call_helper(ptr);
-    sprintf(helper_func_name, "%s_func_%lx_call%d", helper_str[h], current_func_offset, call_idx);
+    sprintf(helper_func_name, "%s_inband", helper_str[h]);
     LLVMValueRef helper = LLVMGetNamedFunction(module, helper_func_name);
     if (!helper) {
         char build_macro[4096] = {0};
         char bc_name[256] = {0};
         char element[256] = {0};
         sprintf(build_macro, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\"", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
-        sprintf(element, " -DHELPER_NAME=%s_func_%lx_call%d", helper_str[h], current_func_offset, call_idx);
+        sprintf(element, " -DHELPER_NAME=%s_inband", helper_str[h]);
         strcat(build_macro, element);
-        sprintf(bc_name, "helper_templates/%s_func_%lx_call%d.bc", helper_str[h], current_func_offset, call_idx);
+        sprintf(bc_name, "helper_templates/%s.bc", helper_str[h]);
         assert(strlen(build_macro) < sizeof(build_macro));
         uint8_t do_inline_helper = do_link_helper(h, build_macro, bc_name, helper_str[h]);
         assert(do_inline_helper);
@@ -2748,61 +2744,22 @@ static void translate_cc_compute_outband(OpCodeType opc, void *ptr) {
         runtime_operands[i] = operands[i];
         runtime_is_imm[i] = is_imm[i];
     }
-    assert(h != helper_cc_compute_all_outband || initial_imm_idx != -1 || (!is_imm[0] && !is_imm[1] && !is_imm[2] && !is_imm[3] &&
+    assert(!is_imm[0] && !is_imm[1] && !is_imm[2] &&
            operands[0].s.valid && operands[0].s.slot_type == SUB_SLOT_XREG && operands[0].s.slot_idx == cc_dst &&
            operands[1].s.valid && operands[1].s.slot_type == SUB_SLOT_XREG && operands[1].s.slot_idx == cc_src &&
-           operands[2].s.valid && operands[2].s.slot_type == SUB_SLOT_ENVVAR && operands[2].s.slot_idx == cc_src2 &&
-           operands[3].s.valid && operands[3].s.slot_type == SUB_SLOT_XREG && operands[3].s.slot_idx == cc_op));
-    assert(h != helper_cc_compute_c_outband || (!is_imm[0] && !is_imm[1] && !is_imm[2] && !is_imm[3] &&
-           operands[0].s.valid && operands[0].s.slot_type == SUB_SLOT_XREG && operands[0].s.slot_idx == cc_dst &&
-           operands[1].s.valid && operands[1].s.slot_type == SUB_SLOT_XREG && operands[1].s.slot_idx == cc_src &&
-           operands[2].s.valid && operands[2].s.slot_type == SUB_SLOT_ENVVAR && operands[2].s.slot_idx == cc_src2 &&
-           operands[3].s.valid && operands[3].s.slot_type == SUB_SLOT_XREG && operands[3].s.slot_idx == cc_op));
-    assert(h != helper_cc_compute_nz_outband || (!is_imm[0] && !is_imm[1] && !is_imm[2] &&
-           operands[0].s.valid && operands[0].s.slot_type == SUB_SLOT_XREG && operands[0].s.slot_idx == cc_dst &&
-           operands[1].s.valid && operands[1].s.slot_type == SUB_SLOT_XREG && operands[1].s.slot_idx == cc_src &&
-           operands[2].s.valid && operands[2].s.slot_type == SUB_SLOT_XREG && operands[2].s.slot_idx == cc_op));
+           operands[2].s.valid && operands[2].s.slot_type == SUB_SLOT_XREG && operands[2].s.slot_idx == cc_op);
     int op_cnt = 0;
-    int runtime_op_cnt = (h == helper_cc_compute_nz_outband) ? 3 : 4;
-    if (h == helper_cc_compute_c_outband) {
-        operands[0] = operands[2];
-        is_imm[0] = is_imm[2];
-        op_cnt = 1;
-    } else if (h == helper_cc_compute_all_outband) {
-        if (imm_cnt == 0) {
-            operands[0] = operands[2];
-            is_imm[0] = is_imm[2];
-            op_cnt = 1;
-        } else if (imm_cnt == 1 || imm_cnt == 2) {
-            operands[0] = operands[2];
-            is_imm[0] = is_imm[2];
-            operands[1] = operands[3];
-            is_imm[1] = is_imm[3];
-            op_cnt = 2;
-            h += 1;
-        } else if (imm_cnt == 3) {
-            operands[0] = operands[1];
-            is_imm[0] = is_imm[1];
-            operands[1] = operands[2];
-            is_imm[1] = is_imm[2];
-            operands[2] = operands[3];
-            is_imm[2] = is_imm[3];
-            op_cnt = 3;
-            h += 2;
-        } else {
-            assert(0);
-        }
-    }
+    int runtime_op_cnt = 3;
 
     char build_macro[4096] = {0};
     char helper_func_name[512] = {0};
     char bc_name[512] = {0};
     char element[512] = {0};
     sprintf(build_macro, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\"", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
-    sprintf(element, " -DHELPER_NAME=%s", helper_str[h]);
+    sprintf(element, " -DHELPER_NAME=%s_outband", helper_str[h]);
     strcat(build_macro, element);
     sprintf(bc_name, "helper_templates/%s.bc", helper_str[h]);
-    sprintf(helper_func_name, "%s", helper_str[h]);
+    sprintf(helper_func_name, "%s_outband", helper_str[h]);
     assert(strlen(build_macro) < sizeof(build_macro));
 
     // Get the second half
@@ -2828,10 +2785,10 @@ static void translate_cc_compute_outband(OpCodeType opc, void *ptr) {
 
     // Generate exception handler to fallback to QEMU runtime
     // Get the helper
-    LLVMValueRef helper_func = LLVMGetNamedFunction(module, helper_str[h - (helper_cc_compute_all_outband - helper_cc_compute_all)]);
+    LLVMValueRef helper_func = LLVMGetNamedFunction(module, helper_str[h]);
     if (!helper_func) {
         LLVMTypeRef helper_type = LLVMFunctionType(LLVMInt64Type(), app_arg_types_to_default_cc, runtime_op_cnt, 0);
-        helper_func = LLVMAddFunction(module, helper_str[h - (helper_cc_compute_all_outband - helper_cc_compute_all)], helper_type);
+        helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
     }
     // FIXME: trampoline should do stack adjustment to offset the stack space reserved during inlined helper call
     // Trampoline handles register-context switch
@@ -2845,11 +2802,9 @@ static void translate_cc_compute_outband(OpCodeType opc, void *ptr) {
     // FIXME: why split logic between collect_arguments_and_types and some random code?
     app_arg_types_to_qemuaot_cc[call_arg_cnts - FIXED_VECTOR_PARAM_COUNT] = llvm_int_types[LLVMInt64];
     call_args[call_arg_cnts++] = second_half_addr;
-    if (h == helper_cc_compute_nz_outband) {
-        LLVMValueRef trampoline_addr = LLVMBuildPtrToInt(builder, trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-        app_arg_types_to_qemuaot_cc[call_arg_cnts - FIXED_VECTOR_PARAM_COUNT] = llvm_int_types[LLVMInt64];
-        call_args[call_arg_cnts++] = trampoline_addr;
-    }
+    LLVMValueRef trampoline_addr = LLVMBuildPtrToInt(builder, trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    app_arg_types_to_qemuaot_cc[call_arg_cnts - FIXED_VECTOR_PARAM_COUNT] = llvm_int_types[LLVMInt64];
+    call_args[call_arg_cnts++] = trampoline_addr;
     assert(call_arg_cnts <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
     LLVMValueRef helper = LLVMGetNamedFunction(module, helper_func_name);
     assert(helper);
@@ -3015,11 +2970,12 @@ void translate_call(OpCodeType opc, void *ptr) {
     HelperType h = get_helper(ptr);
     if (h == helper_jmp_ind) {
         return translate_short_circuit_jmp_ind(opc, ptr);
-    } else if (h == helper_cc_compute_all || h == helper_cc_compute_c || h == helper_cc_compute_nz ||
-               h == helper_cc_compute_all_inband || h == helper_cc_compute_c_inband || h == helper_cc_compute_nz_inband) {
-        return translate_cc_compute_inband(opc, ptr);
-    } else if (h == helper_cc_compute_all_outband || h == helper_cc_compute_c_outband || h == helper_cc_compute_nz_outband) {
-        return translate_cc_compute_outband(opc, ptr);
+    } else if (h == helper_cc_compute_all || h == helper_cc_compute_c || h == helper_cc_compute_nz) {
+        if (helper_require_exception_path[h]) {
+            return translate_cc_compute_outband(opc, ptr);
+        } else {
+            return translate_cc_compute_inband(opc, ptr);
+        }
     }
 #ifdef DEBUG
     printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
@@ -4520,12 +4476,12 @@ void module_epilog() {
         exit(1);
     }
 
-    // Remove helper_cc_compute_*_inband_*, helper_*_xmm_*
+    // Remove helper_cc_compute_*, helper_*_xmm_*
     LLVMValueRef currentFunction = LLVMGetFirstFunction(module);
     while (currentFunction != NULL) {
         const char* funcName = LLVMGetValueName(currentFunction);
         LLVMValueRef deleteCandidate = NULL;
-        if (strstr(funcName, "_inband_") || (strstr(funcName, "helper_") && strstr(funcName, "_xmm_"))) {
+        if (strstr(funcName, "helper_") && (strstr(funcName, "_xmm_") || strstr(funcName, "_inband") || strstr(funcName, "_outband"))) {
             deleteCandidate = currentFunction;
         }
         currentFunction = LLVMGetNextFunction(currentFunction);

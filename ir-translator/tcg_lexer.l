@@ -331,12 +331,6 @@ call                            call
 cc_compute_all                  cc_compute_all
 cc_compute_c                    cc_compute_c
 cc_compute_nz                   cc_compute_nz
-cc_compute_all_inband           cc_compute_all_inband
-cc_compute_c_inband             cc_compute_c_inband
-cc_compute_nz_inband            cc_compute_nz_inband
-cc_compute_all_outband          cc_compute_all_outband
-cc_compute_c_outband            cc_compute_c_outband
-cc_compute_nz_outband           cc_compute_nz_outband
 clrsb_i32                       clrsb_i32
 clrsb_i64                       clrsb_i64
 clts                            clts
@@ -1798,12 +1792,6 @@ xsetbv                          xsetbv
 {cc_compute_all}                { HANDLE_COLUMN; yylval->oh.h = helper_cc_compute_all; return SYMBOL; }
 {cc_compute_c}                  { HANDLE_COLUMN; yylval->oh.h = helper_cc_compute_c; return SYMBOL; }
 {cc_compute_nz}                 { HANDLE_COLUMN; yylval->oh.h = helper_cc_compute_nz; return SYMBOL; }
-{cc_compute_all_inband}         { HANDLE_COLUMN; yylval->oh.h = helper_cc_compute_all_inband; return SYMBOL; }
-{cc_compute_c_inband}           { HANDLE_COLUMN; yylval->oh.h = helper_cc_compute_c_inband; return SYMBOL; }
-{cc_compute_nz_inband}          { HANDLE_COLUMN; yylval->oh.h = helper_cc_compute_nz_inband; return SYMBOL; }
-{cc_compute_all_outband}        { HANDLE_COLUMN; yylval->oh.h = helper_cc_compute_all_outband; return SYMBOL; }
-{cc_compute_c_outband}          { HANDLE_COLUMN; yylval->oh.h = helper_cc_compute_c_outband; return SYMBOL; }
-{cc_compute_nz_outband}         { HANDLE_COLUMN; yylval->oh.h = helper_cc_compute_nz_outband; return SYMBOL; }
 {clrsb_i32}                     { HANDLE_COLUMN; yylval->oh.h = helper_clrsb_i32; return SYMBOL; }
 {clrsb_i64}                     { HANDLE_COLUMN; yylval->oh.h = helper_clrsb_i64; return SYMBOL; }
 {clts}                          { HANDLE_COLUMN; yylval->oh.h = helper_clts; return SYMBOL; }
