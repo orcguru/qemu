@@ -52,7 +52,13 @@ unqualifiedId:
         | Override
         | Virtual
         | AndAnd
-        | OrOr;
+        | OrOr
+        | Env
+        | VecQ
+        | VecL
+        | VecW
+        | VecB
+        ;
 
 qualifiedId: nestedNameSpecifier Template? unqualifiedId;
 

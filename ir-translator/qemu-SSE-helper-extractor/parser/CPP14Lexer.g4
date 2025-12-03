@@ -217,6 +217,17 @@ Volatile: 'volatile' | '__volatile__';
 Wchar: 'wchar_t';
 
 While: 'while';
+
+Env: 'env';
+
+VecQ: '_q_ZMMReg';
+
+VecL: '_l_ZMMReg';
+
+VecW: '_w_ZMMReg';
+
+VecB: '_b_ZMMReg';
+
 /*Operators*/
 
 LeftParen: '(';
