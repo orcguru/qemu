@@ -51,13 +51,239 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterUnqualifiedId(CPP14Parser.UnqualifiedIdContext ctx) { }
+	@Override public void enterUID1(CPP14Parser.UID1Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitUnqualifiedId(CPP14Parser.UnqualifiedIdContext ctx) { }
+	@Override public void exitUID1(CPP14Parser.UID1Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID2(CPP14Parser.UID2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID2(CPP14Parser.UID2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID3(CPP14Parser.UID3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID3(CPP14Parser.UID3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID4(CPP14Parser.UID4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID4(CPP14Parser.UID4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID5(CPP14Parser.UID5Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID5(CPP14Parser.UID5Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID6(CPP14Parser.UID6Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID6(CPP14Parser.UID6Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID7(CPP14Parser.UID7Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID7(CPP14Parser.UID7Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID8(CPP14Parser.UID8Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID8(CPP14Parser.UID8Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID9(CPP14Parser.UID9Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID9(CPP14Parser.UID9Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID10(CPP14Parser.UID10Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID10(CPP14Parser.UID10Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID11(CPP14Parser.UID11Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID11(CPP14Parser.UID11Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID12(CPP14Parser.UID12Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID12(CPP14Parser.UID12Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID13(CPP14Parser.UID13Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID13(CPP14Parser.UID13Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUID14(CPP14Parser.UID14Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUID14(CPP14Parser.UID14Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUIDEnv(CPP14Parser.UIDEnvContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUIDEnv(CPP14Parser.UIDEnvContext ctx) {
+          System.out.println("<ENV>$$BEGIN:" + Integer.toString(ctx.Env().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.Env().getSymbol().getStopIndex()));
+        }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUIDVecQ(CPP14Parser.UIDVecQContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUIDVecQ(CPP14Parser.UIDVecQContext ctx) {
+          System.out.println("<VecQ>$$BEGIN:" + Integer.toString(ctx.VecQ().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecQ().getSymbol().getStopIndex()));
+        }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUIDVecL(CPP14Parser.UIDVecLContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUIDVecL(CPP14Parser.UIDVecLContext ctx) {
+          System.out.println("<VecL>$$BEGIN:" + Integer.toString(ctx.VecL().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecL().getSymbol().getStopIndex()));
+        }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUIDVecW(CPP14Parser.UIDVecWContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUIDVecW(CPP14Parser.UIDVecWContext ctx) {
+          System.out.println("<VecW>$$BEGIN:" + Integer.toString(ctx.VecW().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecW().getSymbol().getStopIndex()));
+        }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUIDVecB(CPP14Parser.UIDVecBContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUIDVecB(CPP14Parser.UIDVecBContext ctx) {
+          System.out.println("<VecB>$$BEGIN:" + Integer.toString(ctx.VecB().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecB().getSymbol().getStopIndex()));
+        }
 	/**
 	 * {@inheritDoc}
 	 *

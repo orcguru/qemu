@@ -39,25 +39,25 @@ primaryExpression:
 idExpression: unqualifiedId | qualifiedId;
 
 unqualifiedId:
-	Identifier
-	| LeftParen And RightParen LeftBracket Identifier RightBracket
-	| operatorFunctionId
-	| conversionFunctionId
-	| literalOperatorId
-	| Tilde (className | decltypeSpecifier)
-	| templateId
-        | Final
-        | New
-        | Typename_
-        | Override
-        | Virtual
-        | AndAnd
-        | OrOr
-        | Env
-        | VecQ
-        | VecL
-        | VecW
-        | VecB
+	Identifier                                                      # UID1
+	| LeftParen And RightParen LeftBracket Identifier RightBracket  # UID2
+	| operatorFunctionId                                            # UID3
+	| conversionFunctionId                                          # UID4
+	| literalOperatorId                                             # UID5
+	| Tilde (className | decltypeSpecifier)                         # UID6
+	| templateId                                                    # UID7
+        | Final                                                         # UID8
+        | New                                                           # UID9
+        | Typename_                                                     # UID10
+        | Override                                                      # UID11
+        | Virtual                                                       # UID12
+        | AndAnd                                                        # UID13
+        | OrOr                                                          # UID14
+        | Env                                                           # UIDEnv
+        | VecQ                                                          # UIDVecQ
+        | VecL                                                          # UIDVecL
+        | VecW                                                          # UIDVecW
+        | VecB                                                          # UIDVecB
         ;
 
 qualifiedId: nestedNameSpecifier Template? unqualifiedId;
