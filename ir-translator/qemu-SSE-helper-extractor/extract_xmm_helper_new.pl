@@ -44,6 +44,7 @@ my %funcs = ();
 my %func_lookup = ();
 my %func_lookup_map = ();
 $func_lookup{'MAP'} = \%func_lookup_map;
+my $global_func_idx = 0;
 open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
 while (<FD>) {
   my $line = $_;
@@ -97,12 +98,14 @@ while (<FD>) {
     $func_name = &extract_func_name($func_name);
     $info{'NAME'} = $func_name;
     $info{'FUNC_FULL'} = &GetText($fullStart, $fullStop);
+    $info{'FUNC_IDX'} = $global_func_idx;
+    $global_func_idx = $global_func_idx + 1;
     my %calls = ();
     $info{'CALLS'} = \%calls;
     my %returns = ();
     $info{'RETURNS'} = \%returns;
     if (exists $funcs{$info{'NAME'}}) {
-      print "Duplicated function definition $info{'NAME'}!\n";
+      #print "Duplicated function definition $info{'NAME'}!\n";
       $info{'NAME'} = $info{'NAME'}."__DUPLICATED";
     }
     $funcs{$info{'NAME'}} = \%info;
@@ -136,6 +139,9 @@ while (<FD>) {
     $info{'LOOKUP_START'} = $info{'PAREN_START'};
     $info{'LOOKUP_STOP'} = $info{'PAREN_STOP'};
     $info{'CALL_TARGET'} = &GetText($info{'NAME_START'}, $info{'NAME_STOP'});
+    if (not exists $funcs{$info{'CALL_TARGET'}}) {
+      $info{'IS_FOREIGN'} = 1;
+    }
     my $str = &GetText($info{'PAREN_START'}, $info{'PAREN_STOP'});
     $str =~ s/^\s*\(\s*//;
     $str =~ s/\s*\)\s*$//;
@@ -147,7 +153,11 @@ while (<FD>) {
     $info{'CALL_ARGUMENTS'} = \@fields;
     my ($func_idx, $ptr) = &lookup($info{'NAME_START'}, \%func_lookup);
     if ($func_idx != -1) {
+      print "$ptr->{'NAME'} calls $info{'CALL_TARGET'}\n";
       $info{'PARENT'} = $ptr->{'NAME'};
+      if (exists $info{'IS_FOREIGN'}) {
+        $funcs{$ptr->{'NAME'}}->{'IS_FOREIGN'} = 1;
+      }
       $funcs{$ptr->{'NAME'}}->{'CALLS'}->{$info{'NAME_START'}} = \%info;
       $callsite_lookup{'MAP'}->{$info{'LOOKUP_START'}} = \%info;
     }
@@ -430,6 +440,57 @@ my %qemuaot_gp_params_map = (
 );
 my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
 my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
+
+foreach my $f (keys %funcs) {
+  if (not ($f =~ /^helper_/ and $f =~ /_xmm$/)) {
+    next;
+  }
+  print "$f\n";
+  # Collect dependent functions
+  my @sub_call_stack = ();
+  my %defined_func = ();
+  $defined_func{$f} = 1;
+  foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
+    my $call_target = $funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'};
+    if (exists $funcs{$call_target}) {
+      if (not exists $defined_func{$call_target}) {
+        push @sub_call_stack, $call_target;
+        $defined_func{$call_target} = 1;
+      }
+    }
+  }
+  while (@sub_call_stack > 0) {
+    my @new_call_stack = ();
+    foreach my $c (@sub_call_stack) {
+      foreach my $e (keys %{$funcs{$c}->{'CALLS'}}) {
+        my $call_target = $funcs{$c}->{'CALLS'}->{$e}->{'CALL_TARGET'};
+        if (exists $funcs{$call_target}) {
+          if (not exists $defined_func{$call_target}) {
+            push @new_call_stack, $call_target;
+            $defined_func{$call_target} = 1;
+          }
+        }
+      }
+    }
+    @sub_call_stack = @new_call_stack;
+  }
+
+  # Generate function
+  open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
+  print OUT "$blank_info\n\n";
+
+  my %order_to_func = ();
+  foreach my $sf (keys %defined_func) {
+    $order_to_func{$funcs{$sf}->{'FUNC_IDX'}} = $sf;
+  }
+  my @sorted_funcs = sort {$a <=> $b} keys %order_to_func;
+  foreach my $s (@sorted_funcs) {
+    my $new_func = $funcs{$order_to_func{$s}}->{'FUNC_FULL'};
+    print OUT "$new_func\n\n";
+  }
+
+  close OUT;
+}
 
 sub lookup
 {

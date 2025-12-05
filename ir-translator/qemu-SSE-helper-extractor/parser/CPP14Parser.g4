@@ -170,7 +170,7 @@ noExceptExpression: Noexcept LeftParen expression RightParen;
 
 castExpression:
 	Extension? unaryExpression
-	| ((Minus | Tilde | Not)? Star | Minus | Tilde)? LeftParen theTypeId (LeftBracket initializerClause RightBracket)? RightParen castExpression;
+	| ((Minus | Tilde | Not)? Star | Minus | Tilde)? LeftParen theTypeId (LeftBracket initializerClause RightBracket)? RightParen (castExpression | initializerClause);
 
 pointerMemberExpression:
 	castExpression ((DotStar | ArrowStar) castExpression)*;
