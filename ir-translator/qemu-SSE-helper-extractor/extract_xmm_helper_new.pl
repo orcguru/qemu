@@ -300,6 +300,12 @@ while (<FD>) {
           $env_info{'LOOKUP_STOP'} = $env_info{'STOP'};
           $env_info{'GET_ADDRESS'} = $get_address;
           $env_info{'DEF_SYM_INFO'} = \@sym_info;
+          if ($file_content[$stop+1] eq " " and $file_content[$stop+2] eq "=" and $file_content[$stop+3] eq " ") {
+            if ($sym_info[0]->{'SYM'} eq "cc_src" or $sym_info[0]->{'SYM'} eq "cc_dst" or $sym_info[0]->{'SYM'} eq "cc_op" or $sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs") {
+              $env_info{'UPDATE_REGISTER_CONTEXT'} = 1;
+              $func_ptr->{'UPDATE_REGISTER_CONTEXT'} = 1;
+            }
+          }
           if (not exists $func_ptr->{'ENV'}) {
             my %info = ();
             $func_ptr->{'ENV'} = \%info;
