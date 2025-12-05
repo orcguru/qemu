@@ -184,7 +184,10 @@ foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'TOUCHED'} = 1;
 }
 
-# Remaining info
+# Handle return info and collect ENV
+my %env_lookup = ();
+my %env_lookup_map = ();
+$env_lookup{'MAP'} = \%env_lookup_map;
 open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
 while (<FD>) {
   my $line = $_;
@@ -233,17 +236,155 @@ while (<FD>) {
         if ($file_content[$stop+1] ne "-") {
           my ($call_idx, $call_ptr) = &lookup($start, \%callsite_lookup);
           if ($call_idx == -1) {
-            print "standalone ENV inside $func_ptr->{'NAME'}\n";
+            # Copy from x25
+            #print "standalone ENV inside $func_ptr->{'NAME'}\n";
+            die "" if ($file_content[$start-1] eq "." or $file_content[$start-1] eq ">");
+            my $get_address = 0;
+            if ($file_content[$start-1] eq "&") {
+              $get_address = 1;
+              $start = $start - 1;
+            }
+            my %env_info = ();
+            $env_info{'TXT'} = &GetText($start, $stop);
+            $env_info{'START'} = $start;
+            $env_info{'STOP'} = $stop;
+            $env_info{'LOOKUP_START'} = $env_info{'START'};
+            $env_info{'LOOKUP_STOP'} = $env_info{'STOP'};
+            $env_info{'GET_ADDRESS'} = $get_address;
+            my @empty = ();
+            $env_info{'DEF_SYM_INFO'} = \@empty;
+            if (not exists $func_ptr->{'ENV'}) {
+              my %info = ();
+              $func_ptr->{'ENV'} = \%info;
+            }
+            $func_ptr->{'ENV'}->{$start} = \%env_info;
+            $env_lookup{'MAP'}->{$env_info{'LOOKUP_START'}} = \%env_info;
           }
         } else {
+          die "" if ($file_content[$start-1] eq "." or $file_content[$start-1] eq ">");
           die "" if $file_content[$stop+2] ne ">";
+          my $get_address = 0;
+          if ($file_content[$start-1] eq "&") {
+            $get_address = 1;
+            $start = $start - 1;
+          }
+          my @sym_info = ();
+          my $pos = $stop + 3;
+          while (1) {
+            my ($sym, $sym_start, $sym_stop) = &GetSymbol($pos, 0);
+            my %info = ();
+            $info{'SYM'} = $sym;
+            $info{'IS_ARRAY'} = 0;
+            if ($file_content[$sym_stop+1] eq "[") {
+              $info{'IS_ARRAY'} = 1;
+              my ($array_idx, $array_idx_start, $array_idx_stop) = &GetSymbol($sym_stop+2, 0);
+              die "" if $file_content[$array_idx_stop+1] ne "]";
+              $info{'ARRAY_IDX'} = $array_idx;
+              $pos = $array_idx_stop + 2;
+            } else {
+              $pos = $sym_stop + 1;
+            }
+            push @sym_info, \%info;
+            if ($file_content[$pos] eq ".") {
+              $pos = $pos + 1;
+            } else {
+              last;
+            }
+          }
+          $stop = $pos - 1;
+          my %env_info = ();
+          $env_info{'TXT'} = &GetText($start, $stop);
+          $env_info{'START'} = $start;
+          $env_info{'STOP'} = $stop;
+          $env_info{'LOOKUP_START'} = $env_info{'START'};
+          $env_info{'LOOKUP_STOP'} = $env_info{'STOP'};
+          $env_info{'GET_ADDRESS'} = $get_address;
+          $env_info{'DEF_SYM_INFO'} = \@sym_info;
+          if (not exists $func_ptr->{'ENV'}) {
+            my %info = ();
+            $func_ptr->{'ENV'} = \%info;
+          }
+          $func_ptr->{'ENV'}->{$start} = \%env_info;
+          $env_lookup{'MAP'}->{$env_info{'LOOKUP_START'}} = \%env_info;
         }
       }
     }
   }
 }
 close FD;
-exit 0;
+my @sorted_env_addr = sort {$a <=> $b} sort keys %{$env_lookup{'MAP'}};
+$env_lookup{'SORTED_ADDR'} = \@sorted_env_addr;
+
+# Handle Vec* info
+open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
+while (<FD>) {
+  my $line = $_;
+  chomp($line);
+  if ($line =~ /^<(Vec[BWLQ])>/) {
+    my $code = $1;
+    my @fields = split(/\$\$/, $line);
+    my @f1 = split(/:/, $fields[1]);
+    my @f2 = split(/:/, $fields[2]);
+    my $start = $f1[1];
+    my $stop = $f2[1];
+    my ($func_idx, $func_ptr) = &lookup($start, \%func_lookup);
+    if ($func_idx != -1) {
+      if (exists $func_ptr->{'TOUCHED'}) {
+        my ($env_idx, $env_ptr) = &lookup($start, \%env_lookup);
+        if ($env_idx == -1) {
+          die "" if $file_content[$stop+1] ne "[";
+          my @vec_symbols = ();
+          my %info = ();
+          $info{'SYM'} = $code;
+          $info{'IS_ARRAY'} = 1;
+          my ($array_idx, $array_idx_start, $array_idx_stop) = &GetContentWithArrayBound($stop+2);
+          $info{'ARRAY_IDX'} = $array_idx;
+          die "" if ($file_content[$array_idx_stop+2] eq "." or $file_content[$array_idx_stop+2] eq "-");
+          $stop = $array_idx_stop + 1;
+          unshift @vec_symbols, \%info;
+          if ($file_content[$start-1] eq ">") {
+            my ($sym, $sym_start, $sym_stop) = &GetSymbol($start-3, 1);
+            my %info = ();
+            $info{'SYM'} = $sym;
+            $info{'IS_ARRAY'} = 0;
+            unshift @vec_symbols, \%info;
+            die "" if ($file_content[$sym_start-1] eq ">" or $file_content[$sym_start-1] eq ".");
+            $start = $sym_start;
+          } elsif ($file_content[$start-1] eq ".") {
+            my ($sym, $sym_start, $sym_stop) = &GetSymbol($start-2, 1);
+            my %info = ();
+            $info{'SYM'} = $sym;
+            $info{'IS_ARRAY'} = 0;
+            unshift @vec_symbols, \%info;
+            die "" if ($file_content[$sym_start-1] eq ">" or $file_content[$sym_start-1] eq ".");
+            $start = $sym_start;
+          } else {
+            die "";
+          }
+          $stop = $array_idx_stop + 1;
+          my %vec_info = ();
+          $vec_info{'TXT'} = &GetText($start, $stop);
+          $vec_info{'START'} = $start;
+          $vec_info{'STOP'} = $stop;
+          $vec_info{'LOOKUP_START'} = $vec_info{'START'};
+          $vec_info{'LOOKUP_STOP'} = $vec_info{'STOP'};
+          if ($file_content[$start-1] eq "&") {
+            $vec_info{'GET_ADDRESS'} = 1;
+          } else {
+            $vec_info{'GET_ADDRESS'} = 0;
+          }
+          $vec_info{'DEF_SYM_INFO'} = \@vec_symbols;
+          if (not exists $func_ptr->{'VEC'}) {
+            my %info = ();
+            $func_ptr->{'VEC'} = \%info;
+          }
+          $func_ptr->{'VEC'}->{$start} = \%vec_info;
+        }
+      }
+    }
+  }
+}
+close FD;
 
 # Collect background info (-function)
 open FDIN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
@@ -353,4 +494,58 @@ sub GetText
   my @sub_array = @file_content[$posStart..$posEnd];
   my $ret = join("", @sub_array);
   return $ret;
+}
+
+sub GetSymbol
+{
+  my ($sym_start, $reverse) = @_;
+  my $sym_stop = $sym_start;
+  while (("a" le $file_content[$sym_stop] and $file_content[$sym_stop] le "z") or
+        ("A" le $file_content[$sym_stop] and $file_content[$sym_stop] le "Z") or
+        ("0" le $file_content[$sym_stop] and $file_content[$sym_stop] le "9") or
+        $file_content[$sym_stop] eq "_") {
+    if ($reverse) {
+      $sym_stop = $sym_stop - 1;
+    } else {
+      $sym_stop = $sym_stop + 1;
+    }
+  }
+  if ($reverse) {
+    $sym_stop = $sym_stop + 1;
+  } else {
+    $sym_stop = $sym_stop - 1;
+  }
+  if ($reverse) {
+    my $tmp = $sym_start;
+    $sym_start = $sym_stop;
+    $sym_stop = $tmp;
+  }
+  if ($sym_start > $sym_stop) {
+    die "Symbol not found at $sym_start!\n";
+  }
+  my @sub_array = @file_content[$sym_start..$sym_stop];
+  my $sym = join("", @sub_array);
+  return ($sym, $sym_start, $sym_stop);
+}
+
+sub GetContentWithArrayBound
+{
+  my ($sym_start) = @_;
+  my $sym_stop = $sym_start;
+  my $cnt = 1;
+  while (1) {
+    if ($file_content[$sym_stop] eq "[") {
+      $cnt = $cnt + 1;
+    } elsif ($file_content[$sym_stop] eq "]") {
+      $cnt = $cnt - 1;
+    }
+    if ($cnt == 0) {
+      last;
+    }
+    $sym_stop = $sym_stop + 1;
+  }
+  $sym_stop = $sym_stop - 1;
+  my @sub_array = @file_content[$sym_start..$sym_stop];
+  my $sym = join("", @sub_array);
+  return ($sym, $sym_start, $sym_stop);
 }
