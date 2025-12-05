@@ -137,7 +137,7 @@ unaryExpression:
 	| deleteExpression
         | HackBuildin1 LeftParen (typeSpecifier Comma?)+ RightParen
         | HackBuildin2 LeftParen typeSpecifier Comma initializerClause RightParen
-        | HackBuildin3 LeftParen idExpression Comma declSpecifierSeq Star? RightParen;
+        | HackBuildin3 LeftParen castExpression Comma declSpecifierSeq Star? RightParen;
 
 unaryOperator: Or | Star | And | Plus | Tilde | Minus | Not;
 
@@ -533,13 +533,12 @@ declarator:
 pointerDeclarator: (pointerOperator Restrict? Const? attributeSpecifierSeq?)* noPointerDeclarator;
 
 noPointerDeclarator:
-	declaratorid attributeSpecifierSeq?
-	| noPointerDeclarator (
-		parametersAndQualifiers
-		| LeftBracket Restrict? constantExpression? RightBracket attributeSpecifierSeq?
-	)
-	| LeftParen pointerDeclarator RightParen
-	| LeftBracket parameterDeclarationClause RightBracket;
+	declaratorid attributeSpecifierSeq?                   # npd1
+	| noPointerDeclarator parametersAndQualifiers         # npdFuncCall
+	| noPointerDeclarator LeftBracket Restrict? constantExpression? RightBracket attributeSpecifierSeq?                       # npd2
+	| LeftParen pointerDeclarator RightParen              # npd3
+	| LeftBracket parameterDeclarationClause RightBracket # npd4
+    ;
 
 parametersAndQualifiers:
 	LeftParen (parameterDeclarationClause | Ellipsis)? RightParen cvqualifierseq? virtualSpecifierSeq? refqualifier?

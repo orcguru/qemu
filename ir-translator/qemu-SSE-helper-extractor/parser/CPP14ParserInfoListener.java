@@ -1773,13 +1773,68 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterNoPointerDeclarator(CPP14Parser.NoPointerDeclaratorContext ctx) { }
+	@Override public void enterNpd4(CPP14Parser.Npd4Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitNoPointerDeclarator(CPP14Parser.NoPointerDeclaratorContext ctx) { }
+	@Override public void exitNpd4(CPP14Parser.Npd4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterNpdFuncCall(CPP14Parser.NpdFuncCallContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitNpdFuncCall(CPP14Parser.NpdFuncCallContext ctx) {
+          if (ctx.noPointerDeclarator() != null && ctx.noPointerDeclarator() instanceof CPP14Parser.Npd1Context) {
+            CPP14Parser.Npd1Context npd1ctx = (CPP14Parser.Npd1Context)ctx.noPointerDeclarator();
+            if (npd1ctx.attributeSpecifierSeq() == null) {
+              System.out.println("<FUNCTION_CALL>$$NAME_BEGIN:" + Integer.toString(npd1ctx.declaratorid().getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(npd1ctx.declaratorid().getStart().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(ctx.parametersAndQualifiers().LeftParen(0).getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(ctx.parametersAndQualifiers().RightParen(0).getSymbol().getStopIndex()));
+            }
+          }
+        }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterNpd3(CPP14Parser.Npd3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitNpd3(CPP14Parser.Npd3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterNpd2(CPP14Parser.Npd2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitNpd2(CPP14Parser.Npd2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterNpd1(CPP14Parser.Npd1Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitNpd1(CPP14Parser.Npd1Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
