@@ -108,7 +108,10 @@ while (<FD>) {
       #print "Duplicated function definition $info{'NAME'}!\n";
       $info{'NAME'} = $info{'NAME'}."__DUPLICATED";
     }
+    my ($head, $args) = &parse_func_head(\%info);
     $funcs{$info{'NAME'}} = \%info;
+    $info{'HEAD'} = $head;
+    $info{'ARGS'} = $args;
     $func_lookup{'MAP'}->{$info{'LOOKUP_START'}} = \%info;
   }
 }
@@ -153,7 +156,7 @@ while (<FD>) {
     $info{'CALL_ARGUMENTS'} = \@fields;
     my ($func_idx, $ptr) = &lookup($info{'NAME_START'}, \%func_lookup);
     if ($func_idx != -1) {
-      print "$ptr->{'NAME'} calls $info{'CALL_TARGET'}\n";
+      #print "$ptr->{'NAME'} calls $info{'CALL_TARGET'}\n";
       $info{'PARENT'} = $ptr->{'NAME'};
       if (exists $info{'IS_FOREIGN'}) {
         $funcs{$ptr->{'NAME'}}->{'IS_FOREIGN'} = 1;
@@ -281,13 +284,13 @@ while (<FD>) {
           my @sym_info = ();
           my $pos = $stop + 3;
           while (1) {
-            my ($sym, $sym_start, $sym_stop) = &GetSymbol($pos, 0);
+            my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $pos, 0);
             my %info = ();
             $info{'SYM'} = $sym;
             $info{'IS_ARRAY'} = 0;
             if ($file_content[$sym_stop+1] eq "[") {
               $info{'IS_ARRAY'} = 1;
-              my ($array_idx, $array_idx_start, $array_idx_stop) = &GetSymbol($sym_stop+2, 0);
+              my ($array_idx, $array_idx_start, $array_idx_stop) = &GetSymbol(\@file_content, $sym_stop+2, 0);
               die "" if $file_content[$array_idx_stop+1] ne "]";
               $info{'ARRAY_IDX'} = $array_idx;
               $pos = $array_idx_stop + 2;
@@ -359,7 +362,7 @@ while (<FD>) {
           $stop = $array_idx_stop + 1;
           unshift @vec_symbols, \%info;
           if ($file_content[$start-1] eq ">") {
-            my ($sym, $sym_start, $sym_stop) = &GetSymbol($start-3, 1);
+            my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $start-3, 1);
             my %info = ();
             $info{'SYM'} = $sym;
             $info{'IS_ARRAY'} = 0;
@@ -367,7 +370,7 @@ while (<FD>) {
             die "" if ($file_content[$sym_start-1] eq ">" or $file_content[$sym_start-1] eq ".");
             $start = $sym_start;
           } elsif ($file_content[$start-1] eq ".") {
-            my ($sym, $sym_start, $sym_stop) = &GetSymbol($start-2, 1);
+            my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $start-2, 1);
             my %info = ();
             $info{'SYM'} = $sym;
             $info{'IS_ARRAY'} = 0;
@@ -445,17 +448,31 @@ foreach my $f (keys %funcs) {
   if (not ($f =~ /^helper_/ and $f =~ /_xmm$/)) {
     next;
   }
-  print "$f\n";
+  my $has_foreign_call = 0;
+  if (exists $funcs{$f}->{'IS_FOREIGN'}) {
+    $has_foreign_call = 1;
+  }
+  my $update_register_context = 0;
+  if (exists $funcs{$f}->{'UPDATE_REGISTER_CONTEXT'}) {
+    $update_register_context = 1;
+  }
   # Collect dependent functions
   my @sub_call_stack = ();
   my %defined_func = ();
   $defined_func{$f} = 1;
+  my %vec_plans = ();
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     my $call_target = $funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'};
     if (exists $funcs{$call_target}) {
       if (not exists $defined_func{$call_target}) {
         push @sub_call_stack, $call_target;
         $defined_func{$call_target} = 1;
+        if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
+          $has_foreign_call = 1;
+        }
+        if (exists $funcs{$call_target}->{'UPDATE_REGISTER_CONTEXT'}) {
+          $update_register_context = 1;
+        }
       }
     }
   }
@@ -468,12 +485,20 @@ foreach my $f (keys %funcs) {
           if (not exists $defined_func{$call_target}) {
             push @new_call_stack, $call_target;
             $defined_func{$call_target} = 1;
+            if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
+              $has_foreign_call = 1;
+            }
+            if (exists $funcs{$call_target}->{'UPDATE_REGISTER_CONTEXT'}) {
+              $update_register_context = 1;
+            }
           }
         }
       }
     }
     @sub_call_stack = @new_call_stack;
   }
+
+  print "$f $has_foreign_call $update_register_context\n";
 
   # Generate function
   open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
@@ -565,12 +590,21 @@ sub GetText
 
 sub GetSymbol
 {
-  my ($sym_start, $reverse) = @_;
+  my ($str_array, $sym_start, $reverse) = @_;
+  if ($reverse == 0) {
+    while ($str_array->[$sym_start] eq "(") {
+      $sym_start = $sym_start + 1;
+    }
+  } else {
+    while ($str_array->[$sym_start] eq ")") {
+      $sym_start = $sym_start - 1;
+    }
+  }
   my $sym_stop = $sym_start;
-  while (("a" le $file_content[$sym_stop] and $file_content[$sym_stop] le "z") or
-        ("A" le $file_content[$sym_stop] and $file_content[$sym_stop] le "Z") or
-        ("0" le $file_content[$sym_stop] and $file_content[$sym_stop] le "9") or
-        $file_content[$sym_stop] eq "_") {
+  while (("a" le $str_array->[$sym_stop] and $str_array->[$sym_stop] le "z") or
+        ("A" le $str_array->[$sym_stop] and $str_array->[$sym_stop] le "Z") or
+        ("0" le $str_array->[$sym_stop] and $str_array->[$sym_stop] le "9") or
+        $str_array->[$sym_stop] eq "_") {
     if ($reverse) {
       $sym_stop = $sym_stop - 1;
     } else {
@@ -588,9 +622,10 @@ sub GetSymbol
     $sym_stop = $tmp;
   }
   if ($sym_start > $sym_stop) {
-    die "Symbol not found at $sym_start!\n";
+    my $debug_info = join("", @{$str_array});
+    die "Symbol not found at $debug_info:$sym_start!\n";
   }
-  my @sub_array = @file_content[$sym_start..$sym_stop];
+  my @sub_array = @{$str_array}[$sym_start..$sym_stop];
   my $sym = join("", @sub_array);
   return ($sym, $sym_start, $sym_stop);
 }
@@ -615,4 +650,101 @@ sub GetContentWithArrayBound
   my @sub_array = @file_content[$sym_start..$sym_stop];
   my $sym = join("", @sub_array);
   return ($sym, $sym_start, $sym_stop);
+}
+
+sub parse_func_head
+{
+  my ($func) = @_;
+  my $str = &GetText($func->{'FULL_START'}, $func->{'NAME_STOP'}, $ARGV[0]);
+  $str = &mov_tail_attribute_to_head($str);
+  my @chars = split(//, $str);
+  my $idx = $#chars;
+  my $paren_cnt = 0;
+  while ($idx >= 0) {
+    if ($chars[$idx] eq ")") {
+      $paren_cnt = $paren_cnt + 1;
+    } elsif ($chars[$idx] eq "(") {
+      $paren_cnt = $paren_cnt - 1;
+      if ($paren_cnt == 0) {
+        last;
+      }
+    }
+    $idx = $idx - 1;
+  }
+  my @slice_head = @chars[0..($idx-1)];
+  my @slice_tail = @chars[$idx..$#chars];
+  my $head = join("", @slice_head);
+  my $tail = join("", @slice_tail);
+  $tail =~ s/^\(\s*//;
+  $tail =~ s/\s*\)\s*$//;
+  $tail =~ s/,\s*\.\.\.$//;
+  $tail =~ s/\s*$//;
+  if ($tail ne "void") {
+    my @fields = split(/,/, $tail);
+    my @params = ();
+    foreach my $i (0 .. $#fields) {
+      $fields[$i] =~ s/^\s*//;
+      $fields[$i] =~ s/\s*$//;
+      my @sub_fields = split(/\s+/, $fields[$i]);
+      my %info = ();
+      die "$str" if @sub_fields == 1;
+      my $type = "";
+      foreach my $idx (0 .. $#sub_fields-1) {
+        if ($type eq "") {
+          $type = $sub_fields[$idx];
+        } else {
+          $type = $type." ".$sub_fields[$idx];
+        }
+      }
+      my $var = $sub_fields[$#sub_fields];
+      if ($var =~ /^([\*]+)/) {
+        $type = $type." ".$1;
+        $var =~ s/^[\*]+//;
+      }
+      $info{'TYPE'} = $type;
+      $info{'VAR_NAME'} = $var;
+      push @params, \%info;
+    }
+    return ($head, \@params);
+  } else {
+    my @empty = ();
+    return ($head, \@empty);
+  }
+}
+
+sub mov_tail_attribute_to_head
+{
+  my ($str) = @_;
+  while (1) {
+    my @chars = split(//, $str);
+    my $idx = $#chars;
+    my $paren_cnt = 0;
+    while ($idx >= 0) {
+      if ($chars[$idx] eq ")") {
+        $paren_cnt = $paren_cnt + 1;
+      } elsif ($chars[$idx] eq "(") {
+        $paren_cnt = $paren_cnt - 1;
+        if ($paren_cnt == 0) {
+          last;
+        }
+      }
+      $idx = $idx - 1;
+    }
+    $idx = $idx - 1;
+    while ($chars[$idx] eq " ") {
+      $idx = $idx - 1;
+    }
+    my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@chars, $idx, 1);
+    if (not $sym =~ /_*attribute_*/) {
+      last;
+    } else {
+      my @head = @chars[0..($sym_start-1)];
+      my @tail = @chars[$sym_start..$#chars];
+      my $head_str = join("", @head);
+      $head_str =~ s/\s*$//;
+      my $tail_str = join("", @tail);
+      $str = $tail_str." ".$head_str;
+    }
+  }
+  return $str;
 }
