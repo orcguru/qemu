@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use IO::Handle;
 use File::Basename;
+use IO::Select;
 use Cwd 'abs_path';
 
 if ($#ARGV < 1) {
@@ -97,7 +98,7 @@ while (<FD>) {
     my $func_name = &GetText($nameStart, $nameStop);
     $func_name = &extract_func_name($func_name);
     $info{'NAME'} = $func_name;
-    $info{'FUNC_FULL'} = &GetText($fullStart, $fullStop);
+    $info{'FUNC_FULL'} = &GetText($bodyStart, $bodyStop);
     $info{'FUNC_IDX'} = $global_func_idx;
     $global_func_idx = $global_func_idx + 1;
     my %calls = ();
@@ -108,10 +109,7 @@ while (<FD>) {
       #print "Duplicated function definition $info{'NAME'}!\n";
       $info{'NAME'} = $info{'NAME'}."__DUPLICATED";
     }
-    my ($head, $args) = &parse_func_head(\%info);
     $funcs{$info{'NAME'}} = \%info;
-    $info{'HEAD'} = $head;
-    $info{'ARGS'} = $args;
     $func_lookup{'MAP'}->{$info{'LOOKUP_START'}} = \%info;
   }
 }
@@ -158,6 +156,27 @@ while (<FD>) {
     if ($func_idx != -1) {
       #print "$ptr->{'NAME'} calls $info{'CALL_TARGET'}\n";
       $info{'PARENT'} = $ptr->{'NAME'};
+
+      # Get detail call info to be expanded into inline functions
+      my @scalars = ();
+      my @vectors = ();
+      my $callee = $funcs{$info{'CALL_TARGET'}};
+      foreach my $e (@{$callee->{'SCALAR_ARGS'}}) {
+        push @scalars, $fields[$e->{'IDX'}];
+      }
+      foreach my $e (@{$callee->{'VECTOR_ARGS'}}) {
+        push @vectors, $fields[$e->{'IDX'}];
+      }
+      $info{'SCALAR_CALL_ARGS'} = \@scalars;
+      $info{'VECTOR_CALL_ARGS'} = \@vectors;
+      my $caller = $ptr;
+      my @caller_arg_vectors = ();
+      foreach my $v (@vectors) {
+        my $caller_idx = &get_vec_arg_idx($caller, $v);
+        die "Check $caller->{'NAME'} vector call $callee->{'NAME'}\n" if ($caller_idx == -1);
+        push @caller_arg_vectors, $caller_idx;
+      }
+      $info{'CALLER_ARG_VECTORS'} = \@caller_arg_vectors;
       if (exists $info{'IS_FOREIGN'}) {
         $funcs{$ptr->{'NAME'}}->{'IS_FOREIGN'} = 1;
       }
@@ -195,6 +214,11 @@ while (keys %workset > 0) {
 }
 foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'TOUCHED'} = 1;
+  my ($head, $scalar_args, $vector_args, $pure_arg_info) = &parse_func_head($funcs{$f});
+  $funcs{$f}->{'HEAD'} = $head;
+  $funcs{$f}->{'PURE_ARG_INFO'} = $pure_arg_info;
+  $funcs{$f}->{'SCALAR_ARGS'} = $scalar_args;
+  $funcs{$f}->{'VECTOR_ARGS'} = $vector_args;
 }
 
 # Handle return info and collect ENV
@@ -284,13 +308,13 @@ while (<FD>) {
           my @sym_info = ();
           my $pos = $stop + 3;
           while (1) {
-            my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $pos, 0);
+            my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $pos, 0, 1);
             my %info = ();
             $info{'SYM'} = $sym;
             $info{'IS_ARRAY'} = 0;
             if ($file_content[$sym_stop+1] eq "[") {
               $info{'IS_ARRAY'} = 1;
-              my ($array_idx, $array_idx_start, $array_idx_stop) = &GetSymbol(\@file_content, $sym_stop+2, 0);
+              my ($array_idx, $array_idx_start, $array_idx_stop) = &GetSymbol(\@file_content, $sym_stop+2, 0, 2);
               die "" if $file_content[$array_idx_stop+1] ne "]";
               $info{'ARRAY_IDX'} = $array_idx;
               $pos = $array_idx_stop + 2;
@@ -362,7 +386,7 @@ while (<FD>) {
           $stop = $array_idx_stop + 1;
           unshift @vec_symbols, \%info;
           if ($file_content[$start-1] eq ">") {
-            my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $start-3, 1);
+            my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $start-3, 1, 3);
             my %info = ();
             $info{'SYM'} = $sym;
             $info{'IS_ARRAY'} = 0;
@@ -370,7 +394,7 @@ while (<FD>) {
             die "" if ($file_content[$sym_start-1] eq ">" or $file_content[$sym_start-1] eq ".");
             $start = $sym_start;
           } elsif ($file_content[$start-1] eq ".") {
-            my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $start-2, 1);
+            my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $start-2, 1, 4);
             my %info = ();
             $info{'SYM'} = $sym;
             $info{'IS_ARRAY'} = 0;
@@ -379,6 +403,16 @@ while (<FD>) {
             $start = $sym_start;
           } else {
             die "";
+          }
+          # Parse vec_symbols into argument info or var info
+          my %var_info = ();
+          my $vec_param_idx = &get_vec_arg_idx($func_ptr, $vec_symbols[0]->{'SYM'});
+          if ($vec_param_idx == -1) {
+            $var_info{'FROM_PARAM'} = 1;
+            $var_info{'VAR'} = $vec_param_idx;
+          } else {
+            $var_info{'FROM_PARAM'} = 0;
+            $var_info{'VAR'} = $vec_symbols[0]->{'SYM'};
           }
           $stop = $array_idx_stop + 1;
           my %vec_info = ();
@@ -393,6 +427,7 @@ while (<FD>) {
             $vec_info{'GET_ADDRESS'} = 0;
           }
           $vec_info{'DEF_SYM_INFO'} = \@vec_symbols;
+          $vec_info{'VAR_INFO'} = \%var_info;
           if (not exists $func_ptr->{'VEC'}) {
             my %info = ();
             $func_ptr->{'VEC'} = \%info;
@@ -459,20 +494,37 @@ foreach my $f (keys %funcs) {
   # Collect dependent functions
   my @sub_call_stack = ();
   my %defined_func = ();
-  $defined_func{$f} = 1;
-  my %vec_plans = ();
+  # Assume no infinite recursive calls for path_info
+  my %path_info = ();
+  my @label_info = ();
+  $path_info{'ROOT'} = \@label_info;
+  $defined_func{$f} = \%path_info;
+  my %func_call_path = ();
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     my $call_target = $funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'};
     if (exists $funcs{$call_target}) {
       if (not exists $defined_func{$call_target}) {
         push @sub_call_stack, $call_target;
-        $defined_func{$call_target} = 1;
+        my %p_info = ();
+        $defined_func{$call_target} = \%p_info;
         if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
           $has_foreign_call = 1;
         }
         if (exists $funcs{$call_target}->{'UPDATE_REGISTER_CONTEXT'}) {
           $update_register_context = 1;
         }
+      }
+      foreach my $pi (keys %{$defined_func{$f}}) {
+        my $current_pi = $pi."_".$f."_loc$e";
+        my @label_info = ();
+        foreach my $elem (@{$defined_func{$f}->{$pi}}) {
+          push @label_info, $elem;
+        }
+        my %entry_info = ();
+        $entry_info{'FUNC'} = $f;
+        $entry_info{'LOC'} = $e;
+        push @label_info, \%entry_info;
+        $defined_func{$call_target}->{$current_pi} = \@label_info;
       }
     }
   }
@@ -484,13 +536,26 @@ foreach my $f (keys %funcs) {
         if (exists $funcs{$call_target}) {
           if (not exists $defined_func{$call_target}) {
             push @new_call_stack, $call_target;
-            $defined_func{$call_target} = 1;
+            my %p_info = ();
+            $defined_func{$call_target} = \%p_info;
             if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
               $has_foreign_call = 1;
             }
             if (exists $funcs{$call_target}->{'UPDATE_REGISTER_CONTEXT'}) {
               $update_register_context = 1;
             }
+          }
+          foreach my $pi (keys %{$defined_func{$c}}) {
+            my $current_pi = $pi."_".$c."_loc$e";
+            my @label_info = ();
+            foreach my $elem (@{$defined_func{$f}->{$pi}}) {
+              push @label_info, $elem;
+            }
+            my %entry_info = ();
+            $entry_info{'FUNC'} = $f;
+            $entry_info{'LOC'} = $e;
+            push @label_info, \%entry_info;
+            $defined_func{$call_target}->{$current_pi} = \@label_info;
           }
         }
       }
@@ -510,7 +575,8 @@ foreach my $f (keys %funcs) {
   }
   my @sorted_funcs = sort {$a <=> $b} keys %order_to_func;
   foreach my $s (@sorted_funcs) {
-    my $new_func = $funcs{$order_to_func{$s}}->{'FUNC_FULL'};
+    my $func_name = $order_to_func{$s};
+    my $new_func = &gen_replicated_func($func_name, \%defined_func);
     print OUT "$new_func\n\n";
   }
 
@@ -590,7 +656,8 @@ sub GetText
 
 sub GetSymbol
 {
-  my ($str_array, $sym_start, $reverse) = @_;
+  my ($str_array, $sym_start, $reverse, $debug_idx) = @_;
+  select()->flush();
   if ($reverse == 0) {
     while ($str_array->[$sym_start] eq "(") {
       $sym_start = $sym_start + 1;
@@ -601,6 +668,7 @@ sub GetSymbol
     }
   }
   my $sym_stop = $sym_start;
+  die "" if (not($sym_stop >= 0 and $sym_stop <= $#{$str_array}));
   while (("a" le $str_array->[$sym_stop] and $str_array->[$sym_stop] le "z") or
         ("A" le $str_array->[$sym_stop] and $str_array->[$sym_stop] le "Z") or
         ("0" le $str_array->[$sym_stop] and $str_array->[$sym_stop] le "9") or
@@ -610,11 +678,18 @@ sub GetSymbol
     } else {
       $sym_stop = $sym_stop + 1;
     }
+    if ($sym_stop < 0 or $sym_stop > $#{$str_array}) {
+      last;
+    }
   }
   if ($reverse) {
-    $sym_stop = $sym_stop + 1;
+    if ($sym_stop < $#{$str_array}) {
+      $sym_stop = $sym_stop + 1;
+    }
   } else {
-    $sym_stop = $sym_stop - 1;
+    if ($sym_stop > 0) {
+      $sym_stop = $sym_stop - 1;
+    }
   }
   if ($reverse) {
     my $tmp = $sym_start;
@@ -623,7 +698,7 @@ sub GetSymbol
   }
   if ($sym_start > $sym_stop) {
     my $debug_info = join("", @{$str_array});
-    die "Symbol not found at $debug_info:$sym_start!\n";
+    die "Symbol not found at $debug_info:$sym_start-$sym_stop END:$#{$str_array}!\n";
   }
   my @sub_array = @{$str_array}[$sym_start..$sym_stop];
   my $sym = join("", @sub_array);
@@ -674,14 +749,37 @@ sub parse_func_head
   my @slice_head = @chars[0..($idx-1)];
   my @slice_tail = @chars[$idx..$#chars];
   my $head = join("", @slice_head);
+  my $head_copy = $head;
+  $head =~ s/\n/ /g;
+  $head =~ s/\s*$//;
+  @slice_head = split(//, $head);
+  my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@slice_head, $#slice_head, 1, 5);
+  $sym_start = $sym_start - 1;
+  while ($slice_head[$sym_start] eq " " or $slice_head[$sym_start] eq "*") {
+    $sym_start = $sym_start - 1;
+  }
+  my @sub_slice = @slice_head[0..$sym_start];
+  $head = join("", @sub_slice);
+  if ($head =~ /\)$/) {
+    $head = &mov_tail_attribute_to_head($head);
+  }
+  @slice_head = split(//, $head);
+  $sym_start = $#slice_head;
+  while ($slice_head[$sym_start] eq " " or $slice_head[$sym_start] eq "*") {
+    $sym_start = $sym_start - 1;
+  }
+  ($sym, $sym_start, $sym_stop) = &GetSymbol(\@slice_head, $sym_start, 1, 6);
+  print "type:$sym\n";
   my $tail = join("", @slice_tail);
   $tail =~ s/^\(\s*//;
   $tail =~ s/\s*\)\s*$//;
   $tail =~ s/,\s*\.\.\.$//;
   $tail =~ s/\s*$//;
+  my $pure_arg_info = $tail;
   if ($tail ne "void") {
     my @fields = split(/,/, $tail);
-    my @params = ();
+    my @scalar = ();
+    my @vector = ();
     foreach my $i (0 .. $#fields) {
       $fields[$i] =~ s/^\s*//;
       $fields[$i] =~ s/\s*$//;
@@ -703,12 +801,21 @@ sub parse_func_head
       }
       $info{'TYPE'} = $type;
       $info{'VAR_NAME'} = $var;
-      push @params, \%info;
+      $info{'IDX'} = $i;
+      # Drop env from arguments
+      if ($var eq "env") {
+        next;
+      }
+      if ($type eq "ZMMReg *") {
+        push @vector, \%info;
+      } else {
+        push @scalar, \%info;
+      }
     }
-    return ($head, \@params);
+    return ($head_copy, \@scalar, \@vector, $pure_arg_info);
   } else {
     my @empty = ();
-    return ($head, \@empty);
+    return ($head_copy, \@empty, \@empty, $pure_arg_info);
   }
 }
 
@@ -734,7 +841,7 @@ sub mov_tail_attribute_to_head
     while ($chars[$idx] eq " ") {
       $idx = $idx - 1;
     }
-    my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@chars, $idx, 1);
+    my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@chars, $idx, 1, 7);
     if (not $sym =~ /_*attribute_*/) {
       last;
     } else {
@@ -744,7 +851,43 @@ sub mov_tail_attribute_to_head
       $head_str =~ s/\s*$//;
       my $tail_str = join("", @tail);
       $str = $tail_str." ".$head_str;
+      if (not $str =~ /\)$/) {
+        last;
+      }
     }
   }
   return $str;
+}
+
+sub get_vec_arg_idx
+{
+  my ($func_ptr, $vec_sym) = @_;
+  foreach my $idx (0 .. $#{$func_ptr->{'VECTOR_ARGS'}}) {
+    if ($func_ptr->{'VECTOR_ARGS'}->[$idx]->{'VAR_NAME'} eq $vec_sym) {
+      return $idx;
+    }
+  }
+  return -1;
+}
+
+sub gen_replicated_func
+{
+  my ($target_func, $func_replicate_info) = @_;
+  my $new_func = "";
+  if (@{$funcs{$target_func}->{'VECTOR_ARGS'}} == 0) {
+    my $new_head = $funcs{$target_func}->{'HEAD'};
+    my $current_func = $new_head."($funcs{$target_func}->{'PURE_ARG_INFO'})\n";
+    $current_func = $current_func.$funcs{$target_func}->{'FUNC_FULL'}."\n\n";
+    $new_func = $new_func.$current_func;
+  } else {
+    foreach my $pi (keys %{$func_replicate_info->{$target_func}}) {
+      my $new_head = $funcs{$target_func}->{'HEAD'};
+      die "" if not $new_head =~ /$funcs{$target_func}->{'NAME'}$/;
+      $new_head = $new_head."_".$pi;
+      my $current_func = $new_head."($funcs{$target_func}->{'PURE_ARG_INFO'})\n";
+      $current_func = $current_func.$funcs{$target_func}->{'FUNC_FULL'}."\n\n";
+      $new_func = $new_func.$current_func;
+    }
+  }
+  return $new_func;
 }
