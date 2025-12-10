@@ -156,27 +156,6 @@ while (<FD>) {
     if ($func_idx != -1) {
       #print "$ptr->{'NAME'} calls $info{'CALL_TARGET'}\n";
       $info{'PARENT'} = $ptr->{'NAME'};
-
-      # Get detail call info to be expanded into inline functions
-      my @scalars = ();
-      my @vectors = ();
-      my $callee = $funcs{$info{'CALL_TARGET'}};
-      foreach my $e (@{$callee->{'SCALAR_ARGS'}}) {
-        push @scalars, $fields[$e->{'IDX'}];
-      }
-      foreach my $e (@{$callee->{'VECTOR_ARGS'}}) {
-        push @vectors, $fields[$e->{'IDX'}];
-      }
-      $info{'SCALAR_CALL_ARGS'} = \@scalars;
-      $info{'VECTOR_CALL_ARGS'} = \@vectors;
-      my $caller = $ptr;
-      my @caller_arg_vectors = ();
-      foreach my $v (@vectors) {
-        my $caller_idx = &get_vec_arg_idx($caller, $v);
-        die "Check $caller->{'NAME'} vector call $callee->{'NAME'}\n" if ($caller_idx == -1);
-        push @caller_arg_vectors, $caller_idx;
-      }
-      $info{'CALLER_ARG_VECTORS'} = \@caller_arg_vectors;
       if (exists $info{'IS_FOREIGN'}) {
         $funcs{$ptr->{'NAME'}}->{'IS_FOREIGN'} = 1;
       }
@@ -214,12 +193,40 @@ while (keys %workset > 0) {
 }
 foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'TOUCHED'} = 1;
-  my ($head, $scalar_args, $vector_args, $pure_arg_info) = &parse_func_head($funcs{$f});
+  my ($head, $scalar_args, $vector_args, $pure_arg_info, $ret128_info) = &parse_func_head($funcs{$f});
   $funcs{$f}->{'HEAD'} = $head;
   $funcs{$f}->{'PURE_ARG_INFO'} = $pure_arg_info;
   $funcs{$f}->{'SCALAR_ARGS'} = $scalar_args;
   $funcs{$f}->{'VECTOR_ARGS'} = $vector_args;
+  $funcs{$f}->{'128'} = $ret128_info;
 }
+
+# Patch detail call info used by vector expansion
+foreach my $f (keys %funcs) {
+  foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
+    my $i = $funcs{$f}->{'CALLS'}->{$e};
+    my @scalars = ();
+    my @vectors = ();
+    my $callee = $funcs{$i->{'CALL_TARGET'}};
+    foreach my $e (@{$callee->{'SCALAR_ARGS'}}) {
+      push @scalars, $i->{'CALL_ARGUMENTS'}->[$e->{'IDX'}];
+    }
+    foreach my $e (@{$callee->{'VECTOR_ARGS'}}) {
+      push @vectors, $i->{'CALL_ARGUMENTS'}->[$e->{'IDX'}];
+    }
+    $i->{'SCALAR_CALL_ARGS'} = \@scalars;
+    $i->{'VECTOR_CALL_ARGS'} = \@vectors;
+    my $caller = $funcs{$i->{'PARENT'}};
+    my @caller_arg_vectors = ();
+    foreach my $v (@vectors) {
+      my $caller_idx = &get_vec_arg_idx($caller, $v);
+      die "Check $caller->{'NAME'} vector call $callee->{'NAME'}\n" if ($caller_idx == -1);
+      push @caller_arg_vectors, $caller_idx;
+    }
+    $i->{'CALLER_ARG_VECTORS'} = \@caller_arg_vectors;
+  }
+}
+close FD;
 
 # Handle return info and collect ENV
 my %env_lookup = ();
@@ -479,7 +486,8 @@ my %qemuaot_gp_params_map = (
 my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
 my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
 
-foreach my $f (keys %funcs) {
+my $f = "helper_pcmpistrm_xmm";
+#foreach my $f (keys %funcs) {
   if (not ($f =~ /^helper_/ and $f =~ /_xmm$/)) {
     next;
   }
@@ -548,11 +556,11 @@ foreach my $f (keys %funcs) {
           foreach my $pi (keys %{$defined_func{$c}}) {
             my $current_pi = $pi."_".$c."_loc$e";
             my @label_info = ();
-            foreach my $elem (@{$defined_func{$f}->{$pi}}) {
+            foreach my $elem (@{$defined_func{$c}->{$pi}}) {
               push @label_info, $elem;
             }
             my %entry_info = ();
-            $entry_info{'FUNC'} = $f;
+            $entry_info{'FUNC'} = $c;
             $entry_info{'LOC'} = $e;
             push @label_info, \%entry_info;
             $defined_func{$call_target}->{$current_pi} = \@label_info;
@@ -581,7 +589,7 @@ foreach my $f (keys %funcs) {
   }
 
   close OUT;
-}
+#}
 
 sub lookup
 {
@@ -769,7 +777,14 @@ sub parse_func_head
     $sym_start = $sym_start - 1;
   }
   ($sym, $sym_start, $sym_stop) = &GetSymbol(\@slice_head, $sym_start, 1, 6);
-  print "type:$sym\n";
+  my %ret128_info = ();
+  if ($sym =~ /128/) {
+    $ret128_info{'RETURN128'} = 1;
+    $ret128_info{'TYPE_NAME'} = $sym;
+  } else {
+    $ret128_info{'RETURN128'} = 0;
+    $ret128_info{'TYPE_NAME'} = "";
+  }
   my $tail = join("", @slice_tail);
   $tail =~ s/^\(\s*//;
   $tail =~ s/\s*\)\s*$//;
@@ -799,6 +814,8 @@ sub parse_func_head
         $type = $type." ".$1;
         $var =~ s/^[\*]+//;
       }
+      $var =~ s/\s*$//;
+      $var =~ s/^\s*//;
       $info{'TYPE'} = $type;
       $info{'VAR_NAME'} = $var;
       $info{'IDX'} = $i;
@@ -812,10 +829,10 @@ sub parse_func_head
         push @scalar, \%info;
       }
     }
-    return ($head_copy, \@scalar, \@vector, $pure_arg_info);
+    return ($head_copy, \@scalar, \@vector, $pure_arg_info, \%ret128_info);
   } else {
     my @empty = ();
-    return ($head_copy, \@empty, \@empty, $pure_arg_info);
+    return ($head_copy, \@empty, \@empty, $pure_arg_info, \%ret128_info);
   }
 }
 
@@ -880,13 +897,53 @@ sub gen_replicated_func
     $current_func = $current_func.$funcs{$target_func}->{'FUNC_FULL'}."\n\n";
     $new_func = $new_func.$current_func;
   } else {
+    my %pi_info = ();
     foreach my $pi (keys %{$func_replicate_info->{$target_func}}) {
+      my @input_arg_vec_idx = ();
+      $pi_info{$pi} = \@input_arg_vec_idx;
+      if ($pi eq "ROOT") {
+        foreach my $idx (0 .. $#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
+          push @{$pi_info{$pi}}, $idx;
+        }
+      } else {
+        # Figure out vector argument mapping
+        foreach my $i (@{$func_replicate_info->{$target_func}->{$pi}}) {
+          die "" if not exists $funcs{$i->{'FUNC'}};
+          die "" if not exists $funcs{$i->{'FUNC'}}->{'CALLS'}->{$i->{'LOC'}};
+          if (@{$pi_info{$pi}} == 0) {
+            foreach my $vi (0 .. $#{$funcs{$func_replicate_info->{$target_func}->{$pi}->[0]->{'FUNC'}}->{'VECTOR_ARGS'}}) {
+              push @{$pi_info{$pi}}, $vi;
+            }
+          }
+          die "" if @{$funcs{$i->{'FUNC'}}->{'CALLS'}->{$i->{'LOC'}}->{'CALLER_ARG_VECTORS'}} == 0;
+          my $target_func = $funcs{$i->{'FUNC'}}->{'CALLS'}->{$i->{'LOC'}}->{'CALL_TARGET'};
+          my @target_args = ();
+          foreach my $ti (@{$funcs{$i->{'FUNC'}}->{'CALLS'}->{$i->{'LOC'}}->{'CALLER_ARG_VECTORS'}}) {
+            die "" if ($ti < 0 or $ti > $#{$pi_info{$pi}});
+            push @target_args, $pi_info{$pi}->[$ti];
+          }
+          die "" if @target_args == 0;
+          $pi_info{$pi} = \@target_args;
+        }
+      }
+      die "" if $#{$pi_info{$pi}} == -1;
+      # Define vector arguments
+      foreach my $idx (0 .. $#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
+        my $fi = $funcs{$target_func}->{'VECTOR_ARGS'}->[$idx];
+        $new_func = $new_func."#define $fi->{'VAR_NAME'} VEC$pi_info{$pi}->[$idx]\n";
+      }
       my $new_head = $funcs{$target_func}->{'HEAD'};
       die "" if not $new_head =~ /$funcs{$target_func}->{'NAME'}$/;
       $new_head = $new_head."_".$pi;
       my $current_func = $new_head."($funcs{$target_func}->{'PURE_ARG_INFO'})\n";
-      $current_func = $current_func.$funcs{$target_func}->{'FUNC_FULL'}."\n\n";
+      $current_func = $current_func.$funcs{$target_func}->{'FUNC_FULL'}."\n";
       $new_func = $new_func.$current_func;
+      # Un-define vector arguments
+      foreach my $idx (0 .. $#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
+        my $fi = $funcs{$target_func}->{'VECTOR_ARGS'}->[$idx];
+        $new_func = $new_func."#undef $fi->{'VAR_NAME'}\n";
+      }
+      $new_func = $new_func."\n";
     }
   }
   return $new_func;
