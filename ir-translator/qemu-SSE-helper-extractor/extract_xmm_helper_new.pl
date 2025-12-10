@@ -486,8 +486,7 @@ my %qemuaot_gp_params_map = (
 my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
 my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
 
-my $f = "helper_pcmpistrm_xmm";
-#foreach my $f (keys %funcs) {
+foreach my $f (keys %funcs) {
   if (not ($f =~ /^helper_/ and $f =~ /_xmm$/)) {
     next;
   }
@@ -589,7 +588,7 @@ my $f = "helper_pcmpistrm_xmm";
   }
 
   close OUT;
-#}
+}
 
 sub lookup
 {
@@ -894,7 +893,8 @@ sub gen_replicated_func
   if (@{$funcs{$target_func}->{'VECTOR_ARGS'}} == 0) {
     my $new_head = $funcs{$target_func}->{'HEAD'};
     my $current_func = $new_head."($funcs{$target_func}->{'PURE_ARG_INFO'})\n";
-    $current_func = $current_func.$funcs{$target_func}->{'FUNC_FULL'}."\n\n";
+    my $new_func_body = &get_func_body($funcs{$target_func}, "");
+    $current_func = $current_func.$new_func_body."\n\n";
     $new_func = $new_func.$current_func;
   } else {
     my %pi_info = ();
@@ -934,9 +934,12 @@ sub gen_replicated_func
       }
       my $new_head = $funcs{$target_func}->{'HEAD'};
       die "" if not $new_head =~ /$funcs{$target_func}->{'NAME'}$/;
-      $new_head = $new_head."_".$pi;
+      if ($pi ne "ROOT") {
+        $new_head = $new_head."_".$pi;
+      }
       my $current_func = $new_head."($funcs{$target_func}->{'PURE_ARG_INFO'})\n";
-      $current_func = $current_func.$funcs{$target_func}->{'FUNC_FULL'}."\n";
+      my $new_func_body = &get_func_body($funcs{$target_func}, $pi);
+      $current_func = $current_func.$new_func_body."\n";
       $new_func = $new_func.$current_func;
       # Un-define vector arguments
       foreach my $idx (0 .. $#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
@@ -947,4 +950,29 @@ sub gen_replicated_func
     }
   }
   return $new_func;
+}
+
+sub get_func_body
+{
+  my ($func_ptr, $pi) = @_;
+  if ($pi eq "") {
+    return $func_ptr->{'FUNC_FULL'};
+  }
+  my @sorted_calls = sort {$a <=> $b} keys %{$func_ptr->{'CALLS'}};
+  my $current_pos = $func_ptr->{'BODY_START'};
+  my $body = "";
+  foreach my $e (@sorted_calls) {
+    my $txt = &GetText($current_pos, ($e - 1));
+    $body = $body.$txt;
+    my $call_target = $func_ptr->{'CALLS'}->{$e}->{'CALL_TARGET'};
+    if (not exists $funcs{$call_target} or @{$funcs{$call_target}->{'VECTOR_ARGS'}} == 0) {
+      $current_pos = $e;
+    } else {
+      $body = $body.$call_target."_".$pi."_".$func_ptr->{'NAME'}."_loc".$e;
+      $current_pos = $func_ptr->{'CALLS'}->{$e}->{'NAME_STOP'} + 1;
+    }
+  }
+  my $txt = &GetText($current_pos, $func_ptr->{'BODY_STOP'});
+  $body = $body.$txt;
+  return $body;
 }
