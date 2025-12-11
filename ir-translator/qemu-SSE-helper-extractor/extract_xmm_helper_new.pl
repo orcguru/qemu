@@ -140,7 +140,7 @@ while (<FD>) {
     $info{'LOOKUP_START'} = $info{'PAREN_START'};
     $info{'LOOKUP_STOP'} = $info{'PAREN_STOP'};
     $info{'CALL_TARGET'} = &GetText($info{'NAME_START'}, $info{'NAME_STOP'});
-    if (not exists $funcs{$info{'CALL_TARGET'}}) {
+    if (&FuncNameIsForeign($info{'CALL_TARGET'})) {
       $info{'IS_FOREIGN'} = 1;
     }
     my $str = &GetText($info{'PAREN_START'} + 1, $info{'PAREN_STOP'} - 1);
@@ -529,6 +529,12 @@ foreach my $f (keys %funcs) {
         $entry_info{'LOC'} = $e;
         push @label_info, \%entry_info;
         $defined_func{$call_target}->{$current_pi} = \@label_info;
+        # FIXME: simplify duplicated mark actions
+        if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
+          foreach my $i (@label_info) {
+            $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+          }
+        }
       }
     }
   }
@@ -560,6 +566,12 @@ foreach my $f (keys %funcs) {
             $entry_info{'LOC'} = $e;
             push @label_info, \%entry_info;
             $defined_func{$call_target}->{$current_pi} = \@label_info;
+            # FIXME: simplify duplicated mark actions
+            if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
+              foreach my $i (@label_info) {
+                $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+              }
+            }
           }
         }
       }
@@ -580,7 +592,7 @@ foreach my $f (keys %funcs) {
   my @sorted_funcs = sort {$a <=> $b} keys %order_to_func;
   foreach my $s (@sorted_funcs) {
     my $func_name = $order_to_func{$s};
-    my $new_func = &gen_replicated_func($func_name, \%defined_func, $has_foreign_call);
+    my $new_func = &gen_replicated_func($func_name, \%defined_func);
     print OUT "$new_func\n\n";
   }
 
@@ -895,11 +907,11 @@ sub get_vec_arg_idx
 
 sub gen_replicated_func
 {
-  my ($target_func, $func_replicate_info, $has_foreign) = @_;
+  my ($target_func, $func_replicate_info) = @_;
   my $new_func = "";
   if (@{$funcs{$target_func}->{'VECTOR_ARGS'}} == 0) {
     my $new_head = $funcs{$target_func}->{'HEAD'};
-    my $args = &collect_func_args($funcs{$target_func}, $has_foreign);
+    my $args = &collect_func_args($funcs{$target_func});
     my $current_func = $new_head."($args)\n";
     my $new_func_body = &get_func_body($funcs{$target_func}, "");
     $current_func = $current_func.$new_func_body."\n\n";
@@ -945,7 +957,7 @@ sub gen_replicated_func
       if ($pi ne "ROOT") {
         $new_head = $new_head."_".$pi;
       }
-      my $args = &collect_func_args($funcs{$target_func}, $has_foreign);
+      my $args = &collect_func_args($funcs{$target_func});
       my $current_func = $new_head."($args)\n";
       my $new_func_body = &get_func_body($funcs{$target_func}, $pi);
       $current_func = $current_func.$new_func_body."\n";
@@ -971,14 +983,19 @@ sub get_func_body
   my $current_pos = $func_ptr->{'BODY_START'};
   my $body = "";
   foreach my $e (@sorted_calls) {
+    if ($e < $current_pos) {
+      next;
+    }
+    die "" if $e == $current_pos;
     my $txt = &GetText($current_pos, ($e - 1));
     $body = $body.$txt;
     my $call_target = $func_ptr->{'CALLS'}->{$e}->{'CALL_TARGET'};
-    if (not exists $funcs{$call_target} or @{$funcs{$call_target}->{'VECTOR_ARGS'}} == 0) {
+    if (not exists $funcs{$call_target}) {
       $current_pos = $e;
     } else {
-      $body = $body.$call_target."_".$pi."_".$func_ptr->{'NAME'}."_loc".$e;
-      $current_pos = $func_ptr->{'CALLS'}->{$e}->{'NAME_STOP'} + 1;
+      my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi);
+      $body = $body.$call_txt;
+      $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
     }
   }
   my $txt = &GetText($current_pos, $func_ptr->{'BODY_STOP'});
@@ -986,9 +1003,56 @@ sub get_func_body
   return $body;
 }
 
+sub update_func_call
+{
+  my ($caller_ptr, $call_pos, $callee_ptr, $path_info) = @_;
+  my $call_info = $caller_ptr->{'CALLS'}->{$call_pos};
+  my $str = $callee_ptr->{'NAME'}."_".$path_info."_".$caller_ptr->{'NAME'}."_loc".$call_pos;
+  $str = $str."(";
+  foreach my $idx (0 .. $#qemuaot_gp_params) {
+    my $a = $qemuaot_gp_params[$idx];
+    if ($idx == 0) {
+      $str = $str.$a;
+    } else {
+      $str = $str.", ".$a;
+    }
+  }
+  $str = $str.", $qemuaot_vec_invoke";
+  my %sub_calls = ();
+  foreach my $e (keys %{$caller_ptr->{'CALLS'}}) {
+    if ($e > $call_info->{'PAREN_START'} and $e < $call_info->{'PAREN_STOP'}) {
+      $sub_calls{$e} = 1;
+    }
+  }
+  my @sorted_sub_calls = sort {$a <=> $b} keys %sub_calls;
+  my $sub_call_idx = 0;
+  foreach my $idx (0 .. $#{$call_info->{'SCALAR_CALL_ARGS'}}) {
+    my $arg = $call_info->{'SCALAR_CALL_ARGS'}->[$idx];
+    if ($arg =~ /\(/ and (not $arg =~ /^\(/)) {
+      die "" if not $arg =~ /\)/;
+      die "$caller_ptr->{'NAME'} $callee_ptr->{'NAME'}" if not exists $sorted_sub_calls[$sub_call_idx];
+      my $sub_call_info = $caller_ptr->{'CALLS'}->{$sorted_sub_calls[$sub_call_idx]};
+      if (exists $funcs{$sub_call_info->{'CALL_TARGET'}}) {
+        my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info);
+        $str = $str.", ".$sub_call_idx;
+      } else {
+        $str = $str.", ".$arg;
+      }
+      $sub_call_idx = $sub_call_idx + 1;
+    } else {
+      $str = $str.", ".$arg;
+    }
+  }
+  if (exists $callee_ptr->{'IS_FOREIGN'}) {
+    $str = $str.", normal_return, exception_return";
+  }
+  $str = $str.")";
+  return $str;
+}
+
 sub collect_func_args
 {
-  my ($func_ptr, $has_foreign) = @_;
+  my ($func_ptr) = @_;
   my $args = "";
   foreach my $g (@qemuaot_gp_params) {
     $args = $args.$qemuaot_gp_params_map{$g}." ".$g.", ";
@@ -997,7 +1061,7 @@ sub collect_func_args
   foreach my $i (@{$func_ptr->{'SCALAR_ARGS'}}) {
     $args = $args.", ".$i->{'TYPE'}." ".$i->{'VAR_NAME'};
   }
-  if ($has_foreign) {
+  if (exists $func_ptr->{'IS_FOREIGN'}) {
     $args = $args.", unsigned long normal_return, unsigned long exception_return";
   }
   return $args;
@@ -1094,5 +1158,17 @@ sub IsValidSymbolStart
     return 1;
   } else {
     return 0;
+  }
+}
+
+sub FuncNameIsForeign
+{
+  my ($func_name) = @_;
+  if (exists $funcs{$func_name}) {
+    return 0;
+  } elsif ($func_name =~ /^__builtin_/) {
+    return 0;
+  } else {
+    return 1;
   }
 }
