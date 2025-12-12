@@ -1196,33 +1196,9 @@ sub get_func_body
       if ($entry->{'GET_ADDRESS'}) {
         $current_pos = $e;
       } else {
-        if ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_src") {
-          $body = $body."src1";
-          $current_pos = $entry->{'STOP'} + 1;
-        } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_dst") {
-          $body = $body."dst";
-          $current_pos = $entry->{'STOP'} + 1;
-        } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_op") {
-          $body = $body."op";
-          $current_pos = $entry->{'STOP'} + 1;
-        } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "regs") {
-          die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
-          my $reg_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};
-          if (exists $md->{$reg_idx}) {
-            $reg_idx = $md->{$reg_idx};
-          }
-          die "" if not exists $env_reg_idx_map{$reg_idx};
-          $body = $body.$env_reg_idx_map{$reg_idx};
-          $current_pos = $entry->{'STOP'} + 1;
-        } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "xmm_regs") {
-          die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
-          my $xmm_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};
-          die "" if not exists $env_xmmregs_idx_map{$xmm_idx};
-          die "" if $entry->{'DEF_SYM_INFO'}->[1]->{'IS_ARRAY'} == 0;
-          my $vec_sym = $entry->{'DEF_SYM_INFO'}->[1]->{'SYM'};
-          die "" if not exists $VecSymbolToCType{$vec_sym};
-          my $vec_idx = $entry->{'DEF_SYM_INFO'}->[1]->{'ARRAY_IDX'};
-          $body = $body."(($VecSymbolToCType{$vec_sym})$env_xmmregs_idx_map{$xmm_idx})[$vec_idx]";
+        my $new_var = &replace_env_var($entry, $md);
+        if ($new_var ne "") {
+          $body = $body.$new_var;
           $current_pos = $entry->{'STOP'} + 1;
         } else {
           $current_pos = $e;
@@ -1241,7 +1217,12 @@ sub update_func_call
 {
   my ($caller_ptr, $call_pos, $callee_ptr, $path_info) = @_;
   my $call_info = $caller_ptr->{'CALLS'}->{$call_pos};
-  my $str = $callee_ptr->{'NAME'}."_".$path_info."_".$caller_ptr->{'NAME'}."_loc".$call_pos;
+  my $str = "";
+  if ($callee_ptr->{'DO_EXPAND'}) {
+    $str = $callee_ptr->{'NAME'}."_".$path_info."_".$caller_ptr->{'NAME'}."_loc".$call_pos;
+  } else {
+    $str = $callee_ptr->{'NAME'};
+  }
   $str = $str."(";
   foreach my $idx (0 .. $#qemuaot_gp_params) {
     my $a = $qemuaot_gp_params[$idx];
@@ -1268,7 +1249,7 @@ sub update_func_call
       my $sub_call_info = $caller_ptr->{'CALLS'}->{$sorted_sub_calls[$sub_call_idx]};
       if (exists $funcs{$sub_call_info->{'CALL_TARGET'}}) {
         my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info);
-        $str = $str.", ".$sub_call_idx;
+        $str = $str.", ".$sub_call_txt;
       } else {
         $str = $str.", ".$arg;
       }
@@ -1405,4 +1386,36 @@ sub FuncNameIsForeign
   } else {
     return 1;
   }
+}
+
+sub replace_env_var
+{
+  my ($entry, $md) = @_;
+
+  my $new_var = "";
+  if ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_src") {
+    $new_var = "src1";
+  } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_dst") {
+    $new_var = "dst";
+  } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_op") {
+    $new_var = "op";
+  } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "regs") {
+    die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
+    my $reg_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};
+    if (exists $md->{$reg_idx}) {
+      $reg_idx = $md->{$reg_idx};
+    }
+    die "" if not exists $env_reg_idx_map{$reg_idx};
+    $new_var = $env_reg_idx_map{$reg_idx};
+  } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "xmm_regs") {
+    die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
+    my $xmm_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};
+    die "" if not exists $env_xmmregs_idx_map{$xmm_idx};
+    die "" if $entry->{'DEF_SYM_INFO'}->[1]->{'IS_ARRAY'} == 0;
+    my $vec_sym = $entry->{'DEF_SYM_INFO'}->[1]->{'SYM'};
+    die "" if not exists $VecSymbolToCType{$vec_sym};
+    my $vec_idx = $entry->{'DEF_SYM_INFO'}->[1]->{'ARRAY_IDX'};
+    $new_var = "(($VecSymbolToCType{$vec_sym})$env_xmmregs_idx_map{$xmm_idx})[$vec_idx]";
+  }
+  return $new_var;
 }
