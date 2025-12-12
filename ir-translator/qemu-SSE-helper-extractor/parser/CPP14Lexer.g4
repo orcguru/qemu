@@ -228,6 +228,8 @@ VecW: '_w_ZMMReg';
 
 VecB: '_b_ZMMReg';
 
+VecType: 'ZMMReg';
+
 /*Operators*/
 
 LeftParen: '(';

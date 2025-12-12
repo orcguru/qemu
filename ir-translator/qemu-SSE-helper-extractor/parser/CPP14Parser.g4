@@ -58,6 +58,7 @@ unqualifiedId:
         | VecL                                                          # UIDVecL
         | VecW                                                          # UIDVecW
         | VecB                                                          # UIDVecB
+        | VecType                                                       # UIDVecT
         ;
 
 qualifiedId: nestedNameSpecifier Template? unqualifiedId;
@@ -630,7 +631,10 @@ initializerList:
 bracedInitList: (LeftParen Identifier RightParen)? LeftBrace (initializerList Comma?)? RightBrace;
 /*Classes*/
 
-className: Identifier | simpleTemplateId;
+className: Identifier               # ClassNameID
+          | simpleTemplateId        # ClassNameST
+          | VecType                 # ClassNameVT
+          ;
 
 classSpecifier:
 	classHead LeftBrace memberSpecification? RightBrace;

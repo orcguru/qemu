@@ -289,6 +289,20 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterUIDVecT(CPP14Parser.UIDVecTContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUIDVecT(CPP14Parser.UIDVecTContext ctx) {
+          System.out.println("<VecType>$$BEGIN:" + Integer.toString(ctx.VecType().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecType().getSymbol().getStopIndex()));
+        }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterQualifiedId(CPP14Parser.QualifiedIdContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -2158,13 +2172,39 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterClassName(CPP14Parser.ClassNameContext ctx) { }
+	@Override public void enterClassNameID(CPP14Parser.ClassNameIDContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitClassName(CPP14Parser.ClassNameContext ctx) { }
+	@Override public void exitClassNameID(CPP14Parser.ClassNameIDContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterClassNameST(CPP14Parser.ClassNameSTContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitClassNameST(CPP14Parser.ClassNameSTContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterClassNameVT(CPP14Parser.ClassNameVTContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitClassNameVT(CPP14Parser.ClassNameVTContext ctx) {
+          System.out.println("<VecType>$$BEGIN:" + Integer.toString(ctx.VecType().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecType().getSymbol().getStopIndex()));
+        }
 	/**
 	 * {@inheritDoc}
 	 *

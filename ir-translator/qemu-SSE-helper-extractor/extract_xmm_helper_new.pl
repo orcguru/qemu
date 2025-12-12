@@ -11,11 +11,11 @@ if ($#ARGV < 1) {
   exit 1;
 }
 
-my %prefixMap = (
-  "q" => ["unsigned long", "v2ulong"],
-  "l" => ["unsigned int", "v4uint"],
-  "w" => ["unsigned short", "v8ushort"],
-  "b" => ["unsigned char", "v16uchar"]
+my %VecCodeToCType = (
+  "VecQ" => "v2ulong",
+  "VecL" => "v4uint",
+  "VecW" => "v8ushort",
+  "VecB" => "v16uchar"
 );
 my $path = "$ARGV[0].helper_xmm";
 my $file_size = -s $ARGV[0];
@@ -197,6 +197,58 @@ foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'VECTOR_ARGS'} = $vector_args;
   $funcs{$f}->{'128'} = $ret128_info;
 }
+
+# Collect VecType info(ZMMReg), to detect tmp vector variable and do the patch.
+open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
+while (<FD>) {
+  my $line = $_;
+  chomp($line);
+  if ($line =~ /^<VecType>/) {
+    my @fields = split(/\$\$/, $line);
+    my @f1 = split(/:/, $fields[1]);
+    my @f2 = split(/:/, $fields[2]);
+    my $start = $f1[1];
+    my $stop = $f2[1];
+    my ($func_idx, $func_ptr) = &lookup($start, \%func_lookup);
+    if ($func_idx != -1) {
+      my %info = ();
+      $info{'START'} = $start;
+      my $current_pos = $stop + 1;
+      while (&IsValidSymbolStart($file_content[$current_pos]) == 0) {
+        die "" if $file_content[$current_pos] eq "*";
+        $current_pos = $current_pos + 1;
+      }
+      my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $current_pos, 0);
+      $info{'SYM'} = $sym;
+      $current_pos = $sym_stop + 1;
+      while ($file_content[$current_pos] =~ /\s/) {
+        $current_pos = $current_pos + 1;
+      }
+      die "" if $file_content[$current_pos] ne "=";
+      $current_pos = $current_pos + 1;
+      while ($file_content[$current_pos] =~ /\s/) {
+        $current_pos = $current_pos + 1;
+      }
+      die "" if $file_content[$current_pos] ne "*";
+      $current_pos = $current_pos + 1;
+      while ($file_content[$current_pos] =~ /\s/) {
+        $current_pos = $current_pos + 1;
+      }
+      ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $current_pos, 0);
+      my $vec_arg_idx = &get_vec_arg_idx($func_ptr, $sym);
+      die "" if $vec_arg_idx == -1;
+      die "" if $file_content[$sym_stop+1] ne ";";
+      $info{'VEC_ARG_IDX'} = $vec_arg_idx;
+      $info{'STOP'} = $sym_stop;
+      if (not exists $func_ptr->{'VEC_VAR'}) {
+        my %vec_var_info = ();
+        $func_ptr->{'VEC_VAR'} = \%vec_var_info;
+      }
+      $func_ptr->{'VEC_VAR'}->{$info{'START'}} = \%info;
+    }
+  }
+}
+close FD;
 
 # Patch detail call info used by vector expansion
 foreach my $f (keys %funcs) {
@@ -387,7 +439,6 @@ while (<FD>) {
           my ($array_idx, $array_idx_start, $array_idx_stop) = &GetContentWithArrayBound($stop+2);
           $info{'ARRAY_IDX'} = $array_idx;
           die "" if ($file_content[$array_idx_stop+2] eq "." or $file_content[$array_idx_stop+2] eq "-");
-          $stop = $array_idx_stop + 1;
           unshift @vec_symbols, \%info;
           if ($file_content[$start-1] eq ">") {
             my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $start-3, 1);
@@ -409,29 +460,23 @@ while (<FD>) {
             die "";
           }
           # Parse vec_symbols into argument info or var info
-          my %var_info = ();
-          my $vec_param_idx = &get_vec_arg_idx($func_ptr, $vec_symbols[0]->{'SYM'});
-          if ($vec_param_idx == -1) {
-            $var_info{'FROM_PARAM'} = 1;
-            $var_info{'VAR'} = $vec_param_idx;
-          } else {
-            $var_info{'FROM_PARAM'} = 0;
-            $var_info{'VAR'} = $vec_symbols[0]->{'SYM'};
-          }
-          $stop = $array_idx_stop + 1;
           my %vec_info = ();
           $vec_info{'TXT'} = &GetText($start, $stop);
           $vec_info{'START'} = $start;
           $vec_info{'STOP'} = $stop;
           $vec_info{'LOOKUP_START'} = $vec_info{'START'};
           $vec_info{'LOOKUP_STOP'} = $vec_info{'STOP'};
-          if ($file_content[$start-1] eq "&") {
-            $vec_info{'GET_ADDRESS'} = 1;
-          } else {
-            $vec_info{'GET_ADDRESS'} = 0;
-          }
+          $vec_info{'TYPE'} = $vec_symbols[$#vec_symbols]->{'SYM'};
+          die "" if $file_content[$start-1] eq "&";
           $vec_info{'DEF_SYM_INFO'} = \@vec_symbols;
-          $vec_info{'VAR_INFO'} = \%var_info;
+          my $vec_param_idx = &get_vec_arg_idx($func_ptr, $vec_symbols[0]->{'SYM'});
+          if ($vec_param_idx != -1) {
+            $vec_info{'FROM_PARAM'} = 1;
+            $vec_info{'VAR'} = $vec_param_idx;
+          } else {
+            $vec_info{'FROM_PARAM'} = 0;
+            $vec_info{'VAR'} = $vec_symbols[0]->{'SYM'};
+          }
           if (not exists $func_ptr->{'VEC'}) {
             my %info = ();
             $func_ptr->{'VEC'} = \%info;
@@ -584,7 +629,15 @@ foreach my $f (keys %funcs) {
   # Generate function
   open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
   print OUT "$blank_info\n\n";
+  print OUT<<EOF;
 
+// QEMU_HELPER_BEGIN
+typedef unsigned short __attribute__((__vector_size__(16))) v8ushort;
+typedef unsigned char __attribute__((__vector_size__(16))) v16uchar;
+typedef unsigned int __attribute__((__vector_size__(16))) v4uint;
+typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;
+
+EOF
   my %order_to_func = ();
   foreach my $sf (keys %defined_func) {
     $order_to_func{$funcs{$sf}->{'FUNC_IDX'}} = $sf;
@@ -979,23 +1032,49 @@ sub get_func_body
   if ($pi eq "") {
     return $func_ptr->{'FUNC_FULL'};
   }
-  my @sorted_calls = sort {$a <=> $b} keys %{$func_ptr->{'CALLS'}};
+  my %events = ();
+  foreach my $e (keys %{$func_ptr->{'CALLS'}}) {
+    $events{$e} = 1;
+  }
+  foreach my $e (keys %{$func_ptr->{'VEC'}}) {
+    $events{$e} = 1;
+  }
+  foreach my $e (keys %{$func_ptr->{'VEC_VAR'}}) {
+    $events{$e} = 1;
+  }
+  my @sorted_events = sort {$a <=> $b} keys %events;
   my $current_pos = $func_ptr->{'BODY_START'};
   my $body = "";
-  foreach my $e (@sorted_calls) {
+  foreach my $e (@sorted_events) {
     if ($e < $current_pos) {
       next;
     }
     die "" if $e == $current_pos;
     my $txt = &GetText($current_pos, ($e - 1));
     $body = $body.$txt;
-    my $call_target = $func_ptr->{'CALLS'}->{$e}->{'CALL_TARGET'};
-    if (not exists $funcs{$call_target}) {
-      $current_pos = $e;
+    if (exists $func_ptr->{'CALLS'}->{$e}) {
+      my $call_target = $func_ptr->{'CALLS'}->{$e}->{'CALL_TARGET'};
+      if (not exists $funcs{$call_target}) {
+        $current_pos = $e;
+      } else {
+        my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi);
+        $body = $body.$call_txt;
+        $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
+      }
+    } elsif (exists $func_ptr->{'VEC'}->{$e}) {
+      if ($func_ptr->{'VEC'}->{$e}->{'FROM_PARAM'}) {
+        $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}})$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$e}->{'VAR'}]->{'VAR_NAME'})";
+        $current_pos = $func_ptr->{'VEC'}->{$e}->{'STOP'} + 1;
+      } else {
+        $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}})$func_ptr->{'VEC'}->{$e}->{'VAR'})";
+        $current_pos = $func_ptr->{'VEC'}->{$e}->{'STOP'} + 1;
+      }
+    } elsif (exists $func_ptr->{'VEC_VAR'}->{$e}) {
+      my $entry = $func_ptr->{'VEC_VAR'}->{$e};
+      $body = $body."v2ulong ".$entry->{'SYM'}." = ".$func_ptr->{'VECTOR_ARGS'}->[$entry->{'VEC_ARG_IDX'}]->{'VAR_NAME'};
+      $current_pos = $entry->{'STOP'} + 1;
     } else {
-      my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi);
-      $body = $body.$call_txt;
-      $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
+      die "";
     }
   }
   my $txt = &GetText($current_pos, $func_ptr->{'BODY_STOP'});
