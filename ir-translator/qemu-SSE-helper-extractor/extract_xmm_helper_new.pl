@@ -570,8 +570,10 @@ my %qemuaot_gp_params_map = (
   "op" => "unsigned int",
   "rip" => "unsigned long",
 );
-my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
-my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
+#my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
+#my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
+my $qemuaot_vec_invoke = "xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h";
+my $qemuaot_vec_declare = "v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong ymm1_h, v2ulong xmm2, v2ulong ymm2_h, v2ulong xmm3, v2ulong ymm3_h, v2ulong xmm4, v2ulong ymm4_h, v2ulong xmm5, v2ulong ymm5_h, v2ulong xmm6, v2ulong ymm6_h, v2ulong xmm7, v2ulong ymm7_h, v2ulong xmm8, v2ulong ymm8_h, v2ulong xmm9, v2ulong ymm9_h, v2ulong xmm10, v2ulong ymm10_h, v2ulong xmm11, v2ulong ymm11_h, v2ulong xmm12, v2ulong ymm12_h, v2ulong xmm13, v2ulong ymm13_h, v2ulong xmm14, v2ulong ymm14_h";
 my %env_reg_idx_map = (
   "R_EAX" => "rax",
   "R_ECX" => "rcx",
@@ -907,9 +909,11 @@ sub parse_func_head
     $head_copy = "__attribute__((weak)) ".$head_copy;
   }
   if (not ($func->{'NAME'} =~ /^helper_/ and $func->{'NAME'} =~ /_xmm$/)) {
-    if (not $head_copy =~ /static/) {
-      $head_copy = "static ".$head_copy;
+    if ($head_copy =~ /static\s+/) {
+      $head_copy =~ s/static\s+//;
     }
+  } else {
+    $head_copy =~ s/$func->{'NAME'}/HELPER_ENTRY/;
   }
   $head =~ s/\n/ /g;
   $head =~ s/\s*$//;
@@ -1098,7 +1102,7 @@ sub gen_replicated_func
       }
       die "" if $#{$pi_info{$pi}} == -1;
       my $new_head = $funcs{$target_func}->{'HEAD'};
-      die "" if not $new_head =~ /$funcs{$target_func}->{'NAME'}$/;
+      #die "" if not $new_head =~ /$funcs{$target_func}->{'NAME'}$/;
       if ($pi ne "ROOT") {
         $new_head = $new_head."_".$pi;
       }
@@ -1135,9 +1139,6 @@ sub gen_replicated_func
 sub get_func_body
 {
   my ($func_ptr, $pi, $md) = @_;
-  if ($pi eq "") {
-    return $func_ptr->{'FUNC_FULL'};
-  }
   my %events = ();
   foreach my $e (keys %{$func_ptr->{'CALLS'}}) {
     $events{$e} = 1;
@@ -1391,7 +1392,9 @@ sub FuncNameIsForeign
 sub replace_env_var
 {
   my ($entry, $md) = @_;
-
+  if ($#{$entry->{'DEF_SYM_INFO'}} == -1) {
+    return "env";
+  }
   my $new_var = "";
   if ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_src") {
     $new_var = "src1";
