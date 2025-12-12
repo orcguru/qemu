@@ -17,6 +17,12 @@ my %VecCodeToCType = (
   "VecW" => "v8ushort",
   "VecB" => "v16uchar"
 );
+my %VecSymbolToCType = (
+  "_q_ZMMReg" => "v2ulong",
+  "_l_ZMMReg" => "v4uint",
+  "_w_ZMMReg" => "v8ushort",
+  "_b_ZMMReg" => "v16uchar"
+);
 my $path = "$ARGV[0].helper_xmm";
 my $file_size = -s $ARGV[0];
 open FDIN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
@@ -190,11 +196,24 @@ while (keys %workset > 0) {
 }
 foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'TOUCHED'} = 1;
-  my ($head, $scalar_args, $vector_args, $pure_arg_info, $ret128_info) = &parse_func_head($funcs{$f});
+  my ($head, $scalar_args, $vector_args, $pure_arg_info, $ret128_info, $env_type) = &parse_func_head($funcs{$f});
   $funcs{$f}->{'HEAD'} = $head;
   $funcs{$f}->{'PURE_ARG_INFO'} = $pure_arg_info;
   $funcs{$f}->{'SCALAR_ARGS'} = $scalar_args;
   $funcs{$f}->{'VECTOR_ARGS'} = $vector_args;
+  $funcs{$f}->{'ENV_TYPE'} = $env_type;
+  if (@{$vector_args} > 0) {
+    $funcs{$f}->{'DO_EXPAND'} = 1;
+    if (not exists $funcs{$f}->{'EXPAND_FACTORS'}) {
+      my @array = ();
+      $funcs{$f}->{'EXPAND_FACTORS'} = \@array;
+    }
+    foreach my $e (@{$vector_args}) {
+      push @{$funcs{$f}->{'EXPAND_FACTORS'}}, $e->{'VAR_NAME'};
+    }
+  } else {
+    $funcs{$f}->{'DO_EXPAND'} = 0;
+  }
   $funcs{$f}->{'128'} = $ret128_info;
 }
 
@@ -329,6 +348,8 @@ while (<FD>) {
         if ($file_content[$stop+1] ne "-") {
           my ($call_idx, $call_ptr) = &lookup($start, \%callsite_lookup);
           if ($call_idx == -1) {
+            $func_ptr->{'DO_DEFINE_ENV'} = 1;
+            die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
             # Copy from x25
             #print "standalone ENV inside $func_ptr->{'NAME'}\n";
             die "" if ($file_content[$start-1] eq "." or $file_content[$start-1] eq ">");
@@ -360,6 +381,8 @@ while (<FD>) {
           if ($file_content[$start-1] eq "&") {
             $get_address = 1;
             $start = $start - 1;
+            $func_ptr->{'DO_DEFINE_ENV'} = 1;
+            die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
           }
           my @sym_info = ();
           my $pos = $stop + 3;
@@ -393,6 +416,28 @@ while (<FD>) {
           $env_info{'LOOKUP_STOP'} = $env_info{'STOP'};
           $env_info{'GET_ADDRESS'} = $get_address;
           $env_info{'DEF_SYM_INFO'} = \@sym_info;
+          if ($sym_info[0]->{'SYM'} eq "regs") {
+            die "" if $sym_info[0]->{'IS_ARRAY'} == 0;
+            foreach my $si (@{$func_ptr->{'SCALAR_ARGS'}}) {
+              if ($sym_info[0]->{'ARRAY_IDX'} eq $si->{'VAR_NAME'}) {
+                $func_ptr->{'DO_EXPAND'} = 1;
+                if (not exists $func_ptr->{'EXPAND_FACTORS'}) {
+                  my @array = ();
+                  $func_ptr->{'EXPAND_FACTORS'} = \@array;
+                  my %info_map = ();
+                  $func_ptr->{'EXPAND_FACTORS_MAP'} = \%info_map;
+                }
+                if (not exists $func_ptr->{'EXPAND_FACTORS_MAP'}->{$si->{'VAR_NAME'}}) {
+                  push @{$func_ptr->{'EXPAND_FACTORS'}}, $si->{'VAR_NAME'};
+                  $func_ptr->{'EXPAND_FACTORS_MAP'}->{$si->{'VAR_NAME'}} = 1;
+                }
+              }
+            }
+          }
+          if (not ($sym_info[0]->{'SYM'} eq "cc_src" or $sym_info[0]->{'SYM'} eq "cc_dst" or $sym_info[0]->{'SYM'} eq "cc_op" or $sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs")) {
+            $func_ptr->{'DO_DEFINE_ENV'} = 1;
+            die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
+          }
           if ($file_content[$stop+1] eq " " and $file_content[$stop+2] eq "=" and $file_content[$stop+3] eq " ") {
             if ($sym_info[0]->{'SYM'} eq "cc_src" or $sym_info[0]->{'SYM'} eq "cc_dst" or $sym_info[0]->{'SYM'} eq "cc_op" or $sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs") {
               $env_info{'UPDATE_REGISTER_CONTEXT'} = 1;
@@ -527,6 +572,42 @@ my %qemuaot_gp_params_map = (
 );
 my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
 my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
+my %env_reg_idx_map = (
+  "R_EAX" => "rax",
+  "R_ECX" => "rcx",
+  "R_EDX" => "rdx",
+  "R_EBX" => "rbx",
+  "R_ESP" => "rsp",
+  "R_EBP" => "rbp",
+  "R_ESI" => "rsi",
+  "R_EDI" => "rdi",
+  "R_R8" => "r8",
+  "R_R9" => "r9",
+  "R_R10" => "r10",
+  "R_R11" => "r11",
+  "R_R12" => "r12",
+  "R_R13" => "r13",
+  "R_R14" => "r14",
+  "R_R15" => "r15"
+);
+my %env_xmmregs_idx_map = (
+  "0" => "xmm0",
+  "1" => "xmm1",
+  "2" => "xmm2",
+  "3" => "xmm3",
+  "4" => "xmm4",
+  "5" => "xmm5",
+  "6" => "xmm6",
+  "7" => "xmm7",
+  "8" => "xmm8",
+  "9" => "xmm9",
+  "10" => "xmm10",
+  "11" => "xmm11",
+  "12" => "xmm12",
+  "13" => "xmm13",
+  "14" => "xmm14",
+  "15" => "xmm15"
+);
 
 foreach my $f (keys %funcs) {
   if (not ($f =~ /^helper_/ and $f =~ /_xmm$/)) {
@@ -799,6 +880,7 @@ sub GetContentWithArrayBound
 sub parse_func_head
 {
   my ($func) = @_;
+  my $env_type = "NA";
   my $str = &GetText($func->{'FULL_START'}, $func->{'NAME_STOP'}, $ARGV[0]);
   $str = &mov_tail_attribute_to_head($str);
   my @chars = split(//, $str);
@@ -892,6 +974,7 @@ sub parse_func_head
       $info{'IDX'} = $i;
       # Drop env from arguments
       if ($var eq "env") {
+        $env_type = $type;
         next;
       }
       if ($type eq "ZMMReg *") {
@@ -900,10 +983,10 @@ sub parse_func_head
         push @scalar, \%info;
       }
     }
-    return ($head_copy, \@scalar, \@vector, $pure_arg_info, \%ret128_info);
+    return ($head_copy, \@scalar, \@vector, $pure_arg_info, \%ret128_info, $env_type);
   } else {
     my @empty = ();
-    return ($head_copy, \@empty, \@empty, $pure_arg_info, \%ret128_info);
+    return ($head_copy, \@empty, \@empty, $pure_arg_info, \%ret128_info, $env_type);
   }
 }
 
@@ -958,15 +1041,27 @@ sub get_vec_arg_idx
   return -1;
 }
 
+sub get_scalar_arg_idx
+{
+  my ($func_ptr, $scalar_sym) = @_;
+  foreach my $idx (0 .. $#{$func_ptr->{'SCALAR_ARGS'}}) {
+    if ($func_ptr->{'SCALAR_ARGS'}->[$idx]->{'VAR_NAME'} eq $scalar_sym) {
+      return $idx;
+    }
+  }
+  return -1;
+}
+
 sub gen_replicated_func
 {
   my ($target_func, $func_replicate_info) = @_;
   my $new_func = "";
-  if (@{$funcs{$target_func}->{'VECTOR_ARGS'}} == 0) {
+  if ($funcs{$target_func}->{'DO_EXPAND'} == 0) {
     my $new_head = $funcs{$target_func}->{'HEAD'};
     my $args = &collect_func_args($funcs{$target_func});
     my $current_func = $new_head."($args)\n";
-    my $new_func_body = &get_func_body($funcs{$target_func}, "");
+    my %empty = ();
+    my $new_func_body = &get_func_body($funcs{$target_func}, "", \%empty);
     $current_func = $current_func.$new_func_body."\n\n";
     $new_func = $new_func.$current_func;
   } else {
@@ -988,7 +1083,9 @@ sub gen_replicated_func
               push @{$pi_info{$pi}}, $vi;
             }
           }
-          die "" if @{$funcs{$i->{'FUNC'}}->{'CALLS'}->{$i->{'LOC'}}->{'CALLER_ARG_VECTORS'}} == 0;
+          if (@{$funcs{$i->{'FUNC'}}->{'CALLS'}->{$i->{'LOC'}}->{'CALLER_ARG_VECTORS'}} == 0) {
+            last;
+          }
           my $target_func = $funcs{$i->{'FUNC'}}->{'CALLS'}->{$i->{'LOC'}}->{'CALL_TARGET'};
           my @target_args = ();
           foreach my $ti (@{$funcs{$i->{'FUNC'}}->{'CALLS'}->{$i->{'LOC'}}->{'CALLER_ARG_VECTORS'}}) {
@@ -1000,11 +1097,6 @@ sub gen_replicated_func
         }
       }
       die "" if $#{$pi_info{$pi}} == -1;
-      # Define vector arguments
-      foreach my $idx (0 .. $#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
-        my $fi = $funcs{$target_func}->{'VECTOR_ARGS'}->[$idx];
-        $new_func = $new_func."#define $fi->{'VAR_NAME'} VEC$pi_info{$pi}->[$idx]\n";
-      }
       my $new_head = $funcs{$target_func}->{'HEAD'};
       die "" if not $new_head =~ /$funcs{$target_func}->{'NAME'}$/;
       if ($pi ne "ROOT") {
@@ -1012,13 +1104,27 @@ sub gen_replicated_func
       }
       my $args = &collect_func_args($funcs{$target_func});
       my $current_func = $new_head."($args)\n";
-      my $new_func_body = &get_func_body($funcs{$target_func}, $pi);
+      # Define arguments
+      my %macro_def = ();
+      foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
+        my $vec_idx = &get_vec_arg_idx($funcs{$target_func}, $var);
+        if ($vec_idx != -1) {
+          $current_func = $current_func."#define $var VEC$pi_info{$pi}->[$vec_idx]\n";
+        } else {
+          my $scalar_idx = &get_scalar_arg_idx($funcs{$target_func}, $var);
+          die "" if $scalar_idx == -1;
+          die "" if $#{$func_replicate_info->{$target_func}->{$pi}} == -1;
+          my $in = $func_replicate_info->{$target_func}->{$pi}->[$#{$func_replicate_info->{$target_func}->{$pi}}];
+          $current_func = $current_func."#define $var $funcs{$in->{'FUNC'}}->{'CALLS'}->{$in->{'LOC'}}->{'SCALAR_CALL_ARGS'}->[$scalar_idx]\n";
+          $macro_def{$var} = $funcs{$in->{'FUNC'}}->{'CALLS'}->{$in->{'LOC'}}->{'SCALAR_CALL_ARGS'}->[$scalar_idx];
+        }
+      }
+      my $new_func_body = &get_func_body($funcs{$target_func}, $pi, \%macro_def);
       $current_func = $current_func.$new_func_body."\n";
       $new_func = $new_func.$current_func;
-      # Un-define vector arguments
-      foreach my $idx (0 .. $#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
-        my $fi = $funcs{$target_func}->{'VECTOR_ARGS'}->[$idx];
-        $new_func = $new_func."#undef $fi->{'VAR_NAME'}\n";
+      # Un-define arguments
+      foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
+        $new_func = $new_func."#undef $var\n";
       }
       $new_func = $new_func."\n";
     }
@@ -1028,7 +1134,7 @@ sub gen_replicated_func
 
 sub get_func_body
 {
-  my ($func_ptr, $pi) = @_;
+  my ($func_ptr, $pi, $md) = @_;
   if ($pi eq "") {
     return $func_ptr->{'FUNC_FULL'};
   }
@@ -1042,9 +1148,21 @@ sub get_func_body
   foreach my $e (keys %{$func_ptr->{'VEC_VAR'}}) {
     $events{$e} = 1;
   }
+  foreach my $e (keys %{$func_ptr->{'ENV'}}) {
+    $events{$e} = 1;
+  }
   my @sorted_events = sort {$a <=> $b} keys %events;
-  my $current_pos = $func_ptr->{'BODY_START'};
+  my $current_pos;
   my $body = "";
+  if (exists $func_ptr->{'DO_DEFINE_ENV'}) {
+    $body = "{\n";
+    $body = $body."   $func_ptr->{'ENV_TYPE'}env;\n";
+    # FIXME: cross platform
+    $body = $body."   asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
+    $current_pos = $func_ptr->{'BODY_START'} + 1;
+  } else {
+    $current_pos = $func_ptr->{'BODY_START'};
+  }
   foreach my $e (@sorted_events) {
     if ($e < $current_pos) {
       next;
@@ -1073,6 +1191,43 @@ sub get_func_body
       my $entry = $func_ptr->{'VEC_VAR'}->{$e};
       $body = $body."v2ulong ".$entry->{'SYM'}." = ".$func_ptr->{'VECTOR_ARGS'}->[$entry->{'VEC_ARG_IDX'}]->{'VAR_NAME'};
       $current_pos = $entry->{'STOP'} + 1;
+    } elsif (exists $func_ptr->{'ENV'}->{$e}) {
+      my $entry = $func_ptr->{'ENV'}->{$e};
+      if ($entry->{'GET_ADDRESS'}) {
+        $current_pos = $e;
+      } else {
+        if ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_src") {
+          $body = $body."src1";
+          $current_pos = $entry->{'STOP'} + 1;
+        } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_dst") {
+          $body = $body."dst";
+          $current_pos = $entry->{'STOP'} + 1;
+        } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_op") {
+          $body = $body."op";
+          $current_pos = $entry->{'STOP'} + 1;
+        } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "regs") {
+          die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
+          my $reg_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};
+          if (exists $md->{$reg_idx}) {
+            $reg_idx = $md->{$reg_idx};
+          }
+          die "" if not exists $env_reg_idx_map{$reg_idx};
+          $body = $body.$env_reg_idx_map{$reg_idx};
+          $current_pos = $entry->{'STOP'} + 1;
+        } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "xmm_regs") {
+          die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
+          my $xmm_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};
+          die "" if not exists $env_xmmregs_idx_map{$xmm_idx};
+          die "" if $entry->{'DEF_SYM_INFO'}->[1]->{'IS_ARRAY'} == 0;
+          my $vec_sym = $entry->{'DEF_SYM_INFO'}->[1]->{'SYM'};
+          die "" if not exists $VecSymbolToCType{$vec_sym};
+          my $vec_idx = $entry->{'DEF_SYM_INFO'}->[1]->{'ARRAY_IDX'};
+          $body = $body."(($VecSymbolToCType{$vec_sym})$env_xmmregs_idx_map{$xmm_idx})[$vec_idx]";
+          $current_pos = $entry->{'STOP'} + 1;
+        } else {
+          $current_pos = $e;
+        }
+      }
     } else {
       die "";
     }
