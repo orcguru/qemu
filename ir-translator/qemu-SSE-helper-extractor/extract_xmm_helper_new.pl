@@ -109,6 +109,8 @@ while (<FD>) {
     $global_func_idx = $global_func_idx + 1;
     my %calls = ();
     $info{'CALLS'} = \%calls;
+    my %vec_assign = ();
+    $info{'VEC_ASSIGN'} = \%vec_assign;
     my %returns = ();
     $info{'RETURNS'} = \%returns;
     if (exists $funcs{$info{'NAME'}}) {
@@ -515,18 +517,34 @@ while (<FD>) {
           die "" if $file_content[$start-1] eq "&";
           $vec_info{'DEF_SYM_INFO'} = \@vec_symbols;
           my $vec_param_idx = &get_vec_arg_idx($func_ptr, $vec_symbols[0]->{'SYM'});
+          my $skip_vec = 0;
           if ($vec_param_idx != -1) {
             $vec_info{'FROM_PARAM'} = 1;
             $vec_info{'VAR'} = $vec_param_idx;
+            if ($file_content[$array_idx_stop+2] eq " " and $file_content[$array_idx_stop+3] eq "=" and $file_content[$array_idx_stop+4] eq " ") {
+              # Collect vector assignment info
+              my %vec_assign = ();
+              $vec_assign{'VEC_INFO'} = \%vec_info;
+              $vec_assign{'ASSIGN_POS'} = $array_idx_stop+3;
+              my $semi_pos = $vec_assign{'ASSIGN_POS'};
+              while ($file_content[$semi_pos] ne ";") {
+                $semi_pos = $semi_pos + 1;
+              }
+              $vec_assign{'SEMI_POS'} = $semi_pos;
+              $func_ptr->{'VEC_ASSIGN'}->{$start} = \%vec_assign;
+              $skip_vec = 1;
+            }
           } else {
             $vec_info{'FROM_PARAM'} = 0;
             $vec_info{'VAR'} = $vec_symbols[0]->{'SYM'};
           }
-          if (not exists $func_ptr->{'VEC'}) {
-            my %info = ();
-            $func_ptr->{'VEC'} = \%info;
+          if ($skip_vec == 0) {
+            if (not exists $func_ptr->{'VEC'}) {
+              my %info = ();
+              $func_ptr->{'VEC'} = \%info;
+            }
+            $func_ptr->{'VEC'}->{$start} = \%vec_info;
           }
-          $func_ptr->{'VEC'}->{$start} = \%vec_info;
         }
       }
     }
@@ -1152,6 +1170,9 @@ sub get_func_body
   foreach my $e (keys %{$func_ptr->{'ENV'}}) {
     $events{$e} = 1;
   }
+  foreach my $e (keys %{$func_ptr->{'VEC_ASSIGN'}}) {
+    $events{$e} = 1;
+  }
   my @sorted_events = sort {$a <=> $b} keys %events;
   my $current_pos;
   my $body = "";
@@ -1204,6 +1225,45 @@ sub get_func_body
         } else {
           $current_pos = $e;
         }
+      }
+    } elsif (exists $func_ptr->{'VEC_ASSIGN'}->{$e}) {
+      my $vec_entry = $func_ptr->{'VEC_ASSIGN'}->{$e}->{'VEC_INFO'};
+      if ($vec_entry->{'FROM_PARAM'}) {
+        if ($vec_entry->{'TYPE'} eq "VecQ") {
+          $body = $body."$func_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'}";
+          $current_pos = $vec_entry->{'STOP'} + 1;
+        } else {
+          $body = $body."{\n";
+          $body = $body."$VecCodeToCType{$vec_entry->{'TYPE'}} vec_assign_tmp = ($VecCodeToCType{$vec_entry->{'TYPE'}})$func_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'};\n";
+          $body = $body."vec_assign_tmp[".$vec_entry->{'DEF_SYM_INFO'}->[$#{$vec_entry->{'DEF_SYM_INFO'}}]->{'ARRAY_IDX'}."] ";
+          my $sub_head = $func_ptr->{'VEC_ASSIGN'}->{$e}->{'ASSIGN_POS'};
+          my $sub_current = $sub_head;
+          while ($sub_current != $func_ptr->{'VEC_ASSIGN'}->{$e}->{'SEMI_POS'}) {
+            if (exists $func_ptr->{'VEC'}->{$sub_current}) {
+              my $sub_str = &GetText($sub_head, ($sub_current-1));
+              $body = $body.$sub_str;
+
+              if ($func_ptr->{'VEC'}->{$sub_current}->{'FROM_PARAM'}) {
+                $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$sub_current}->{'TYPE'}})$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$sub_current}->{'VAR'}]->{'VAR_NAME'})";
+              } else {
+                $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$sub_current}->{'TYPE'}})$func_ptr->{'VEC'}->{$sub_current}->{'VAR'})";
+              }
+              $sub_head = $func_ptr->{'VEC'}->{$sub_current}->{'STOP'} + 1;
+              $sub_current = $sub_head;
+            } else {
+              $sub_current = $sub_current + 1;
+            }
+          }
+          my $sub_str = &GetText($sub_head, $sub_current);
+          $body = $body.$sub_str;
+          $body = $body."\n$func_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'} = (v2ulong)vec_assign_tmp;\n";
+          $body = $body."}\n";
+          $current_pos = $sub_current + 1;
+        }
+      } else {
+        # FIXME
+        $body = $body."(($VecCodeToCType{$vec_entry->{'TYPE'}})$vec_entry->{'VAR'})";
+        $current_pos = $vec_entry->{'STOP'} + 1;
       }
     } else {
       die "";
