@@ -152,8 +152,9 @@ while (<FD>) {
       $info{'IS_FOREIGN'} = 1;
     }
     my $str = &GetText($info{'PAREN_START'} + 1, $info{'PAREN_STOP'} - 1);
-    my $args = &ExtractCallArguments($str);
+    my ($args, $ranges) = &ExtractCallArguments($str, $info{'PAREN_START'} + 1);
     $info{'CALL_ARGUMENTS'} = $args;
+    $info{'CALL_ARGUMENT_RANGES'} = $ranges;
     my ($func_idx, $ptr) = &lookup($info{'NAME_START'}, \%func_lookup);
     if ($func_idx != -1) {
       #print "$ptr->{'NAME'} calls $info{'CALL_TARGET'}\n";
@@ -276,15 +277,18 @@ foreach my $f (keys %funcs) {
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     my $i = $funcs{$f}->{'CALLS'}->{$e};
     my @scalars = ();
+    my @scalar_ranges = ();
     my @vectors = ();
     my $callee = $funcs{$i->{'CALL_TARGET'}};
     foreach my $e (@{$callee->{'SCALAR_ARGS'}}) {
       push @scalars, $i->{'CALL_ARGUMENTS'}->[$e->{'IDX'}];
+      push @scalar_ranges, $i->{'CALL_ARGUMENT_RANGES'}->[$e->{'IDX'}];
     }
     foreach my $e (@{$callee->{'VECTOR_ARGS'}}) {
       push @vectors, $i->{'CALL_ARGUMENTS'}->[$e->{'IDX'}];
     }
     $i->{'SCALAR_CALL_ARGS'} = \@scalars;
+    $i->{'SCALAR_CALL_ARG_RANGES'} = \@scalar_ranges;
     $i->{'VECTOR_CALL_ARGS'} = \@vectors;
     my $caller = $funcs{$i->{'PARENT'}};
     my @caller_arg_vectors = ();
@@ -1316,7 +1320,38 @@ sub update_func_call
       }
       $sub_call_idx = $sub_call_idx + 1;
     } else {
-      $str = $str.", ".$arg;
+      my $range_info = $call_info->{'SCALAR_CALL_ARG_RANGES'}->[$idx];
+      my @vecs = ();
+      foreach my $e (keys %{$caller_ptr->{'VEC'}}) {
+        if ($e >= $range_info->{'START'} and $e < $range_info->{'STOP'}) {
+          push @vecs, $e;
+        }
+      }
+      if (@vecs != 0) {
+        $str = $str.", ";
+        @vecs = sort {$a <=> $b} @vecs;
+        my $last_dump = $range_info->{'START'};
+        foreach my $pos (@vecs) {
+          if ($last_dump < $pos) {
+            my $sub_str = &GetText($last_dump, $pos - 1);
+            $str = $str.$sub_str;
+          }
+          my $vec_entry = $caller_ptr->{'VEC'}->{$pos};
+
+          if ($vec_entry->{'FROM_PARAM'}) {
+            $str = $str."(($VecCodeToCType{$vec_entry->{'TYPE'}})$caller_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'})";
+          } else {
+            $str = $str."(($VecCodeToCType{$vec_entry->{'TYPE'}})$vec_entry->{'VAR'})";
+          }
+          $last_dump = $vec_entry->{'STOP'} + 1;
+        }
+        if ($last_dump <= $range_info->{'STOP'}) {
+          my $sub_str = &GetText($last_dump, $range_info->{'STOP'});
+          $str = $str.$sub_str;
+        }
+      } else {
+        $str = $str.", ".$arg;
+      }
     }
   }
   if (exists $callee_ptr->{'IS_FOREIGN'}) {
@@ -1346,8 +1381,23 @@ sub collect_func_args
 # There could be function call within arguments
 sub ExtractCallArguments
 {
-  my ($input) = @_;
+  my ($input, $start_idx) = @_;
   my @output = ();
+  my @comma_split_fields = split(/,/, $input);
+  my @size_cnt = ();
+  foreach my $csf (@comma_split_fields) {
+    my @sub_fields = split(//, $csf);
+    my $cnt = @sub_fields;
+    push @size_cnt, $cnt;
+  }
+  my @range = ();
+  foreach my $s (@size_cnt) {
+    my %info = ();
+    $info{'START'} = $start_idx;
+    $info{'STOP'} = $start_idx + $s - 1;
+    push @range, \%info;
+    $start_idx = $info{'STOP'} + 2;
+  }
   $input =~ s/\n/ /g;
   $input =~ s/^\s*//;
   $input =~ s/\s*$//;
@@ -1421,7 +1471,7 @@ sub ExtractCallArguments
       last;
     }
   }
-  return \@output;
+  return (\@output, \@range);
 }
 
 sub IsValidSymbolStart
