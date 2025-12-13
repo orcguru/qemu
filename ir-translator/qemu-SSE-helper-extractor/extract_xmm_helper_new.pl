@@ -152,7 +152,7 @@ while (<FD>) {
       $info{'IS_FOREIGN'} = 1;
     }
     my $str = &GetText($info{'PAREN_START'} + 1, $info{'PAREN_STOP'} - 1);
-    my ($args, $ranges) = &ExtractCallArguments($str, $info{'PAREN_START'} + 1);
+    my ($args, $ranges) = &ExtractCallArguments($str, $info{'PAREN_START'} + 1, $info{'PAREN_STOP'} - 1);
     $info{'CALL_ARGUMENTS'} = $args;
     $info{'CALL_ARGUMENT_RANGES'} = $ranges;
     my ($func_idx, $ptr) = &lookup($info{'NAME_START'}, \%func_lookup);
@@ -762,7 +762,7 @@ sub lookup
   my ($loc, $lookup_info) = @_;
   my $low_idx = 0;
   my $high_idx = $#{$lookup_info->{'SORTED_ADDR'}};
-  while (($high_idx - $low_idx) != 1) {
+  while (($high_idx - $low_idx) > 1) {
     if (!($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$low_idx]}->{'LOOKUP_START'} < $loc and $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_START'} > $loc)) {
       return -1;
     }
@@ -773,10 +773,12 @@ sub lookup
       $high_idx = $middle_idx;
     }
   }
-  if (!($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$low_idx]}->{'LOOKUP_START'} < $loc and $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$low_idx]}->{'LOOKUP_STOP'} > $loc)) {
-    return -1;
+  if ($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$low_idx]}->{'LOOKUP_START'} < $loc and $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$low_idx]}->{'LOOKUP_STOP'} > $loc) {
+    return ($low_idx, $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$low_idx]});
+  } elsif ($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_START'} < $loc and $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_STOP'} > $loc) {
+    return ($high_idx, $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]});
   }
-  return ($low_idx, $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$low_idx]});
+  return -1;
 }
 
 sub extract_func_name
@@ -1243,7 +1245,14 @@ sub get_func_body
           my $sub_head = $func_ptr->{'VEC_ASSIGN'}->{$e}->{'ASSIGN_POS'};
           my $sub_current = $sub_head;
           while ($sub_current != $func_ptr->{'VEC_ASSIGN'}->{$e}->{'SEMI_POS'}) {
-            if (exists $func_ptr->{'VEC'}->{$sub_current}) {
+            if (exists $func_ptr->{'CALLS'}->{$sub_current} and exists $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}) {
+              my $sub_str = &GetText($sub_head, ($sub_current-1));
+              $body = $body.$sub_str;
+              my $func_call_str = &update_func_call($func_ptr, $sub_current, $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}, $pi);
+              $body = $body.$func_call_str;
+              $sub_head = $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'} + 1;
+              $sub_current = $sub_head;
+            } elsif (exists $func_ptr->{'VEC'}->{$sub_current}) {
               my $sub_str = &GetText($sub_head, ($sub_current-1));
               $body = $body.$sub_str;
               if ($func_ptr->{'VEC'}->{$sub_current}->{'FROM_PARAM'}) {
@@ -1389,7 +1398,7 @@ sub collect_func_args
 # There could be function call within arguments
 sub ExtractCallArguments
 {
-  my ($input, $start_idx) = @_;
+  my ($input, $start_idx, $stop_idx) = @_;
   my @output = ();
   my @comma_split_fields = split(/,/, $input);
   my @size_cnt = ();
@@ -1399,13 +1408,9 @@ sub ExtractCallArguments
     push @size_cnt, $cnt;
   }
   my @range = ();
-  foreach my $s (@size_cnt) {
-    my %info = ();
-    $info{'START'} = $start_idx;
-    $info{'STOP'} = $start_idx + $s - 1;
-    push @range, \%info;
-    $start_idx = $info{'STOP'} + 2;
-  }
+  my $range_start = $start_idx;
+  my $comma_cnt = 0;
+  my $comma_start = 0;
   $input =~ s/\n/ /g;
   $input =~ s/^\s*//;
   $input =~ s/\s*$//;
@@ -1423,6 +1428,10 @@ sub ExtractCallArguments
       my @elems = @chars[$start_idx..$#chars];
       my $elem = join("", @elems);
       push @output, $elem;
+      my %r_info = ();
+      $r_info{'START'} = $range_start;
+      $r_info{'STOP'} = $stop_idx;
+      push @range, \%r_info;
       last;
     }
     my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@chars, $idx, 0);
@@ -1431,6 +1440,10 @@ sub ExtractCallArguments
       my @elems = @chars[$start_idx..$#chars];
       my $elem = join("", @elems);
       push @output, $elem;
+      my %r_info = ();
+      $r_info{'START'} = $range_start;
+      $r_info{'STOP'} = $stop_idx;
+      push @range, \%r_info;
       last;
     }
     while (1) {
@@ -1444,6 +1457,10 @@ sub ExtractCallArguments
         my @elems = @chars[$start_idx..$#chars];
         my $elem = join("", @elems);
         push @output, $elem;
+        my %r_info = ();
+        $r_info{'START'} = $range_start;
+        $r_info{'STOP'} = $stop_idx;
+        push @range, \%r_info;
         last;
       }
       if ($chars[$idx] eq "(") {
@@ -1455,12 +1472,25 @@ sub ExtractCallArguments
             $cnt = $cnt + 1;
           } elsif ($chars[$idx] eq ")") {
             $cnt = $cnt - 1;
+          } elsif ($chars[$idx] eq ",") {
+            $comma_cnt = $comma_cnt + 1;
           }
         }
       } elsif ($chars[$idx] eq ",") {
         my @elems = @chars[$start_idx..($idx-1)];
         my $elem = join("", @elems);
         push @output, $elem;
+        my %r_info = ();
+        $r_info{'START'} = $range_start;
+        my $total_size_cnt = 0;
+        foreach my $cc ($comma_start..$comma_cnt) {
+          $total_size_cnt = $total_size_cnt + $size_cnt[$cc];
+        }
+        $total_size_cnt = $total_size_cnt + ($comma_cnt - $comma_start);
+        $r_info{'STOP'} = $range_start + $total_size_cnt - 1;
+        push @range, \%r_info;
+        $comma_start = $comma_cnt + 1;
+        $range_start = $r_info{'STOP'} + 2;
         last;
       } else {
         die "";
@@ -1470,6 +1500,7 @@ sub ExtractCallArguments
       last;
     }
     if ($chars[$idx] eq ",") {
+      $comma_cnt = $comma_cnt + 1;
       $idx = $idx + 1;
     }
     while ($idx <= $#chars and $chars[$idx] =~ /\s/) {
