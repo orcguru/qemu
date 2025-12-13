@@ -569,7 +569,7 @@ my $total_size = -s $ARGV[0];
 my $txt = &GetText($current_pos, ($total_size - 1));
 $blank_info = $blank_info."\n".$txt;
 
-my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "src1", "dst", "op", "rip");
+my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
 my %qemuaot_gp_params_map = (
   "rax" => "unsigned long",
   "rcx" => "unsigned long",
@@ -587,9 +587,9 @@ my %qemuaot_gp_params_map = (
   "r13" => "unsigned long",
   "r14" => "unsigned long",
   "r15" => "unsigned long",
-  "src1" => "unsigned long",
-  "dst" => "unsigned long",
-  "op" => "unsigned int",
+  "qemuaot_src1" => "unsigned long",
+  "qemuaot_dst" => "unsigned long",
+  "qemuaot_op" => "unsigned int",
   "rip" => "unsigned long",
 );
 #my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
@@ -1246,7 +1246,6 @@ sub get_func_body
             if (exists $func_ptr->{'VEC'}->{$sub_current}) {
               my $sub_str = &GetText($sub_head, ($sub_current-1));
               $body = $body.$sub_str;
-
               if ($func_ptr->{'VEC'}->{$sub_current}->{'FROM_PARAM'}) {
                 $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$sub_current}->{'TYPE'}})$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$sub_current}->{'VAR'}]->{'VAR_NAME'})";
               } else {
@@ -1316,48 +1315,57 @@ sub update_func_call
         my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info);
         $str = $str.", ".$sub_call_txt;
       } else {
-        $str = $str.", ".$arg;
+        my $param = &update_vector_inside_single_param($caller_ptr, $call_info, $idx, $arg);
+        $str = $str.", ".$param;
       }
       $sub_call_idx = $sub_call_idx + 1;
     } else {
-      my $range_info = $call_info->{'SCALAR_CALL_ARG_RANGES'}->[$idx];
-      my @vecs = ();
-      foreach my $e (keys %{$caller_ptr->{'VEC'}}) {
-        if ($e >= $range_info->{'START'} and $e < $range_info->{'STOP'}) {
-          push @vecs, $e;
-        }
-      }
-      if (@vecs != 0) {
-        $str = $str.", ";
-        @vecs = sort {$a <=> $b} @vecs;
-        my $last_dump = $range_info->{'START'};
-        foreach my $pos (@vecs) {
-          if ($last_dump < $pos) {
-            my $sub_str = &GetText($last_dump, $pos - 1);
-            $str = $str.$sub_str;
-          }
-          my $vec_entry = $caller_ptr->{'VEC'}->{$pos};
-
-          if ($vec_entry->{'FROM_PARAM'}) {
-            $str = $str."(($VecCodeToCType{$vec_entry->{'TYPE'}})$caller_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'})";
-          } else {
-            $str = $str."(($VecCodeToCType{$vec_entry->{'TYPE'}})$vec_entry->{'VAR'})";
-          }
-          $last_dump = $vec_entry->{'STOP'} + 1;
-        }
-        if ($last_dump <= $range_info->{'STOP'}) {
-          my $sub_str = &GetText($last_dump, $range_info->{'STOP'});
-          $str = $str.$sub_str;
-        }
-      } else {
-        $str = $str.", ".$arg;
-      }
+      my $param = &update_vector_inside_single_param($caller_ptr, $call_info, $idx, $arg);
+      $str = $str.", ".$param;
     }
   }
   if (exists $callee_ptr->{'IS_FOREIGN'}) {
     $str = $str.", normal_return, exception_return";
   }
   $str = $str.")";
+  return $str;
+}
+
+sub update_vector_inside_single_param
+{
+  my ($caller_ptr, $call_info, $idx, $arg) = @_;
+  my $str = "";
+  my $range_info = $call_info->{'SCALAR_CALL_ARG_RANGES'}->[$idx];
+  my @vecs = ();
+  foreach my $e (keys %{$caller_ptr->{'VEC'}}) {
+    if ($e >= $range_info->{'START'} and $e < $range_info->{'STOP'}) {
+      push @vecs, $e;
+    }
+  }
+  if (@vecs != 0) {
+    @vecs = sort {$a <=> $b} @vecs;
+    my $last_dump = $range_info->{'START'};
+    foreach my $pos (@vecs) {
+      if ($last_dump < $pos) {
+        my $sub_str = &GetText($last_dump, $pos - 1);
+        $str = $str.$sub_str;
+      }
+      my $vec_entry = $caller_ptr->{'VEC'}->{$pos};
+
+      if ($vec_entry->{'FROM_PARAM'}) {
+        $str = $str."(($VecCodeToCType{$vec_entry->{'TYPE'}})$caller_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'})";
+      } else {
+        $str = $str."(($VecCodeToCType{$vec_entry->{'TYPE'}})$vec_entry->{'VAR'})";
+      }
+      $last_dump = $vec_entry->{'STOP'} + 1;
+    }
+    if ($last_dump <= $range_info->{'STOP'}) {
+      my $sub_str = &GetText($last_dump, $range_info->{'STOP'});
+      $str = $str.$sub_str;
+    }
+  } else {
+    $str = $arg;
+  }
   return $str;
 }
 
@@ -1507,11 +1515,11 @@ sub replace_env_var
   }
   my $new_var = "";
   if ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_src") {
-    $new_var = "src1";
+    $new_var = "qemuaot_src1";
   } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_dst") {
-    $new_var = "dst";
+    $new_var = "qemuaot_dst";
   } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_op") {
-    $new_var = "op";
+    $new_var = "qemuaot_op";
   } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "regs") {
     die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
     my $reg_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};

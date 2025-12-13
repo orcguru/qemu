@@ -228,6 +228,12 @@ VecW: '_w_ZMMReg';
 
 VecB: '_b_ZMMReg';
 
+VecH: '_h_ZMMReg';
+
+VecS: '_s_ZMMReg';
+
+VecD: '_d_ZMMReg';
+
 VecType: 'ZMMReg';
 
 /*Operators*/

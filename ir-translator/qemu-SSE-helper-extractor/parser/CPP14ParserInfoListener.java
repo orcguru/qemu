@@ -284,6 +284,49 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	@Override public void exitUIDVecB(CPP14Parser.UIDVecBContext ctx) {
           System.out.println("<VecB>$$BEGIN:" + Integer.toString(ctx.VecB().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecB().getSymbol().getStopIndex()));
         }
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUIDVecH(CPP14Parser.UIDVecHContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUIDVecH(CPP14Parser.UIDVecHContext ctx) {
+          System.out.println("<VecW>$$BEGIN:" + Integer.toString(ctx.VecH().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecH().getSymbol().getStopIndex()));
+        }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUIDVecS(CPP14Parser.UIDVecSContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUIDVecS(CPP14Parser.UIDVecSContext ctx) {
+          System.out.println("<VecL>$$BEGIN:" + Integer.toString(ctx.VecS().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecS().getSymbol().getStopIndex()));
+        }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterUIDVecD(CPP14Parser.UIDVecDContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUIDVecD(CPP14Parser.UIDVecDContext ctx) {
+          System.out.println("<VecQ>$$BEGIN:" + Integer.toString(ctx.VecD().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecD().getSymbol().getStopIndex()));
+        }
 	/**
 	 * {@inheritDoc}
 	 *
