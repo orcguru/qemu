@@ -164,6 +164,11 @@ while (<FD>) {
       $info{'PARENT'} = $ptr->{'NAME'};
       if (exists $info{'IS_FOREIGN'}) {
         $funcs{$ptr->{'NAME'}}->{'IS_FOREIGN'} = 1;
+        foreach my $a (@{$args}) {
+          if ($a =~ /^\s*env\s*$/) {
+            $ptr->{'DO_DEFINE_ENV'} = 1;
+          }
+        }
       }
       $funcs{$ptr->{'NAME'}}->{'CALLS'}->{$info{'NAME_START'}} = \%info;
       $callsite_lookup{'MAP'}->{$info{'LOOKUP_START'}} = \%info;
