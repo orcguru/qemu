@@ -125,6 +125,19 @@ close FD;
 my @sorted_func_addr = sort {$a <=> $b} sort keys %{$func_lookup{'MAP'}};
 $func_lookup{'SORTED_ADDR'} = \@sorted_func_addr;
 
+# Collect background info (-function)
+open FDIN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
+my $current_pos = 0;
+my $blank_info = "";
+foreach my $a (@{$func_lookup{'SORTED_ADDR'}}) {
+  my $txt = &GetText($current_pos, ($func_lookup{'MAP'}->{$a}->{'FULL_START'} - 1));
+  $blank_info = $blank_info."\n".$txt;
+  $current_pos = $func_lookup{'MAP'}->{$a}->{'FULL_STOP'} + 1;
+}
+my $total_size = -s $ARGV[0];
+my $txt = &GetText($current_pos, ($total_size - 1));
+$blank_info = $blank_info."\n".$txt;
+
 # Collect call sites 
 my %callsite_lookup = ();
 my %callsite_lookup_map = ();
@@ -147,6 +160,10 @@ while (<FD>) {
     $info{'PAREN_STOP'} = $f4[1];
     $info{'LOOKUP_START'} = $info{'PAREN_START'};
     $info{'LOOKUP_STOP'} = $info{'PAREN_STOP'};
+    my $check_call = &GetText(($info{'NAME_STOP'} + 1), $info{'PAREN_START'});
+    if (not $check_call =~ /^\s*\(/) {
+      next;
+    }
     $info{'CALL_TARGET'} = &GetText($info{'NAME_START'}, $info{'NAME_STOP'});
     if (&FuncNameIsForeign($info{'CALL_TARGET'})) {
       $info{'IS_FOREIGN'} = 1;
@@ -179,6 +196,62 @@ close FD;
 my @sorted_callsite_addr = sort {$a <=> $b} sort keys %{$callsite_lookup{'MAP'}};
 $callsite_lookup{'SORTED_ADDR'} = \@sorted_callsite_addr;
 
+# Collect foreign_funcs types
+my %func_type_input = ();
+my $line_info = "";
+my @blank_lines = split(/\n/, $blank_info);
+foreach my $line (@blank_lines) {
+  if ($line =~ /^#/) {
+    next;
+  }
+  if (not $line =~ /;/) {
+    $line_info = $line_info.$line." ";
+  } else {
+    $line_info = $line_info.$line;
+    if ($line_info =~ /\(/) {
+      $line_info =~ s/extern\s+//;
+      my @defs = split(/;/, $line_info);
+      foreach my $l (@defs) {
+        if ($l =~ /\(/) {
+          $l =~ s/^\s+//;
+          $l =~ s/\s+$//;
+          $l = &remove_attribute($l);
+          if ($l =~ /\(/) {
+            my @fields = split(/\(/, $l);
+            my @sub_fields = split(/\s+/, $fields[0]);
+            if (@sub_fields > 1) {
+              my $valid = 1;
+              my @fields_for_type = ();
+              foreach my $ls_idx (0..($#sub_fields-1)) {
+                my $ls = $sub_fields[$ls_idx];
+                if ($ls =~ /__attribute__/ or $ls =~ /extern/) {
+                  next;
+                }
+                if (&IsValidSymbol($ls) == 0) {
+                  $valid = 0;
+                  last;
+                }
+                push @fields_for_type, $ls;
+              }
+              if ($valid == 0) {
+                next;
+              }
+              my $type_info = join(" ", @fields_for_type);
+              my $ff_name = $sub_fields[$#sub_fields];
+              while ($ff_name =~ /^\*/) {
+                $ff_name =~ s/^\*//;
+                $type_info = $type_info."*";
+              }
+              $func_type_input{$ff_name} = $type_info;
+            }
+          }
+        }
+      }
+    }
+    $line_info = "";
+  }
+}
+
 # Mark functions by *_xmm
 my %covered_funcs = ();
 my %workset = ();
@@ -202,6 +275,7 @@ while (keys %workset > 0) {
   }
   %workset = %tmpset;
 }
+my %foreign_funcs = ();
 foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'TOUCHED'} = 1;
   my ($head, $scalar_args, $vector_args, $pure_arg_info, $ret128_info, $env_type) = &parse_func_head($funcs{$f});
@@ -223,6 +297,17 @@ foreach my $f (keys %covered_funcs) {
     $funcs{$f}->{'DO_EXPAND'} = 0;
   }
   $funcs{$f}->{'128'} = $ret128_info;
+  foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
+    if (&FuncNameIsForeign($funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'})) {
+      $foreign_funcs{$funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'}} = 1;
+    }
+  }
+}
+
+foreach my $f (keys %foreign_funcs) {
+  if (not exists $func_type_input{$f}) {
+    print "$f type not detected\n";
+  }
 }
 
 # Collect VecType info(ZMMReg), to detect tmp vector variable and do the patch.
@@ -561,19 +646,6 @@ while (<FD>) {
 }
 close FD;
 
-# Collect background info (-function)
-open FDIN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
-my $current_pos = 0;
-my $blank_info = "";
-foreach my $a (@{$func_lookup{'SORTED_ADDR'}}) {
-  my $txt = &GetText($current_pos, ($func_lookup{'MAP'}->{$a}->{'FULL_START'} - 1));
-  $blank_info = $blank_info."\n".$txt;
-  $current_pos = $func_lookup{'MAP'}->{$a}->{'FULL_STOP'} + 1;
-}
-my $total_size = -s $ARGV[0];
-my $txt = &GetText($current_pos, ($total_size - 1));
-$blank_info = $blank_info."\n".$txt;
-
 my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
 my %qemuaot_gp_params_map = (
   "rax" => "unsigned long",
@@ -748,6 +820,13 @@ typedef unsigned int __attribute__((__vector_size__(16))) v4uint;
 typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;
 
 EOF
+  if ($has_foreign_call) {
+    print OUT "typedef __attribute__((qemuaot,noreturn)) void (*FUNC_EXCEPTION_RET)(";
+    foreach my $p (@qemuaot_gp_params) {
+      print OUT "$qemuaot_gp_params_map{$p} $p, ";
+    }
+    print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
+  }
   my %order_to_func = ();
   foreach my $sf (keys %defined_func) {
     $order_to_func{$funcs{$sf}->{'FUNC_IDX'}} = $sf;
@@ -755,7 +834,7 @@ EOF
   my @sorted_funcs = sort {$a <=> $b} keys %order_to_func;
   foreach my $s (@sorted_funcs) {
     my $func_name = $order_to_func{$s};
-    my $new_func = &gen_replicated_func($func_name, \%defined_func);
+    my $new_func = &gen_replicated_func($func_name, \%defined_func, $f);
     print OUT "$new_func\n\n";
   }
 
@@ -944,6 +1023,7 @@ sub parse_func_head
   } else {
     $head_copy =~ s/$func->{'NAME'}/HELPER_ENTRY/;
   }
+  $head_copy = "__attribute__((qemuaot)) ".$head_copy;
   $head =~ s/\n/ /g;
   $head =~ s/\s*$//;
   @slice_head = split(//, $head);
@@ -1063,6 +1143,32 @@ sub mov_tail_attribute_to_head
   return $str;
 }
 
+sub remove_attribute
+{
+  my ($str) = @_;
+  while ($str =~ /^\s*__attribute__/) {
+    my @chars = split(//, $str);
+    my $idx = 0;
+    my $paren_cnt = 0;
+    while ($idx <= $#chars) {
+      if ($chars[$idx] eq ")") {
+        $paren_cnt = $paren_cnt - 1;
+        if ($paren_cnt == 0) {
+          last;
+        }
+      } elsif ($chars[$idx] eq "(") {
+        $paren_cnt = $paren_cnt + 1;
+      }
+      $idx = $idx + 1;
+    }
+    $idx = $idx + 1;
+    my @sub_chars = @chars[$idx..$#chars];
+    $str = join("", @sub_chars);
+    $str =~ s/^\s+//;
+  }
+  return $str;
+}
+
 sub get_vec_arg_idx
 {
   my ($func_ptr, $vec_sym) = @_;
@@ -1087,14 +1193,14 @@ sub get_scalar_arg_idx
 
 sub gen_replicated_func
 {
-  my ($target_func, $func_replicate_info) = @_;
+  my ($target_func, $func_replicate_info, $exception_exit) = @_;
   my $new_func = "";
   if ($funcs{$target_func}->{'DO_EXPAND'} == 0) {
     my $new_head = $funcs{$target_func}->{'HEAD'};
     my $args = &collect_func_args($funcs{$target_func});
     my $current_func = $new_head."($args)\n";
     my %empty = ();
-    my $new_func_body = &get_func_body($funcs{$target_func}, "", \%empty);
+    my $new_func_body = &get_func_body($funcs{$target_func}, "", \%empty, $exception_exit);
     $current_func = $current_func.$new_func_body."\n\n";
     $new_func = $new_func.$current_func;
   } else {
@@ -1152,7 +1258,7 @@ sub gen_replicated_func
           $macro_def{$var} = $funcs{$in->{'FUNC'}}->{'CALLS'}->{$in->{'LOC'}}->{'SCALAR_CALL_ARGS'}->[$scalar_idx];
         }
       }
-      my $new_func_body = &get_func_body($funcs{$target_func}, $pi, \%macro_def);
+      my $new_func_body = &get_func_body($funcs{$target_func}, $pi, \%macro_def, $exception_exit);
       $current_func = $current_func.$new_func_body."\n";
       $new_func = $new_func.$current_func;
       # Un-define arguments
@@ -1167,7 +1273,7 @@ sub gen_replicated_func
 
 sub get_func_body
 {
-  my ($func_ptr, $pi, $md) = @_;
+  my ($func_ptr, $pi, $md, $exception_exit) = @_;
   my %events = ();
   foreach my $e (keys %{$func_ptr->{'CALLS'}}) {
     $events{$e} = 1;
@@ -1206,7 +1312,12 @@ sub get_func_body
     if (exists $func_ptr->{'CALLS'}->{$e}) {
       my $call_target = $func_ptr->{'CALLS'}->{$e}->{'CALL_TARGET'};
       if (not exists $funcs{$call_target}) {
-        $current_pos = $e;
+        $body = $body."((FUNC_EXCEPTION_RET)exception_return/*$call_target*/)(";
+        foreach my $p (@qemuaot_gp_params) {
+          $body = $body."$p, ";
+        }
+        $body = $body.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)normal_return)";
+        $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
       } else {
         my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi);
         $body = $body.$call_txt;
@@ -1452,7 +1563,7 @@ sub ExtractCallArguments
       last;
     }
     while (1) {
-      while ($chars[$idx] ne "(" and $chars[$idx] ne ",") {
+      while ($chars[$idx] ne "(" and $chars[$idx] ne "{" and $chars[$idx] ne ",") {
         $idx = $idx + 1;
         if ($idx > $#chars) {
           last;
@@ -1476,6 +1587,19 @@ sub ExtractCallArguments
           if ($chars[$idx] eq "(") {
             $cnt = $cnt + 1;
           } elsif ($chars[$idx] eq ")") {
+            $cnt = $cnt - 1;
+          } elsif ($chars[$idx] eq ",") {
+            $comma_cnt = $comma_cnt + 1;
+          }
+        }
+      } elsif ($chars[$idx] eq "{") {
+        my $cnt = 1;
+        while ($cnt != 0) {
+          $idx = $idx + 1;
+          die "" if ($idx > $#chars);
+          if ($chars[$idx] eq "{") {
+            $cnt = $cnt + 1;
+          } elsif ($chars[$idx] eq "}") {
             $cnt = $cnt - 1;
           } elsif ($chars[$idx] eq ",") {
             $comma_cnt = $comma_cnt + 1;
@@ -1531,12 +1655,27 @@ sub IsValidSymbolStart
   }
 }
 
+sub IsValidSymbol
+{
+  my ($str) = @_;
+  my @chars = split(//, $str);
+  foreach my $c (@chars) {
+    if (not (("a" le $c and $c le "z") or
+        ("A" le $c and $c le "Z") or
+        ("0" le $c and $c le "9") or
+        $c eq "_" or $c eq "*")) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 sub FuncNameIsForeign
 {
   my ($func_name) = @_;
   if (exists $funcs{$func_name}) {
     return 0;
-  } elsif ($func_name =~ /^__builtin_/) {
+  } elsif ($func_name =~ /^__builtin_/ or $func_name =~ /^__atomic/) {
     return 0;
   } else {
     return 1;
