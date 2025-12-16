@@ -644,6 +644,7 @@ while (<FD>) {
               }
               $vec_assign{'SEMI_POS'} = $semi_pos;
               $func_ptr->{'VEC_ASSIGN'}->{$start} = \%vec_assign;
+              $func_ptr->{'UPDATE_REGISTER_CONTEXT'} = 1;
               $skip_vec = 1;
             }
           } else {
@@ -660,6 +661,7 @@ while (<FD>) {
               }
               $vec_assign{'SEMI_POS'} = $semi_pos;
               $func_ptr->{'VEC_ASSIGN'}->{$start} = \%vec_assign;
+              $func_ptr->{'UPDATE_REGISTER_CONTEXT'} = 1;
               $skip_vec = 1;
             }
           }
@@ -704,6 +706,7 @@ while (<FD>) {
             }
             $vec_assign{'SEMI_POS'} = $semi_pos;
             $func_ptr->{'VEC_ASSIGN'}->{$vec_info{'START'}} = \%vec_assign;
+            $func_ptr->{'UPDATE_REGISTER_CONTEXT'} = 1;
             delete $func_ptr->{'ENV'}->{$env_ptr->{'LOOKUP_START'}};
           }
         }
@@ -1129,11 +1132,10 @@ sub parse_func_head
   ($sym, $sym_start, $sym_stop) = &GetSymbol(\@slice_head, $sym_start, 1);
   my %ret128_info = ();
   if ($sym =~ /128/) {
-    $ret128_info{'RETURN128'} = 1;
-    $ret128_info{'TYPE_NAME'} = $sym;
+    $ret128_info{'RETURN128'} = $sym;
+    $head_copy =~ s/$sym/v2ulong/;
   } else {
-    $ret128_info{'RETURN128'} = 0;
-    $ret128_info{'TYPE_NAME'} = "";
+    $ret128_info{'RETURN128'} = "";
   }
   my $tail = join("", @slice_tail);
   $tail =~ s/^\(\s*//;
@@ -1377,6 +1379,11 @@ sub get_func_body
   foreach my $e (keys %{$func_ptr->{'VECX'}}) {
     $events{$e} = 1;
   }
+  foreach my $e (keys %{$func_ptr->{'RETURNS'}}) {
+    if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_EXPR") {
+      $events{$e} = 1;
+    }
+  }
   my @sorted_events = sort {$a <=> $b} keys %events;
   my $current_pos;
   my $body = "";
@@ -1393,9 +1400,10 @@ sub get_func_body
     if ($e < $current_pos) {
       next;
     }
-    die "" if $e == $current_pos;
-    my $txt = &GetText($current_pos, ($e - 1));
-    $body = $body.$txt;
+    if ($e != $current_pos) {
+      my $txt = &GetText($current_pos, ($e - 1));
+      $body = $body.$txt;
+    }
     if (exists $func_ptr->{'CALLS'}->{$e}) {
       my $call_target = $func_ptr->{'CALLS'}->{$e}->{'CALL_TARGET'};
       if (not exists $funcs{$call_target}) {
@@ -1413,6 +1421,9 @@ sub get_func_body
           $current_pos = $e;
         }
       } else {
+        if ($funcs{$call_target}->{'128'}->{'RETURN128'} ne "") {
+          $body = $body."($funcs{$call_target}->{'128'}->{'RETURN128'})";
+        }
         my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi);
         $body = $body.$call_txt;
         $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
@@ -1489,6 +1500,15 @@ sub get_func_body
       }
     } elsif (exists $func_ptr->{'VECX'}->{$e}) {
       $current_pos = $func_ptr->{'VECX'}->{$e}->{'STOP'} + 1;
+    } elsif (exists $func_ptr->{'RETURNS'}->{$e}) {
+      my $ret_info = $func_ptr->{'RETURNS'}->{$e};
+      if ($func_ptr->{'128'}->{'RETURN128'} ne "") {
+        my $sub_str = &GetText($e, $ret_info->{'EXPR_START'}-1);
+        $body = $body.$sub_str."(v2ulong)";
+        $current_pos = $ret_info->{'EXPR_START'};
+      } else {
+        $current_pos = $e;
+      }
     } else {
       die "";
     }
