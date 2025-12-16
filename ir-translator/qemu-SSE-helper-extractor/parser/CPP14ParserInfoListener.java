@@ -332,6 +332,20 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterUIDVecX(CPP14Parser.UIDVecXContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitUIDVecX(CPP14Parser.UIDVecXContext ctx) {
+          System.out.println("<VecX>$$BEGIN:" + Integer.toString(ctx.VecX().getSymbol().getStartIndex()) + "$$END:" + Integer.toString(ctx.VecX().getSymbol().getStopIndex()));
+        }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterUIDVecT(CPP14Parser.UIDVecTContext ctx) { }
 	/**
 	 * {@inheritDoc}

@@ -709,6 +709,29 @@ while (<FD>) {
         }
       }
     }
+  } elsif ($line =~ /^<VecX>/) {
+    my @fields = split(/\$\$/, $line);
+    my @f1 = split(/:/, $fields[1]);
+    my @f2 = split(/:/, $fields[2]);
+    my $start = $f1[1];
+    my $stop = $f2[1];
+    my ($func_idx, $func_ptr) = &lookup($start, \%func_lookup);
+    if ($func_idx != -1) {
+      if (exists $func_ptr->{'TOUCHED'}) {
+        die "" if ($file_content[$start-1] ne ">" or $file_content[$start-2] ne "-");
+        die "" if $file_content[$stop+1] ne "[";
+        my ($array_idx, $array_idx_start, $array_idx_stop) = &GetContentWithArrayBound($stop+2);
+        die "" if $file_content[$array_idx_stop+1] ne "]";
+        my %info = ();
+        $info{'START'} = $start-2;
+        $info{'STOP'} = $array_idx_stop+1;
+        if (not exists $func_ptr->{'VECX'}) {
+          my %vecx_info = ();
+          $func_ptr->{'VECX'} = \%vecx_info;
+        }
+        $func_ptr->{'VECX'}->{$info{'START'}} = \%info;
+      }
+    }
   }
 }
 close FD;
@@ -1350,6 +1373,9 @@ sub get_func_body
   foreach my $e (keys %{$func_ptr->{'VEC_ASSIGN'}}) {
     $events{$e} = 1;
   }
+  foreach my $e (keys %{$func_ptr->{'VECX'}}) {
+    $events{$e} = 1;
+  }
   my @sorted_events = sort {$a <=> $b} keys %events;
   my $current_pos;
   my $body = "";
@@ -1460,6 +1486,8 @@ sub get_func_body
         $body = $body."}\n";
         $current_pos = $sub_current + 1;
       }
+    } elsif (exists $func_ptr->{'VECX'}->{$e}) {
+      $current_pos = $func_ptr->{'VECX'}->{$e}->{'STOP'} + 1;
     } else {
       die "";
     }

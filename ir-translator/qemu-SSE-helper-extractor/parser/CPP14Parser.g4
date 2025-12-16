@@ -61,6 +61,7 @@ unqualifiedId:
         | VecH                                                          # UIDVecH
         | VecS                                                          # UIDVecS
         | VecD                                                          # UIDVecD
+        | VecX                                                          # UIDVecX
         | VecType                                                       # UIDVecT
         ;
 

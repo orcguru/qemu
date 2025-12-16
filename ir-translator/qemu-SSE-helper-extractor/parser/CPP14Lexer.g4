@@ -234,6 +234,8 @@ VecS: '_s_ZMMReg';
 
 VecD: '_d_ZMMReg';
 
+VecX: '_x_ZMMReg';
+
 VecType: 'ZMMReg';
 
 /*Operators*/
