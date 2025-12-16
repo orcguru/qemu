@@ -534,12 +534,6 @@ while (<FD>) {
             $func_ptr->{'DO_DEFINE_ENV'} = 1;
             die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
           }
-          if ($file_content[$stop+1] eq " " and $file_content[$stop+2] eq "=" and $file_content[$stop+3] eq " ") {
-            if ($sym_info[0]->{'SYM'} eq "cc_src" or $sym_info[0]->{'SYM'} eq "cc_dst" or $sym_info[0]->{'SYM'} eq "cc_op" or $sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs") {
-              $env_info{'UPDATE_REGISTER_CONTEXT'} = 1;
-              $func_ptr->{'UPDATE_REGISTER_CONTEXT'} = 1;
-            }
-          }
           if (not exists $func_ptr->{'ENV'}) {
             my %info = ();
             $func_ptr->{'ENV'} = \%info;
@@ -644,7 +638,6 @@ while (<FD>) {
               }
               $vec_assign{'SEMI_POS'} = $semi_pos;
               $func_ptr->{'VEC_ASSIGN'}->{$start} = \%vec_assign;
-              $func_ptr->{'UPDATE_REGISTER_CONTEXT'} = 1;
               $skip_vec = 1;
             }
           } else {
@@ -661,7 +654,6 @@ while (<FD>) {
               }
               $vec_assign{'SEMI_POS'} = $semi_pos;
               $func_ptr->{'VEC_ASSIGN'}->{$start} = \%vec_assign;
-              $func_ptr->{'UPDATE_REGISTER_CONTEXT'} = 1;
               $skip_vec = 1;
             }
           }
@@ -706,7 +698,6 @@ while (<FD>) {
             }
             $vec_assign{'SEMI_POS'} = $semi_pos;
             $func_ptr->{'VEC_ASSIGN'}->{$vec_info{'START'}} = \%vec_assign;
-            $func_ptr->{'UPDATE_REGISTER_CONTEXT'} = 1;
             delete $func_ptr->{'ENV'}->{$env_ptr->{'LOOKUP_START'}};
           }
         }
@@ -793,10 +784,6 @@ foreach my $f (keys %funcs) {
   if (exists $funcs{$f}->{'IS_FOREIGN'}) {
     $has_foreign_call = 1;
   }
-  my $update_register_context = 0;
-  if (exists $funcs{$f}->{'UPDATE_REGISTER_CONTEXT'}) {
-    $update_register_context = 1;
-  }
   # Collect dependent functions
   my @sub_call_stack = ();
   my %defined_func = ();
@@ -816,9 +803,6 @@ foreach my $f (keys %funcs) {
         $defined_func{$call_target} = \%p_info;
         if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
           $has_foreign_call = 1;
-        }
-        if (exists $funcs{$call_target}->{'UPDATE_REGISTER_CONTEXT'}) {
-          $update_register_context = 1;
         }
       }
       foreach my $pi (keys %{$defined_func{$f}}) {
@@ -856,9 +840,6 @@ foreach my $f (keys %funcs) {
             if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
               $has_foreign_call = 1;
             }
-            if (exists $funcs{$call_target}->{'UPDATE_REGISTER_CONTEXT'}) {
-              $update_register_context = 1;
-            }
           }
           foreach my $pi (keys %{$defined_func{$c}}) {
             my $current_pi = $pi."_".$c."_loc$e";
@@ -886,7 +867,7 @@ foreach my $f (keys %funcs) {
     @sub_call_stack = @new_call_stack;
   }
 
-  print "$f $has_foreign_call $update_register_context\n";
+  print "$f $has_foreign_call\n";
 
   # Generate function
   open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
