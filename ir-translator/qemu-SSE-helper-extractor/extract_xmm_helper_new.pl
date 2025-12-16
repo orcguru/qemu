@@ -728,6 +728,7 @@ foreach my $f (keys %funcs) {
   # Assume no infinite recursive calls for path_info
   my %path_info = ();
   my @label_info = ();
+  my %foreign_calls = ();
   $path_info{'ROOT'} = \@label_info;
   $defined_func{$f} = \%path_info;
   my %func_call_path = ();
@@ -763,6 +764,8 @@ foreach my $f (keys %funcs) {
           }
         }
       }
+    } elsif (&FuncNameIsForeign($call_target)) {
+      $foreign_calls{$call_target} = $func_type_input{$call_target};
     }
   }
   while (@sub_call_stack > 0) {
@@ -800,6 +803,8 @@ foreach my $f (keys %funcs) {
               }
             }
           }
+        } elsif (&FuncNameIsForeign($call_target)) {
+          $foreign_calls{$call_target} = $func_type_input{$call_target};
         }
       }
     }
@@ -820,8 +825,14 @@ typedef unsigned int __attribute__((__vector_size__(16))) v4uint;
 typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;
 
 EOF
-  if ($has_foreign_call) {
-    print OUT "typedef __attribute__((qemuaot,noreturn)) void (*FUNC_EXCEPTION_RET)(";
+  my %foreign_types = ();
+  foreach my $ff (keys %foreign_calls) {
+    my $type_name = $foreign_calls{$ff};
+    $type_name =~ s/\s+/_/g;
+    $foreign_types{$foreign_calls{$ff}} = $type_name;
+  }
+  foreach my $t (keys %foreign_types) {
+    print OUT "typedef __attribute__((qemuaot,noreturn)) $t (*FUNC_EXCEPTION_RET_$foreign_types{$t})(";
     foreach my $p (@qemuaot_gp_params) {
       print OUT "$qemuaot_gp_params_map{$p} $p, ";
     }
@@ -834,7 +845,7 @@ EOF
   my @sorted_funcs = sort {$a <=> $b} keys %order_to_func;
   foreach my $s (@sorted_funcs) {
     my $func_name = $order_to_func{$s};
-    my $new_func = &gen_replicated_func($func_name, \%defined_func, $f);
+    my $new_func = &gen_replicated_func($func_name, \%defined_func, $f, \%foreign_calls);
     print OUT "$new_func\n\n";
   }
 
@@ -1193,14 +1204,14 @@ sub get_scalar_arg_idx
 
 sub gen_replicated_func
 {
-  my ($target_func, $func_replicate_info, $exception_exit) = @_;
+  my ($target_func, $func_replicate_info, $exception_exit, $fc) = @_;
   my $new_func = "";
   if ($funcs{$target_func}->{'DO_EXPAND'} == 0) {
     my $new_head = $funcs{$target_func}->{'HEAD'};
     my $args = &collect_func_args($funcs{$target_func});
     my $current_func = $new_head."($args)\n";
     my %empty = ();
-    my $new_func_body = &get_func_body($funcs{$target_func}, "", \%empty, $exception_exit);
+    my $new_func_body = &get_func_body($funcs{$target_func}, "", \%empty, $exception_exit, $fc);
     $current_func = $current_func.$new_func_body."\n\n";
     $new_func = $new_func.$current_func;
   } else {
@@ -1258,7 +1269,7 @@ sub gen_replicated_func
           $macro_def{$var} = $funcs{$in->{'FUNC'}}->{'CALLS'}->{$in->{'LOC'}}->{'SCALAR_CALL_ARGS'}->[$scalar_idx];
         }
       }
-      my $new_func_body = &get_func_body($funcs{$target_func}, $pi, \%macro_def, $exception_exit);
+      my $new_func_body = &get_func_body($funcs{$target_func}, $pi, \%macro_def, $exception_exit, $fc);
       $current_func = $current_func.$new_func_body."\n";
       $new_func = $new_func.$current_func;
       # Un-define arguments
@@ -1273,7 +1284,7 @@ sub gen_replicated_func
 
 sub get_func_body
 {
-  my ($func_ptr, $pi, $md, $exception_exit) = @_;
+  my ($func_ptr, $pi, $md, $exception_exit, $fc) = @_;
   my %events = ();
   foreach my $e (keys %{$func_ptr->{'CALLS'}}) {
     $events{$e} = 1;
@@ -1312,12 +1323,19 @@ sub get_func_body
     if (exists $func_ptr->{'CALLS'}->{$e}) {
       my $call_target = $func_ptr->{'CALLS'}->{$e}->{'CALL_TARGET'};
       if (not exists $funcs{$call_target}) {
-        $body = $body."((FUNC_EXCEPTION_RET)exception_return/*$call_target*/)(";
-        foreach my $p (@qemuaot_gp_params) {
-          $body = $body."$p, ";
+        if (&FuncNameIsForeign($call_target)) {
+          die "" if not exists $fc->{$call_target};
+          my $type_name = $fc->{$call_target};
+          $type_name =~ s/\s+/_/g;
+          $body = $body."((FUNC_EXCEPTION_RET_$type_name)exception_return/*$call_target*/)(";
+          foreach my $p (@qemuaot_gp_params) {
+            $body = $body."$p, ";
+          }
+          $body = $body.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)normal_return)";
+          $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
+        } else {
+          $current_pos = $e;
         }
-        $body = $body.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)normal_return)";
-        $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
       } else {
         my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi);
         $body = $body.$call_txt;
