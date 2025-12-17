@@ -23,6 +23,71 @@ my %VecSymbolToCType = (
   "_w_ZMMReg" => "v8ushort",
   "_b_ZMMReg" => "v16uchar"
 );
+my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
+my %qemuaot_gp_params_map = (
+  "rax" => "unsigned long",
+  "rcx" => "unsigned long",
+  "rdx" => "unsigned long",
+  "rbx" => "unsigned long",
+  "rsp" => "unsigned long",
+  "rbp" => "unsigned long",
+  "rsi" => "unsigned long",
+  "rdi" => "unsigned long",
+  "r8" => "unsigned long",
+  "r9" => "unsigned long",
+  "r10" => "unsigned long",
+  "r11" => "unsigned long",
+  "r12" => "unsigned long",
+  "r13" => "unsigned long",
+  "r14" => "unsigned long",
+  "r15" => "unsigned long",
+  "qemuaot_src1" => "unsigned long",
+  "qemuaot_dst" => "unsigned long",
+  "qemuaot_op" => "unsigned int",
+  "rip" => "unsigned long",
+  "env->sse_status" => "float_status"
+);
+#my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
+#my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
+my $qemuaot_vec_invoke = "xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h";
+my $qemuaot_vec_declare = "v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong ymm1_h, v2ulong xmm2, v2ulong ymm2_h, v2ulong xmm3, v2ulong ymm3_h, v2ulong xmm4, v2ulong ymm4_h, v2ulong xmm5, v2ulong ymm5_h, v2ulong xmm6, v2ulong ymm6_h, v2ulong xmm7, v2ulong ymm7_h, v2ulong xmm8, v2ulong ymm8_h, v2ulong xmm9, v2ulong ymm9_h, v2ulong xmm10, v2ulong ymm10_h, v2ulong xmm11, v2ulong ymm11_h, v2ulong xmm12, v2ulong ymm12_h, v2ulong xmm13, v2ulong ymm13_h, v2ulong xmm14, v2ulong ymm14_h";
+my %env_reg_idx_map = (
+  "R_EAX" => "rax",
+  "R_ECX" => "rcx",
+  "R_EDX" => "rdx",
+  "R_EBX" => "rbx",
+  "R_ESP" => "rsp",
+  "R_EBP" => "rbp",
+  "R_ESI" => "rsi",
+  "R_EDI" => "rdi",
+  "R_R8" => "r8",
+  "R_R9" => "r9",
+  "R_R10" => "r10",
+  "R_R11" => "r11",
+  "R_R12" => "r12",
+  "R_R13" => "r13",
+  "R_R14" => "r14",
+  "R_R15" => "r15"
+);
+my %env_xmmregs_idx_map = (
+  "0" => "xmm0",
+  "1" => "xmm1",
+  "2" => "xmm2",
+  "3" => "xmm3",
+  "4" => "xmm4",
+  "5" => "xmm5",
+  "6" => "xmm6",
+  "7" => "xmm7",
+  "8" => "xmm8",
+  "9" => "xmm9",
+  "10" => "xmm10",
+  "11" => "xmm11",
+  "12" => "xmm12",
+  "13" => "xmm13",
+  "14" => "xmm14",
+  "15" => "xmm15"
+);
+
 my $path = "$ARGV[0].helper_xmm";
 my $file_size = -s $ARGV[0];
 open FDIN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
@@ -113,6 +178,8 @@ while (<FD>) {
     $info{'VEC_ASSIGN'} = \%vec_assign;
     my %returns = ();
     $info{'RETURNS'} = \%returns;
+    my %backup_info = ();
+    $info{'ENVVAR_AND_VECTORS'} = \%backup_info;
     if (exists $funcs{$info{'NAME'}}) {
       #print "Duplicated function definition $info{'NAME'}!\n";
       $info{'NAME'} = $info{'NAME'}."__DUPLICATED";
@@ -442,6 +509,7 @@ while (<FD>) {
     if ($func_idx != -1) {
       if (exists $func_ptr->{'TOUCHED'}) {
         if ($file_content[$stop+1] ne "-") {
+          # The case for single "env" pointer
           my ($call_idx, $call_ptr) = &lookup($start, \%callsite_lookup);
           if ($call_idx == -1) {
             $func_ptr->{'DO_DEFINE_ENV'} = 1;
@@ -471,6 +539,7 @@ while (<FD>) {
             $env_lookup{'MAP'}->{$env_info{'LOOKUP_START'}} = \%env_info;
           }
         } else {
+          # Reference through "env" pointer
           die "" if ($file_content[$start-1] eq "." or $file_content[$start-1] eq ">");
           die "" if $file_content[$stop+2] ne ">";
           my $get_address = 0;
@@ -531,8 +600,36 @@ while (<FD>) {
             }
           }
           if (not ($sym_info[0]->{'SYM'} eq "cc_src" or $sym_info[0]->{'SYM'} eq "cc_dst" or $sym_info[0]->{'SYM'} eq "cc_op" or $sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs")) {
-            $func_ptr->{'DO_DEFINE_ENV'} = 1;
+            die "" if $sym_info[0]->{'IS_ARRAY'} == 1;
             die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
+            $func_ptr->{'DO_DEFINE_ENV'} = 1;
+            $func_ptr->{'ENVVAR_AND_VECTORS'}->{"env->$sym_info[0]->{'SYM'}"} = 1;
+          } else {
+            if ($sym_info[0]->{'SYM'} eq "cc_src") {
+              $func_ptr->{'ENVVAR_AND_VECTORS'}->{"qemuaot_src1"} = 1;
+            }
+            if ($sym_info[0]->{'SYM'} eq "cc_dst") {
+              $func_ptr->{'ENVVAR_AND_VECTORS'}->{"qemuaot_dst"} = 1;
+            }
+            if ($sym_info[0]->{'SYM'} eq "cc_op") {
+              $func_ptr->{'ENVVAR_AND_VECTORS'}->{"qemuaot_op"} = 1;
+            }
+            if ($sym_info[0]->{'SYM'} eq "regs") {
+              die "" if $sym_info[0]->{'IS_ARRAY'} == 0;
+              if (exists $env_reg_idx_map{$sym_info[0]->{'ARRAY_IDX'}}) {
+                my $touched_var = $env_reg_idx_map{$sym_info[0]->{'ARRAY_IDX'}};
+                $func_ptr->{'ENVVAR_AND_VECTORS'}->{$touched_var} = 1;
+              }
+            }
+            if ($sym_info[0]->{'SYM'} eq "xmm_regs") {
+              die "" if $sym_info[0]->{'IS_ARRAY'} == 0;
+              if (exists $env_xmmregs_idx_map{$sym_info[0]->{'ARRAY_IDX'}}) {
+                my $touched_var = $env_xmmregs_idx_map{$sym_info[0]->{'ARRAY_IDX'}};
+                $func_ptr->{'ENVVAR_AND_VECTORS'}->{$touched_var} = 1;
+              } else {
+                die "";
+              }
+            }
           }
           if (not exists $func_ptr->{'ENV'}) {
             my %info = ();
@@ -550,24 +647,6 @@ my @sorted_env_addr = sort {$a <=> $b} sort keys %{$env_lookup{'MAP'}};
 $env_lookup{'SORTED_ADDR'} = \@sorted_env_addr;
 
 # Handle Vec* info
-my %env_xmmregs_idx_map = (
-  "0" => "xmm0",
-  "1" => "xmm1",
-  "2" => "xmm2",
-  "3" => "xmm3",
-  "4" => "xmm4",
-  "5" => "xmm5",
-  "6" => "xmm6",
-  "7" => "xmm7",
-  "8" => "xmm8",
-  "9" => "xmm9",
-  "10" => "xmm10",
-  "11" => "xmm11",
-  "12" => "xmm12",
-  "13" => "xmm13",
-  "14" => "xmm14",
-  "15" => "xmm15"
-);
 open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
 while (<FD>) {
   my $line = $_;
@@ -730,52 +809,6 @@ while (<FD>) {
 }
 close FD;
 
-my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
-my %qemuaot_gp_params_map = (
-  "rax" => "unsigned long",
-  "rcx" => "unsigned long",
-  "rdx" => "unsigned long",
-  "rbx" => "unsigned long",
-  "rsp" => "unsigned long",
-  "rbp" => "unsigned long",
-  "rsi" => "unsigned long",
-  "rdi" => "unsigned long",
-  "r8" => "unsigned long",
-  "r9" => "unsigned long",
-  "r10" => "unsigned long",
-  "r11" => "unsigned long",
-  "r12" => "unsigned long",
-  "r13" => "unsigned long",
-  "r14" => "unsigned long",
-  "r15" => "unsigned long",
-  "qemuaot_src1" => "unsigned long",
-  "qemuaot_dst" => "unsigned long",
-  "qemuaot_op" => "unsigned int",
-  "rip" => "unsigned long",
-);
-#my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
-#my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
-my $qemuaot_vec_invoke = "xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h";
-my $qemuaot_vec_declare = "v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong ymm1_h, v2ulong xmm2, v2ulong ymm2_h, v2ulong xmm3, v2ulong ymm3_h, v2ulong xmm4, v2ulong ymm4_h, v2ulong xmm5, v2ulong ymm5_h, v2ulong xmm6, v2ulong ymm6_h, v2ulong xmm7, v2ulong ymm7_h, v2ulong xmm8, v2ulong ymm8_h, v2ulong xmm9, v2ulong ymm9_h, v2ulong xmm10, v2ulong ymm10_h, v2ulong xmm11, v2ulong ymm11_h, v2ulong xmm12, v2ulong ymm12_h, v2ulong xmm13, v2ulong ymm13_h, v2ulong xmm14, v2ulong ymm14_h";
-my %env_reg_idx_map = (
-  "R_EAX" => "rax",
-  "R_ECX" => "rcx",
-  "R_EDX" => "rdx",
-  "R_EBX" => "rbx",
-  "R_ESP" => "rsp",
-  "R_EBP" => "rbp",
-  "R_ESI" => "rsi",
-  "R_EDI" => "rdi",
-  "R_R8" => "r8",
-  "R_R9" => "r9",
-  "R_R10" => "r10",
-  "R_R11" => "r11",
-  "R_R12" => "r12",
-  "R_R13" => "r13",
-  "R_R14" => "r14",
-  "R_R15" => "r15"
-);
-
 foreach my $f (keys %funcs) {
   if (not ($f =~ /^helper_/ and $f =~ /_xmm$/)) {
     next;
@@ -901,11 +934,13 @@ EOF
   my @sorted_funcs = sort {$a <=> $b} keys %order_to_func;
   foreach my $s (@sorted_funcs) {
     my $func_name = $order_to_func{$s};
-    my $new_func = &gen_replicated_func($func_name, \%defined_func, $f, \%foreign_calls);
+    my $new_func = &gen_replicated_func($func_name, \%defined_func, $f, \%foreign_calls, \%order_to_func);
     print OUT "$new_func\n\n";
   }
 
   close OUT;
+
+  # FIXME: do check EXCEPTION paths have all been covered
 }
 
 sub lookup
@@ -1260,7 +1295,7 @@ sub get_scalar_arg_idx
 
 sub gen_replicated_func
 {
-  my ($target_func, $func_replicate_info, $exception_exit, $fc) = @_;
+  my ($target_func, $func_replicate_info, $exception_exit, $fc, $order_to_func) = @_;
   my $new_func = "";
   if ($funcs{$target_func}->{'DO_EXPAND'} == 0) {
     my $new_head = $funcs{$target_func}->{'HEAD'};
@@ -1326,6 +1361,38 @@ sub gen_replicated_func
         }
       }
       my $new_func_body = &get_func_body($funcs{$target_func}, $pi, \%macro_def, $exception_exit, $fc);
+      if ($target_func eq $exception_exit) {
+        my %backups = ();
+        my $need_env = 0;
+        foreach my $ok (keys %{$order_to_func}) {
+          foreach my $bv (keys %{$funcs{$order_to_func->{$ok}}->{'ENVVAR_AND_VECTORS'}}) {
+            $backups{$bv} = 1;
+            if ($bv =~ /^env/) {
+              $need_env = 1;
+            }
+          }
+        }
+        my $backup_vars = "";
+        if ($need_env or exists $funcs{$target_func}->{'DO_DEFINE_ENV'}) {
+          $backup_vars = "CPUX86State *env;\n";
+          $backup_vars = $backup_vars."asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
+        }
+        foreach my $bk (keys %backups) {
+          if ($bk =~ /^xmm/) {
+            $backup_vars = $backup_vars."v2ulong backup_$bk = $bk;\n";
+          } else {
+            die "" if not exists $qemuaot_gp_params_map{$bk};
+            my $var_name = $bk;
+            $var_name =~ s/^env\-\>//;
+            $backup_vars = $backup_vars."$qemuaot_gp_params_map{$bk} backup_$var_name = $bk;\n";
+          }
+        }
+        foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
+          $backup_vars = $backup_vars."v2ulong backup_$var = $var;\n";
+        }
+        $backup_vars = $backup_vars."\n";
+        $new_func_body =~ s/^\{/\{\n$backup_vars/;
+      }
       $current_func = $current_func.$new_func_body."\n";
       $new_func = $new_func.$current_func;
       # Un-define arguments
@@ -1368,7 +1435,7 @@ sub get_func_body
   my @sorted_events = sort {$a <=> $b} keys %events;
   my $current_pos;
   my $body = "";
-  if (exists $func_ptr->{'DO_DEFINE_ENV'}) {
+  if (exists $func_ptr->{'DO_DEFINE_ENV'} and $func_ptr->{'NAME'} ne $exception_exit) {
     $body = "{\n";
     $body = $body."   $func_ptr->{'ENV_TYPE'}env;\n";
     # FIXME: cross platform
@@ -1426,7 +1493,7 @@ sub get_func_body
       if ($entry->{'GET_ADDRESS'}) {
         $current_pos = $e;
       } else {
-        my $new_var = &replace_env_var($entry, $md);
+        my $new_var = &replace_env_var($entry, $md, $func_ptr);
         if ($new_var ne "") {
           $body = $body.$new_var;
           $current_pos = $entry->{'STOP'} + 1;
@@ -1781,7 +1848,7 @@ sub FuncNameIsForeign
 
 sub replace_env_var
 {
-  my ($entry, $md) = @_;
+  my ($entry, $md, $func_ptr) = @_;
   if ($#{$entry->{'DEF_SYM_INFO'}} == -1) {
     return "env";
   }
@@ -1800,6 +1867,7 @@ sub replace_env_var
     }
     die "" if not exists $env_reg_idx_map{$reg_idx};
     $new_var = $env_reg_idx_map{$reg_idx};
+    $func_ptr->{'ENVVAR_AND_VECTORS'}->{$new_var} = 1;
   } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "xmm_regs") {
     die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
     my $xmm_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};
