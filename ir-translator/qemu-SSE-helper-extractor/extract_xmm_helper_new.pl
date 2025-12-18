@@ -959,7 +959,7 @@ EOF
   }
   close IN;
   foreach my $ff (keys %foreign_calls) {
-    die "$ff" if $check_body =~ /\s$ff\(/;
+    die "$ff" if $check_body =~ /([^a-zA-Z_0-9])${ff}([^a-zA-Z_0-9])/;
   }
 }
 
@@ -1524,7 +1524,7 @@ sub get_func_body
         if ($funcs{$call_target}->{'128'}->{'RETURN128'} ne "") {
           $body = $body."($funcs{$call_target}->{'128'}->{'RETURN128'})";
         }
-        my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi);
+        my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi, $fc);
         $body = $body.$call_txt;
         $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
       }
@@ -1586,7 +1586,7 @@ sub get_func_body
           if (exists $func_ptr->{'CALLS'}->{$sub_current} and exists $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}) {
             my $sub_str = &GetText($sub_head, ($sub_current-1));
             $body = $body.$sub_str;
-            my $func_call_str = &update_func_call($func_ptr, $sub_current, $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}, $pi);
+            my $func_call_str = &update_func_call($func_ptr, $sub_current, $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}, $pi, $fc);
             $body = $body.$func_call_str;
             $sub_head = $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'} + 1;
             $sub_current = $sub_head;
@@ -1644,7 +1644,7 @@ sub get_func_body
 
 sub update_func_call
 {
-  my ($caller_ptr, $call_pos, $callee_ptr, $path_info) = @_;
+  my ($caller_ptr, $call_pos, $callee_ptr, $path_info, $fc) = @_;
   my $call_info = $caller_ptr->{'CALLS'}->{$call_pos};
   my $str = "";
   if ($callee_ptr->{'DO_EXPAND'}) {
@@ -1686,7 +1686,16 @@ sub update_func_call
       die "$caller_ptr->{'NAME'} $callee_ptr->{'NAME'}" if not exists $sorted_sub_calls[$sub_call_idx];
       my $sub_call_info = $caller_ptr->{'CALLS'}->{$sorted_sub_calls[$sub_call_idx]};
       if (exists $funcs{$sub_call_info->{'CALL_TARGET'}}) {
-        my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info);
+        my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info, $fc);
+        $call_list = $call_list.", ".$sub_call_txt;
+      } elsif (&FuncNameIsForeign($sub_call_info->{'CALL_TARGET'})) {
+        die "" if not exists $fc->{$sub_call_info->{'CALL_TARGET'}};
+        my $sub_call_txt = "";
+        if ($caller_ptr->{'HELPER_INTERFACE'}) {
+          $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(trigger_exception = 1)";
+        } else {
+          $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(*trigger_exception_ptr = 1)";
+        }
         $call_list = $call_list.", ".$sub_call_txt;
       } else {
         my $param = &update_vector_inside_single_param($caller_ptr, $call_info, $idx, $arg);
