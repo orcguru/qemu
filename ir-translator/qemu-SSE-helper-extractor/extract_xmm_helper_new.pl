@@ -944,6 +944,23 @@ EOF
   close OUT;
 
   # FIXME: do check EXCEPTION paths have all been covered
+  my $check_body = "";
+  my $check_on = 0;
+  open IN, "< $path/$f.c" or die "Cannot open $path/$f.c for read!\n";
+  while (<IN>) {
+    my $line = $_;
+    chomp($line);
+    if ($line =~ /QEMU_HELPER_BEGIN/) {
+      $check_on = 1;
+    }
+    if ($check_on) {
+      $check_body = $check_body."$line\n";
+    }
+  }
+  close IN;
+  foreach my $ff (keys %foreign_calls) {
+    die "$ff" if $check_body =~ /\s$ff\(/;
+  }
 }
 
 sub lookup
@@ -1571,6 +1588,18 @@ sub get_func_body
             $body = $body.$sub_str;
             my $func_call_str = &update_func_call($func_ptr, $sub_current, $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}, $pi);
             $body = $body.$func_call_str;
+            $sub_head = $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'} + 1;
+            $sub_current = $sub_head;
+          } elsif (exists $func_ptr->{'CALLS'}->{$sub_current} and &FuncNameIsForeign($func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'})) {
+            my $sub_str = &GetText($sub_head, ($sub_current-1));
+            $body = $body.$sub_str;
+            my $foreign_call = $func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'};
+            die "" if not exists $fc->{$foreign_call};
+            if ($func_ptr->{'HELPER_INTERFACE'}) {
+              $body = $body."($fc->{$foreign_call})(trigger_exception = 1)";
+            } else {
+              $body = $body."($fc->{$foreign_call})(*trigger_exception_ptr = 1)";
+            }
             $sub_head = $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'} + 1;
             $sub_current = $sub_head;
           } elsif (exists $func_ptr->{'VEC'}->{$sub_current}) {
