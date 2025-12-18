@@ -169,6 +169,10 @@ while (<FD>) {
     my $func_name = &GetText($nameStart, $nameStop);
     $func_name = &extract_func_name($func_name);
     $info{'NAME'} = $func_name;
+    $info{'HELPER_INTERFACE'} = 0;
+    if ($info{'NAME'} =~ /^helper_/ and $info{'NAME'} =~ /_xmm$/) {
+      $info{'HELPER_INTERFACE'} = 1;
+    }
     $info{'FUNC_FULL'} = &GetText($bodyStart, $bodyStop);
     $info{'FUNC_IDX'} = $global_func_idx;
     $global_func_idx = $global_func_idx + 1;
@@ -184,6 +188,7 @@ while (<FD>) {
       #print "Duplicated function definition $info{'NAME'}!\n";
       $info{'NAME'} = $info{'NAME'}."__DUPLICATED";
     }
+    $info{'DO_EXPAND'} = 0;
     $funcs{$info{'NAME'}} = \%info;
     $func_lookup{'MAP'}->{$info{'LOOKUP_START'}} = \%info;
   }
@@ -351,18 +356,6 @@ foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'SCALAR_ARGS'} = $scalar_args;
   $funcs{$f}->{'VECTOR_ARGS'} = $vector_args;
   $funcs{$f}->{'ENV_TYPE'} = $env_type;
-  if (@{$vector_args} > 0) {
-    $funcs{$f}->{'DO_EXPAND'} = 1;
-    if (not exists $funcs{$f}->{'EXPAND_FACTORS'}) {
-      my @array = ();
-      $funcs{$f}->{'EXPAND_FACTORS'} = \@array;
-    }
-    foreach my $e (@{$vector_args}) {
-      push @{$funcs{$f}->{'EXPAND_FACTORS'}}, $e->{'VAR_NAME'};
-    }
-  } else {
-    $funcs{$f}->{'DO_EXPAND'} = 0;
-  }
   $funcs{$f}->{'128'} = $ret128_info;
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     if (&FuncNameIsForeign($funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'})) {
@@ -900,6 +893,16 @@ foreach my $f (keys %funcs) {
     @sub_call_stack = @new_call_stack;
   }
 
+  # Update REG references
+  foreach my $sf (keys %defined_func) {
+    &add_reg_references_on_execution_path($sf, \%defined_func);
+  }
+
+  # Standalone references to cc_src/cc_op/REG need pass through all intermediate function calls
+  foreach my $sf (keys %defined_func) {
+    &populate_additional_arguments_on_execution_path($sf, \%defined_func);
+  }
+
   print "$f $has_foreign_call\n";
 
   # Generate function
@@ -920,8 +923,8 @@ EOF
     $type_name =~ s/\s+/_/g;
     $foreign_types{$foreign_calls{$ff}} = $type_name;
   }
-  foreach my $t (keys %foreign_types) {
-    print OUT "typedef __attribute__((qemuaot,noreturn)) $t (*FUNC_EXCEPTION_RET_$foreign_types{$t})(";
+  if (keys %foreign_types > 0) {
+    print OUT "typedef __attribute__((qemuaot,noreturn)) void (*FUNC_EXCEPTION_RET)(";
     foreach my $p (@qemuaot_gp_params) {
       print OUT "$qemuaot_gp_params_map{$p} $p, ";
     }
@@ -935,7 +938,7 @@ EOF
   foreach my $s (@sorted_funcs) {
     my $func_name = $order_to_func{$s};
     my $new_func = &gen_replicated_func($func_name, \%defined_func, $f, \%foreign_calls, \%order_to_func);
-    print OUT "$new_func\n\n";
+    print OUT "$new_func";
   }
 
   close OUT;
@@ -1298,13 +1301,32 @@ sub gen_replicated_func
   my ($target_func, $func_replicate_info, $exception_exit, $fc, $order_to_func) = @_;
   my $new_func = "";
   if ($funcs{$target_func}->{'DO_EXPAND'} == 0) {
+    die "" if not exists $func_replicate_info->{$target_func};
+    die "" if keys %{$func_replicate_info->{$target_func}} == 0;
     my $new_head = $funcs{$target_func}->{'HEAD'};
     my $args = &collect_func_args($funcs{$target_func});
     my $current_func = $new_head."($args)\n";
+    if ($funcs{$target_func}->{'HELPER_INTERFACE'}) {
+      foreach my $vec_idx (0..$#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
+        my $arg_entry = $funcs{$target_func}->{'VECTOR_ARGS'}->[$vec_idx];
+        $current_func = $current_func."#define $arg_entry->{'VAR_NAME'} VEC$vec_idx\n";
+      }
+    }
     my %empty = ();
-    my $new_func_body = &get_func_body($funcs{$target_func}, "", \%empty, $exception_exit, $fc);
-    $current_func = $current_func.$new_func_body."\n\n";
+    my @pis = keys %{$func_replicate_info->{$target_func}};
+    my $new_func_body = &get_func_body($funcs{$target_func}, $pis[0], \%empty, $exception_exit, $fc);
+    if ($target_func eq $exception_exit) {
+      $new_func_body = &add_context_backup($new_func_body, $target_func, $order_to_func);
+    }
+    $current_func = $current_func.$new_func_body."\n";
+    if ($funcs{$target_func}->{'HELPER_INTERFACE'}) {
+      foreach my $vec_idx (0..$#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
+        my $arg_entry = $funcs{$target_func}->{'VECTOR_ARGS'}->[$vec_idx];
+        $current_func = $current_func."#undef $arg_entry->{'VAR_NAME'}\n";
+      }
+    }
     $new_func = $new_func.$current_func;
+    $new_func = $new_func."\n";
   } else {
     my %pi_info = ();
     foreach my $pi (keys %{$func_replicate_info->{$target_func}}) {
@@ -1348,61 +1370,74 @@ sub gen_replicated_func
       # Define arguments
       my %macro_def = ();
       foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
-        my $vec_idx = &get_vec_arg_idx($funcs{$target_func}, $var);
-        if ($vec_idx != -1) {
-          $current_func = $current_func."#define $var VEC$pi_info{$pi}->[$vec_idx]\n";
-        } else {
-          my $scalar_idx = &get_scalar_arg_idx($funcs{$target_func}, $var);
-          die "" if $scalar_idx == -1;
-          die "" if $#{$func_replicate_info->{$target_func}->{$pi}} == -1;
-          my $in = $func_replicate_info->{$target_func}->{$pi}->[$#{$func_replicate_info->{$target_func}->{$pi}}];
-          $current_func = $current_func."#define $var $funcs{$in->{'FUNC'}}->{'CALLS'}->{$in->{'LOC'}}->{'SCALAR_CALL_ARGS'}->[$scalar_idx]\n";
-          $macro_def{$var} = $funcs{$in->{'FUNC'}}->{'CALLS'}->{$in->{'LOC'}}->{'SCALAR_CALL_ARGS'}->[$scalar_idx];
+        my $scalar_idx = &get_scalar_arg_idx($funcs{$target_func}, $var);
+        die "" if $scalar_idx == -1;
+        die "" if $#{$func_replicate_info->{$target_func}->{$pi}} == -1;
+        my $in = $func_replicate_info->{$target_func}->{$pi}->[$#{$func_replicate_info->{$target_func}->{$pi}}];
+        $macro_def{$var} = $funcs{$in->{'FUNC'}}->{'CALLS'}->{$in->{'LOC'}}->{'SCALAR_CALL_ARGS'}->[$scalar_idx];
+      }
+      if ($funcs{$target_func}->{'HELPER_INTERFACE'}) {
+        foreach my $vec_idx (0..$#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
+          my $arg_entry = $funcs{$target_func}->{'VECTOR_ARGS'}->[$vec_idx];
+          $current_func = $current_func."#define $arg_entry->{'VAR_NAME'} VEC$vec_idx\n";
         }
       }
       my $new_func_body = &get_func_body($funcs{$target_func}, $pi, \%macro_def, $exception_exit, $fc);
       if ($target_func eq $exception_exit) {
-        my %backups = ();
-        my $need_env = 0;
-        foreach my $ok (keys %{$order_to_func}) {
-          foreach my $bv (keys %{$funcs{$order_to_func->{$ok}}->{'ENVVAR_AND_VECTORS'}}) {
-            $backups{$bv} = 1;
-            if ($bv =~ /^env/) {
-              $need_env = 1;
-            }
-          }
-        }
-        my $backup_vars = "";
-        if ($need_env or exists $funcs{$target_func}->{'DO_DEFINE_ENV'}) {
-          $backup_vars = "CPUX86State *env;\n";
-          $backup_vars = $backup_vars."asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
-        }
-        foreach my $bk (keys %backups) {
-          if ($bk =~ /^xmm/) {
-            $backup_vars = $backup_vars."v2ulong backup_$bk = $bk;\n";
-          } else {
-            die "" if not exists $qemuaot_gp_params_map{$bk};
-            my $var_name = $bk;
-            $var_name =~ s/^env\-\>//;
-            $backup_vars = $backup_vars."$qemuaot_gp_params_map{$bk} backup_$var_name = $bk;\n";
-          }
-        }
-        foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
-          $backup_vars = $backup_vars."v2ulong backup_$var = $var;\n";
-        }
-        $backup_vars = $backup_vars."\n";
-        $new_func_body =~ s/^\{/\{\n$backup_vars/;
+        $new_func_body = &add_context_backup($new_func_body, $order_to_func);
       }
       $current_func = $current_func.$new_func_body."\n";
       $new_func = $new_func.$current_func;
       # Un-define arguments
-      foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
-        $new_func = $new_func."#undef $var\n";
+      if ($funcs{$target_func}->{'HELPER_INTERFACE'}) {
+        foreach my $vec_idx (0..$#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
+          my $arg_entry = $funcs{$target_func}->{'VECTOR_ARGS'}->[$vec_idx];
+          $current_func = $current_func."#undef $arg_entry->{'VAR_NAME'}\n";
+        }
       }
       $new_func = $new_func."\n";
     }
   }
   return $new_func;
+}
+
+sub add_context_backup
+{
+  my ($new_func_body, $target_func, $order_to_func) = @_;
+  my %backups = ();
+  my $need_env = 0;
+  foreach my $ok (keys %{$order_to_func}) {
+    foreach my $bv (keys %{$funcs{$order_to_func->{$ok}}->{'ENVVAR_AND_VECTORS'}}) {
+      $backups{$bv} = 1;
+      if ($bv =~ /^env/) {
+        $need_env = 1;
+      }
+    }
+  }
+  my $backup_vars = "";
+  if (exists $funcs{$target_func}->{'IS_FOREIGN'}) {
+    $backup_vars = $backup_vars."int trigger_exception = 0;\n";
+  }
+  if ($need_env or exists $funcs{$target_func}->{'DO_DEFINE_ENV'}) {
+    $backup_vars = $backup_vars."CPUX86State *env;\n";
+    $backup_vars = $backup_vars."asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
+  }
+  foreach my $bk (keys %backups) {
+    if ($bk =~ /^xmm/) {
+      $backup_vars = $backup_vars."v2ulong backup_$bk = $bk;\n";
+    } else {
+      die "" if not exists $qemuaot_gp_params_map{$bk};
+      my $var_name = $bk;
+      $var_name =~ s/^env\-\>//;
+      $backup_vars = $backup_vars."$qemuaot_gp_params_map{$bk} backup_$var_name = $bk;\n";
+    }
+  }
+  foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
+    $backup_vars = $backup_vars."v2ulong backup_$var = $var;\n";
+  }
+  $backup_vars = $backup_vars."\n";
+  $new_func_body =~ s/^\{/\{\n$backup_vars/;
+  return $new_func_body;
 }
 
 sub get_func_body
@@ -1459,11 +1494,11 @@ sub get_func_body
           die "" if not exists $fc->{$call_target};
           my $type_name = $fc->{$call_target};
           $type_name =~ s/\s+/_/g;
-          $body = $body."((FUNC_EXCEPTION_RET_$type_name)exception_return/*$call_target*/)(";
-          foreach my $p (@qemuaot_gp_params) {
-            $body = $body."$p, ";
+          if ($func_ptr->{'HELPER_INTERFACE'}) {
+            $body = $body."($type_name)(trigger_exception = 1)";
+          } else {
+            $body = $body."($type_name)(*trigger_exception_ptr = 1)";
           }
-          $body = $body.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)normal_return)";
           $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
         } else {
           $current_pos = $e;
@@ -1478,7 +1513,11 @@ sub get_func_body
       }
     } elsif (exists $func_ptr->{'VEC'}->{$e}) {
       if ($func_ptr->{'VEC'}->{$e}->{'FROM_PARAM'}) {
-        $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}})$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$e}->{'VAR'}]->{'VAR_NAME'})";
+        if ($func_ptr->{'HELPER_INTERFACE'}) {
+          $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}})$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$e}->{'VAR'}]->{'VAR_NAME'})";
+        } else {
+          $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}})(*$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$e}->{'VAR'}]->{'VAR_NAME'}))";
+        }
         $current_pos = $func_ptr->{'VEC'}->{$e}->{'STOP'} + 1;
       } else {
         $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}})$func_ptr->{'VEC'}->{$e}->{'VAR'})";
@@ -1486,7 +1525,11 @@ sub get_func_body
       }
     } elsif (exists $func_ptr->{'VEC_VAR'}->{$e}) {
       my $entry = $func_ptr->{'VEC_VAR'}->{$e};
-      $body = $body."v2ulong ".$entry->{'SYM'}." = ".$func_ptr->{'VECTOR_ARGS'}->[$entry->{'VEC_ARG_IDX'}]->{'VAR_NAME'};
+      if ($func_ptr->{'HELPER_INTERFACE'}) {
+        $body = $body."v2ulong ".$entry->{'SYM'}." = ".$func_ptr->{'VECTOR_ARGS'}->[$entry->{'VEC_ARG_IDX'}]->{'VAR_NAME'};
+      } else {
+        $body = $body."v2ulong ".$entry->{'SYM'}." = *".$func_ptr->{'VECTOR_ARGS'}->[$entry->{'VEC_ARG_IDX'}]->{'VAR_NAME'};
+      }
       $current_pos = $entry->{'STOP'} + 1;
     } elsif (exists $func_ptr->{'ENV'}->{$e}) {
       my $entry = $func_ptr->{'ENV'}->{$e};
@@ -1505,7 +1548,11 @@ sub get_func_body
       my $vec_entry = $func_ptr->{'VEC_ASSIGN'}->{$e}->{'VEC_INFO'};
       my $vec_var = "";
       if ($vec_entry->{'FROM_PARAM'}) {
-        $vec_var = $func_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'};
+        if ($func_ptr->{'HELPER_INTERFACE'}) {
+          $vec_var = $func_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'};
+        } else {
+          $vec_var = "(*".$func_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'}.")";
+        }
       } else {
         $vec_var = $vec_entry->{'VAR'};
       }
@@ -1577,15 +1624,24 @@ sub update_func_call
     $str = $callee_ptr->{'NAME'};
   }
   $str = $str."(";
-  foreach my $idx (0 .. $#qemuaot_gp_params) {
-    my $a = $qemuaot_gp_params[$idx];
-    if ($idx == 0) {
-      $str = $str.$a;
-    } else {
-      $str = $str.", ".$a;
-    }
+  my $call_list = "";
+  my $prefix = "";
+  my $postfix = "";
+  if ($caller_ptr->{'HELPER_INTERFACE'}) {
+    $prefix = "&";
+  } else {
+    $postfix = "_ptr";
   }
-  $str = $str.", $qemuaot_vec_invoke";
+  my @sorted_keys = sort {$a cmp $b} keys %{$callee_ptr->{'ENVVAR_AND_VECTORS'}};
+  foreach my $sk (@sorted_keys) {
+    if ($sk =~ /^env\-\>/) {
+      next;
+    }
+    $call_list = $call_list.", $prefix$sk$postfix";
+  }
+  foreach my $vec_arg (@{$call_info->{'VECTOR_CALL_ARGS'}}) {
+    $call_list = $call_list.", $prefix$vec_arg";
+  }
   my %sub_calls = ();
   foreach my $e (keys %{$caller_ptr->{'CALLS'}}) {
     if ($e > $call_info->{'PAREN_START'} and $e < $call_info->{'PAREN_STOP'}) {
@@ -1602,20 +1658,27 @@ sub update_func_call
       my $sub_call_info = $caller_ptr->{'CALLS'}->{$sorted_sub_calls[$sub_call_idx]};
       if (exists $funcs{$sub_call_info->{'CALL_TARGET'}}) {
         my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info);
-        $str = $str.", ".$sub_call_txt;
+        $call_list = $call_list.", ".$sub_call_txt;
       } else {
         my $param = &update_vector_inside_single_param($caller_ptr, $call_info, $idx, $arg);
-        $str = $str.", ".$param;
+        $call_list = $call_list.", ".$param;
       }
       $sub_call_idx = $sub_call_idx + 1;
     } else {
       my $param = &update_vector_inside_single_param($caller_ptr, $call_info, $idx, $arg);
-      $str = $str.", ".$param;
+      $call_list = $call_list.", ".$param;
     }
   }
-  if (exists $callee_ptr->{'IS_FOREIGN'}) {
-    $str = $str.", normal_return, exception_return";
+  if ($callee_ptr->{'IS_FOREIGN'}) {
+    if ($caller_ptr->{'HELPER_INTERFACE'}) {
+      $call_list = $call_list.", &trigger_exception";
+    } else {
+      die "" if (not exists $caller_ptr->{'IS_FOREIGN'});
+      $call_list = $call_list.", trigger_exception_ptr";
+    }
   }
+  $call_list =~ s/^,\s+//;
+  $str = $str.$call_list;
   $str = $str.")";
   return $str;
 }
@@ -1662,16 +1725,39 @@ sub collect_func_args
 {
   my ($func_ptr) = @_;
   my $args = "";
-  foreach my $g (@qemuaot_gp_params) {
-    $args = $args.$qemuaot_gp_params_map{$g}." ".$g.", ";
+  if ($func_ptr->{'HELPER_INTERFACE'}) {
+    foreach my $g (@qemuaot_gp_params) {
+      $args = $args.$qemuaot_gp_params_map{$g}." ".$g.", ";
+    }
+    $args = $args.$qemuaot_vec_declare;
+  } else {
+    my @sorted_keys = sort {$a cmp $b} keys %{$func_ptr->{'ENVVAR_AND_VECTORS'}};
+    foreach my $sk (@sorted_keys) {
+      if ($sk =~ /^env\-\>/) {
+        next;
+      }
+      if ($sk =~ /^xmm/) {
+        $args = $args.", v2ulong *".$sk."_ptr";
+      } else {
+        die "" if not exists $qemuaot_gp_params_map{$sk};
+        $args = $args.", $qemuaot_gp_params_map{$sk} *".$sk."_ptr";
+      }
+    }
   }
-  $args = $args.$qemuaot_vec_declare;
+  if ($func_ptr->{'HELPER_INTERFACE'} == 0) {
+    foreach my $i (@{$func_ptr->{'VECTOR_ARGS'}}) {
+      $args = $args.", v2ulong *".$i->{'VAR_NAME'};
+    }
+  }
   foreach my $i (@{$func_ptr->{'SCALAR_ARGS'}}) {
     $args = $args.", ".$i->{'TYPE'}." ".$i->{'VAR_NAME'};
   }
-  if (exists $func_ptr->{'IS_FOREIGN'}) {
+  if ($func_ptr->{'HELPER_INTERFACE'} and exists $func_ptr->{'IS_FOREIGN'}) {
     $args = $args.", unsigned long normal_return, unsigned long exception_return";
+  } elsif (exists $func_ptr->{'IS_FOREIGN'}) {
+    $args = $args.", int *trigger_exception_ptr";
   }
+  $args =~ s/^,\s+//;
   return $args;
 }
 
@@ -1854,11 +1940,23 @@ sub replace_env_var
   }
   my $new_var = "";
   if ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_src") {
-    $new_var = "qemuaot_src1";
+    if ($func_ptr->{'HELPER_INTERFACE'}) {
+      $new_var = "qemuaot_src1";
+    } else {
+      $new_var = "(*qemuaot_src1_ptr)";
+    }
   } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_dst") {
-    $new_var = "qemuaot_dst";
+    if ($func_ptr->{'HELPER_INTERFACE'}) {
+      $new_var = "qemuaot_dst";
+    } else {
+      $new_var = "(*qemuaot_dst_ptr)";
+    }
   } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_op") {
-    $new_var = "qemuaot_op";
+    if ($func_ptr->{'HELPER_INTERFACE'}) {
+      $new_var = "qemuaot_op";
+    } else {
+      $new_var = "(*qemuaot_op_ptr)";
+    }
   } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "regs") {
     die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
     my $reg_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};
@@ -1866,8 +1964,12 @@ sub replace_env_var
       $reg_idx = $md->{$reg_idx};
     }
     die "" if not exists $env_reg_idx_map{$reg_idx};
-    $new_var = $env_reg_idx_map{$reg_idx};
-    $func_ptr->{'ENVVAR_AND_VECTORS'}->{$new_var} = 1;
+    die "" if not exists $func_ptr->{'ENVVAR_AND_VECTORS'}->{$env_reg_idx_map{$reg_idx}};
+    if ($func_ptr->{'HELPER_INTERFACE'}) {
+      $new_var = $env_reg_idx_map{$reg_idx};
+    } else {
+      $new_var = "(*$env_reg_idx_map{$reg_idx}_ptr)";
+    }
   } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "xmm_regs") {
     die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
     my $xmm_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};
@@ -1876,7 +1978,56 @@ sub replace_env_var
     my $vec_sym = $entry->{'DEF_SYM_INFO'}->[1]->{'SYM'};
     die "" if not exists $VecSymbolToCType{$vec_sym};
     my $vec_idx = $entry->{'DEF_SYM_INFO'}->[1]->{'ARRAY_IDX'};
-    $new_var = "(($VecSymbolToCType{$vec_sym})$env_xmmregs_idx_map{$xmm_idx})[$vec_idx]";
+    if ($func_ptr->{'HELPER_INTERFACE'}) {
+      $new_var = "(($VecSymbolToCType{$vec_sym})$env_xmmregs_idx_map{$xmm_idx})[$vec_idx]";
+    } else {
+      die "";
+    }
   }
   return $new_var;
+}
+
+sub add_reg_references_on_execution_path
+{
+  my ($target_func, $func_replicate_info) = @_;
+  my %macro_def = ();
+  foreach my $pi (keys %{$func_replicate_info->{$target_func}}) {
+    foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
+      my $scalar_idx = &get_scalar_arg_idx($funcs{$target_func}, $var);
+      die "" if $scalar_idx == -1;
+      die "" if $#{$func_replicate_info->{$target_func}->{$pi}} == -1;
+      my $in = $func_replicate_info->{$target_func}->{$pi}->[$#{$func_replicate_info->{$target_func}->{$pi}}];
+      $macro_def{$var} = $funcs{$in->{'FUNC'}}->{'CALLS'}->{$in->{'LOC'}}->{'SCALAR_CALL_ARGS'}->[$scalar_idx];
+    }
+    foreach my $e (keys %{$funcs{$target_func}->{'ENV'}}) {
+      my $entry = $funcs{$target_func}->{'ENV'}->{$e};
+      if (exists $entry->{'DEF_SYM_INFO'}->[0] and $entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "regs") {
+        die "" if $entry->{'DEF_SYM_INFO'}->[0]->{'IS_ARRAY'} == 0;
+        my $reg_idx = $entry->{'DEF_SYM_INFO'}->[0]->{'ARRAY_IDX'};
+        if (exists $macro_def{$reg_idx}) {
+          $reg_idx = $macro_def{$reg_idx};
+        }
+        die "" if not exists $env_reg_idx_map{$reg_idx};
+        my $new_var = $env_reg_idx_map{$reg_idx};
+        $funcs{$target_func}->{'ENVVAR_AND_VECTORS'}->{$new_var} = 1;
+      }
+    }
+  }
+}
+
+sub populate_additional_arguments_on_execution_path
+{
+  my ($target_func, $func_replicate_info) = @_;
+  my $target = $funcs{$target_func};
+  foreach my $pi (keys %{$func_replicate_info->{$target_func}}) {
+    foreach my $entry (@{$func_replicate_info->{$target_func}->{$pi}}) {
+      my $intermediate = $funcs{$entry->{'FUNC'}};
+      foreach my $v (keys %{$target->{'ENVVAR_AND_VECTORS'}}) {
+        if ($v =~ /^env\-\>/) {
+          next;
+        }
+        $intermediate->{'ENVVAR_AND_VECTORS'}->{$v} = 1;
+      }
+    }
+  }
 }
