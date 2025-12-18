@@ -350,13 +350,14 @@ while (keys %workset > 0) {
 my %foreign_funcs = ();
 foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'TOUCHED'} = 1;
-  my ($head, $scalar_args, $vector_args, $pure_arg_info, $ret128_info, $env_type) = &parse_func_head($funcs{$f});
+  my ($head, $scalar_args, $vector_args, $pure_arg_info, $ret128_info, $env_type, $func_type) = &parse_func_head($funcs{$f});
   $funcs{$f}->{'HEAD'} = $head;
   $funcs{$f}->{'PURE_ARG_INFO'} = $pure_arg_info;
   $funcs{$f}->{'SCALAR_ARGS'} = $scalar_args;
   $funcs{$f}->{'VECTOR_ARGS'} = $vector_args;
   $funcs{$f}->{'ENV_TYPE'} = $env_type;
   $funcs{$f}->{'128'} = $ret128_info;
+  $funcs{$f}->{'FUNC_TYPE'} = $func_type;
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     if (&FuncNameIsForeign($funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'})) {
       $foreign_funcs{$funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'}} = 1;
@@ -924,7 +925,7 @@ EOF
     $foreign_types{$foreign_calls{$ff}} = $type_name;
   }
   if (keys %foreign_types > 0) {
-    print OUT "typedef __attribute__((qemuaot,noreturn)) void (*FUNC_EXCEPTION_RET)(";
+    print OUT "typedef __attribute__((qemuaot,noreturn)) $funcs{$f}->{'FUNC_TYPE'} (*FUNC_EXCEPTION_RET)(";
     foreach my $p (@qemuaot_gp_params) {
       print OUT "$qemuaot_gp_params_map{$p} $p, ";
     }
@@ -1132,6 +1133,15 @@ sub parse_func_head
   my @slice_head = @chars[0..($idx-1)];
   my @slice_tail = @chars[$idx..$#chars];
   my $head = join("", @slice_head);
+  my $func_type_info = $head;
+  $func_type_info = &remove_attribute($func_type_info);
+  $func_type_info =~ s/^\s*//;
+  my $func_type = "NA";
+  if ($func->{'NAME'} =~ /^helper_/ and $func->{'NAME'} =~ /_xmm$/) {
+    my @type_fields = split(/\s+/, $func_type_info);
+    my @sub_type_fields = @type_fields[0..($#type_fields-1)];
+    $func_type = join(" ", @sub_type_fields);
+  }
   my $head_copy = $head;
   if (not $head_copy =~ /__attribute__\(\(always_inline\)\)/) {
     $head_copy = "__attribute__((always_inline,weak)) ".$head_copy;
@@ -1218,10 +1228,10 @@ sub parse_func_head
         push @scalar, \%info;
       }
     }
-    return ($head_copy, \@scalar, \@vector, $pure_arg_info, \%ret128_info, $env_type);
+    return ($head_copy, \@scalar, \@vector, $pure_arg_info, \%ret128_info, $env_type, $func_type);
   } else {
     my @empty = ();
-    return ($head_copy, \@empty, \@empty, $pure_arg_info, \%ret128_info, $env_type);
+    return ($head_copy, \@empty, \@empty, $pure_arg_info, \%ret128_info, $env_type, $func_type);
   }
 }
 
@@ -1422,6 +1432,7 @@ sub add_context_backup
 {
   my ($new_func_body, $target_func, $order_to_func) = @_;
   my %backups = ();
+  my %restore_info = ();
   my $need_env = 0;
   foreach my $ok (keys %{$order_to_func}) {
     foreach my $bv (keys %{$funcs{$order_to_func->{$ok}}->{'ENVVAR_AND_VECTORS'}}) {
@@ -1442,18 +1453,24 @@ sub add_context_backup
   foreach my $bk (keys %backups) {
     if ($bk =~ /^xmm/) {
       $backup_vars = $backup_vars."v2ulong backup_$bk = $bk;\n";
+      $restore_info{"backup_$bk"} = $bk;
     } else {
       die "" if not exists $qemuaot_gp_params_map{$bk};
       my $var_name = $bk;
       $var_name =~ s/^env\-\>//;
       $backup_vars = $backup_vars."$qemuaot_gp_params_map{$bk} backup_$var_name = $bk;\n";
+      $restore_info{"backup_$var_name"} = $bk;
     }
   }
-  foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
-    $backup_vars = $backup_vars."v2ulong backup_$var = $var;\n";
+  if (exists $funcs{$target_func}->{'IS_FOREIGN'}) {
+    foreach my $v (@{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
+      $backup_vars = $backup_vars."v2ulong backup_$v->{'VAR_NAME'} = $v->{'VAR_NAME'};\n";
+      $restore_info{"backup_$v->{'VAR_NAME'}"} = $v->{'VAR_NAME'};
+    }
   }
   $backup_vars = $backup_vars."\n";
   $new_func_body =~ s/^\{/\{\n$backup_vars/;
+  $funcs{$target_func}->{'RESTORE_INFO'} = \%restore_info;
   return $new_func_body;
 }
 
@@ -1481,6 +1498,11 @@ sub get_func_body
   }
   foreach my $e (keys %{$func_ptr->{'RETURNS'}}) {
     if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_EXPR") {
+      $events{$e} = 1;
+    }
+  }
+  if ($func_ptr->{'HELPER_INTERFACE'}) {
+    foreach my $e (keys %{$func_ptr->{'RETURNS'}}) {
       $events{$e} = 1;
     }
   }
@@ -1627,9 +1649,22 @@ sub get_func_body
     } elsif (exists $func_ptr->{'RETURNS'}->{$e}) {
       my $ret_info = $func_ptr->{'RETURNS'}->{$e};
       if ($func_ptr->{'128'}->{'RETURN128'} ne "") {
+        die "" if $func_ptr->{'HELPER_INTERFACE'};
         my $sub_str = &GetText($e, $ret_info->{'EXPR_START'}-1);
         $body = $body.$sub_str."(v2ulong)";
         $current_pos = $ret_info->{'EXPR_START'};
+      } elsif ($func_ptr->{'HELPER_INTERFACE'} and exists $func_ptr->{'IS_FOREIGN'}) {
+        $body = $body."{\n";
+        my $exp = &get_exception_path($func_ptr, $exception_exit);
+        $body = $body.$exp;
+        if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_VOID") {
+          $body = $body."return;\n}\n";
+          $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
+        } else {
+          my $txt = &GetText($e, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
+          $body = $body.$txt.";\n}\n";
+          $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'} + 2;
+        }
       } else {
         $current_pos = $e;
       }
@@ -1639,6 +1674,27 @@ sub get_func_body
   }
   my $txt = &GetText($current_pos, $func_ptr->{'BODY_STOP'});
   $body = $body.$txt;
+  if (exists $func_ptr->{'IS_FOREIGN'} and $func_ptr->{'HELPER_INTERFACE'}) {
+    my $exp = &get_exception_path($func_ptr, $exception_exit);
+    $body =~ s/\}$/\n$exp\}/;
+  }
+  return $body;
+}
+
+sub get_exception_path
+{
+  my ($func_ptr, $exception_exit) = @_;
+  my $body = "";
+  $body = $body."if (trigger_exception) {\n";
+  foreach my $rk (keys %{$func_ptr->{'RESTORE_INFO'}}) {
+    $body = $body."  $func_ptr->{'RESTORE_INFO'}->{$rk} = $rk;\n";
+  }
+  $body = $body."  return ((FUNC_EXCEPTION_RET)exception_return)(";
+    foreach my $p (@qemuaot_gp_params) {
+      $body = $body."$p, ";
+    }
+    $body = $body.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)normal_return);\n";
+  $body = $body."}\n";
   return $body;
 }
 
