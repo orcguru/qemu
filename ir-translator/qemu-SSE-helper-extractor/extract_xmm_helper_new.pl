@@ -924,6 +924,15 @@ EOF
     $type_name =~ s/\s+/_/g;
     $foreign_types{$foreign_calls{$ff}} = $type_name;
   }
+  print OUT "typedef __attribute__((qemuaot)) $funcs{$f}->{'FUNC_TYPE'} (*FUNC_NORMAL_RET)(";
+  foreach my $p (@qemuaot_gp_params) {
+    print OUT "$qemuaot_gp_params_map{$p} $p, ";
+  }
+  print OUT "$qemuaot_vec_declare";
+  if ($funcs{$f}->{'FUNC_TYPE'} ne "void") {
+    print OUT ", $funcs{$f}->{'FUNC_TYPE'} ret_val";
+  }
+  print OUT ");\n";
   if (keys %foreign_types > 0) {
     print OUT "typedef __attribute__((qemuaot,noreturn)) $funcs{$f}->{'FUNC_TYPE'} (*FUNC_EXCEPTION_RET)(";
     foreach my $p (@qemuaot_gp_params) {
@@ -1653,17 +1662,44 @@ sub get_func_body
         my $sub_str = &GetText($e, $ret_info->{'EXPR_START'}-1);
         $body = $body.$sub_str."(v2ulong)";
         $current_pos = $ret_info->{'EXPR_START'};
-      } elsif ($func_ptr->{'HELPER_INTERFACE'} and exists $func_ptr->{'IS_FOREIGN'}) {
-        $body = $body."{\n";
-        my $exp = &get_exception_path($func_ptr, $exception_exit);
-        $body = $body.$exp;
-        if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_VOID") {
-          $body = $body."return;\n}\n";
-          $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
+      } elsif ($func_ptr->{'HELPER_INTERFACE'}) {
+        if (exists $func_ptr->{'IS_FOREIGN'}) {
+          $body = $body."{\n";
+          my $exp = &get_exception_path($func_ptr, $exception_exit);
+          $body = $body.$exp;
+          if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_VOID") {
+            $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
+            foreach my $p (@qemuaot_gp_params) {
+              $body = $body."$p, ";
+            }
+            $body = $body.$qemuaot_vec_invoke.");\n}\n";
+            $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
+          } else {
+            my $expr = &GetText($func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
+            $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
+            foreach my $p (@qemuaot_gp_params) {
+              $body = $body."$p, ";
+            }
+            $body = $body.$qemuaot_vec_invoke.", $expr);\n}\n";
+            $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'} + 2;
+          }
         } else {
-          my $txt = &GetText($e, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
-          $body = $body.$txt.";\n}\n";
-          $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'} + 2;
+          if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_VOID") {
+            $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
+            foreach my $p (@qemuaot_gp_params) {
+              $body = $body."$p, ";
+            }
+            $body = $body.$qemuaot_vec_invoke.");\n";
+            $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
+          } else {
+            my $expr = &GetText($func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
+            $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
+            foreach my $p (@qemuaot_gp_params) {
+              $body = $body."$p, ";
+            }
+            $body = $body.$qemuaot_vec_invoke.", $expr);\n";
+            $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'} + 2;
+          }
         }
       } else {
         $current_pos = $e;
@@ -1674,9 +1710,18 @@ sub get_func_body
   }
   my $txt = &GetText($current_pos, $func_ptr->{'BODY_STOP'});
   $body = $body.$txt;
-  if (exists $func_ptr->{'IS_FOREIGN'} and $func_ptr->{'HELPER_INTERFACE'}) {
-    my $exp = &get_exception_path($func_ptr, $exception_exit);
-    $body =~ s/\}$/\n$exp\}/;
+  if ($func_ptr->{'HELPER_INTERFACE'} and $func_ptr->{'FUNC_TYPE'} eq "void") {
+    my $exp_logic = "";
+    if (exists $func_ptr->{'IS_FOREIGN'}) {
+      $exp_logic = &get_exception_path($func_ptr, $exception_exit);
+    }
+    my $normal_logic = "";
+    $normal_logic = $normal_logic."return ((FUNC_NORMAL_RET)normal_return)(";
+    foreach my $p (@qemuaot_gp_params) {
+      $normal_logic = $normal_logic."$p, ";
+    }
+    $normal_logic = $normal_logic.$qemuaot_vec_invoke.");\n";
+    $body =~ s/\}$/\n$exp_logic$normal_logic\}/;
   }
   return $body;
 }
@@ -1846,8 +1891,12 @@ sub collect_func_args
   foreach my $i (@{$func_ptr->{'SCALAR_ARGS'}}) {
     $args = $args.", ".$i->{'TYPE'}." ".$i->{'VAR_NAME'};
   }
-  if ($func_ptr->{'HELPER_INTERFACE'} and exists $func_ptr->{'IS_FOREIGN'}) {
-    $args = $args.", unsigned long normal_return, unsigned long exception_return";
+  if ($func_ptr->{'HELPER_INTERFACE'}) {
+    if (exists $func_ptr->{'IS_FOREIGN'}) {
+      $args = $args.", unsigned long normal_return, unsigned long exception_return";
+    } else {
+      $args = $args.", unsigned long normal_return";
+    }
   } elsif (exists $func_ptr->{'IS_FOREIGN'}) {
     $args = $args.", int *trigger_exception_ptr";
   }
