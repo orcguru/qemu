@@ -46,6 +46,9 @@
       "v4ulong ymm0, v4ulong ymm1, v4ulong ymm2, v4ulong ymm3, v4ulong ymm4, v4ulong ymm5, v4ulong ymm6, v4ulong ymm7, v4ulong ymm8, v4ulong ymm9, v4ulong ymm10, v4ulong ymm11, v4ulong ymm12, v4ulong ymm13, v4ulong ymm14"
 #define YMM_PARAM_LIST              \
       "ymm0, ymm1, ymm2, ymm3, ymm4, ymm5, ymm6, ymm7, ymm8, ymm9, ymm10, ymm11, ymm12, ymm13, ymm14"
+#define IS_YMM_HELPER(h)            (h > ymm_helper_begin && h < HELPER_MAX)
+#define IS_XMM_HELPER(h)            (h > xmm_helper_begin && h < ymm_helper_begin)
+#define INLINE_HELPER_ENABLED(h)    IS_XMM_HELPER(h)
 
 #define DEBUG_VALUE_TYPE(v)                                     \
     do {                                                        \
@@ -300,9 +303,7 @@ extern LLVMType opciosz[OPCODE_MAX][3];
 extern uint8_t opcoc[OPCODE_MAX];
 extern uint8_t opcmem_addr_nzidx[OPCODE_MAX];
 extern const char *helper_str[];
-extern LLVMType helper_vec_type[HELPER_MAX];
 extern const char *xmmreg_str[];
-extern uint8_t inline_helper_enabled[HELPER_MAX];
 extern uint64_t xreg_offsets[XREG_MAX];
 extern CVectorType cvector_type_for_llvm_type[LLVMMAXType];
 extern const char *ymm_str[NON_XMM];
@@ -3021,23 +3022,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     char build_macro[4096] = {0};
-    if (cvector_type_for_llvm_type[helper_vec_type[h]] != vinvalid) {
-        if (cvector_type_for_llvm_type[helper_vec_type[h]] < v4ulong) {
-            sprintf(build_macro, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\" -DXMM_PARAM_DECLARE=\"", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
-            for (int i = 0; i < XMM_COUNT; ++i) {
-                char element[64] = {0};
-                sprintf(element, "%s xmm%d, %s ymm%d_h%s", cvector_str[cvector_type_for_llvm_type[helper_vec_type[h]]], i, cvector_str[cvector_type_for_llvm_type[helper_vec_type[h]]], i, i == (XMM_COUNT - 1) ? "\" " : ", ");
-                strcat(build_macro, element);
-            }
-        } else {
-            sprintf(build_macro, "-DYMM_PARAM_DECLARE_COMMON=\"%s\" -DYMM_PARAM_LIST=\"%s\" -DYMM_PARAM_DECLARE=\"", YMM_PARAM_DECLARE_COMMON, YMM_PARAM_LIST);
-            for (int i = 0; i < XMM_COUNT; ++i) {
-                char element[64] = {0};
-                sprintf(element, "%s ymm%d%s", cvector_str[cvector_type_for_llvm_type[helper_vec_type[h]]], i, i == (XMM_COUNT - 1) ? "\" " : ", ");
-                strcat(build_macro, element);
-            }
-        }
-    }
+    sprintf(build_macro, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\"", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
 
     // Collect used xmm indexes, and xmm indexes that need be put into registers
     XMMRegType used_xmm_regs[MAX_OPERANDS_COUNT];
@@ -3046,7 +3031,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     int touched_effective_xmm_regs_cnt = 0;
     uint8_t op_cnt = 0;
     // Try to do vector register spill/reload only if the helper can be inlined
-    if (helper_vec_type[h] != LLVMInvalidType && inline_helper_enabled[h]) {
+    if (INLINE_HELPER_ENABLED(h)) {
         do {
             operands[op_cnt] = get_operand(ptr, (op_cnt + noargs), &is_imm[op_cnt]);
             if (is_imm[op_cnt] == 0 && operands[op_cnt].s.valid == 0) {
@@ -3094,7 +3079,6 @@ void translate_call(OpCodeType opc, void *ptr) {
     XMMRegType spilled_xmm_regs[MAX_OPERANDS_COUNT];
     XMMRegType passenger_xmm_regs[MAX_OPERANDS_COUNT];
     int passenger_xmm_regs_cnt = 0;
-    int passenger_is_ymm = 0;
     if (touched_effective_xmm_regs_cnt && ((used_xmm_regs_cnt + touched_effective_xmm_regs_cnt) <= XMM_COUNT)) {
         XMMRegType free_xmm_regs[XMM_COUNT];
         XMMRegType tmp = xmm0;
@@ -3124,9 +3108,6 @@ void translate_call(OpCodeType opc, void *ptr) {
             spilled_xmm_regs[passenger_xmm_regs_cnt] = candidate;
             passenger_xmm_regs_cnt += 1;
         }
-        if (helper_vec_type[h] >= LLVMVector32xi8) {
-            passenger_is_ymm = 1;
-        }
     }
 
     // FIXME: can we avoid spill in case inline failed?
@@ -3143,7 +3124,7 @@ void translate_call(OpCodeType opc, void *ptr) {
             xmm_val = LLVMGetParam(llvm_func, (FIXED_PARAM_COUNT + spilled_xmm_regs[i]));
         }
         spill_vector(xmm_val, spilled_xmm_regs[i]);
-        if (passenger_is_ymm) {
+        if (IS_YMM_HELPER(h)) {
             if (fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1]) {
                 OperandType param_in_stack;
                 param_in_stack.s.valid = 1;
@@ -3174,16 +3155,16 @@ void translate_call(OpCodeType opc, void *ptr) {
             assert(alias.s.valid);
             if (alias.s.slot_type == SUB_SLOT_XMM) {
                 char element[32];
-                if (helper_vec_type[h] < LLVMVector32xi8) {
+                if (IS_XMM_HELPER(h)) {
                     // Invoke XMM
-                    sprintf(element, " -DARGUMENT%d=%s", op_cnt, xmmreg_str[alias.s.slot_idx]);
+                    sprintf(element, " -DVEC%d=%s", op_cnt, xmmreg_str[alias.s.slot_idx]);
                 } else {
                     // Invoke YMM, need aggregate on riscv64
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
                     // NOT FOR FIXED-VECTOR
                     assert(0);
 #endif
-                    sprintf(element, " -DARGUMENT%d=%s", op_cnt, ymm_str[alias.s.slot_idx]);
+                    sprintf(element, " -DVEC%d=%s", op_cnt, ymm_str[alias.s.slot_idx]);
                 }
                 strcat(build_macro, element);
             } else if (alias.s.slot_type == SUB_SLOT_ENV) {
@@ -3199,16 +3180,16 @@ void translate_call(OpCodeType opc, void *ptr) {
                         not_enough_vector_registers_to_inline = 1;
                     } else {
                         char element[32];
-                        if (!passenger_is_ymm) {
+                        if (!IS_YMM_HELPER(h)) {
                             // Invoke XMM
-                            sprintf(element, " -DARGUMENT%d=%s", op_cnt, xmmreg_str[spilled_xmm_regs[idx]]);
+                            sprintf(element, " -DVEC%d=%s", op_cnt, xmmreg_str[spilled_xmm_regs[idx]]);
                         } else {
                             // Invoke YMM, need aggregate on riscv64
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
                             // NOT FOR FIXED-VECTOR
                             assert(0);
 #endif
-                            sprintf(element, " -DARGUMENT%d=%s", op_cnt, ymm_str[spilled_xmm_regs[idx]]);
+                            sprintf(element, " -DVEC%d=%s", op_cnt, ymm_str[spilled_xmm_regs[idx]]);
                         }
                         strcat(build_macro, element);
                     }
@@ -3259,7 +3240,7 @@ void translate_call(OpCodeType opc, void *ptr) {
 
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnts = 0;
-    uint8_t do_inline_helper = (helper_vec_type[h] != LLVMInvalidType && inline_helper_enabled[h] && !not_enough_vector_registers_to_inline) ? do_link_helper(h, build_macro, bc_name, helper_str[h]) : 0;
+    uint8_t do_inline_helper = (INLINE_HELPER_ENABLED(h) && !not_enough_vector_registers_to_inline) ? do_link_helper(h, build_macro, bc_name, helper_str[h]) : 0;
     int did_inline_helper = 0;
     if (!do_inline_helper) {
         // Get the helper
@@ -3297,7 +3278,7 @@ void translate_call(OpCodeType opc, void *ptr) {
             }
             LLVMBuildStore(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i]]);
             fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i]] = 1;
-            if (passenger_is_ymm) {
+            if (IS_YMM_HELPER(h)) {
                 xmm_val = reload_vector(passenger_xmm_regs[i] + 1);
                 if (!func_xmm_alloca[spilled_xmm_regs[i] + 1]) {
                     LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1]], fixed_vector_stack_names[XREG_MAX + spilled_xmm_regs[i] + 1]);
@@ -3327,7 +3308,7 @@ void translate_call(OpCodeType opc, void *ptr) {
             }
         }
 
-        if (helper_vec_type[h] < LLVMVector32xi8) {
+        if (IS_XMM_HELPER(h)) {
             // Invoke XMM
             call_arg_cnts = collect_arguments_and_types(opc, h, call_args, operands, is_imm, op_cnt, app_arg_types_to_qemuaot_cc);
             assert(call_arg_cnts <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
@@ -3345,7 +3326,7 @@ void translate_call(OpCodeType opc, void *ptr) {
             assert(0);
 #endif
             LLVMValueRef constants[32];
-            LLVMType t = helper_vec_type[h];
+            LLVMType t = LLVMVector4xi64;
             int cnt = llvm_vector_elem_bit_counts[t*2];
             for (int i = 0; i < cnt; i++) {
                 LLVMValueRef element_value = LLVMConstInt(llvm_int_types[OPC_DUAL_VECTOR_TO_FIXED(t)], i, 0);
@@ -3536,7 +3517,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         for (int i = 0; i < passenger_xmm_regs_cnt; ++i) {
             LLVMValueRef xmm_val = LLVMGetParam(llvm_func, (FIXED_PARAM_COUNT + spilled_xmm_regs[i]));
             spill_vector(xmm_val, passenger_xmm_regs[i]);
-            if (passenger_is_ymm) {
+            if (IS_YMM_HELPER(h)) {
                 xmm_val = LLVMGetParam(llvm_func, (FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1));
                 spill_vector(xmm_val, passenger_xmm_regs[i] + 1);
             }
@@ -3550,7 +3531,7 @@ void translate_call(OpCodeType opc, void *ptr) {
             }
             LLVMBuildStore(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i]]);
             fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i]] = 1;
-            if (passenger_is_ymm) {
+            if (IS_YMM_HELPER(h)) {
                 xmm_val = reload_vector(spilled_xmm_regs[i] + 1);
                 if (!func_xmm_alloca[spilled_xmm_regs[i] + 1]) {
                     LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1]], fixed_vector_stack_names[XREG_MAX + spilled_xmm_regs[i] + 1]);

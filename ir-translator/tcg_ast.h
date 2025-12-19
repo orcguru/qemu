@@ -96,26 +96,8 @@ typedef enum {
     X(helper_aad) \
     X(helper_aam) \
     X(helper_aas) \
-    X(helper_addpd_xmm) \
-    X(helper_addpd_ymm) \
-    X(helper_addps_xmm) \
-    X(helper_addps_ymm) \
     X(helper_addsd) \
     X(helper_addss) \
-    X(helper_addsubpd_xmm) \
-    X(helper_addsubpd_ymm) \
-    X(helper_addsubps_xmm) \
-    X(helper_addsubps_ymm) \
-    X(helper_aesdeclast_xmm) \
-    X(helper_aesdeclast_ymm) \
-    X(helper_aesdec_xmm) \
-    X(helper_aesdec_ymm) \
-    X(helper_aesenclast_xmm) \
-    X(helper_aesenclast_ymm) \
-    X(helper_aesenc_xmm) \
-    X(helper_aesenc_ymm) \
-    X(helper_aesimc_xmm) \
-    X(helper_aeskeygenassist_xmm) \
     X(helper_atomic_add_fetchb) \
     X(helper_atomic_add_fetchl_be) \
     X(helper_atomic_add_fetchl_le) \
@@ -244,14 +226,6 @@ typedef enum {
     X(helper_atomic_xor_fetchq_le) \
     X(helper_atomic_xor_fetchw_be) \
     X(helper_atomic_xor_fetchw_le) \
-    X(helper_blendpd_xmm) \
-    X(helper_blendpd_ymm) \
-    X(helper_blendps_xmm) \
-    X(helper_blendps_ymm) \
-    X(helper_blendvpd_xmm) \
-    X(helper_blendvpd_ymm) \
-    X(helper_blendvps_xmm) \
-    X(helper_blendvps_ymm) \
     X(helper_bndck) \
     X(helper_bnd_jmp) \
     X(helper_bndldx32) \
@@ -270,195 +244,67 @@ typedef enum {
     X(helper_clts) \
     X(helper_clz_i32) \
     X(helper_clz_i64) \
-    X(helper_cmpeqpd_xmm) \
-    X(helper_cmpeqpd_ymm) \
-    X(helper_cmpeqps_xmm) \
-    X(helper_cmpeqps_ymm) \
     X(helper_cmpeqsd) \
-    X(helper_cmpeqspd_xmm) \
-    X(helper_cmpeqspd_ymm) \
-    X(helper_cmpeqsps_xmm) \
-    X(helper_cmpeqsps_ymm) \
     X(helper_cmpeqss) \
     X(helper_cmpeqssd) \
     X(helper_cmpeqsss) \
-    X(helper_cmpequpd_xmm) \
-    X(helper_cmpequpd_ymm) \
-    X(helper_cmpequps_xmm) \
-    X(helper_cmpequps_ymm) \
     X(helper_cmpequsd) \
-    X(helper_cmpequspd_xmm) \
-    X(helper_cmpequspd_ymm) \
-    X(helper_cmpequsps_xmm) \
-    X(helper_cmpequsps_ymm) \
     X(helper_cmpequss) \
     X(helper_cmpequssd) \
     X(helper_cmpequsss) \
-    X(helper_cmpfalsepd_xmm) \
-    X(helper_cmpfalsepd_ymm) \
-    X(helper_cmpfalseps_xmm) \
-    X(helper_cmpfalseps_ymm) \
     X(helper_cmpfalsesd) \
-    X(helper_cmpfalsespd_xmm) \
-    X(helper_cmpfalsespd_ymm) \
-    X(helper_cmpfalsesps_xmm) \
-    X(helper_cmpfalsesps_ymm) \
     X(helper_cmpfalsess) \
     X(helper_cmpfalsessd) \
     X(helper_cmpfalsesss) \
-    X(helper_cmpgepd_xmm) \
-    X(helper_cmpgepd_ymm) \
-    X(helper_cmpgeps_xmm) \
-    X(helper_cmpgeps_ymm) \
-    X(helper_cmpgeqpd_xmm) \
-    X(helper_cmpgeqpd_ymm) \
-    X(helper_cmpgeqps_xmm) \
-    X(helper_cmpgeqps_ymm) \
     X(helper_cmpgeqsd) \
     X(helper_cmpgeqss) \
     X(helper_cmpgesd) \
     X(helper_cmpgess) \
-    X(helper_cmpgtpd_xmm) \
-    X(helper_cmpgtpd_ymm) \
-    X(helper_cmpgtps_xmm) \
-    X(helper_cmpgtps_ymm) \
-    X(helper_cmpgtqpd_xmm) \
-    X(helper_cmpgtqpd_ymm) \
-    X(helper_cmpgtqps_xmm) \
-    X(helper_cmpgtqps_ymm) \
     X(helper_cmpgtqsd) \
     X(helper_cmpgtqss) \
     X(helper_cmpgtsd) \
     X(helper_cmpgtss) \
-    X(helper_cmplepd_xmm) \
-    X(helper_cmplepd_ymm) \
-    X(helper_cmpleps_xmm) \
-    X(helper_cmpleps_ymm) \
-    X(helper_cmpleqpd_xmm) \
-    X(helper_cmpleqpd_ymm) \
-    X(helper_cmpleqps_xmm) \
-    X(helper_cmpleqps_ymm) \
     X(helper_cmpleqsd) \
     X(helper_cmpleqss) \
     X(helper_cmplesd) \
     X(helper_cmpless) \
-    X(helper_cmpltpd_xmm) \
-    X(helper_cmpltpd_ymm) \
-    X(helper_cmpltps_xmm) \
-    X(helper_cmpltps_ymm) \
-    X(helper_cmpltqpd_xmm) \
-    X(helper_cmpltqpd_ymm) \
-    X(helper_cmpltqps_xmm) \
-    X(helper_cmpltqps_ymm) \
     X(helper_cmpltqsd) \
     X(helper_cmpltqss) \
     X(helper_cmpltsd) \
     X(helper_cmpltss) \
-    X(helper_cmpneqpd_xmm) \
-    X(helper_cmpneqpd_ymm) \
-    X(helper_cmpneqps_xmm) \
-    X(helper_cmpneqps_ymm) \
-    X(helper_cmpneqqpd_xmm) \
-    X(helper_cmpneqqpd_ymm) \
-    X(helper_cmpneqqps_xmm) \
-    X(helper_cmpneqqps_ymm) \
     X(helper_cmpneqqsd) \
     X(helper_cmpneqqss) \
     X(helper_cmpneqsd) \
     X(helper_cmpneqss) \
-    X(helper_cmpnequpd_xmm) \
-    X(helper_cmpnequpd_ymm) \
-    X(helper_cmpnequps_xmm) \
-    X(helper_cmpnequps_ymm) \
     X(helper_cmpnequsd) \
-    X(helper_cmpnequspd_xmm) \
-    X(helper_cmpnequspd_ymm) \
-    X(helper_cmpnequsps_xmm) \
-    X(helper_cmpnequsps_ymm) \
     X(helper_cmpnequss) \
     X(helper_cmpnequssd) \
     X(helper_cmpnequsss) \
-    X(helper_cmpngepd_xmm) \
-    X(helper_cmpngepd_ymm) \
-    X(helper_cmpngeps_xmm) \
-    X(helper_cmpngeps_ymm) \
-    X(helper_cmpngeqpd_xmm) \
-    X(helper_cmpngeqpd_ymm) \
-    X(helper_cmpngeqps_xmm) \
-    X(helper_cmpngeqps_ymm) \
     X(helper_cmpngeqsd) \
     X(helper_cmpngeqss) \
     X(helper_cmpngesd) \
     X(helper_cmpngess) \
-    X(helper_cmpngtpd_xmm) \
-    X(helper_cmpngtpd_ymm) \
-    X(helper_cmpngtps_xmm) \
-    X(helper_cmpngtps_ymm) \
-    X(helper_cmpngtqpd_xmm) \
-    X(helper_cmpngtqpd_ymm) \
-    X(helper_cmpngtqps_xmm) \
-    X(helper_cmpngtqps_ymm) \
     X(helper_cmpngtqsd) \
     X(helper_cmpngtqss) \
     X(helper_cmpngtsd) \
     X(helper_cmpngtss) \
-    X(helper_cmpnlepd_xmm) \
-    X(helper_cmpnlepd_ymm) \
-    X(helper_cmpnleps_xmm) \
-    X(helper_cmpnleps_ymm) \
-    X(helper_cmpnleqpd_xmm) \
-    X(helper_cmpnleqpd_ymm) \
-    X(helper_cmpnleqps_xmm) \
-    X(helper_cmpnleqps_ymm) \
     X(helper_cmpnleqsd) \
     X(helper_cmpnleqss) \
     X(helper_cmpnlesd) \
     X(helper_cmpnless) \
-    X(helper_cmpnltpd_xmm) \
-    X(helper_cmpnltpd_ymm) \
-    X(helper_cmpnltps_xmm) \
-    X(helper_cmpnltps_ymm) \
-    X(helper_cmpnltqpd_xmm) \
-    X(helper_cmpnltqpd_ymm) \
-    X(helper_cmpnltqps_xmm) \
-    X(helper_cmpnltqps_ymm) \
     X(helper_cmpnltqsd) \
     X(helper_cmpnltqss) \
     X(helper_cmpnltsd) \
     X(helper_cmpnltss) \
-    X(helper_cmpordpd_xmm) \
-    X(helper_cmpordpd_ymm) \
-    X(helper_cmpordps_xmm) \
-    X(helper_cmpordps_ymm) \
     X(helper_cmpordsd) \
-    X(helper_cmpordspd_xmm) \
-    X(helper_cmpordspd_ymm) \
-    X(helper_cmpordsps_xmm) \
-    X(helper_cmpordsps_ymm) \
     X(helper_cmpordss) \
     X(helper_cmpordssd) \
     X(helper_cmpordsss) \
-    X(helper_cmptruepd_xmm) \
-    X(helper_cmptruepd_ymm) \
-    X(helper_cmptrueps_xmm) \
-    X(helper_cmptrueps_ymm) \
     X(helper_cmptruesd) \
-    X(helper_cmptruespd_xmm) \
-    X(helper_cmptruespd_ymm) \
-    X(helper_cmptruesps_xmm) \
-    X(helper_cmptruesps_ymm) \
     X(helper_cmptruess) \
     X(helper_cmptruessd) \
     X(helper_cmptruesss) \
-    X(helper_cmpunordpd_xmm) \
-    X(helper_cmpunordpd_ymm) \
-    X(helper_cmpunordps_xmm) \
-    X(helper_cmpunordps_ymm) \
     X(helper_cmpunordsd) \
-    X(helper_cmpunordspd_xmm) \
-    X(helper_cmpunordspd_ymm) \
-    X(helper_cmpunordsps_xmm) \
-    X(helper_cmpunordsps_ymm) \
     X(helper_cmpunordss) \
     X(helper_cmpunordssd) \
     X(helper_cmpunordsss) \
@@ -471,25 +317,9 @@ typedef enum {
     X(helper_ctpop_i64) \
     X(helper_ctz_i32) \
     X(helper_ctz_i64) \
-    X(helper_cvtdq2pd_xmm) \
-    X(helper_cvtdq2pd_ymm) \
-    X(helper_cvtdq2ps_xmm) \
-    X(helper_cvtdq2ps_ymm) \
-    X(helper_cvtpd2dq_xmm) \
-    X(helper_cvtpd2dq_ymm) \
     X(helper_cvtpd2pi) \
-    X(helper_cvtpd2ps_xmm) \
-    X(helper_cvtpd2ps_ymm) \
-    X(helper_cvtph2ps_xmm) \
-    X(helper_cvtph2ps_ymm) \
     X(helper_cvtpi2pd) \
     X(helper_cvtpi2ps) \
-    X(helper_cvtps2dq_xmm) \
-    X(helper_cvtps2dq_ymm) \
-    X(helper_cvtps2pd_xmm) \
-    X(helper_cvtps2pd_ymm) \
-    X(helper_cvtps2ph_xmm) \
-    X(helper_cvtps2ph_ymm) \
     X(helper_cvtps2pi) \
     X(helper_cvtsd2si) \
     X(helper_cvtsd2sq) \
@@ -501,11 +331,7 @@ typedef enum {
     X(helper_cvtss2sd) \
     X(helper_cvtss2si) \
     X(helper_cvtss2sq) \
-    X(helper_cvttpd2dq_xmm) \
-    X(helper_cvttpd2dq_ymm) \
     X(helper_cvttpd2pi) \
-    X(helper_cvttps2dq_xmm) \
-    X(helper_cvttps2dq_ymm) \
     X(helper_cvttps2pi) \
     X(helper_cvttsd2si) \
     X(helper_cvttsd2sq) \
@@ -517,19 +343,12 @@ typedef enum {
     X(helper_div_i32) \
     X(helper_div_i64) \
     X(helper_divl_EAX) \
-    X(helper_divpd_xmm) \
-    X(helper_divpd_ymm) \
-    X(helper_divps_xmm) \
-    X(helper_divps_ymm) \
     X(helper_divq_EAX) \
     X(helper_divsd) \
     X(helper_divss) \
     X(helper_divu_i32) \
     X(helper_divu_i64) \
     X(helper_divw_AX) \
-    X(helper_dppd_xmm) \
-    X(helper_dpps_xmm) \
-    X(helper_dpps_ymm) \
     X(helper_emms) \
     X(helper_enter_mmx) \
     X(helper_exit_atomic) \
@@ -577,10 +396,6 @@ typedef enum {
     X(helper_fldt_ST0) \
     X(helper_fldz_FT0) \
     X(helper_fldz_ST0) \
-    X(helper_fma4pd_xmm) \
-    X(helper_fma4pd_ymm) \
-    X(helper_fma4ps_xmm) \
-    X(helper_fma4ps_ymm) \
     X(helper_fma4sd) \
     X(helper_fma4ss) \
     X(helper_fmov_FT0_STN) \
@@ -786,14 +601,6 @@ typedef enum {
     X(helper_gvec_ussub8) \
     X(helper_gvec_xor) \
     X(helper_gvec_xors) \
-    X(helper_haddpd_xmm) \
-    X(helper_haddpd_ymm) \
-    X(helper_haddps_xmm) \
-    X(helper_haddps_ymm) \
-    X(helper_hsubpd_xmm) \
-    X(helper_hsubpd_ymm) \
-    X(helper_hsubps_xmm) \
-    X(helper_hsubps_ymm) \
     X(helper_icebp) \
     X(helper_idivb_AL) \
     X(helper_idivl_EAX) \
@@ -817,66 +624,23 @@ typedef enum {
     X(helper_lsl) \
     X(helper_ltr) \
     X(helper_maskmov_mmx) \
-    X(helper_maskmov_xmm) \
-    X(helper_maxpd_xmm) \
-    X(helper_maxpd_ymm) \
-    X(helper_maxps_xmm) \
-    X(helper_maxps_ymm) \
     X(helper_maxsd) \
     X(helper_maxss) \
     X(helper_memset) \
-    X(helper_minpd_xmm) \
-    X(helper_minpd_ymm) \
-    X(helper_minps_xmm) \
-    X(helper_minps_ymm) \
     X(helper_minsd) \
     X(helper_minss) \
-    X(helper_movmskpd_xmm) \
-    X(helper_movmskpd_ymm) \
-    X(helper_movmskps_xmm) \
-    X(helper_movmskps_ymm) \
-    X(helper_mpsadbw_xmm) \
-    X(helper_mpsadbw_ymm) \
-    X(helper_mulpd_xmm) \
-    X(helper_mulpd_ymm) \
-    X(helper_mulps_xmm) \
-    X(helper_mulps_ymm) \
     X(helper_mulsd) \
     X(helper_mulsh_i64) \
     X(helper_mulss) \
     X(helper_muluh_i64) \
     X(helper_nonatomic_cmpxchgo) \
     X(helper_packssdw_mmx) \
-    X(helper_packssdw_xmm) \
-    X(helper_packssdw_ymm) \
     X(helper_packsswb_mmx) \
-    X(helper_packsswb_xmm) \
-    X(helper_packsswb_ymm) \
-    X(helper_packusdw_xmm) \
-    X(helper_packusdw_ymm) \
     X(helper_packuswb_mmx) \
-    X(helper_packuswb_xmm) \
-    X(helper_packuswb_ymm) \
     X(helper_palignr_mmx) \
-    X(helper_palignr_xmm) \
-    X(helper_palignr_ymm) \
     X(helper_pause) \
     X(helper_pavgb_mmx) \
-    X(helper_pavgb_xmm) \
-    X(helper_pavgb_ymm) \
     X(helper_pavgw_mmx) \
-    X(helper_pavgw_xmm) \
-    X(helper_pavgw_ymm) \
-    X(helper_pblendvb_xmm) \
-    X(helper_pblendvb_ymm) \
-    X(helper_pblendw_xmm) \
-    X(helper_pblendw_ymm) \
-    X(helper_pclmulqdq_xmm) \
-    X(helper_pclmulqdq_ymm) \
-    X(helper_pcmpestri_xmm) \
-    X(helper_pcmpestrm_xmm) \
-    X(helper_pcmpistri_xmm) \
-    X(helper_pcmpistrm_xmm) \
     X(helper_pdep) \
     X(helper_pext) \
     X(helper_pf2id) \
@@ -896,156 +660,43 @@ typedef enum {
     X(helper_pfsub) \
     X(helper_pfsubr) \
     X(helper_phaddd_mmx) \
-    X(helper_phaddd_xmm) \
-    X(helper_phaddd_ymm) \
     X(helper_phaddsw_mmx) \
-    X(helper_phaddsw_xmm) \
-    X(helper_phaddsw_ymm) \
     X(helper_phaddw_mmx) \
-    X(helper_phaddw_xmm) \
-    X(helper_phaddw_ymm) \
-    X(helper_phminposuw_xmm) \
     X(helper_phsubd_mmx) \
-    X(helper_phsubd_xmm) \
-    X(helper_phsubd_ymm) \
     X(helper_phsubsw_mmx) \
-    X(helper_phsubsw_xmm) \
-    X(helper_phsubsw_ymm) \
     X(helper_phsubw_mmx) \
-    X(helper_phsubw_xmm) \
-    X(helper_phsubw_ymm) \
     X(helper_pi2fd) \
     X(helper_pi2fw) \
     X(helper_pmaddubsw_mmx) \
-    X(helper_pmaddubsw_xmm) \
-    X(helper_pmaddubsw_ymm) \
     X(helper_pmaddwd_mmx) \
-    X(helper_pmaddwd_xmm) \
-    X(helper_pmaddwd_ymm) \
-    X(helper_pmovdldup_xmm) \
-    X(helper_pmovdldup_ymm) \
-    X(helper_pmovshdup_xmm) \
-    X(helper_pmovshdup_ymm) \
-    X(helper_pmovsldup_xmm) \
-    X(helper_pmovsldup_ymm) \
-    X(helper_pmovsxbd_xmm) \
-    X(helper_pmovsxbd_ymm) \
-    X(helper_pmovsxbq_xmm) \
-    X(helper_pmovsxbq_ymm) \
-    X(helper_pmovsxbw_xmm) \
-    X(helper_pmovsxbw_ymm) \
-    X(helper_pmovsxdq_xmm) \
-    X(helper_pmovsxdq_ymm) \
-    X(helper_pmovsxwd_xmm) \
-    X(helper_pmovsxwd_ymm) \
-    X(helper_pmovsxwq_xmm) \
-    X(helper_pmovsxwq_ymm) \
-    X(helper_pmovzxbd_xmm) \
-    X(helper_pmovzxbd_ymm) \
-    X(helper_pmovzxbq_xmm) \
-    X(helper_pmovzxbq_ymm) \
-    X(helper_pmovzxbw_xmm) \
-    X(helper_pmovzxbw_ymm) \
-    X(helper_pmovzxdq_xmm) \
-    X(helper_pmovzxdq_ymm) \
-    X(helper_pmovzxwd_xmm) \
-    X(helper_pmovzxwd_ymm) \
-    X(helper_pmovzxwq_xmm) \
-    X(helper_pmovzxwq_ymm) \
-    X(helper_pmuldq_xmm) \
-    X(helper_pmuldq_ymm) \
     X(helper_pmulhrsw_mmx) \
-    X(helper_pmulhrsw_xmm) \
-    X(helper_pmulhrsw_ymm) \
     X(helper_pmulhrw_mmx) \
     X(helper_pmulhuw_mmx) \
-    X(helper_pmulhuw_xmm) \
-    X(helper_pmulhuw_ymm) \
     X(helper_pmulhw_mmx) \
-    X(helper_pmulhw_xmm) \
-    X(helper_pmulhw_ymm) \
     X(helper_pmuludq_mmx) \
-    X(helper_pmuludq_xmm) \
-    X(helper_pmuludq_ymm) \
     X(helper_psadbw_mmx) \
-    X(helper_psadbw_xmm) \
-    X(helper_psadbw_ymm) \
     X(helper_pshufb_mmx) \
-    X(helper_pshufb_xmm) \
-    X(helper_pshufb_ymm) \
-    X(helper_pshufd_xmm) \
-    X(helper_pshufd_ymm) \
-    X(helper_pshufhw_xmm) \
-    X(helper_pshufhw_ymm) \
-    X(helper_pshuflw_xmm) \
-    X(helper_pshuflw_ymm) \
     X(helper_pshufw_mmx) \
     X(helper_psignb_mmx) \
-    X(helper_psignb_xmm) \
-    X(helper_psignb_ymm) \
     X(helper_psignd_mmx) \
-    X(helper_psignd_xmm) \
-    X(helper_psignd_ymm) \
     X(helper_psignw_mmx) \
-    X(helper_psignw_xmm) \
-    X(helper_psignw_ymm) \
     X(helper_pslld_mmx) \
-    X(helper_pslldq_xmm) \
-    X(helper_pslldq_ymm) \
-    X(helper_pslld_xmm) \
-    X(helper_pslld_ymm) \
     X(helper_psllq_mmx) \
-    X(helper_psllq_xmm) \
-    X(helper_psllq_ymm) \
     X(helper_psllw_mmx) \
-    X(helper_psllw_xmm) \
-    X(helper_psllw_ymm) \
     X(helper_psrad_mmx) \
-    X(helper_psrad_xmm) \
-    X(helper_psrad_ymm) \
     X(helper_psraw_mmx) \
-    X(helper_psraw_xmm) \
-    X(helper_psraw_ymm) \
     X(helper_psrld_mmx) \
-    X(helper_psrldq_xmm) \
-    X(helper_psrldq_ymm) \
-    X(helper_psrld_xmm) \
-    X(helper_psrld_ymm) \
     X(helper_psrlq_mmx) \
-    X(helper_psrlq_xmm) \
-    X(helper_psrlq_ymm) \
     X(helper_psrlw_mmx) \
-    X(helper_psrlw_xmm) \
-    X(helper_psrlw_ymm) \
     X(helper_pswapd) \
-    X(helper_ptest_xmm) \
-    X(helper_ptest_ymm) \
     X(helper_punpckhbw_mmx) \
-    X(helper_punpckhbw_xmm) \
-    X(helper_punpckhbw_ymm) \
     X(helper_punpckhdq_mmx) \
-    X(helper_punpckhdq_xmm) \
-    X(helper_punpckhdq_ymm) \
-    X(helper_punpckhqdq_xmm) \
-    X(helper_punpckhqdq_ymm) \
     X(helper_punpckhwd_mmx) \
-    X(helper_punpckhwd_xmm) \
-    X(helper_punpckhwd_ymm) \
     X(helper_punpcklbw_mmx) \
-    X(helper_punpcklbw_xmm) \
-    X(helper_punpcklbw_ymm) \
     X(helper_punpckldq_mmx) \
-    X(helper_punpckldq_xmm) \
-    X(helper_punpckldq_ymm) \
-    X(helper_punpcklqdq_xmm) \
-    X(helper_punpcklqdq_ymm) \
     X(helper_punpcklwd_mmx) \
-    X(helper_punpcklwd_xmm) \
-    X(helper_punpcklwd_ymm) \
     X(helper_raise_exception) \
     X(helper_raise_interrupt) \
-    X(helper_rcpps_xmm) \
-    X(helper_rcpps_ymm) \
     X(helper_rcpss) \
     X(helper_rdpid) \
     X(helper_rdpkru) \
@@ -1058,14 +709,6 @@ typedef enum {
     X(helper_rem_i64) \
     X(helper_remu_i32) \
     X(helper_remu_i64) \
-    X(helper_roundpd_xmm) \
-    X(helper_roundpd_ymm) \
-    X(helper_roundps_xmm) \
-    X(helper_roundps_ymm) \
-    X(helper_roundsd_xmm) \
-    X(helper_roundss_xmm) \
-    X(helper_rsqrtps_xmm) \
-    X(helper_rsqrtps_ymm) \
     X(helper_rsqrtss) \
     X(helper_sar_i64) \
     X(helper_sha1msg1) \
@@ -1080,22 +723,10 @@ typedef enum {
     X(helper_sha256rnds2) \
     X(helper_shl_i64) \
     X(helper_shr_i64) \
-    X(helper_shufpd_xmm) \
-    X(helper_shufpd_ymm) \
-    X(helper_shufps_xmm) \
-    X(helper_shufps_ymm) \
     X(helper_single_step) \
-    X(helper_sqrtpd_xmm) \
-    X(helper_sqrtpd_ymm) \
-    X(helper_sqrtps_xmm) \
-    X(helper_sqrtps_ymm) \
     X(helper_sqrtsd) \
     X(helper_sqrtss) \
     X(helper_st_i128) \
-    X(helper_subpd_xmm) \
-    X(helper_subpd_ymm) \
-    X(helper_subps_xmm) \
-    X(helper_subps_ymm) \
     X(helper_subsd) \
     X(helper_subss) \
     X(helper_syscall) \
@@ -1107,49 +738,6 @@ typedef enum {
     X(helper_update_mxcsr) \
     X(helper_verr) \
     X(helper_verw) \
-    X(helper_vpermdq_ymm) \
-    X(helper_vpermd_ymm) \
-    X(helper_vpermilpd_imm_xmm) \
-    X(helper_vpermilpd_imm_ymm) \
-    X(helper_vpermilpd_xmm) \
-    X(helper_vpermilpd_ymm) \
-    X(helper_vpermilps_imm_xmm) \
-    X(helper_vpermilps_imm_ymm) \
-    X(helper_vpermilps_xmm) \
-    X(helper_vpermilps_ymm) \
-    X(helper_vpermq_ymm) \
-    X(helper_vpgatherdd_xmm) \
-    X(helper_vpgatherdd_ymm) \
-    X(helper_vpgatherdq_xmm) \
-    X(helper_vpgatherdq_ymm) \
-    X(helper_vpgatherqd_xmm) \
-    X(helper_vpgatherqd_ymm) \
-    X(helper_vpgatherqq_xmm) \
-    X(helper_vpgatherqq_ymm) \
-    X(helper_vpmaskmovd_st_xmm) \
-    X(helper_vpmaskmovd_st_ymm) \
-    X(helper_vpmaskmovd_xmm) \
-    X(helper_vpmaskmovd_ymm) \
-    X(helper_vpmaskmovq_st_xmm) \
-    X(helper_vpmaskmovq_st_ymm) \
-    X(helper_vpmaskmovq_xmm) \
-    X(helper_vpmaskmovq_ymm) \
-    X(helper_vpsllvd_xmm) \
-    X(helper_vpsllvd_ymm) \
-    X(helper_vpsllvq_xmm) \
-    X(helper_vpsllvq_ymm) \
-    X(helper_vpsravd_xmm) \
-    X(helper_vpsravd_ymm) \
-    X(helper_vpsravq_xmm) \
-    X(helper_vpsravq_ymm) \
-    X(helper_vpsrlvd_xmm) \
-    X(helper_vpsrlvd_ymm) \
-    X(helper_vpsrlvq_xmm) \
-    X(helper_vpsrlvq_ymm) \
-    X(helper_vtestpd_xmm) \
-    X(helper_vtestpd_ymm) \
-    X(helper_vtestps_xmm) \
-    X(helper_vtestps_ymm) \
     X(helper_write_eflags) \
     X(helper_wrpkru) \
     X(helper_xgetbv) \
@@ -1164,6 +752,420 @@ typedef enum {
     X(helper_dump_registers) \
     X(helper_jit) \
     X(jmp_ind_callback) \
+    X(xmm_helper_begin) \
+    X(helper_addpd_xmm) \
+    X(helper_addps_xmm) \
+    X(helper_addsubpd_xmm) \
+    X(helper_addsubps_xmm) \
+    X(helper_aesdeclast_xmm) \
+    X(helper_aesdec_xmm) \
+    X(helper_aesenclast_xmm) \
+    X(helper_aesenc_xmm) \
+    X(helper_aesimc_xmm) \
+    X(helper_aeskeygenassist_xmm) \
+    X(helper_blendpd_xmm) \
+    X(helper_blendps_xmm) \
+    X(helper_blendvpd_xmm) \
+    X(helper_blendvps_xmm) \
+    X(helper_cmpeqpd_xmm) \
+    X(helper_cmpeqps_xmm) \
+    X(helper_cmpeqspd_xmm) \
+    X(helper_cmpeqsps_xmm) \
+    X(helper_cmpequpd_xmm) \
+    X(helper_cmpequps_xmm) \
+    X(helper_cmpequspd_xmm) \
+    X(helper_cmpequsps_xmm) \
+    X(helper_cmpfalsepd_xmm) \
+    X(helper_cmpfalseps_xmm) \
+    X(helper_cmpfalsespd_xmm) \
+    X(helper_cmpfalsesps_xmm) \
+    X(helper_cmpgepd_xmm) \
+    X(helper_cmpgeps_xmm) \
+    X(helper_cmpgeqpd_xmm) \
+    X(helper_cmpgeqps_xmm) \
+    X(helper_cmpgtpd_xmm) \
+    X(helper_cmpgtps_xmm) \
+    X(helper_cmpgtqpd_xmm) \
+    X(helper_cmpgtqps_xmm) \
+    X(helper_cmplepd_xmm) \
+    X(helper_cmpleps_xmm) \
+    X(helper_cmpleqpd_xmm) \
+    X(helper_cmpleqps_xmm) \
+    X(helper_cmpltpd_xmm) \
+    X(helper_cmpltps_xmm) \
+    X(helper_cmpltqpd_xmm) \
+    X(helper_cmpltqps_xmm) \
+    X(helper_cmpneqpd_xmm) \
+    X(helper_cmpneqps_xmm) \
+    X(helper_cmpneqqpd_xmm) \
+    X(helper_cmpneqqps_xmm) \
+    X(helper_cmpnequpd_xmm) \
+    X(helper_cmpnequps_xmm) \
+    X(helper_cmpnequspd_xmm) \
+    X(helper_cmpnequsps_xmm) \
+    X(helper_cmpngepd_xmm) \
+    X(helper_cmpngeps_xmm) \
+    X(helper_cmpngeqpd_xmm) \
+    X(helper_cmpngeqps_xmm) \
+    X(helper_cmpngtpd_xmm) \
+    X(helper_cmpngtps_xmm) \
+    X(helper_cmpngtqpd_xmm) \
+    X(helper_cmpngtqps_xmm) \
+    X(helper_cmpnlepd_xmm) \
+    X(helper_cmpnleps_xmm) \
+    X(helper_cmpnleqpd_xmm) \
+    X(helper_cmpnleqps_xmm) \
+    X(helper_cmpnltpd_xmm) \
+    X(helper_cmpnltps_xmm) \
+    X(helper_cmpnltqpd_xmm) \
+    X(helper_cmpnltqps_xmm) \
+    X(helper_cmpordpd_xmm) \
+    X(helper_cmpordps_xmm) \
+    X(helper_cmpordspd_xmm) \
+    X(helper_cmpordsps_xmm) \
+    X(helper_cmptruepd_xmm) \
+    X(helper_cmptrueps_xmm) \
+    X(helper_cmptruespd_xmm) \
+    X(helper_cmptruesps_xmm) \
+    X(helper_cmpunordpd_xmm) \
+    X(helper_cmpunordps_xmm) \
+    X(helper_cmpunordspd_xmm) \
+    X(helper_cmpunordsps_xmm) \
+    X(helper_cvtdq2pd_xmm) \
+    X(helper_cvtdq2ps_xmm) \
+    X(helper_cvtpd2dq_xmm) \
+    X(helper_cvtpd2ps_xmm) \
+    X(helper_cvtph2ps_xmm) \
+    X(helper_cvtps2dq_xmm) \
+    X(helper_cvtps2pd_xmm) \
+    X(helper_cvtps2ph_xmm) \
+    X(helper_cvttpd2dq_xmm) \
+    X(helper_cvttps2dq_xmm) \
+    X(helper_divpd_xmm) \
+    X(helper_divps_xmm) \
+    X(helper_dppd_xmm) \
+    X(helper_dpps_xmm) \
+    X(helper_fma4pd_xmm) \
+    X(helper_fma4ps_xmm) \
+    X(helper_haddpd_xmm) \
+    X(helper_haddps_xmm) \
+    X(helper_hsubpd_xmm) \
+    X(helper_hsubps_xmm) \
+    X(helper_maskmov_xmm) \
+    X(helper_maxpd_xmm) \
+    X(helper_maxps_xmm) \
+    X(helper_minpd_xmm) \
+    X(helper_minps_xmm) \
+    X(helper_movmskpd_xmm) \
+    X(helper_movmskps_xmm) \
+    X(helper_mpsadbw_xmm) \
+    X(helper_mulpd_xmm) \
+    X(helper_mulps_xmm) \
+    X(helper_packssdw_xmm) \
+    X(helper_packsswb_xmm) \
+    X(helper_packusdw_xmm) \
+    X(helper_packuswb_xmm) \
+    X(helper_palignr_xmm) \
+    X(helper_pavgb_xmm) \
+    X(helper_pavgw_xmm) \
+    X(helper_pblendvb_xmm) \
+    X(helper_pblendw_xmm) \
+    X(helper_pclmulqdq_xmm) \
+    X(helper_pcmpestri_xmm) \
+    X(helper_pcmpestrm_xmm) \
+    X(helper_pcmpistri_xmm) \
+    X(helper_pcmpistrm_xmm) \
+    X(helper_phaddd_xmm) \
+    X(helper_phaddsw_xmm) \
+    X(helper_phaddw_xmm) \
+    X(helper_phminposuw_xmm) \
+    X(helper_phsubd_xmm) \
+    X(helper_phsubsw_xmm) \
+    X(helper_phsubw_xmm) \
+    X(helper_pmaddubsw_xmm) \
+    X(helper_pmaddwd_xmm) \
+    X(helper_pmovdldup_xmm) \
+    X(helper_pmovshdup_xmm) \
+    X(helper_pmovsldup_xmm) \
+    X(helper_pmovsxbd_xmm) \
+    X(helper_pmovsxbq_xmm) \
+    X(helper_pmovsxbw_xmm) \
+    X(helper_pmovsxdq_xmm) \
+    X(helper_pmovsxwd_xmm) \
+    X(helper_pmovsxwq_xmm) \
+    X(helper_pmovzxbd_xmm) \
+    X(helper_pmovzxbq_xmm) \
+    X(helper_pmovzxbw_xmm) \
+    X(helper_pmovzxdq_xmm) \
+    X(helper_pmovzxwd_xmm) \
+    X(helper_pmovzxwq_xmm) \
+    X(helper_pmuldq_xmm) \
+    X(helper_pmulhrsw_xmm) \
+    X(helper_pmulhuw_xmm) \
+    X(helper_pmulhw_xmm) \
+    X(helper_pmuludq_xmm) \
+    X(helper_psadbw_xmm) \
+    X(helper_pshufb_xmm) \
+    X(helper_pshufd_xmm) \
+    X(helper_pshufhw_xmm) \
+    X(helper_pshuflw_xmm) \
+    X(helper_psignb_xmm) \
+    X(helper_psignd_xmm) \
+    X(helper_psignw_xmm) \
+    X(helper_pslldq_xmm) \
+    X(helper_pslld_xmm) \
+    X(helper_psllq_xmm) \
+    X(helper_psllw_xmm) \
+    X(helper_psrad_xmm) \
+    X(helper_psraw_xmm) \
+    X(helper_psrldq_xmm) \
+    X(helper_psrld_xmm) \
+    X(helper_psrlq_xmm) \
+    X(helper_psrlw_xmm) \
+    X(helper_ptest_xmm) \
+    X(helper_punpckhbw_xmm) \
+    X(helper_punpckhdq_xmm) \
+    X(helper_punpckhqdq_xmm) \
+    X(helper_punpckhwd_xmm) \
+    X(helper_punpcklbw_xmm) \
+    X(helper_punpckldq_xmm) \
+    X(helper_punpcklqdq_xmm) \
+    X(helper_punpcklwd_xmm) \
+    X(helper_rcpps_xmm) \
+    X(helper_roundpd_xmm) \
+    X(helper_roundps_xmm) \
+    X(helper_roundsd_xmm) \
+    X(helper_roundss_xmm) \
+    X(helper_rsqrtps_xmm) \
+    X(helper_shufpd_xmm) \
+    X(helper_shufps_xmm) \
+    X(helper_sqrtpd_xmm) \
+    X(helper_sqrtps_xmm) \
+    X(helper_subpd_xmm) \
+    X(helper_subps_xmm) \
+    X(helper_vpermilpd_imm_xmm) \
+    X(helper_vpermilpd_xmm) \
+    X(helper_vpermilps_imm_xmm) \
+    X(helper_vpermilps_xmm) \
+    X(helper_vpgatherdd_xmm) \
+    X(helper_vpgatherdq_xmm) \
+    X(helper_vpgatherqd_xmm) \
+    X(helper_vpgatherqq_xmm) \
+    X(helper_vpmaskmovd_st_xmm) \
+    X(helper_vpmaskmovd_xmm) \
+    X(helper_vpmaskmovq_st_xmm) \
+    X(helper_vpmaskmovq_xmm) \
+    X(helper_vpsllvd_xmm) \
+    X(helper_vpsllvq_xmm) \
+    X(helper_vpsravd_xmm) \
+    X(helper_vpsravq_xmm) \
+    X(helper_vpsrlvd_xmm) \
+    X(helper_vpsrlvq_xmm) \
+    X(helper_vtestpd_xmm) \
+    X(helper_vtestps_xmm) \
+    X(ymm_helper_begin) \
+    X(helper_addpd_ymm) \
+    X(helper_addps_ymm) \
+    X(helper_addsubpd_ymm) \
+    X(helper_addsubps_ymm) \
+    X(helper_aesdeclast_ymm) \
+    X(helper_aesdec_ymm) \
+    X(helper_aesenclast_ymm) \
+    X(helper_aesenc_ymm) \
+    X(helper_blendpd_ymm) \
+    X(helper_blendps_ymm) \
+    X(helper_blendvpd_ymm) \
+    X(helper_blendvps_ymm) \
+    X(helper_cmpeqpd_ymm) \
+    X(helper_cmpeqps_ymm) \
+    X(helper_cmpeqspd_ymm) \
+    X(helper_cmpeqsps_ymm) \
+    X(helper_cmpequpd_ymm) \
+    X(helper_cmpequps_ymm) \
+    X(helper_cmpequspd_ymm) \
+    X(helper_cmpequsps_ymm) \
+    X(helper_cmpfalsepd_ymm) \
+    X(helper_cmpfalseps_ymm) \
+    X(helper_cmpfalsespd_ymm) \
+    X(helper_cmpfalsesps_ymm) \
+    X(helper_cmpgepd_ymm) \
+    X(helper_cmpgeps_ymm) \
+    X(helper_cmpgeqpd_ymm) \
+    X(helper_cmpgeqps_ymm) \
+    X(helper_cmpgtpd_ymm) \
+    X(helper_cmpgtps_ymm) \
+    X(helper_cmpgtqpd_ymm) \
+    X(helper_cmpgtqps_ymm) \
+    X(helper_cmplepd_ymm) \
+    X(helper_cmpleps_ymm) \
+    X(helper_cmpleqpd_ymm) \
+    X(helper_cmpleqps_ymm) \
+    X(helper_cmpltpd_ymm) \
+    X(helper_cmpltps_ymm) \
+    X(helper_cmpltqpd_ymm) \
+    X(helper_cmpltqps_ymm) \
+    X(helper_cmpneqpd_ymm) \
+    X(helper_cmpneqps_ymm) \
+    X(helper_cmpneqqpd_ymm) \
+    X(helper_cmpneqqps_ymm) \
+    X(helper_cmpnequpd_ymm) \
+    X(helper_cmpnequps_ymm) \
+    X(helper_cmpnequspd_ymm) \
+    X(helper_cmpnequsps_ymm) \
+    X(helper_cmpngepd_ymm) \
+    X(helper_cmpngeps_ymm) \
+    X(helper_cmpngeqpd_ymm) \
+    X(helper_cmpngeqps_ymm) \
+    X(helper_cmpngtpd_ymm) \
+    X(helper_cmpngtps_ymm) \
+    X(helper_cmpngtqpd_ymm) \
+    X(helper_cmpngtqps_ymm) \
+    X(helper_cmpnlepd_ymm) \
+    X(helper_cmpnleps_ymm) \
+    X(helper_cmpnleqpd_ymm) \
+    X(helper_cmpnleqps_ymm) \
+    X(helper_cmpnltpd_ymm) \
+    X(helper_cmpnltps_ymm) \
+    X(helper_cmpnltqpd_ymm) \
+    X(helper_cmpnltqps_ymm) \
+    X(helper_cmpordpd_ymm) \
+    X(helper_cmpordps_ymm) \
+    X(helper_cmpordspd_ymm) \
+    X(helper_cmpordsps_ymm) \
+    X(helper_cmptruepd_ymm) \
+    X(helper_cmptrueps_ymm) \
+    X(helper_cmptruespd_ymm) \
+    X(helper_cmptruesps_ymm) \
+    X(helper_cmpunordpd_ymm) \
+    X(helper_cmpunordps_ymm) \
+    X(helper_cmpunordspd_ymm) \
+    X(helper_cmpunordsps_ymm) \
+    X(helper_cvtdq2pd_ymm) \
+    X(helper_cvtdq2ps_ymm) \
+    X(helper_cvtpd2dq_ymm) \
+    X(helper_cvtpd2ps_ymm) \
+    X(helper_cvtph2ps_ymm) \
+    X(helper_cvtps2dq_ymm) \
+    X(helper_cvtps2pd_ymm) \
+    X(helper_cvtps2ph_ymm) \
+    X(helper_cvttpd2dq_ymm) \
+    X(helper_cvttps2dq_ymm) \
+    X(helper_divpd_ymm) \
+    X(helper_divps_ymm) \
+    X(helper_dpps_ymm) \
+    X(helper_fma4pd_ymm) \
+    X(helper_fma4ps_ymm) \
+    X(helper_haddpd_ymm) \
+    X(helper_haddps_ymm) \
+    X(helper_hsubpd_ymm) \
+    X(helper_hsubps_ymm) \
+    X(helper_maxpd_ymm) \
+    X(helper_maxps_ymm) \
+    X(helper_minpd_ymm) \
+    X(helper_minps_ymm) \
+    X(helper_movmskpd_ymm) \
+    X(helper_movmskps_ymm) \
+    X(helper_mpsadbw_ymm) \
+    X(helper_mulpd_ymm) \
+    X(helper_mulps_ymm) \
+    X(helper_packssdw_ymm) \
+    X(helper_packsswb_ymm) \
+    X(helper_packusdw_ymm) \
+    X(helper_packuswb_ymm) \
+    X(helper_palignr_ymm) \
+    X(helper_pavgb_ymm) \
+    X(helper_pavgw_ymm) \
+    X(helper_pblendvb_ymm) \
+    X(helper_pblendw_ymm) \
+    X(helper_pclmulqdq_ymm) \
+    X(helper_phaddd_ymm) \
+    X(helper_phaddsw_ymm) \
+    X(helper_phaddw_ymm) \
+    X(helper_phsubd_ymm) \
+    X(helper_phsubsw_ymm) \
+    X(helper_phsubw_ymm) \
+    X(helper_pmaddubsw_ymm) \
+    X(helper_pmaddwd_ymm) \
+    X(helper_pmovdldup_ymm) \
+    X(helper_pmovshdup_ymm) \
+    X(helper_pmovsldup_ymm) \
+    X(helper_pmovsxbd_ymm) \
+    X(helper_pmovsxbq_ymm) \
+    X(helper_pmovsxbw_ymm) \
+    X(helper_pmovsxdq_ymm) \
+    X(helper_pmovsxwd_ymm) \
+    X(helper_pmovsxwq_ymm) \
+    X(helper_pmovzxbd_ymm) \
+    X(helper_pmovzxbq_ymm) \
+    X(helper_pmovzxbw_ymm) \
+    X(helper_pmovzxdq_ymm) \
+    X(helper_pmovzxwd_ymm) \
+    X(helper_pmovzxwq_ymm) \
+    X(helper_pmuldq_ymm) \
+    X(helper_pmulhrsw_ymm) \
+    X(helper_pmulhuw_ymm) \
+    X(helper_pmulhw_ymm) \
+    X(helper_pmuludq_ymm) \
+    X(helper_psadbw_ymm) \
+    X(helper_pshufb_ymm) \
+    X(helper_pshufd_ymm) \
+    X(helper_pshufhw_ymm) \
+    X(helper_pshuflw_ymm) \
+    X(helper_psignb_ymm) \
+    X(helper_psignd_ymm) \
+    X(helper_psignw_ymm) \
+    X(helper_pslldq_ymm) \
+    X(helper_pslld_ymm) \
+    X(helper_psllq_ymm) \
+    X(helper_psllw_ymm) \
+    X(helper_psrad_ymm) \
+    X(helper_psraw_ymm) \
+    X(helper_psrldq_ymm) \
+    X(helper_psrld_ymm) \
+    X(helper_psrlq_ymm) \
+    X(helper_psrlw_ymm) \
+    X(helper_ptest_ymm) \
+    X(helper_punpckhbw_ymm) \
+    X(helper_punpckhdq_ymm) \
+    X(helper_punpckhqdq_ymm) \
+    X(helper_punpckhwd_ymm) \
+    X(helper_punpcklbw_ymm) \
+    X(helper_punpckldq_ymm) \
+    X(helper_punpcklqdq_ymm) \
+    X(helper_punpcklwd_ymm) \
+    X(helper_rcpps_ymm) \
+    X(helper_roundpd_ymm) \
+    X(helper_roundps_ymm) \
+    X(helper_rsqrtps_ymm) \
+    X(helper_shufpd_ymm) \
+    X(helper_shufps_ymm) \
+    X(helper_sqrtpd_ymm) \
+    X(helper_sqrtps_ymm) \
+    X(helper_subpd_ymm) \
+    X(helper_subps_ymm) \
+    X(helper_vpermdq_ymm) \
+    X(helper_vpermd_ymm) \
+    X(helper_vpermilpd_imm_ymm) \
+    X(helper_vpermilpd_ymm) \
+    X(helper_vpermilps_imm_ymm) \
+    X(helper_vpermilps_ymm) \
+    X(helper_vpermq_ymm) \
+    X(helper_vpgatherdd_ymm) \
+    X(helper_vpgatherdq_ymm) \
+    X(helper_vpgatherqd_ymm) \
+    X(helper_vpgatherqq_ymm) \
+    X(helper_vpmaskmovd_st_ymm) \
+    X(helper_vpmaskmovd_ymm) \
+    X(helper_vpmaskmovq_st_ymm) \
+    X(helper_vpmaskmovq_ymm) \
+    X(helper_vpsllvd_ymm) \
+    X(helper_vpsllvq_ymm) \
+    X(helper_vpsravd_ymm) \
+    X(helper_vpsravq_ymm) \
+    X(helper_vpsrlvd_ymm) \
+    X(helper_vpsrlvq_ymm) \
+    X(helper_vtestpd_ymm) \
+    X(helper_vtestps_ymm) \
     X(HELPER_MAX)
 
 typedef enum {
