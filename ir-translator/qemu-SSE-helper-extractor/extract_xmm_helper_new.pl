@@ -358,6 +358,9 @@ foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'ENV_TYPE'} = $env_type;
   $funcs{$f}->{'128'} = $ret128_info;
   $funcs{$f}->{'FUNC_TYPE'} = $func_type;
+  if ($funcs{$f}->{'NAME'} =~ /^helper_/ and $funcs{$f}->{'NAME'} =~ /_xmm$/ and $funcs{$f}->{'FUNC_TYPE'} ne "void") {
+    $funcs{$f}->{'HEAD'} =~ s/$funcs{$f}->{'FUNC_TYPE'}\s+/void /;
+  }
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     if (&FuncNameIsForeign($funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'})) {
       $foreign_funcs{$funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'}} = 1;
@@ -904,7 +907,9 @@ foreach my $f (keys %funcs) {
     &populate_additional_arguments_on_execution_path($sf, \%defined_func);
   }
 
-  #print "$f $has_foreign_call\n";
+  if ($has_foreign_call) {
+    print "$f\n";
+  }
 
   # Generate function
   open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
@@ -924,7 +929,7 @@ EOF
     $type_name =~ s/\s+/_/g;
     $foreign_types{$foreign_calls{$ff}} = $type_name;
   }
-  print OUT "typedef __attribute__((qemuaot)) $funcs{$f}->{'FUNC_TYPE'} (*FUNC_NORMAL_RET)(";
+  print OUT "typedef __attribute__((qemuaot)) void (*FUNC_NORMAL_RET)(";
   foreach my $p (@qemuaot_gp_params) {
     print OUT "$qemuaot_gp_params_map{$p} $p, ";
   }
@@ -934,7 +939,7 @@ EOF
   }
   print OUT ");\n";
   if (keys %foreign_types > 0) {
-    print OUT "typedef __attribute__((qemuaot,noreturn)) $funcs{$f}->{'FUNC_TYPE'} (*FUNC_EXCEPTION_RET)(";
+    print OUT "typedef __attribute__((qemuaot,noreturn)) void (*FUNC_EXCEPTION_RET)(";
     foreach my $p (@qemuaot_gp_params) {
       print OUT "$qemuaot_gp_params_map{$p} $p, ";
     }
@@ -1163,7 +1168,7 @@ sub parse_func_head
       $head_copy =~ s/static\s+//;
     }
   } else {
-    $head_copy =~ s/$func->{'NAME'}/HELPER_ENTRY/;
+    $head_copy =~ s/$func->{'NAME'}/HELPER_NAME/;
   }
   $head_copy = "__attribute__((qemuaot)) ".$head_copy;
   $head =~ s/\n/ /g;

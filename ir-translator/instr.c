@@ -1255,7 +1255,7 @@ size_t create_helper_slot_env_slot(void *ptr, OHType h, uint16_t cflags, uint8_t
 }
 
 // INPUT-slot-bits, INPUT-effective-bits, OUTPUT-bits
-LLVMType opciosz[OPCODE_MAX][3] = {
+const LLVMType opciosz[OPCODE_MAX][3] = {
     [addc1o_i32] = {LLVMInvalidType, LLVMInvalidType, LLVMInvalidType},
     [addc1o_i64] = {LLVMInvalidType, LLVMInvalidType, LLVMInvalidType},
     [addci_i32] = {LLVMInvalidType, LLVMInvalidType, LLVMInvalidType},
@@ -1435,7 +1435,7 @@ LLVMType opciosz[OPCODE_MAX][3] = {
     [call] = {LLVMInt64, LLVMInt64, LLVMInt64},
 };
 
-uint8_t opcoc[OPCODE_MAX] = {
+const uint8_t opcoc[OPCODE_MAX] = {
     [abs_vec] = 1,
     [add_i32] = 1,
     [add_i64] = 1,
@@ -1583,7 +1583,7 @@ uint8_t opcoc[OPCODE_MAX] = {
     [xor_vec] = 1,
 };
 
-uint8_t opcmem_addr_nzidx[OPCODE_MAX] = {
+const uint8_t opcmem_addr_nzidx[OPCODE_MAX] = {
     [ld16s_i32] = 1,
     [ld16s_i64] = 1,
     [ld16u_i32] = 1,
@@ -1613,9 +1613,139 @@ uint8_t opcmem_addr_nzidx[OPCODE_MAX] = {
     [st_vec] = 1,
 };
 
+const int helper_compress_arg_cnt[HELPER_MAX] = {
+    [helper_cc_compute_nz] = 3,
+};
+
+#define MAX_COMPRESSED_ARGS         3
+const XRegType helper_compress_arg_expectations[HELPER_MAX][MAX_COMPRESSED_ARGS] = {
+    [helper_cc_compute_nz] = {cc_dst, cc_src, cc_op},
+};
+
+const int helper_require_exception_path[HELPER_MAX] = {
+    [helper_cc_compute_nz] = 1,
+    [helper_addps_xmm] = 1,
+    [helper_minps_xmm] = 1,
+    [helper_cmpltps_xmm] = 1,
+    [helper_addsubps_xmm] = 1,
+    [helper_cmpltqps_xmm] = 1,
+    [helper_vpgatherdq_xmm] = 1,
+    [helper_cmpnlepd_xmm] = 1,
+    [helper_cmpnequps_xmm] = 1,
+    [helper_cmptrueps_xmm] = 1,
+    [helper_cmpngtpd_xmm] = 1,
+    [helper_cmpneqpd_xmm] = 1,
+    [helper_aesdec_xmm] = 1,
+    [helper_cmpfalsepd_xmm] = 1,
+    [helper_cmpfalsespd_xmm] = 1,
+    [helper_cmpngtps_xmm] = 1,
+    [helper_cvttpd2dq_xmm] = 1,
+    [helper_cmpltpd_xmm] = 1,
+    [helper_mulps_xmm] = 1,
+    [helper_cvtps2dq_xmm] = 1,
+    [helper_cmpfalseps_xmm] = 1,
+    [helper_cmpnleqpd_xmm] = 1,
+    [helper_cmpneqps_xmm] = 1,
+    [helper_cmpngtqpd_xmm] = 1,
+    [helper_cmpltqpd_xmm] = 1,
+    [helper_addsubpd_xmm] = 1,
+    [helper_aesenc_xmm] = 1,
+    [helper_cvtph2ps_xmm] = 1,
+    [helper_sqrtpd_xmm] = 1,
+    [helper_vpmaskmovq_st_xmm] = 1,
+    [helper_cmpnleps_xmm] = 1,
+    [helper_cmpneqqpd_xmm] = 1,
+    [helper_cvtps2ph_xmm] = 1,
+    [helper_cmpunordsps_xmm] = 1,
+    [helper_fma4ps_xmm] = 1,
+    [helper_hsubps_xmm] = 1,
+    [helper_cmpordsps_xmm] = 1,
+    [helper_cmpequsps_xmm] = 1,
+    [helper_mulpd_xmm] = 1,
+    [helper_cmpnltpd_xmm] = 1,
+    [helper_cvtpd2dq_xmm] = 1,
+    [helper_cmpeqpd_xmm] = 1,
+    [helper_cmpngepd_xmm] = 1,
+    [helper_roundss_xmm] = 1,
+    [helper_dppd_xmm] = 1,
+    [helper_cmpgeps_xmm] = 1,
+    [helper_cmpgeqps_xmm] = 1,
+    [helper_aesdeclast_xmm] = 1,
+    [helper_cmpngeps_xmm] = 1,
+    [helper_haddpd_xmm] = 1,
+    [helper_minpd_xmm] = 1,
+    [helper_cmpgeqpd_xmm] = 1,
+    [helper_cmpnltqpd_xmm] = 1,
+    [helper_cmpeqps_xmm] = 1,
+    [helper_addpd_xmm] = 1,
+    [helper_vpgatherqq_xmm] = 1,
+    [helper_roundsd_xmm] = 1,
+    [helper_aesimc_xmm] = 1,
+    [helper_aesenclast_xmm] = 1,
+    [helper_cmpngeqpd_xmm] = 1,
+    [helper_maskmov_xmm] = 1,
+    [helper_cmpnltps_xmm] = 1,
+    [helper_cmpgepd_xmm] = 1,
+    [helper_pclmulqdq_xmm] = 1,
+    [helper_cmpordpd_xmm] = 1,
+    [helper_cmpnequpd_xmm] = 1,
+    [helper_cmplepd_xmm] = 1,
+    [helper_cmpequpd_xmm] = 1,
+    [helper_haddps_xmm] = 1,
+    [helper_dpps_xmm] = 1,
+    [helper_cmpleqpd_xmm] = 1,
+    [helper_vpmaskmovd_st_xmm] = 1,
+    [helper_cmpeqsps_xmm] = 1,
+    [helper_cmptruepd_xmm] = 1,
+    [helper_rcpps_xmm] = 1,
+    [helper_divps_xmm] = 1,
+    [helper_vpgatherdd_xmm] = 1,
+    [helper_subpd_xmm] = 1,
+    [helper_cmpleqps_xmm] = 1,
+    [helper_cmpnleqps_xmm] = 1,
+    [helper_cmpleps_xmm] = 1,
+    [helper_maxpd_xmm] = 1,
+    [helper_fma4pd_xmm] = 1,
+    [helper_cmpeqspd_xmm] = 1,
+    [helper_hsubpd_xmm] = 1,
+    [helper_cvtpd2ps_xmm] = 1,
+    [helper_cmpneqqps_xmm] = 1,
+    [helper_cmpordps_xmm] = 1,
+    [helper_cmpequps_xmm] = 1,
+    [helper_cmpngtqps_xmm] = 1,
+    [helper_cmptruesps_xmm] = 1,
+    [helper_cmpfalsesps_xmm] = 1,
+    [helper_cmpequspd_xmm] = 1,
+    [helper_cmpordspd_xmm] = 1,
+    [helper_subps_xmm] = 1,
+    [helper_cvttps2dq_xmm] = 1,
+    [helper_maxps_xmm] = 1,
+    [helper_cmpgtqpd_xmm] = 1,
+    [helper_roundps_xmm] = 1,
+    [helper_cmpunordps_xmm] = 1,
+    [helper_cvtdq2pd_xmm] = 1,
+    [helper_vpgatherqd_xmm] = 1,
+    [helper_cmpnequsps_xmm] = 1,
+    [helper_cmpunordspd_xmm] = 1,
+    [helper_sqrtps_xmm] = 1,
+    [helper_cmpgtpd_xmm] = 1,
+    [helper_cvtdq2ps_xmm] = 1,
+    [helper_cmpnltqps_xmm] = 1,
+    [helper_cmpunordpd_xmm] = 1,
+    [helper_cmpnequspd_xmm] = 1,
+    [helper_rsqrtps_xmm] = 1,
+    [helper_cmptruespd_xmm] = 1,
+    [helper_divpd_xmm] = 1,
+    [helper_cvtps2pd_xmm] = 1,
+    [helper_roundpd_xmm] = 1,
+    [helper_cmpngeqps_xmm] = 1,
+    [helper_cmpgtqps_xmm] = 1,
+    [helper_cmpgtps_xmm] = 1,
+};
+
 // Make sure argument type matches, otherwise inline could not happen!
 #define MAX_ADDED_ARGS              5
-LLVMType helper_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
+const LLVMType helper_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_jmp_ind] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [helper_cc_compute_all] = {LLVMInt64},
     [helper_cc_compute_all_ADD1] = {LLVMInt64, LLVMInt32},
@@ -1663,7 +1793,7 @@ LLVMType helper_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_vpermq_ymm] = {LLVMInt32},
 };
 
-LLVMType helper_return_type[HELPER_MAX] = {
+const LLVMType helper_return_type[HELPER_MAX] = {
     [helper_cc_compute_all] = LLVMInt64,
     [helper_cc_compute_all_ADD1] = LLVMInt64,
     [helper_cc_compute_all_ADD2] = LLVMInt64,
@@ -1675,11 +1805,7 @@ LLVMType helper_return_type[HELPER_MAX] = {
     [helper_movmskpd_ymm] = LLVMInt32,
 };
 
-int helper_require_exception_path[HELPER_MAX] = {
-    [helper_cc_compute_nz] = 1,
-};
-
-uint64_t xreg_offsets[XREG_MAX] = {
+const uint64_t xreg_offsets[XREG_MAX] = {
     [rax] = 0x0,
     [rcx] = 0x8,
     [rdx] = 0x10,
@@ -1702,7 +1828,7 @@ uint64_t xreg_offsets[XREG_MAX] = {
     [rip] = 0x80,
 };
 
-CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
+const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
     [LLVMVector2xi64] = v2ulong,
     [LLVMVector4xi32] = v4uint,
     [LLVMVector8xi16] = v8ushort,
