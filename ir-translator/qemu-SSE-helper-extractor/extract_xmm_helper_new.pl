@@ -907,9 +907,9 @@ foreach my $f (keys %funcs) {
     &populate_additional_arguments_on_execution_path($sf, \%defined_func);
   }
 
-  if ($has_foreign_call) {
-    print "$f\n";
-  }
+  #if ($has_foreign_call) {
+  #  print "$f\n";
+  #}
 
   # Generate function
   open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
@@ -1893,9 +1893,18 @@ sub collect_func_args
       $args = $args.", v2ulong *".$i->{'VAR_NAME'};
     }
   }
+  #if ($func_ptr->{'HELPER_INTERFACE'} and @{$func_ptr->{'SCALAR_ARGS'}} > 0) {
+  #  print "$func_ptr->{'NAME'}";
+  #}
   foreach my $i (@{$func_ptr->{'SCALAR_ARGS'}}) {
     $args = $args.", ".$i->{'TYPE'}." ".$i->{'VAR_NAME'};
+    #if ($func_ptr->{'HELPER_INTERFACE'}) {
+    #  print " $i->{'TYPE'}";
+    #}
   }
+  #if ($func_ptr->{'HELPER_INTERFACE'} and @{$func_ptr->{'SCALAR_ARGS'}} > 0) {
+  #  print "\n";
+  #}
   if ($func_ptr->{'HELPER_INTERFACE'}) {
     if (exists $func_ptr->{'IS_FOREIGN'}) {
       $args = $args.", unsigned long normal_return, unsigned long exception_return";
