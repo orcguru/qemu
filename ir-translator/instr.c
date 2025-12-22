@@ -595,6 +595,22 @@ size_t create_vector_slot3(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0,
     return sizeof(*i);
 }
 
+size_t create_vector_slot4(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, OperandType s3) {
+#ifdef DEBUG
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
+#endif
+    Instr1BV42 *i = (Instr1BV42 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BV42_ext;
+    i->opc = op.o;
+    i->es = ai.p.ves;
+    SET_SLOT(0);
+    SET_SLOT(1);
+    SET_SLOT(2);
+    SET_SLOT(3);
+    return sizeof(*i);
+}
+
 size_t create_vector_slot5_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, uint8_t relop) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
@@ -779,21 +795,6 @@ size_t create_scalar_slot3_imm(void *ptr, OHType op, OperandType s0, OperandType
     SET_SLOT(1);
     SET_SLOT(2);
     i->imm = i0;
-    return sizeof(*i);
-}
-
-size_t create_vector_slot2_vimm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t vi0) {
-#ifdef DEBUG
-    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
-#endif
-    Instr1BV48 *i = (Instr1BV48 *)ptr;
-    i->instr_type = SIZEXB;
-    i->instr_type_ext = Instr1BV48_ext;
-    i->opc = op.o;
-    i->es = ai.p.ves;
-    SET_SLOT(0);
-    SET_SLOT(1);
-    i->imm = vi0;
     return sizeof(*i);
 }
 
@@ -1309,7 +1310,7 @@ const LLVMType opciosz[OPCODE_MAX][3] = {
     [divu_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [divu_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [dupm_vec] = {LLVMVector16xi8, LLVMVector16xi8, LLVMVector16xi8},
-    [dup_vec] = {LLVMVector16xi8, LLVMVector16xi8, LLVMVector16xi8},
+    [dup_vec] = {LLVMInt64, LLVMInt64, LLVMVector16xi8},
     [eqv_i32] = {LLVMInt32, LLVMInt32, LLVMInt32},
     [eqv_i64] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [eqv_vec] = {LLVMVector16xi8, LLVMVector16xi8, LLVMVector16xi8},

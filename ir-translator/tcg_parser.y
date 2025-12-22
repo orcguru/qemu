@@ -110,10 +110,11 @@ SYMBOL SLOT                                                             { insert
 vector:
 SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT                             { insert_instr(instr_buf, create_vector_slot2(instr_buf, $1, $4, $6, $8)); }
 | SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT                { insert_instr(instr_buf, create_vector_slot3(instr_buf, $1, $4, $6, $8, $10)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT     { insert_instr(instr_buf, create_vector_slot4(instr_buf, $1, $4, $6, $8, $10, $12)); }
 | SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT COMMA RELOP    { insert_instr(instr_buf, create_vector_slot3_relop(instr_buf, $1, $4, $6, $8, $10, $12)); }
 | SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA V128 IMMX                      { insert_instr(instr_buf, create_vector_slot_vimm(instr_buf, $1, $4, $6, $9)); }
 | SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA IMMX                { insert_instr(instr_buf, create_vector_slot2_imm(instr_buf, $1, $4, $6, $8, $10)); }
-| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA V128 IMMX           { insert_instr(instr_buf, create_vector_slot2_vimm(instr_buf, $1, $4, $6, $8, $11)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA V128 IMMX           { insert_instr(instr_buf, create_vector_slot2_imm(instr_buf, $1, $4, $6, $8, $11)); }
 | SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA ENV COMMA IMMX                 { insert_instr(instr_buf, create_vector_slot_env_imm(instr_buf, $1, $4, $6, $10)); };
 
 call_helper:
