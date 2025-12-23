@@ -2733,7 +2733,8 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
     }
     NEW_AUX_ENT(AT_MINSIGSTKSZ, 0x5a0);
     NEW_AUX_ENT(AT_HWCAP, (abi_ulong)0x00000000178bfbfdUL);
-    NEW_AUX_ENT(AT_PAGESZ, (abi_ulong)(TARGET_PAGE_SIZE));
+    //NEW_AUX_ENT(AT_PAGESZ, (abi_ulong)(TARGET_PAGE_SIZE));
+    NEW_AUX_ENT(AT_PAGESZ, (abi_ulong)0x4000);
     NEW_AUX_ENT(AT_CLKTCK, (abi_ulong)0x64);
     NEW_AUX_ENT(AT_PHDR, (abi_ulong)(info->load_addr + exec->e_phoff));
     NEW_AUX_ENT(AT_PHENT, (abi_ulong)(sizeof (struct elf_phdr)));
