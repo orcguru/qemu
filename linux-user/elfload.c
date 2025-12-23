@@ -2292,7 +2292,7 @@ static int elf_core_dump(int, const CPUArchState *);
 static void load_symbols(struct elfhdr *hdr, const ImageSource *src,
                          abi_ulong load_bias);
 #ifdef AOT_IR
-void fill_section_gap_with_nop(struct image_info *info, struct elfhdr *hdr, const ImageSource *src);
+void fill_section_gap_with_nop_and_update_end_code(struct image_info *info, struct elfhdr *hdr, const ImageSource *src);
 #endif
 
 /* Verify the portions of EHDR within E_IDENT for the target.
@@ -3601,7 +3601,7 @@ static void load_elf_image(const char *image_name, const ImageSource *src,
     }
 
 #ifdef AOT_IR
-    fill_section_gap_with_nop(info, ehdr, src);
+    fill_section_gap_with_nop_and_update_end_code(info, ehdr, src);
 #endif
 
     debuginfo_report_elf(image_name, src->fd, load_bias);
@@ -3858,7 +3858,7 @@ static void load_symbols(struct elfhdr *hdr, const ImageSource *src,
 }
 
 #ifdef AOT_IR
-void fill_section_gap_with_nop(struct image_info *info, struct elfhdr *hdr, const ImageSource *src)
+void fill_section_gap_with_nop_and_update_end_code(struct image_info *info, struct elfhdr *hdr, const ImageSource *src)
 {
     int i, shnum;
     g_autofree struct elf_shdr *shdr = NULL;
@@ -3880,6 +3880,8 @@ void fill_section_gap_with_nop(struct image_info *info, struct elfhdr *hdr, cons
         exit(-1);
     }
     bswap_shdr(shdr, shnum);
+    abi_long exec_begin = 0;
+    abi_long exec_end = 0;
     for (i = 0; i < shnum; ++i) {
         if (shdr[i].sh_type == SHT_PROGBITS && ((i + 1) < shnum) && shdr[i + 1].sh_type == SHT_PROGBITS) {
             if ((shdr[i].sh_addr + shdr[i].sh_size) < shdr[i + 1].sh_addr) {
@@ -3890,6 +3892,17 @@ void fill_section_gap_with_nop(struct image_info *info, struct elfhdr *hdr, cons
                 }
             }
         }
+        if (shdr[i].sh_flags &= SHF_EXECINSTR) {
+            if (shdr[i].sh_addr < exec_begin) {
+                exec_begin = shdr[i].sh_addr;
+            }
+            if ((shdr[i].sh_addr + shdr[i].sh_size) > exec_end) {
+                exec_end = (shdr[i].sh_addr + shdr[i].sh_size);
+            }
+        }
+    }
+    if ((exec_end - exec_begin) < (info->end_code - info->start_code)) {
+        info->end_code = info->start_code + (exec_end - exec_begin);
     }
     if (target_mprotect(info->code_mmap_start, info->code_mmap_len, info->code_mmap_prot) == -1) {
         error_setg_errno(&err, errno, "Failed mprotect");
