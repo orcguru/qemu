@@ -3880,7 +3880,8 @@ void fill_section_gap_with_nop_and_update_end_code(struct image_info *info, stru
         exit(-1);
     }
     bswap_shdr(shdr, shnum);
-    abi_long exec_begin = 0;
+    abi_long load_begin = (1UL << 63)-1;
+    abi_long exec_begin = (1UL << 63)-1;
     abi_long exec_end = 0;
     for (i = 0; i < shnum; ++i) {
         if (shdr[i].sh_type == SHT_PROGBITS && ((i + 1) < shnum) && shdr[i + 1].sh_type == SHT_PROGBITS) {
@@ -3900,10 +3901,12 @@ void fill_section_gap_with_nop_and_update_end_code(struct image_info *info, stru
                 exec_end = (shdr[i].sh_addr + shdr[i].sh_size);
             }
         }
+        if (shdr[i].sh_addr < load_begin) {
+            load_begin = shdr[i].sh_addr;
+        }
     }
-    if ((exec_end - exec_begin) < (info->end_code - info->start_code)) {
-        info->end_code = info->start_code + (exec_end - exec_begin);
-    }
+    info->start_code += (exec_begin - load_begin);
+    info->end_code = info->start_code + (exec_end - exec_begin);
     if (target_mprotect(info->code_mmap_start, info->code_mmap_len, info->code_mmap_prot) == -1) {
         error_setg_errno(&err, errno, "Failed mprotect");
         error_reportf_err(err, "%s", "");

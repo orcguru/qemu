@@ -1062,6 +1062,7 @@ static void gen_tcg_ir(CPUState *cpu)
 #endif
     unsigned long start_code = get_image_start_code(cpu);
     unsigned long end_code = get_image_end_code(cpu);
+    printf("start_code:%lx end_code:%lx\n", start_code, end_code);
     vaddr pc = start_code;
     x_load_addr = start_code;
 
