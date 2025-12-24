@@ -3259,6 +3259,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
     /// Collect function call arguments: those arguments for inlined helper can be different from runtime helpers
     /// Do vector register spill/reload if necessary
     // Collect used xmm indexes, and xmm indexes that need be put into registers
+    uint8_t env_idx = get_env_idx(ptr);
     XMMRegType used_xmm_regs[MAX_OPERANDS_COUNT];
     int used_xmm_regs_cnt = 0;
     XMMRegType touched_effective_xmm_regs[MAX_OPERANDS_COUNT];
@@ -3458,12 +3459,12 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         // Get the helper
         LLVMValueRef helper_func = LLVMGetNamedFunction(module, helper_str[h]);
         if (!helper_func) {
-            LLVMTypeRef helper_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], app_arg_types_to_default_cc, runtime_operands_cnt, 0);
+            LLVMTypeRef helper_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], app_arg_types_to_default_cc, (runtime_operands_cnt + (env_idx == 0xff ? 0 : 1)), 0);
             helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
         }
         // FIXME: verify that stack point does not need adjustment, since QEMUAOT CC does not have prolog/epilog
         // Trampoline handles register-context switch
-        exception_path_trampoline = get_trampoline(helper_func, 1, helper_return_type[h] != LLVMInvalidType ? 1 : 0, runtime_operands_cnt, 0xff, runtime_operands, runtime_is_imm, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs);
+        exception_path_trampoline = get_trampoline(helper_func, 1, helper_return_type[h] != LLVMInvalidType ? 1 : 0, runtime_operands_cnt, (env_idx == 0xff ? env_idx : (env_idx - (helper_return_type[h] != LLVMInvalidType ? 1 : 0))), runtime_operands, runtime_is_imm, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs);
     }
 
     // Generate the fast path inlined helper
