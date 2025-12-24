@@ -1264,14 +1264,13 @@ void translate_bswap16_i32(OpCodeType opc, void *ptr) {
     GET_2_OPERANDS();
     CREATE_SHR(tmp0, operand1, 8);
     AttributeType attr = get_attribute(ptr);
-    assert(attr.attr_type == SUB_ATTR_SWAP);
-    if (attr.attr_val & IZ) {
+    if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & IZ)) {
         CREATE_EXTRACT(tmp0, tmp0, 0, 8);
     }
-    if (attr.attr_val & OS) {
+    if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OS)) {
         CREATE_SHL(tmp1, operand1, 24);
         CREATE_SAR(tmp1, tmp1, 16);
-    } else if (attr.attr_val & OZ) {
+    } else if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OZ)) {
         CREATE_EXTRACT(tmp1, operand1, 0, 8);
         CREATE_SHL(tmp1, tmp1, 8);
     } else {
@@ -1290,14 +1289,13 @@ void translate_bswap16_i64(OpCodeType opc, void *ptr) {
     GET_2_OPERANDS();
     CREATE_SHR(tmp0, operand1, 8);
     AttributeType attr = get_attribute(ptr);
-    assert(attr.attr_type == SUB_ATTR_SWAP);
-    if (attr.attr_val & IZ) {
+    if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & IZ)) {
         CREATE_EXTRACT(tmp0, tmp0, 0, 8);
     }
-    if (attr.attr_val & OS) {
+    if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OS)) {
         CREATE_SHL(tmp1, operand1, 56);
         CREATE_SAR(tmp1, tmp1, 48);
-    } else if (attr.attr_val & OZ) {
+    } else if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OZ)) {
         CREATE_EXTRACT(tmp1, operand1, 0, 8);
         CREATE_SHL(tmp1, tmp1, 8);
     } else {
@@ -1343,8 +1341,7 @@ void translate_bswap32_i64(OpCodeType opc, void *ptr) {
     CREATE_SHR(tmp0, operand0, 16);
 
     AttributeType attr = get_attribute(ptr);
-    assert(attr.attr_type == SUB_ATTR_SWAP);
-    if (attr.attr_val & OS) {
+    if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OS)) {
         CREATE_SAR(tmp1, tmp1, 32);
     } else {
         CREATE_SHR(tmp1, tmp1, 32);
