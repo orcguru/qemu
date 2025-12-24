@@ -3463,7 +3463,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         }
         // FIXME: verify that stack point does not need adjustment, since QEMUAOT CC does not have prolog/epilog
         // Trampoline handles register-context switch
-        exception_path_trampoline = get_trampoline(helper_func, 1, 1, runtime_operands_cnt, 0xff, runtime_operands, runtime_is_imm, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs);
+        exception_path_trampoline = get_trampoline(helper_func, 1, helper_return_type[h] != LLVMInvalidType ? 1 : 0, runtime_operands_cnt, 0xff, runtime_operands, runtime_is_imm, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs);
     }
 
     // Generate the fast path inlined helper
