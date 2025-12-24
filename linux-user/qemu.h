@@ -17,6 +17,14 @@
  */
 #define SIGSET_T_SIZE (_NSIG / 8)
 
+#ifdef AOT_IR
+typedef struct hole_desc {
+        uint64_t hole_start;
+        uint64_t hole_end;
+        struct hole_desc *next;
+} hole_desc_t;
+#endif
+
 /*
  * This struct is used to hold certain information about the image.
  * Basically, it replicates in user space what would be certain
@@ -72,6 +80,10 @@ struct image_info {
         abi_ulong       code_mmap_start;
         abi_ulong       code_mmap_len;
         int             code_mmap_prot;
+#endif
+
+#ifdef AOT_IR
+        hole_desc_t     *hole_info;
 #endif
 };
 

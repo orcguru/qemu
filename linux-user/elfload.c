@@ -3864,6 +3864,7 @@ void fill_section_gap_with_nop_and_update_end_code(struct image_info *info, stru
     g_autofree struct elf_shdr *shdr = NULL;
     Error *err = NULL;
 
+    info->hole_info = NULL;
     shnum = hdr->e_shnum;
     shdr = imgsrc_read_alloc(hdr->e_shoff, shnum * sizeof(struct elf_shdr),
                              src, NULL);
@@ -3905,8 +3906,67 @@ void fill_section_gap_with_nop_and_update_end_code(struct image_info *info, stru
             load_begin = shdr[i].sh_addr;
         }
     }
+    for (i = 0; i < shnum; ++i) {
+        if (!(shdr[i].sh_flags &= SHF_EXECINSTR) && (shdr[i].sh_addr > exec_begin && shdr[i].sh_addr < exec_end)) {
+            int merged = 0;
+            hole_desc_t *hole_ptr = info->hole_info;
+            while (hole_ptr) {
+                if ((shdr[i].sh_addr + shdr[i].sh_size) == hole_ptr->hole_start) {
+                    hole_ptr->hole_start = shdr[i].sh_addr;
+                    merged = 1;
+                    break;
+                } else if (shdr[i].sh_addr == hole_ptr->hole_end) {
+                    hole_ptr->hole_end = (shdr[i].sh_addr + shdr[i].sh_size);
+                    merged = 1;
+                    break;
+                }
+                hole_ptr = hole_ptr->next;
+            }
+            if (!merged) {
+                hole_desc_t *hole = (hole_desc_t *)g_malloc(sizeof(hole_desc_t));
+                hole->hole_start = shdr[i].sh_addr;
+                hole->hole_end = (shdr[i].sh_addr + shdr[i].sh_size);
+                hole->next = NULL;
+                hole_ptr = info->hole_info;
+                hole_desc_t *hole_prev = NULL;
+                while (hole_ptr && hole_ptr->hole_start < hole->hole_start) {
+                    hole_prev = hole_ptr;
+                    hole_ptr = hole_ptr->next;
+                }
+                if (!hole_prev) {
+                    if (!info->hole_info) {
+                        info->hole_info = hole;
+                    } else {
+                        hole->next = info->hole_info;
+                        info->hole_info = hole;
+                    }
+                } else {
+                    hole->next = hole_prev->next;
+                    hole_prev->next = hole;
+                }
+            }
+        }
+    }
+    hole_desc_t *hole_ptr = info->hole_info;
+    abi_ulong delta = info->start_code - load_begin;
+    while (hole_ptr) {
+        hole_ptr->hole_start += delta;
+        hole_ptr->hole_end += delta;
+        hole_ptr = hole_ptr->next;
+    }
     info->start_code += (exec_begin - load_begin);
     info->end_code = info->start_code + (exec_end - exec_begin);
+    // Sanity check
+    hole_ptr = info->hole_info;
+    while (hole_ptr) {
+        assert(hole_ptr->hole_start > info->start_code);
+        assert(hole_ptr->hole_end < info->end_code);
+        if (hole_ptr->next) {
+            assert(hole_ptr->hole_end < hole_ptr->next->hole_start);
+        }
+        hole_ptr = hole_ptr->next;
+    }
+
     if (target_mprotect(info->code_mmap_start, info->code_mmap_len, info->code_mmap_prot) == -1) {
         error_setg_errno(&err, errno, "Failed mprotect");
         error_reportf_err(err, "%s", "");
@@ -4669,6 +4729,14 @@ abi_ulong get_image_end_code(CPUState *cpu)
     TaskState *ts = (TaskState *)cpu->opaque;
     struct image_info *info = ts->info;
     return info->end_code;
+}
+
+hole_desc_t *get_image_hole_desc(CPUState *cpu);
+hole_desc_t *get_image_hole_desc(CPUState *cpu)
+{
+    TaskState *ts = (TaskState *)cpu->opaque;
+    struct image_info *info = ts->info;
+    return info->hole_info;
 }
 
 abi_ulong get_image_entry(CPUState *cpu);

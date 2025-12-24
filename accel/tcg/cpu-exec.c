@@ -990,6 +990,12 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
 }
 
 #ifdef AOT_IR
+typedef struct hole_desc {
+        uint64_t hole_start;
+        uint64_t hole_end;
+        struct hole_desc *next;
+} hole_desc_t;
+
 uintptr_t branch_left = -1UL;
 uintptr_t branch_right = -1UL;
 uintptr_t pc_before = -1;
@@ -997,6 +1003,7 @@ GHashTable *bb_split_htable = NULL;
 extern uintptr_t x_load_addr;
 extern unsigned long get_image_start_code(CPUState *cpu);
 extern unsigned long get_image_end_code(CPUState *cpu);
+extern hole_desc_t *get_image_hole_desc(CPUState *cpu);
 extern unsigned long get_image_entry(CPUState *cpu);
 extern uint32_t get_hflags_for_codegen(CPUState *cpu);
 
@@ -1062,7 +1069,14 @@ static void gen_tcg_ir(CPUState *cpu)
 #endif
     unsigned long start_code = get_image_start_code(cpu);
     unsigned long end_code = get_image_end_code(cpu);
+    hole_desc_t *hole_ptr = get_image_hole_desc(cpu);
+    printf("Code region:\n");
     printf("start_code:%lx end_code:%lx\n", start_code, end_code);
+    hole_desc_t *hole_tmp = hole_ptr;
+    while (hole_tmp) {
+        printf("hole:%lx - %lx\n", hole_tmp->hole_start, hole_tmp->hole_end);
+        hole_tmp = hole_tmp->next;
+    }
     vaddr pc = start_code;
     x_load_addr = start_code;
 
@@ -1096,7 +1110,16 @@ static void gen_tcg_ir(CPUState *cpu)
             ghash_insert_jmp_dest(bb_split_htable, tb->jmp_target_addr[1]);
         }
         pc += tb->size;
-        if (pc >= end_code) {
+        if (hole_ptr && pc >= hole_ptr->hole_start) {
+            pc = hole_ptr->hole_end;
+            hole_ptr = hole_ptr->next;
+            last_branch_left = -1;
+            last_branch_right = -1;
+            pc_after = -1;
+            branch_left = -1;
+            branch_right = -1;
+            continue;
+        } else if (pc >= end_code) {
             break;
         }
         pc_after = (pc - x_load_addr);
@@ -1122,6 +1145,7 @@ static void gen_tcg_ir(CPUState *cpu)
 
     pc = start_code;
     x_load_addr = start_code;
+    hole_ptr = get_image_hole_desc(cpu);
     while (1) {
         last_branch_left = branch_left;
         last_branch_right = branch_right;
@@ -1135,7 +1159,16 @@ static void gen_tcg_ir(CPUState *cpu)
         s.cs_base = cs_base;
         TranslationBlock *tb = tb_gen_code(cpu, s);
         pc += tb->size;
-        if (pc >= end_code) {
+        if (hole_ptr && pc >= hole_ptr->hole_start) {
+            pc = hole_ptr->hole_end;
+            hole_ptr = hole_ptr->next;
+            last_branch_left = -1;
+            last_branch_right = -1;
+            pc_after = -1;
+            branch_left = -1;
+            branch_right = -1;
+            continue;
+        } else if (pc >= end_code) {
             break;
         }
         pc_after = (pc - x_load_addr);
