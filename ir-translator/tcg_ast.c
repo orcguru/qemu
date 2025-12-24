@@ -1619,7 +1619,7 @@ void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
     } else if (operand1.s.slot_type == SUB_SLOT_TMP) {
         assert(has_alias(operand1) && is_imm);
         OperandType alias = get_alias(operand1);
-        assert(alias.s.valid && alias.s.slot_type == SUB_SLOT_XMM);
+        assert(alias.s.valid);
         alias.s.offset += operand2.i;
         CREATE_LD_ENV_XMM(opc, operand0, alias);
     } else {
