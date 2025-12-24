@@ -510,6 +510,23 @@ typedef struct __attribute__((packed)) {
     uint16_t slot1_idx      :10;
     uint16_t slot2_type     :2;
     uint16_t slot2_idx      :10;
+    uint16_t slot3_type     :2;
+    uint16_t slot3_idx      :10;
+    uint64_t imm;
+} Instr1BH5I_ENV0;
+
+typedef struct __attribute__((packed)) {
+    uint8_t instr_type      :1;
+    uint8_t instr_type_ext  :6;
+    uint8_t helper_l;
+    uint8_t helper_h        :3;
+    uint8_t noargs          :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
 } Instr1BH4S3;
 
 typedef struct __attribute__((packed)) {
@@ -561,6 +578,20 @@ typedef struct __attribute__((packed)) {
     uint16_t slot1_idx      :10;
     uint64_t imm;
 } Instr1BH41_ENV0;
+
+typedef struct __attribute__((packed)) {
+    uint8_t instr_type      :1;
+    uint8_t instr_type_ext  :6;
+    uint16_t helper         :11;
+    uint16_t noargs         :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
+    uint16_t slot1_type     :2;
+    uint16_t slot1_idx      :10;
+    uint64_t imm;
+    uint16_t slot2_type     :2;
+    uint16_t slot2_idx      :10;
+} Instr1BH42_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
