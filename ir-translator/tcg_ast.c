@@ -476,10 +476,6 @@ static LLVMType fixed_vector_param_llvmtypes[FIXED_VECTOR_PARAM_COUNT] = {0};
 static uint8_t fixed_vector_param_in_stack[FIXED_VECTOR_PARAM_COUNT] = {0};
 static const char *fixed_vector_arg_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 static const char *fixed_vector_stack_names[FIXED_VECTOR_PARAM_COUNT] = {NULL};
-// FIXME: put xmm_tmp in stack?
-#if 0
-static const char *xmm_tmp_stack_names[2] = {NULL};
-#endif
 static const char *tmp_stack_names[1<<STACK_INDEX_SHIFT] = {NULL};
 static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)] = {NULL};
 static int ir_var_name_idx = 0;
@@ -4679,10 +4675,6 @@ void module_prolog() {
         snprintf(stack_name_buf[i], sizeof(stack_name_buf[i]), "%s.stack", fixed_vector_arg_names[i]);
         fixed_vector_stack_names[i] = stack_name_buf[i];
     }
-#if 0
-    xmm_tmp_stack_names[0] = "xmmt";
-    xmm_tmp_stack_names[1] = "ymmt_h";
-#endif
     for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
         snprintf(tmp_name_buf[i], sizeof(tmp_name_buf[i]), "tmp%d.stack", i);
         tmp_stack_names[i] = tmp_name_buf[i];
