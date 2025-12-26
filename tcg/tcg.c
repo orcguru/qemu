@@ -7356,7 +7356,7 @@ void tcg_expand_vec_op(TCGOpcode o, TCGType t, unsigned e, TCGArg a0, ...)
 #include "tcg/tcg-aot.h"
 helper_func_t helper_funcs[2000];
 size_t helper_funcs_count = 0;
-void register_for_aot_helper(const char *name, uint64_t addr)
+void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type)
 {
     int found = 0;
     for (int i = 0; i < helper_funcs_count; ++i) {
@@ -7369,6 +7369,12 @@ void register_for_aot_helper(const char *name, uint64_t addr)
         assert(helper_funcs_count < 2000);
         helper_funcs[helper_funcs_count].name = name;
         helper_funcs[helper_funcs_count].addr = addr;
+        int ret_bit_cnt = 0;
+        if (strcmp(ret_type, "void") != 0) {
+            ret_bit_cnt = atoi(ret_type+1);
+        }
+        // Collect helper return type for ir-translator
+        //printf("%s %d\n", name, ret_bit_cnt);
         helper_funcs_count += 1;
     }
 }

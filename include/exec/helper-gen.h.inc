@@ -11,13 +11,14 @@
 #include "exec/helper-head.h.inc"
 
 #define DEF_HELPER_FLAGS_0(name, flags, ret)                            \
-void register_for_aot_helper(const char *name, uint64_t addr);          \
+void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type);          \
 void glue(register_for_aot_helper_, name)(void)                         \
                              __attribute__((weak,constructor));         \
 void glue(register_for_aot_helper_, name)()                             \
 {                                                                       \
     register_for_aot_helper(stringify(glue(helper_, name)),             \
-                            (uint64_t)glue(helper_, name));             \
+                            (uint64_t)glue(helper_, name),              \
+                            stringify(ret));             \
 }                                                                       \
 extern TCGHelperInfo glue(helper_info_, name);                          \
 static inline void glue(gen_helper_, name)(dh_retvar_decl0(ret))        \
@@ -27,13 +28,14 @@ static inline void glue(gen_helper_, name)(dh_retvar_decl0(ret))        \
 }
 
 #define DEF_HELPER_FLAGS_1(name, flags, ret, t1)                        \
-void register_for_aot_helper(const char *name, uint64_t addr);          \
+void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type);          \
 void glue(register_for_aot_helper_, name)(void)                         \
                              __attribute__((weak,constructor));         \
 void glue(register_for_aot_helper_, name)()                             \
 {                                                                       \
     register_for_aot_helper(stringify(glue(helper_, name)),             \
-                            (uint64_t)glue(helper_, name));             \
+                            (uint64_t)glue(helper_, name),              \
+                            stringify(ret));             \
 }                                                                       \
 extern TCGHelperInfo glue(helper_info_, name);                          \
 static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
@@ -45,13 +47,14 @@ static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
 }
 
 #define DEF_HELPER_FLAGS_2(name, flags, ret, t1, t2)                    \
-void register_for_aot_helper(const char *name, uint64_t addr);          \
+void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type);          \
 void glue(register_for_aot_helper_, name)(void)                         \
                              __attribute__((weak,constructor));         \
 void glue(register_for_aot_helper_, name)()                             \
 {                                                                       \
     register_for_aot_helper(stringify(glue(helper_, name)),             \
-                            (uint64_t)glue(helper_, name));             \
+                            (uint64_t)glue(helper_, name),              \
+                            stringify(ret));             \
 }                                                                       \
 extern TCGHelperInfo glue(helper_info_, name);                          \
 static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
@@ -63,13 +66,14 @@ static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
 }
 
 #define DEF_HELPER_FLAGS_3(name, flags, ret, t1, t2, t3)                \
-void register_for_aot_helper(const char *name, uint64_t addr);          \
+void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type);          \
 void glue(register_for_aot_helper_, name)(void)                         \
                              __attribute__((weak,constructor));         \
 void glue(register_for_aot_helper_, name)()                             \
 {                                                                       \
     register_for_aot_helper(stringify(glue(helper_, name)),             \
-                            (uint64_t)glue(helper_, name));             \
+                            (uint64_t)glue(helper_, name),              \
+                            stringify(ret));             \
 }                                                                       \
 extern TCGHelperInfo glue(helper_info_, name);                          \
 static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
@@ -81,13 +85,14 @@ static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
 }
 
 #define DEF_HELPER_FLAGS_4(name, flags, ret, t1, t2, t3, t4)            \
-void register_for_aot_helper(const char *name, uint64_t addr);          \
+void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type);          \
 void glue(register_for_aot_helper_, name)(void)                         \
                              __attribute__((weak,constructor));         \
 void glue(register_for_aot_helper_, name)()                             \
 {                                                                       \
     register_for_aot_helper(stringify(glue(helper_, name)),             \
-                            (uint64_t)glue(helper_, name));             \
+                            (uint64_t)glue(helper_, name),              \
+                            stringify(ret));             \
 }                                                                       \
 extern TCGHelperInfo glue(helper_info_, name);                          \
 static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
@@ -101,13 +106,14 @@ static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
 }
 
 #define DEF_HELPER_FLAGS_5(name, flags, ret, t1, t2, t3, t4, t5)        \
-void register_for_aot_helper(const char *name, uint64_t addr);          \
+void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type);          \
 void glue(register_for_aot_helper_, name)(void)                         \
                              __attribute__((weak,constructor));         \
 void glue(register_for_aot_helper_, name)()                             \
 {                                                                       \
     register_for_aot_helper(stringify(glue(helper_, name)),             \
-                            (uint64_t)glue(helper_, name));             \
+                            (uint64_t)glue(helper_, name),              \
+                            stringify(ret));             \
 }                                                                       \
 extern TCGHelperInfo glue(helper_info_, name);                          \
 static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
@@ -121,13 +127,14 @@ static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
 }
 
 #define DEF_HELPER_FLAGS_6(name, flags, ret, t1, t2, t3, t4, t5, t6)    \
-void register_for_aot_helper(const char *name, uint64_t addr);          \
+void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type);          \
 void glue(register_for_aot_helper_, name)(void)                         \
                              __attribute__((weak,constructor));         \
 void glue(register_for_aot_helper_, name)()                             \
 {                                                                       \
     register_for_aot_helper(stringify(glue(helper_, name)),             \
-                            (uint64_t)glue(helper_, name));             \
+                            (uint64_t)glue(helper_, name),              \
+                            stringify(ret));             \
 }                                                                       \
 extern TCGHelperInfo glue(helper_info_, name);                          \
 static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
@@ -141,13 +148,14 @@ static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
 }
 
 #define DEF_HELPER_FLAGS_7(name, flags, ret, t1, t2, t3, t4, t5, t6, t7)\
-void register_for_aot_helper(const char *name, uint64_t addr);          \
+void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type);          \
 void glue(register_for_aot_helper_, name)(void)                         \
                              __attribute__((weak,constructor));         \
 void glue(register_for_aot_helper_, name)()                             \
 {                                                                       \
     register_for_aot_helper(stringify(glue(helper_, name)),             \
-                            (uint64_t)glue(helper_, name));             \
+                            (uint64_t)glue(helper_, name),              \
+                            stringify(ret));             \
 }                                                                       \
 extern TCGHelperInfo glue(helper_info_, name);                          \
 static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
