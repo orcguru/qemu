@@ -675,6 +675,9 @@ static void tcg_gen_qemu_ld_i128_int(TCGv_i128 val, TCGTemp *addr,
             tcg_gen_extu_i32_i64(ext_addr, temp_tcgv_i32(addr));
             addr = tcgv_i64_temp(ext_addr);
         }
+#ifdef AOT_IR
+        assert(0);
+#endif
         gen_helper_ld_i128(val, tcg_env, temp_tcgv_i64(addr),
                            tcg_constant_i32(orig_oi));
     }

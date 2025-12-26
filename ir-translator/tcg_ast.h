@@ -1612,6 +1612,7 @@ typedef enum {
     X(LLVMVector16xi16) \
     X(LLVMVector8xi32) \
     X(LLVMVector4xi64) \
+    X(LLVMInt128) \
     X(LLVMMAXType)
 
 typedef enum {
