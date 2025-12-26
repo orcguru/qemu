@@ -7370,9 +7370,12 @@ void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_ty
         helper_funcs[helper_funcs_count].name = name;
         helper_funcs[helper_funcs_count].addr = addr;
         int ret_bit_cnt = 0;
-        if (strcmp(ret_type, "void") != 0) {
+        if (strcmp(ret_type, "tl") == 0 || strstr(ret_type, "ptr") != NULL) {
+            ret_bit_cnt = 64;
+        } else if (strcmp(ret_type, "void") != 0) {
             ret_bit_cnt = atoi(ret_type+1);
         }
+        (void)ret_bit_cnt;
         // Collect helper return type for ir-translator
         //printf("%s %d\n", name, ret_bit_cnt);
         helper_funcs_count += 1;
