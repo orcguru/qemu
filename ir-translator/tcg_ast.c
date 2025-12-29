@@ -4002,6 +4002,59 @@ static void register_labels_for_func(LLVMValueRef func) {
     }
 }
 
+static int process_op_type(uint32_t slot_idx, void *ptr, OpCodeType opc, LLVMType vtype, uint32_t noargs, uint8_t *tmp_has_known_def) {
+    uint32_t is_imm = 0;
+    OperandType operand = get_operand(ptr, slot_idx, &is_imm);
+    // End-of-operands
+    if (!is_imm && !operand.s.valid) {
+        return 0;
+    }
+    LLVMType operand_type = vtype == LLVMInvalidType ?
+                        (opcmem_addr_nzidx[opc] > 0 ?
+                         ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_REG_T : OPC_ADDR_T) :
+                         (slot_idx < opcoc[opc] ? OPC_OUTPUT_T : OPC_INPUT_T)) :
+                        vtype;
+    if (slot_idx == 0 && opc == call) {
+        HelperType h = get_helper(ptr);
+        if (helper_return_type[h] != LLVMInvalidType) {
+            operand_type = helper_return_type[h];
+        }
+    }
+    if (is_imm == 0) {
+        if (operand.s.slot_type == SUB_SLOT_XREG) {
+            xreg_valid |= (1UL<<operand.s.slot_idx);
+        } else if (operand.s.slot_type == SUB_SLOT_TMP) {
+            tmp_valid_non_zero = 1;
+            tmp_available_set(tmp_valid, operand.s.slot_idx);
+            tmp_available_clear(tmp_var_available, operand.s.slot_idx);
+            if (tmp_bits_type[operand.s.slot_idx] < operand_type) {
+                tmp_bits_type[operand.s.slot_idx] = operand_type;
+            }
+        } else if (operand.s.slot_type == SUB_SLOT_XMM) {
+            xmm_valid |= (1UL<<operand.s.slot_idx);
+        }
+        if (operand.s.slot_type == SUB_SLOT_TMP) {
+            if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
+                if (!tmp_has_known_def[operand.s.slot_idx]) {
+                    // At this stage, we do not have alias information yet, so we need to check later
+#ifdef DEBUG
+                    OperandType orig_slot = get_original_slot_for_debug(operand);
+                    printf("  register cross_call tmp:%d orig:%s%d\n", operand.s.slot_idx, orig_slot.s.valid ? (orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp") : "NA", orig_slot.s.valid ? orig_slot.s.slot_idx : 0); fflush(NULL);
+#endif
+                    if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
+                        tmp_shadow_offset[operand.s.slot_idx] = (0 - shadow_call_offset);
+                        shadow_call_offset += 16;
+                    }
+                }
+            }
+            if ((opc == call && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
+                tmp_has_known_def[operand.s.slot_idx] = 1;
+            }
+        }
+    }
+    return 1;
+}
+
 void handle_func(uint64_t val) {
 #ifdef DEBUG
     printf("func %lx\n", val); fflush(NULL);
@@ -4015,7 +4068,6 @@ void handle_func(uint64_t val) {
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint8_t tmp_has_known_def[1<<STACK_INDEX_SHIFT] = {0};
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
-        OperandType operand;
         OpCodeType opc = get_opcode(ptr);
         uint32_t noargs = 0;
         OperandType oarg;
@@ -4037,100 +4089,16 @@ void handle_func(uint64_t val) {
         // Input arguments first
         uint32_t slot_idx = opc == call ? noargs : opcoc[opc];
         do {
-            uint32_t is_imm = 0;
-            operand = get_operand(ptr, slot_idx, &is_imm);
-            // End-of-operands
-            if (!is_imm && !operand.s.valid) {
+
+            if (!process_op_type(slot_idx, ptr, opc, vtype, noargs, tmp_has_known_def)) {
                 break;
-            }
-            LLVMType operand_type = vtype == LLVMInvalidType ?
-                                (opcmem_addr_nzidx[opc] > 0 ?
-                                 ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_REG_T : OPC_ADDR_T) :
-                                 (slot_idx < opcoc[opc] ? OPC_OUTPUT_T : OPC_INPUT_T)) :
-                                vtype;
-            if (is_imm == 0) {
-                if (operand.s.slot_type == SUB_SLOT_XREG) {
-                    xreg_valid |= (1UL<<operand.s.slot_idx);
-                } else if (operand.s.slot_type == SUB_SLOT_TMP) {
-                    tmp_valid_non_zero = 1;
-                    tmp_available_set(tmp_valid, operand.s.slot_idx);
-                    tmp_available_clear(tmp_var_available, operand.s.slot_idx);
-                    if (tmp_bits_type[operand.s.slot_idx] < operand_type) {
-                        tmp_bits_type[operand.s.slot_idx] = operand_type;
-                    }
-                } else if (operand.s.slot_type == SUB_SLOT_XMM) {
-                    xmm_valid |= (1UL<<operand.s.slot_idx);
-                }
-                if (operand.s.slot_type == SUB_SLOT_TMP) {
-                    if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
-                        if (!tmp_has_known_def[operand.s.slot_idx]) {
-                            // At this stage, we do not have alias information yet, so we need to check later
-#ifdef DEBUG
-                            OperandType orig_slot = get_original_slot_for_debug(operand);
-                            printf("  register cross_call tmp:%d orig:%s%d\n", operand.s.slot_idx, orig_slot.s.valid ? (orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp") : "NA", orig_slot.s.valid ? orig_slot.s.slot_idx : 0); fflush(NULL);
-#endif
-                            if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
-                                tmp_shadow_offset[operand.s.slot_idx] = (0 - shadow_call_offset);
-                                shadow_call_offset += 16;
-                            }
-                        }
-                    }
-                    if ((opc == call && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
-                        tmp_has_known_def[operand.s.slot_idx] = 1;
-                    }
-                }
             }
             slot_idx += 1;
         } while (1);
 
-        // FIXME: simplify with regard to above logic
-        // Handle output arg
-        slot_idx = 0;
+        // Output argument
         if (opc == call ? noargs : opcoc[opc]) {
-            uint32_t is_imm = 0;
-            operand = get_operand(ptr, slot_idx, &is_imm);
-            // End-of-operands
-            if (!is_imm && !operand.s.valid) {
-                break;
-            }
-            LLVMType operand_type = vtype == LLVMInvalidType ?
-                                (opcmem_addr_nzidx[opc] > 0 ?
-                                 ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_REG_T : OPC_ADDR_T) :
-                                 (slot_idx < opcoc[opc] ? OPC_OUTPUT_T : OPC_INPUT_T)) :
-                                vtype;
-            if (is_imm == 0) {
-                if (operand.s.slot_type == SUB_SLOT_XREG) {
-                    xreg_valid |= (1UL<<operand.s.slot_idx);
-                } else if (operand.s.slot_type == SUB_SLOT_TMP) {
-                    tmp_valid_non_zero = 1;
-                    tmp_available_set(tmp_valid, operand.s.slot_idx);
-                    tmp_available_clear(tmp_var_available, operand.s.slot_idx);
-                    if (tmp_bits_type[operand.s.slot_idx] < operand_type) {
-                        tmp_bits_type[operand.s.slot_idx] = operand_type;
-                    }
-                } else if (operand.s.slot_type == SUB_SLOT_XMM) {
-                    xmm_valid |= (1UL<<operand.s.slot_idx);
-                }
-                if (operand.s.slot_type == SUB_SLOT_TMP) {
-                    if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
-                        if (!tmp_has_known_def[operand.s.slot_idx]) {
-                            // At this stage, we do not have alias information yet, so we need to check later
-#ifdef DEBUG
-                            OperandType orig_slot = get_original_slot_for_debug(operand);
-                            printf("  register cross_call tmp:%d orig:%s%d\n", operand.s.slot_idx, orig_slot.s.valid ? (orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp") : "NA", orig_slot.s.valid ? orig_slot.s.slot_idx : 0); fflush(NULL);
-#endif
-                            if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
-                                tmp_shadow_offset[operand.s.slot_idx] = (0 - shadow_call_offset);
-                                shadow_call_offset += 16;
-                            }
-                        }
-                    }
-                    if ((opc == call && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
-                        tmp_has_known_def[operand.s.slot_idx] = 1;
-                    }
-                }
-            }
-            slot_idx += 1;
+            process_op_type(0, ptr, opc, vtype, noargs, tmp_has_known_def);
         }
 
         if (opc == call) {
