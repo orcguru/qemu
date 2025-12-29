@@ -38,22 +38,33 @@
     uint8_t is_vec = is_vector(ptr);    \
     LLVMType vtype = is_vec ? get_llvm_vector_type(ptr) : LLVMInvalidType;      \
     LLVMType type_in = is_vec ? vtype : OPC_INPUT_T;    \
-    LLVMType type_out = is_vec ? vtype : OPC_OUTPUT_T;
+    LLVMType type_out = is_vec ? vtype : OPC_OUTPUT_T;  \
+    (void)type_in;  \
+    (void)type_out;
 
 #define DECLARE_AND_INIT_TYPE_FOR_SCALAR \
     uint8_t is_vec = 0;    \
+    (void)is_vec;           \
     LLVMType type_in = OPC_INPUT_T;    \
-    LLVMType type_out = OPC_OUTPUT_T;
+    LLVMType type_out = OPC_OUTPUT_T;   \
+    (void)type_in;  \
+    (void)type_out;
 
 #define DECLARE_AND_INIT_TYPE_FOR_MEM \
     uint8_t is_vec = 0;    \
+    (void)is_vec;           \
     LLVMType type_mem = OPC_MEM_T;    \
-    LLVMType type_reg = OPC_REG_T;
+    LLVMType type_reg = OPC_REG_T;      \
+    (void)type_mem;                 \
+    (void)type_reg;
 
 #define DECLARE_AND_INIT_TYPE_FOR_VECTOR   \
     uint8_t is_vec = 1;    \
+    (void)is_vec;           \
     LLVMType type_in = get_llvm_vector_type(ptr);    \
-    LLVMType type_out = type_in;
+    LLVMType type_out = type_in;            \
+    (void)type_in;  \
+    (void)type_out;
 
 #define WITH_FIXED_VEC_CONTEXT      1
 #define MAX_OPERANDS_COUNT          16
@@ -62,6 +73,7 @@
 #define REGISTER_INDEX_SHIFT        5 
 #define STACK_INDEX_SHIFT           10
 #define XMM_COUNT                   15
+#define ENV_XMM_START               0x360
 #define XMM_PARAM_DECLARE_COMMON    \
       "v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong ymm1_h, v2ulong xmm2, v2ulong ymm2_h, v2ulong xmm3, v2ulong ymm3_h, v2ulong xmm4, v2ulong ymm4_h, v2ulong xmm5, v2ulong ymm5_h, v2ulong xmm6, v2ulong ymm6_h, v2ulong xmm7, v2ulong ymm7_h, v2ulong xmm8, v2ulong ymm8_h, v2ulong xmm9, v2ulong ymm9_h, v2ulong xmm10, v2ulong ymm10_h, v2ulong xmm11, v2ulong ymm11_h, v2ulong xmm12, v2ulong ymm12_h, v2ulong xmm13, v2ulong ymm13_h, v2ulong xmm14, v2ulong ymm14_h"
 #define XMM_PARAM_LIST              \
@@ -298,6 +310,15 @@
         translate_binary(tmp_opc.o, buf, LLVMBuildAdd);  \
     } while (0)
 
+#define CREATE_ADD64(OUT, IN0, IN1)           \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        tmp_opc.o = add_i64;      \
+        create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
+        translate_binary(tmp_opc.o, buf, LLVMBuildAdd);  \
+    } while (0)
+
 #define CREATE_SUB(OUT, IN0, IN1)           \
     do {                                            \
         uint8_t buf[16];                            \
@@ -449,7 +470,7 @@ extern char *lineptr;
 extern const char *opcode_type_str[];
 extern const char *llvm_type_str[];
 extern const char *cvector_str[];
-extern const LLVMType opciosz[OPCODE_MAX][3];
+extern const LLVMType opciosz[OPCODE_MAX][2];
 extern const uint8_t opcoc[OPCODE_MAX];
 extern const uint8_t opcmem_addr_nzidx[OPCODE_MAX];
 extern const char *helper_str[];
@@ -781,7 +802,7 @@ static const char *get_next_var_name(const char *tag, OperandType slot_name_for_
 static OperandType get_shadow_stack_pointer(OpCodeType opc) {
     OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
     OperandType env = get_env_ptr(opc);
-    CREATE_ADD(ptr_addr, env, -8UL);
+    CREATE_ADD64(ptr_addr, env, -8UL);
     OperandType ptr_val = get_tmp_and_do_alloc(OPC_ADDR_T);
     CREATE_LD(ptr_val, ptr_addr);
     return ptr_val;
@@ -790,7 +811,7 @@ static OperandType get_shadow_stack_pointer(OpCodeType opc) {
 static void set_shadow_stack_pointer(OpCodeType opc, OperandType val) {
     OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
     OperandType env = get_env_ptr(opc);
-    CREATE_ADD(ptr_addr, env, -8UL);
+    CREATE_ADD64(ptr_addr, env, -8UL);
     CREATE_ST(val, ptr_addr);
 }
 
@@ -908,7 +929,15 @@ static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, Operan
     if (out.s.slot_type == SUB_SLOT_ENVVAR) {
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
-        CREATE_ADD(tmp, env, env_var_offset[out.s.slot_idx]);
+        CREATE_ADD64(tmp, env, env_var_offset[out.s.slot_idx]);
+        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(val_type, 0), get_next_var_name("store_env_ptr_offset", out));
+        LLVMBuildStore(builder, val, ptr);
+    } else if (out.s.slot_type == SUB_SLOT_ENV) {
+        OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
+        OperandType env = get_env_ptr(opc);
+        assert(out.s.offset >= (ENV_XMM_START + XMM_COUNT * 0x40));
+        CREATE_ADD64(tmp, env, out.s.offset);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(val_type, 0), get_next_var_name("store_env_ptr_offset", out));
         LLVMBuildStore(builder, val, ptr);
@@ -990,14 +1019,14 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
     } else if (operand.s.slot_type == SUB_SLOT_ENVVAR) {
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
-        CREATE_ADD(tmp, env, env_var_offset[operand.s.slot_idx]);
+        CREATE_ADD64(tmp, env, env_var_offset[operand.s.slot_idx]);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset", operand));
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val", operand));
     } else if (operand.s.slot_type == SUB_SLOT_ENV) {
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
-        CREATE_ADD(tmp, env, operand.s.offset);
+        CREATE_ADD64(tmp, env, operand.s.offset);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset", operand));
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val", operand));
@@ -2988,12 +3017,6 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
-    uint8_t is_vec = is_vector(ptr);
-    LLVMType vtype = is_vec ? get_llvm_vector_type(ptr) : LLVMInvalidType;
-    LLVMType type_in = is_vec ? vtype : OPC_INPUT_T;
-    LLVMType type_out = is_vec ? vtype : OPC_OUTPUT_T;
-
-
     HelperType h = get_helper(ptr);
     char *second_half_name = "jmp_ind_callback";
     uint32_t is_imm = 0;
@@ -3072,12 +3095,6 @@ static void translate_cc_compute_inband(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf("%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], ptr); fflush(NULL);
 #endif
-    uint8_t is_vec = is_vector(ptr);
-    LLVMType vtype = is_vec ? get_llvm_vector_type(ptr) : LLVMInvalidType;
-    LLVMType type_in = is_vec ? vtype : OPC_INPUT_T;
-    LLVMType type_out = is_vec ? vtype : OPC_OUTPUT_T;
-
-
     OperandType oarg;
     oarg.s.valid = 0;
     uint32_t is_imm_dummy;
@@ -3194,12 +3211,6 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf(">>>%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], ptr); fflush(NULL);
 #endif
-    uint8_t is_vec = is_vector(ptr);
-    LLVMType vtype = is_vec ? get_llvm_vector_type(ptr) : LLVMInvalidType;
-    LLVMType type_in = is_vec ? vtype : OPC_INPUT_T;
-    LLVMType type_out = is_vec ? vtype : OPC_OUTPUT_T;
-
-
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef shadow_pointer = NULL;
     for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
@@ -4001,10 +4012,8 @@ void handle_func(uint64_t val) {
     void *ptr_init = get_instr_buffer();
     void *ptr_max = ptr_init + get_instr_buffer_size();
     void *ptr;
-    void *helper_output_idx_ptr[BB_MAX_CNT] = {NULL};
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint8_t tmp_has_known_def[1<<STACK_INDEX_SHIFT] = {0};
-    void *prev_call_ptr = NULL;
     for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
         OperandType operand;
         OpCodeType opc = get_opcode(ptr);
@@ -4019,7 +4028,6 @@ void handle_func(uint64_t val) {
                 assert(!is_immo && oarg.s.valid);
             }
             register_idx_for_call_helper(ptr, current_call_idx);
-            helper_output_idx_ptr[current_call_idx] = ptr;
         }
         uint8_t is_vec = is_vector(ptr);
         LLVMType vtype = LLVMInvalidType;
@@ -4037,7 +4045,7 @@ void handle_func(uint64_t val) {
             }
             LLVMType operand_type = vtype == LLVMInvalidType ?
                                 (opcmem_addr_nzidx[opc] > 0 ?
-                                 ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_INPUT_T : OPC_ADDR_T) :
+                                 ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_REG_T : OPC_ADDR_T) :
                                  (slot_idx < opcoc[opc] ? OPC_OUTPUT_T : OPC_INPUT_T)) :
                                 vtype;
             if (is_imm == 0) {
@@ -4087,7 +4095,7 @@ void handle_func(uint64_t val) {
             }
             LLVMType operand_type = vtype == LLVMInvalidType ?
                                 (opcmem_addr_nzidx[opc] > 0 ?
-                                 ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_INPUT_T : OPC_ADDR_T) :
+                                 ((slot_idx < opcmem_addr_nzidx[opc]) ? OPC_REG_T : OPC_ADDR_T) :
                                  (slot_idx < opcoc[opc] ? OPC_OUTPUT_T : OPC_INPUT_T)) :
                                 vtype;
             if (is_imm == 0) {
@@ -4126,7 +4134,6 @@ void handle_func(uint64_t val) {
         }
 
         if (opc == call) {
-            prev_call_ptr = ptr;
             memset(tmp_has_known_def, 0, sizeof(tmp_has_known_def));
             if (!is_immo && oarg.s.valid) {
                 tmp_has_known_def[oarg.s.slot_idx] = 1;
@@ -4186,7 +4193,7 @@ void handle_func(uint64_t val) {
 }
 
 static void handle_single_instr(OpCodeType opc, void *ptr) {
-#ifdef DEBUG
+#if 0
     printf("handle_single_instr: %s ptr:%lx", opcode_type_str[opc], ptr); fflush(NULL);
     void *next = move_to_next(ptr);
     unsigned char *byte = (unsigned char *)ptr;
