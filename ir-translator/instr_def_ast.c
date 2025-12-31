@@ -183,6 +183,12 @@ void gen_api() {
             s_idx += 1;
         }
     }
+    if (instr_def_with_helper[j] != 0 && instr_def_field_cnt[j] > 0 && ((instr_def_field_cnt[j] + env_added) == env_idx)) {
+        printf("    } else if (idx == %d) {\n", env_idx);
+        printf("        ret.s.valid = 1;\n");
+        printf("        ret.s.slot_type = SUB_SLOT_ENV;\n");
+        printf("        ret.s.offset = 0;\n");
+    }
     if (instr_def_field_cnt[j] > 0) {
         printf("    }\n");
     } else {

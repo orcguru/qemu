@@ -586,7 +586,7 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
 static LLVMTypeRef get_vector_parameter_type_for_arch();
 static LLVMValueRef reload_vector(XMMRegType xmm_reg);
 static int collect_arguments_and_types(HelperType h, int target_domain, int gen_flag, OperandType *params, uint32_t *is_imm, uint8_t param_cnt, LLVMValueRef appendix1, LLVMValueRef appendix2, LLVMValueRef current_func,
-                LLVMTypeRef *out_typeref, LLVMValueRef *out_valref);
+                LLVMTypeRef *out_typeref, LLVMValueRef *out_valref, char *func_name);
 
 #define GET_2_OPERANDS()                                \
     do {                                                \
@@ -1792,7 +1792,7 @@ void translate_ret(OpCodeType opc, void *ptr) {
     // The fast path: branch to the next translated qemuaot CC func
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT] = {NULL};
-    int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_AND_VALUE, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, call_args);
+    int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_AND_VALUE, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, call_args, "FASTPATH_RET");
     LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), call_types, arg_cnt, 0);
     LLVMValueRef ret_target = get_source_node_imm_or_stack(opc, 0, loc608, OPC_ADDR_T, 0);
     LLVMValueRef ret_target_ptr = LLVMBuildIntToPtr(builder, ret_target, LLVMPointerType(func_type, 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -2428,14 +2428,13 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
     delta = get_operand(ptr, 0, &is_imm);
     assert(is_imm);
 
-    LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
-    LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT] = {NULL};
-    int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_AND_VALUE, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, call_args);
-    LLVMTypeRef ret_type = LLVMVoidType();
-    LLVMTypeRef func_type = LLVMFunctionType(ret_type, call_types, arg_cnt, 0);
-
     char func_name[64] = {0};
     sprintf(func_name, "func_%lx", (current_func_offset + delta.i));
+    LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
+    LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT] = {NULL};
+    int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_AND_VALUE, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, call_args, func_name);
+    LLVMTypeRef ret_type = LLVMVoidType();
+    LLVMTypeRef func_type = LLVMFunctionType(ret_type, call_types, arg_cnt, 0);
     LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, get_or_add_func_with_qemuaot_cc(func_name, 0, NoInlineAttr), call_args, arg_cnt, "");
     LLVMSetTailCall(call_inst, 1);
     LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
@@ -2464,11 +2463,11 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         return trampoline;
     }
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS] = {NULL};
-    int trampoline_arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, (LLVMValueRef)1, (LLVMValueRef)1, llvm_func, call_types, NULL);
-    assert(trampoline_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS));
+    int call_arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, (LLVMValueRef)1, do_return ? (LLVMValueRef)1 : NULL, llvm_func, call_types, NULL, trampoline_name);
+    assert(call_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS));
 
     trampoline = LLVMAddFunction(module, trampoline_name,
-        LLVMFunctionType(LLVMVoidType(), call_types, trampoline_arg_cnt, 0));
+        LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnt, 0));
     LLVMAddAttributeAtIndex(trampoline, -1, NoInlineAttr);
     LLVMAddAttributeAtIndex(trampoline, -1, target_features_attr);
     LLVMSetLinkage(trampoline, LLVMWeakAnyLinkage);
@@ -2525,7 +2524,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     }
 
     LLVMValueRef call_args[MAX_OPERANDS_COUNT] = {NULL};
-    int call_arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_DEFAULT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, NULL, call_args);
+    call_arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_DEFAULT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, trampoline, NULL, call_args, trampoline_name);
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
     LLVMValueRef helper_addr = LLVMGetParam(trampoline, (FIXED_VECTOR_PARAM_COUNT + operands_cnt));
     LLVMValueRef the_helper = LLVMBuildIntToPtr(builder, helper_addr, LLVMPointerType(helper_type, 0), get_next_var_name("helper", dummy_slot_for_debug));
@@ -2535,6 +2534,9 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         LLVMSetAlignment(env_alloca, 8);
         LLVMBuildStore(builder, env_raw, env_alloca);
     }
+#ifdef DEBUG
+    printf("BuildCall2:%s\n", LLVMGetValueName(helper_func)); fflush(NULL);
+#endif
     LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, the_helper, call_args, call_arg_cnt, with_ret ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
     if (!do_return) {
         LLVMSetTailCall(call_helper_inst, 1);
@@ -2573,6 +2575,9 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     LLVMTypeRef next_type = LLVMGlobalGetValueType(next_func);
     LLVMValueRef next_addr = LLVMGetParam(trampoline, (FIXED_VECTOR_PARAM_COUNT + operands_cnt + 1));
     LLVMValueRef the_next = LLVMBuildIntToPtr(builder, next_addr, LLVMPointerType(next_type, 0), get_next_var_name("next", dummy_slot_for_debug));
+#ifdef DEBUG
+    printf("BuildCall2:%s\n", LLVMGetValueName(next_func)); fflush(NULL);
+#endif
     LLVMValueRef call_next_inst = LLVMBuildCall2(builder, next_type, the_next, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), "");
     LLVMSetTailCall(call_next_inst, 1);
     LLVMSetInstructionCallConv(call_next_inst, QEMUAOT_CC);
@@ -2633,16 +2638,31 @@ static uint8_t is_tail_call(HelperType h) {
     return 0;
 }
 
+static void define_type(LLVMTypeRef *typeref, int idx, LLVMType t) {
+    typeref[idx] = llvm_int_types[t];
+#ifdef DEBUG
+    printf(" %d:%s", idx, llvm_type_str[t]); fflush(NULL);
+#endif
+}
+
 // FIXME: Need to add the for_trampoline flag since in the case when execution goes to the
 // QEMU runtime, data type in register can be LLVMInt64; otherwise data type need be correctly
 // set in order for compiler to do inline.
 static int collect_arguments_and_types(HelperType h, int target_domain, int gen_flag, OperandType *params, uint32_t *is_imm, uint8_t param_cnt, LLVMValueRef appendix1, LLVMValueRef appendix2, LLVMValueRef current_func,
-                LLVMTypeRef *out_typeref, LLVMValueRef *out_valref) {
+                LLVMTypeRef *out_typeref, LLVMValueRef *out_valref, char *func_name) {
+#ifdef DEBUG
+    if (gen_flag != VALUE_ONLY) {
+        printf("Define parameters for %s:", func_name); fflush(NULL);
+    }
+#endif
     if (target_domain == TARGET_DEFAULT_HELPER) {
         if (gen_flag != VALUE_ONLY) {
             for (int i = 0; i < param_cnt; ++i) {
-                out_typeref[i] = llvm_int_types[OPC_ADDR_T];
+                define_type(out_typeref, i, OPC_ADDR_T);
             }
+#ifdef DEBUG
+            printf("\n"); fflush(NULL);
+#endif
             if (gen_flag == TYPE_ONLY) {
                 return param_cnt;
             }
@@ -2657,8 +2677,11 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
     } else if (target_domain == TARGET_QEMUAOT_FASTPATH) {
         if (gen_flag != VALUE_ONLY) {
             for (int i = 0; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
-                out_typeref[i] = llvm_int_types[fixed_vector_param_llvmtypes[i]];
+                define_type(out_typeref, i, fixed_vector_param_llvmtypes[i]);
             }
+#ifdef DEBUG
+            printf("\n"); fflush(NULL);
+#endif
             if (gen_flag == TYPE_ONLY) {
                 return FIXED_VECTOR_PARAM_COUNT;
             }
@@ -2688,11 +2711,23 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
         if (gen_flag != VALUE_ONLY) {
             int idx = 0;
             for (; idx < FIXED_VECTOR_PARAM_COUNT; ++idx) {
-                out_typeref[idx] = llvm_int_types[fixed_vector_param_llvmtypes[idx]];
+                define_type(out_typeref, idx, fixed_vector_param_llvmtypes[idx]);
             }
             for (; idx < (FIXED_VECTOR_PARAM_COUNT + param_cnt); ++idx) {
-                out_typeref[idx] = llvm_int_types[LLVMInt64];
+                define_type(out_typeref, idx, LLVMInt64);
             }
+            if (appendix1) {
+                define_type(out_typeref, idx, LLVMInt64);
+                idx += 1;
+            }
+            if (appendix2) {
+                define_type(out_typeref, idx, LLVMInt64);
+                idx += 1;
+            }
+            assert(idx <= (FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS));
+#ifdef DEBUG
+            printf("\n"); fflush(NULL);
+#endif
             if (gen_flag == TYPE_ONLY) {
                 return idx;
             }
@@ -2720,12 +2755,18 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
         for (; idx < (FIXED_VECTOR_PARAM_COUNT + param_cnt); ++idx) {
             out_valref[idx] = get_source_node_imm_or_stack(call, is_imm[idx - FIXED_VECTOR_PARAM_COUNT], params[idx - FIXED_VECTOR_PARAM_COUNT], LLVMInt64, 0);
         }
+        if (appendix1) {
+            out_valref[idx++] = appendix1;
+        }
+        if (appendix2) {
+            out_valref[idx++] = appendix2;
+        }
         return idx;
     } else if (target_domain == TARGET_QEMUAOT_HELPER || target_domain == TARGET_QEMUAOT_CC_COMPUTE) {
         int idx = 0;
         if (gen_flag != VALUE_ONLY) {
             for (idx = 0; idx < FIXED_VECTOR_PARAM_COUNT; ++idx) {
-                out_typeref[idx] = llvm_int_types[fixed_vector_param_llvmtypes[idx]];
+                define_type(out_typeref, idx, fixed_vector_param_llvmtypes[idx]);
             }
             if (param_cnt) {
                 assert(params && is_imm);
@@ -2733,15 +2774,15 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 #define APP_PARAM_IDX(i)    (i - FIXED_VECTOR_PARAM_COUNT)
                 for (int op_idx = 0; op_idx < param_cnt; ++op_idx) {
                     if (is_imm[op_idx]) {
-                        out_typeref[idx] = llvm_int_types[helper_param_types[APP_PARAM_IDX(idx)]];
+                        define_type(out_typeref, idx, helper_param_types[APP_PARAM_IDX(idx)]);
                     } else {
                         if (params[op_idx].s.slot_type == SUB_SLOT_XMM) {
                             continue;
                         } else if (params[op_idx].s.slot_type == SUB_SLOT_TMP) {
                             assert(!has_alias(params[op_idx]));
-                            out_typeref[idx] = llvm_int_types[helper_param_types[APP_PARAM_IDX(idx)]];
+                            define_type(out_typeref, idx, helper_param_types[APP_PARAM_IDX(idx)]);
                         } else if (params[op_idx].s.slot_type == SUB_SLOT_ENVVAR) {
-                            out_typeref[idx] = llvm_int_types[helper_param_types[APP_PARAM_IDX(idx)]];
+                            define_type(out_typeref, idx, helper_param_types[APP_PARAM_IDX(idx)]);
                         } else if (params[op_idx].s.slot_type == SUB_SLOT_XREG) {
                             assert(0);
                         } else {
@@ -2753,12 +2794,17 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 #undef APP_PARAM_IDX
             }
             if (appendix1) {
-                out_typeref[idx++] = llvm_int_types[LLVMInt64];
+                define_type(out_typeref, idx, LLVMInt64);
+                idx += 1;
             }
             if (appendix2) {
-                out_typeref[idx++] = llvm_int_types[LLVMInt64];
+                define_type(out_typeref, idx, LLVMInt64);
+                idx += 1;
             }
             assert(idx <= (FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS));
+#ifdef DEBUG
+            printf("\n"); fflush(NULL);
+#endif
             if (gen_flag == TYPE_ONLY) {
                 return idx;
             }
@@ -2819,11 +2865,15 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
         int idx = 0;
         if (gen_flag != VALUE_ONLY) {
             for (idx = 0; idx < FIXED_VECTOR_PARAM_COUNT; ++idx) {
-                out_typeref[idx] = llvm_int_types[fixed_vector_param_llvmtypes[idx]];
+                define_type(out_typeref, idx, fixed_vector_param_llvmtypes[idx]);
             }
             if (helper_return_type[h] != LLVMInvalidType) {
-                out_typeref[idx++] = llvm_int_types[helper_return_type[h]];
+                define_type(out_typeref, idx, helper_return_type[h]);
+                idx += 1;
             }
+#ifdef DEBUG
+            printf("\n"); fflush(NULL);
+#endif
             if (gen_flag == TYPE_ONLY) {
                 return idx;
             }
@@ -2841,7 +2891,7 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_r
     LLVMValueRef func = LLVMGetNamedFunction(module, name);
     if (!func) {
         LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
-        int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_ONLY, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, NULL);
+        int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_ONLY, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, NULL, name);
         LLVMTypeRef func_type = LLVMFunctionType(with_ret ? LLVMInt64Type() : LLVMVoidType(), call_types, arg_cnt, 0);
         func = LLVMAddFunction(module, name, func_type);
         LLVMAddAttributeAtIndex(func, -1, attr_inline_ctrl);
@@ -2882,7 +2932,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     LLVMValueRef helper_func = LLVMGetNamedFunction(module, helper_str[h]);
     if (!helper_func) {
         LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
-        int arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, (LLVMValueRef)1, (LLVMValueRef)1, llvm_func, call_types, NULL);
+        int arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, (LLVMValueRef)1, (LLVMValueRef)1, llvm_func, call_types, NULL, helper_str[h]);
         LLVMTypeRef helper_type = LLVMFunctionType(LLVMVoidType(), call_types, arg_cnt, 0);
         helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
     }
@@ -2893,7 +2943,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     LLVMValueRef helper_jit_func = LLVMGetNamedFunction(module, helper_str[helper_jit]);
     if (!helper_jit_func) {
         LLVMTypeRef call_types[MAX_ADDED_ARGS] = {NULL};
-        int call_arg_cnt = collect_arguments_and_types(helper_jit, TARGET_DEFAULT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, NULL);
+        int call_arg_cnt = collect_arguments_and_types(helper_jit, TARGET_DEFAULT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, NULL, helper_str[helper_jit]);
         LLVMTypeRef helper_jit_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
         helper_jit_func = LLVMAddFunction(module, helper_str[helper_jit], helper_jit_type);
     }
@@ -2901,7 +2951,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     LLVMValueRef jit_trampoline = get_trampoline(helper_jit_func, 0, 0, operands, is_imm, operands_cnt, NULL, 0, NULL);
     LLVMValueRef jit_trampoline_addr = LLVMBuildPtrToInt(builder, jit_trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
-    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, second_half_addr, jit_trampoline_addr, llvm_func, NULL, call_args);
+    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, second_half_addr, jit_trampoline_addr, llvm_func, NULL, call_args, helper_str[h]);
     assert(call_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
     LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, call_arg_cnt, "");
@@ -3025,7 +3075,7 @@ static void translate_cc_compute_inband(OpCodeType opc, void *ptr) {
     }
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
-    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_CC_COMPUTE, TYPE_AND_VALUE, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, call_args);
+    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_CC_COMPUTE, TYPE_AND_VALUE, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, call_args, helper_func_name);
     assert(call_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
     LLVMTypeRef helper_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
     LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper, call_args, call_arg_cnt, "");
@@ -3220,6 +3270,27 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         }
     }
 
+    // Update operands point to spilled vector slots
+    for (int i = 0; i < operands_cnt; ++i) {
+        if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_env(operands[i])) {
+            OperandType alias = get_alias(operands[i]);
+            assert(alias.s.valid);
+            XMMReg equivalent_xmm = lookup_xmm_map(alias.s.offset);
+            if (equivalent_xmm.xmm_idx != NON_XMM && equivalent_xmm.xmm_offset == 0) {
+                int new_idx = -1;
+                for (int j = 0; j < passenger_xmm_regs_cnt; ++j) {
+                    if (passenger_xmm_regs[j] == equivalent_xmm.xmm_idx) {
+                        new_idx = j;
+                        break;
+                    }
+                }
+                assert(new_idx != -1);
+                operands[i].s.slot_type = SUB_SLOT_XMM;
+                operands[i].s.slot_idx = spilled_xmm_regs[new_idx];
+            }
+        }
+    }
+
     ///////////////////////////////////////////////////////////
     /// Collect build macros for xmm helpers, and those marcos define specific version of helpers
     char build_macro[4096] = {0};
@@ -3262,7 +3333,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         printf("creating %s\n", second_half_name); fflush(NULL);
 #endif
         LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS] = {NULL};
-        int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER_SECOND_HALF, TYPE_ONLY, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, NULL);
+        int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER_SECOND_HALF, TYPE_ONLY, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, NULL, second_half_name);
         LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnt, 0);
         second_half_func = LLVMAddFunction(module, second_half_name, func_type);
         LLVMAddAttributeAtIndex(second_half_func, -1, AlwaysInlineAttr);
@@ -3281,7 +3352,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         LLVMValueRef helper_func = LLVMGetNamedFunction(module, helper_str[h]);
         if (!helper_func) {
             LLVMTypeRef call_types[MAX_OPERANDS_COUNT] = {NULL};
-            int call_arg_cnt = collect_arguments_and_types(h, TARGET_DEFAULT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, NULL);
+            int call_arg_cnt = collect_arguments_and_types(h, TARGET_DEFAULT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, NULL, helper_str[h]);
             LLVMTypeRef helper_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
             helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
         }
@@ -3297,7 +3368,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef trampoline_addr = helper_require_exception_path[h] ? LLVMBuildPtrToInt(builder, exception_path_trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug)) : NULL;
-    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, TYPE_AND_VALUE, operands, is_imm, operands_cnt, second_half_addr, trampoline_addr, llvm_func, call_types, call_args);
+    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, TYPE_AND_VALUE, operands, is_imm, operands_cnt, second_half_addr, trampoline_addr, llvm_func, call_types, call_args, helper_func_name);
     assert(call_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
     LLVMValueRef helper = LLVMGetNamedFunction(module, helper_func_name);
     assert(helper);
@@ -3549,7 +3620,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         printf("creating %s\n", second_half_name); fflush(NULL);
 #endif
         LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS] = {NULL};
-        int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER_SECOND_HALF, TYPE_ONLY, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, NULL);
+        int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER_SECOND_HALF, TYPE_ONLY, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, NULL, second_half_name);
         LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnt, 0);
         second_half_func = LLVMAddFunction(module, second_half_name, func_type);
         LLVMAddAttributeAtIndex(second_half_func, -1, AlwaysInlineAttr);
@@ -3564,8 +3635,8 @@ void translate_call(OpCodeType opc, void *ptr) {
     LLVMValueRef helper_func = LLVMGetNamedFunction(module, helper_str[h]);
     if (!helper_func) {
         LLVMTypeRef call_types[MAX_ADDED_ARGS] = {NULL};
-        int call_arg_cnt = collect_arguments_and_types(h, TARGET_DEFAULT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, NULL);
-        LLVMTypeRef helper_type = LLVMFunctionType(noargs ? LLVMInt64Type() : LLVMVoidType(), call_types, call_arg_cnt, 0);
+        int call_arg_cnt = collect_arguments_and_types(h, TARGET_DEFAULT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, NULL, helper_str[h]);
+        LLVMTypeRef helper_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
         helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
     }
     LLVMValueRef helper_addr = LLVMBuildPtrToInt(builder, helper_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -3575,7 +3646,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     LLVMValueRef trampoline = get_trampoline(helper_func, second_half_disabled ? 0 : 1, noargs, operands, is_imm, operands_cnt, second_half_func, 0, NULL);
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
-    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER, TYPE_AND_VALUE, operands, is_imm, operands_cnt, helper_addr, second_half_addr, llvm_func, call_types, call_args);
+    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER, TYPE_AND_VALUE, operands, is_imm, operands_cnt, helper_addr, second_half_addr, llvm_func, call_types, call_args, LLVMGetValueName(trampoline));
     assert(call_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
     LLVMTypeRef trampoline_type = LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnt, 0);
     LLVMValueRef call_trampoline_inst = LLVMBuildCall2(builder, trampoline_type, trampoline, call_args, call_arg_cnt, "");
