@@ -91,7 +91,7 @@ typedef enum {
 } RelopType;
 
 #define HELPER_LIST \
-    X(not_a_helper) \
+    X(not_a_helper) /* Used to collect arguments for the fast path tailcall */ \
     X(helper_aaa) \
     X(helper_aad) \
     X(helper_aam) \
@@ -235,8 +235,6 @@ typedef enum {
     X(helper_boundl) \
     X(helper_boundw) \
     X(helper_cc_compute_all) \
-    X(helper_cc_compute_all_ADD1) \
-    X(helper_cc_compute_all_ADD2) \
     X(helper_cc_compute_c) \
     X(helper_cc_compute_nz) \
     X(helper_clrsb_i32) \

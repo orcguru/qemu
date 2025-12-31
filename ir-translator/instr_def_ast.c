@@ -140,12 +140,25 @@ void gen_api() {
     const char *instr = instr_def[j];
     printf("    case %s_ext:\n", instr);
     printf("    %s *i_%s = (%s *)ptr;\n", instr, instr, instr);
+    char *env = strstr(instr, "_ENV");
+    int env_idx = -1;
+    if (env) {
+        env_idx = atoi(env+4);
+    }
     uint32_t s_idx = 0;
+    uint32_t env_added = 0;
     for (uint32_t i = instr_def_field_offset[j]; i < (instr_def_field_offset[j] + instr_def_field_cnt[j]); ++i) {
         if (i == instr_def_field_offset[j]) {
-            printf("    if (idx == %d) {\n", (i - instr_def_field_offset[j]));
+            printf("    if (idx == %d) {\n", (i - instr_def_field_offset[j] + env_added));
         } else {
-            printf("    } else if (idx == %d) {\n", (i - instr_def_field_offset[j]));
+            printf("    } else if (idx == %d) {\n", (i - instr_def_field_offset[j] + env_added));
+        }
+        if (instr_def_with_helper[j] != 0 && (i - instr_def_field_offset[j] + env_added) == env_idx) {
+            printf("        ret.s.valid = 1;\n");
+            printf("        ret.s.slot_type = SUB_SLOT_ENV;\n");
+            printf("        ret.s.offset = 0;\n");
+            env_added += 1;
+            printf("    } else if (idx == %d) {\n", (i - instr_def_field_offset[j] + env_added));
         }
         if (fields_is_not_slot[i] == 1) {
             printf("        *is_imm = 1;\n");
@@ -172,6 +185,14 @@ void gen_api() {
     }
     if (instr_def_field_cnt[j] > 0) {
         printf("    }\n");
+    } else {
+        if (instr_def_with_helper[j] != 0 && env_idx == 0) {
+            printf("    if (idx == 0) {\n");
+            printf("        ret.s.valid = 1;\n");
+            printf("        ret.s.slot_type = SUB_SLOT_ENV;\n");
+            printf("        ret.s.offset = 0;\n");
+            printf("    }\n");
+        }
     }
     printf("    break;\n");
     }
@@ -383,29 +404,6 @@ void gen_api() {
     printf("    default: assert(0);\n");
     printf("    }\n");
     printf("    return -1;\n");
-    printf("}\n");
-    /// get_env_idx
-    printf("\n");
-    printf("uint8_t get_env_idx(void *ptr) {\n");
-    printf("    Instr1B2 *iptr = (Instr1B2 *)ptr;\n");
-    printf("    if (iptr->instr_type != SIZEXB) {\n");
-    printf("        return 0xff;\n");
-    printf("    }\n");
-    printf("    switch (iptr->instr_type_ext) {\n");
-
-    for (uint32_t j = 0; j < instr_def_idx; ++j) {
-        const char *instr = instr_def[j];
-        char *env = strstr(instr, "_ENV");
-        if (env) {
-            printf("    case %s_ext:\n", instr);
-            int idx = atoi(env+4);
-            printf("    return %d;\n", idx);
-        }
-    }
-
-    printf("    default: break;\n");
-    printf("    }\n");
-    printf("    return 0xff;\n");
     printf("}\n");
 }
 
