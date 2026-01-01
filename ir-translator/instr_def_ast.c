@@ -321,31 +321,6 @@ void gen_api() {
     printf("    }\n");
     printf("    return -1;\n");
     printf("}\n");
-    /// get_helper_noargs
-    printf("\n");
-    printf("uint8_t get_helper_noargs(void *ptr) {\n");
-    printf("    Instr1B2 *iptr = (Instr1B2 *)ptr;\n");
-    printf("    assert(iptr->instr_type == SIZEXB);\n");
-    printf("    switch (iptr->instr_type_ext) {\n");
-
-    for (uint32_t j = 0; j < instr_def_idx; ++j) {
-        const char *instr = instr_def[j];
-        printf("    case %s_ext:\n", instr);
-        if (instr_def_with_helper[j] == 0) {
-            printf("    assert(0);\n");
-            printf("    return -1;\n");
-        } else if (instr_def_with_noargs[j] == 1) {
-            printf("    %s *i_%s = (%s *)ptr;\n", instr, instr, instr);
-            printf("    return i_%s->noargs;\n", instr);
-        } else {
-            printf("    return 0;\n");
-        }
-    }
-
-    printf("    default: assert(0);\n");
-    printf("    }\n");
-    printf("    return -1;\n");
-    printf("}\n");
     /// get_label
     printf("\n");
     printf("uint8_t get_label(void *ptr) {\n");

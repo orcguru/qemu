@@ -1666,6 +1666,7 @@ const uint8_t opcmem_addr_nzidx[OPCODE_MAX] = {
     [st_vec] = 1,
 };
 
+/*
 const int helper_compress_arg_cnt[HELPER_MAX] = {
     [helper_cc_compute_nz] = 3,
 };
@@ -1674,6 +1675,7 @@ const int helper_compress_arg_cnt[HELPER_MAX] = {
 const XRegType helper_compress_arg_expectations[HELPER_MAX][MAX_COMPRESSED_ARGS] = {
     [helper_cc_compute_nz] = {cc_dst, cc_src, cc_op},
 };
+*/
 
 const int helper_require_exception_path[HELPER_MAX] = {
     [helper_cc_compute_nz] = 1,
@@ -1796,10 +1798,16 @@ const int helper_require_exception_path[HELPER_MAX] = {
     [helper_cmpgtps_xmm] = 1,
 };
 
+// Dirty hack to keep the same interface between helper_jmp_ind and helper_jit:
+// For XMM helpers, the ENV is omitted from the parameter list; however, for
+// helper_jmp_ind, I would like to keep it to align with helper_jit.
+const int helper_qemuaot_with_env[HELPER_MAX] = {
+    [helper_jmp_ind] = 1,
+};
+
 // Make sure argument type matches, otherwise inline could not happen!
-#define MAX_ADDED_ARGS              5
 const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
-    [helper_jmp_ind] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [helper_jmp_ind] = {LLVMInt64, LLVMInt64},
     [helper_cc_compute_all] = {LLVMInt64, LLVMInt64, LLVMInt64, LLVMInt32},
     [helper_cc_compute_c] = {LLVMInt64, LLVMInt64, LLVMInt64, LLVMInt32},
     [helper_cc_compute_nz] = {LLVMInt64, LLVMInt64, LLVMInt32},
