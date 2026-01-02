@@ -1028,12 +1028,16 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset", operand));
         ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val", operand));
     } else if (operand.s.slot_type == SUB_SLOT_ENV) {
-        OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
-        OperandType env = get_env_ptr(opc);
-        CREATE_ADD64(tmp, env, operand.s.offset);
-        LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
-        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset", operand));
-        ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val", operand));
+        if (operand.s.offset == 0) {
+            ret = get_env_ptr_raw();
+        } else {
+            OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
+            OperandType env = get_env_ptr(opc);
+            CREATE_ADD64(tmp, env, operand.s.offset);
+            LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
+            LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset", operand));
+            ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val", operand));
+        }
     } else if (operand.s.slot_type == SUB_SLOT_XMM) {
         if (operand.s.offset) {
             // Vector operations do not have non-zero offset
