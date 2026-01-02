@@ -589,7 +589,7 @@ static uint8_t get_idx_for_call_helper(void *ptr);
 static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm, OperandType operand, LLVMType tidx, int splat);
 static LLVMTypeRef get_vector_parameter_type_for_arch();
 static LLVMValueRef reload_vector(XMMRegType xmm_reg);
-static int collect_arguments_and_types(HelperType h, int target_domain, int gen_flag, OperandType *params, uint32_t *is_imm, uint8_t param_cnt, LLVMValueRef appendix1, LLVMValueRef appendix2, LLVMValueRef current_func,
+static int collect_arguments_and_types(HelperType h, int target_domain, int gen_flag, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef appendix1, LLVMValueRef appendix2, LLVMValueRef current_func,
                 LLVMTypeRef *out_typeref, LLVMValueRef *out_valref, char *func_name);
 
 #define GET_2_OPERANDS()                                \
@@ -2652,7 +2652,7 @@ static void define_type(LLVMTypeRef *typeref, int idx, LLVMType t) {
 // FIXME: Need to add the for_trampoline flag since in the case when execution goes to the
 // QEMU runtime, data type in register can be LLVMInt64; otherwise data type need be correctly
 // set in order for compiler to do inline.
-static int collect_arguments_and_types(HelperType h, int target_domain, int gen_flag, OperandType *params, uint32_t *is_imm, uint8_t param_cnt, LLVMValueRef appendix1, LLVMValueRef appendix2, LLVMValueRef current_func,
+static int collect_arguments_and_types(HelperType h, int target_domain, int gen_flag, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef appendix1, LLVMValueRef appendix2, LLVMValueRef current_func,
                 LLVMTypeRef *out_typeref, LLVMValueRef *out_valref, char *func_name) {
 #ifdef DEBUG
     if (gen_flag != VALUE_ONLY) {
@@ -2661,23 +2661,23 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 #endif
     if (target_domain == TARGET_DEFAULT_HELPER) {
         if (gen_flag != VALUE_ONLY) {
-            for (int i = 0; i < param_cnt; ++i) {
+            for (int i = 0; i < operands_cnt; ++i) {
                 define_type(out_typeref, i, OPC_ADDR_T);
             }
 #ifdef DEBUG
             printf("\n"); fflush(NULL);
 #endif
             if (gen_flag == TYPE_ONLY) {
-                return param_cnt;
+                return operands_cnt;
             }
         }
-        if (param_cnt) {
+        if (operands_cnt) {
             // current_func must be trampoline, simply get copy from argument
-            for (int i = 0; i < param_cnt; ++i) {
+            for (int i = 0; i < operands_cnt; ++i) {
                 out_valref[i] = LLVMGetParam(current_func, (FIXED_VECTOR_PARAM_COUNT + i));
             }
         }
-        return param_cnt;
+        return operands_cnt;
     } else if (target_domain == TARGET_QEMUAOT_FASTPATH) {
         if (gen_flag != VALUE_ONLY) {
             for (int i = 0; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
@@ -2711,13 +2711,13 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
         }
         return FIXED_VECTOR_PARAM_COUNT;
     } else if (target_domain == TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER) {
-        assert(param_cnt <= MAX_ADDED_ARGS);
+        assert(operands_cnt <= MAX_ADDED_ARGS);
         if (gen_flag != VALUE_ONLY) {
             int idx = 0;
             for (; idx < FIXED_VECTOR_PARAM_COUNT; ++idx) {
                 define_type(out_typeref, idx, fixed_vector_param_llvmtypes[idx]);
             }
-            for (; idx < (FIXED_VECTOR_PARAM_COUNT + param_cnt); ++idx) {
+            for (; idx < (FIXED_VECTOR_PARAM_COUNT + operands_cnt); ++idx) {
                 define_type(out_typeref, idx, LLVMInt64);
             }
             if (appendix1) {
@@ -2756,8 +2756,25 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
                 out_valref[idx] = LLVMGetParam(current_func, idx);
             }
         }
-        for (; idx < (FIXED_VECTOR_PARAM_COUNT + param_cnt); ++idx) {
-            out_valref[idx] = get_source_node_imm_or_stack(call, is_imm[idx - FIXED_VECTOR_PARAM_COUNT], params[idx - FIXED_VECTOR_PARAM_COUNT], LLVMInt64, 0);
+        for (; idx < (FIXED_VECTOR_PARAM_COUNT + operands_cnt); ++idx) {
+#define APP_PARAM_IDX(i)    (i - FIXED_VECTOR_PARAM_COUNT)
+            if (is_imm[APP_PARAM_IDX(idx)] == 0 && operands[APP_PARAM_IDX(idx)].s.valid && operands[APP_PARAM_IDX(idx)].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[APP_PARAM_IDX(idx)])) {
+                OperandType alias = get_alias(operands[APP_PARAM_IDX(idx)]);
+                assert(alias.s.valid);
+                uint64_t xmm_offset = get_xmm_offset(alias.s.slot_idx/2) + 16*(alias.s.slot_idx%2) + alias.s.offset;
+                LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+                LLVMValueRef env_raw = get_env_ptr_raw();
+                out_valref[idx] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("env_ptr_offset", dummy_slot_for_debug));
+            } else if (is_imm[APP_PARAM_IDX(idx)] == 0 && operands[APP_PARAM_IDX(idx)].s.valid && operands[APP_PARAM_IDX(idx)].s.slot_type == SUB_SLOT_TMP && has_alias_env(operands[APP_PARAM_IDX(idx)])) {
+                OperandType alias = get_alias(operands[APP_PARAM_IDX(idx)]);
+                assert(alias.s.valid);
+                LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], alias.s.offset, 0);
+                LLVMValueRef env_raw = get_env_ptr_raw();
+                out_valref[idx] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("env_ptr_offset", dummy_slot_for_debug));
+            } else {
+                out_valref[idx] = get_source_node_imm_or_stack(call, is_imm[idx - FIXED_VECTOR_PARAM_COUNT], operands[idx - FIXED_VECTOR_PARAM_COUNT], LLVMInt64, 0);
+            }
+#undef APP_PARAM_IDX
         }
         if (appendix1) {
             out_valref[idx++] = appendix1;
@@ -2772,31 +2789,31 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
             for (idx = 0; idx < FIXED_VECTOR_PARAM_COUNT; ++idx) {
                 define_type(out_typeref, idx, fixed_vector_param_llvmtypes[idx]);
             }
-            if (param_cnt) {
-                assert(params && is_imm);
+            if (operands_cnt) {
+                assert(operands && is_imm);
                 const LLVMType *helper_param_types = &(helper_collapse_xmm_arg_type[h][0]);
 #define APP_PARAM_IDX(i)    (i - FIXED_VECTOR_PARAM_COUNT)
-                for (int op_idx = 0; op_idx < param_cnt; ++op_idx) {
+                for (int op_idx = 0; op_idx < operands_cnt; ++op_idx) {
                     if (is_imm[op_idx]) {
                         define_type(out_typeref, idx, helper_param_types[APP_PARAM_IDX(idx)]);
                     } else {
-                        if (params[op_idx].s.slot_type == SUB_SLOT_XMM) {
+                        if (operands[op_idx].s.slot_type == SUB_SLOT_XMM) {
                             continue;
-                        } else if (params[op_idx].s.slot_type == SUB_SLOT_ENV) {
+                        } else if (operands[op_idx].s.slot_type == SUB_SLOT_ENV) {
                             if (!helper_qemuaot_with_env[h]) {
                                 continue;
                             }
                             define_type(out_typeref, idx, LLVMInt64);
-                        } else if (params[op_idx].s.slot_type == SUB_SLOT_TMP) {
-                            if (has_alias_xmm(params[op_idx])) {
+                        } else if (operands[op_idx].s.slot_type == SUB_SLOT_TMP) {
+                            if (has_alias_xmm(operands[op_idx])) {
                                 continue;
                             }
-                            assert(!has_alias_env(params[op_idx]));
+                            assert(!has_alias_env(operands[op_idx]));
                             define_type(out_typeref, idx, helper_param_types[APP_PARAM_IDX(idx)]);
-                        } else if (params[op_idx].s.slot_type == SUB_SLOT_ENVVAR) {
+                        } else if (operands[op_idx].s.slot_type == SUB_SLOT_ENVVAR) {
                             define_type(out_typeref, idx, helper_param_types[APP_PARAM_IDX(idx)]);
-                        } else if (params[op_idx].s.slot_type == SUB_SLOT_XREG) {
-                            define_type(out_typeref, idx, fixed_vector_param_llvmtypes[params[op_idx].s.slot_idx]);
+                        } else if (operands[op_idx].s.slot_type == SUB_SLOT_XREG) {
+                            define_type(out_typeref, idx, fixed_vector_param_llvmtypes[operands[op_idx].s.slot_idx]);
                         } else {
                             assert(0);
                         }
@@ -2840,32 +2857,32 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
                 out_valref[idx] = LLVMGetParam(current_func, idx);
             }
         }
-        if (param_cnt) {
-            assert(params && is_imm);
+        if (operands_cnt) {
+            assert(operands && is_imm);
             const LLVMType *helper_param_types = &(helper_collapse_xmm_arg_type[h][0]);
 #define APP_PARAM_IDX(i)    (i - FIXED_VECTOR_PARAM_COUNT)
-            for (int op_idx = 0; op_idx < param_cnt; ++op_idx) {
+            for (int op_idx = 0; op_idx < operands_cnt; ++op_idx) {
                 if (is_imm[op_idx]) {
-                    out_valref[idx] = LLVMConstInt(llvm_int_types[helper_param_types[APP_PARAM_IDX(idx)]], params[op_idx].i, 0);
+                    out_valref[idx] = LLVMConstInt(llvm_int_types[helper_param_types[APP_PARAM_IDX(idx)]], operands[op_idx].i, 0);
                 } else {
-                    if (params[op_idx].s.slot_type == SUB_SLOT_XMM) {
+                    if (operands[op_idx].s.slot_type == SUB_SLOT_XMM) {
                         continue;
-                    } else if (params[op_idx].s.slot_type == SUB_SLOT_ENV) {
+                    } else if (operands[op_idx].s.slot_type == SUB_SLOT_ENV) {
                         if (!helper_qemuaot_with_env[h]) {
                             continue;
                         }
                         out_valref[idx] = get_env_ptr_raw();
-                    } else if (params[op_idx].s.slot_type == SUB_SLOT_TMP) {
-                        if (has_alias_xmm(params[op_idx])) {
+                    } else if (operands[op_idx].s.slot_type == SUB_SLOT_TMP) {
+                        if (has_alias_xmm(operands[op_idx])) {
                             continue;
                         }
-                        assert(!has_alias_env(params[op_idx]));
-                        out_valref[idx] = get_source_node_imm_or_stack(call, 0, params[op_idx], helper_param_types[APP_PARAM_IDX(idx)], 0);
-                    } else if (params[op_idx].s.slot_type == SUB_SLOT_ENVVAR) {
-                        out_valref[idx] = get_source_node_imm_or_stack(call, 0, params[op_idx], helper_param_types[APP_PARAM_IDX(idx)], 0);
-                    } else if (params[op_idx].s.slot_type == SUB_SLOT_XREG) {
-                        if (fixed_vector_param_in_stack[params[op_idx].s.slot_idx]) {
-                            out_valref[idx] = get_source_node_imm_or_stack(call, 0, params[op_idx], fixed_vector_param_llvmtypes[params[op_idx].s.slot_idx], 0);
+                        assert(!has_alias_env(operands[op_idx]));
+                        out_valref[idx] = get_source_node_imm_or_stack(call, 0, operands[op_idx], helper_param_types[APP_PARAM_IDX(idx)], 0);
+                    } else if (operands[op_idx].s.slot_type == SUB_SLOT_ENVVAR) {
+                        out_valref[idx] = get_source_node_imm_or_stack(call, 0, operands[op_idx], helper_param_types[APP_PARAM_IDX(idx)], 0);
+                    } else if (operands[op_idx].s.slot_type == SUB_SLOT_XREG) {
+                        if (fixed_vector_param_in_stack[operands[op_idx].s.slot_idx]) {
+                            out_valref[idx] = get_source_node_imm_or_stack(call, 0, operands[op_idx], fixed_vector_param_llvmtypes[operands[op_idx].s.slot_idx], 0);
                         } else {
                             out_valref[idx] = LLVMGetParam(current_func, idx);
                         }
@@ -3026,63 +3043,19 @@ static void translate_cc_compute_inband(OpCodeType opc, void *ptr) {
     printf("%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], ptr); fflush(NULL);
 #endif
     OperandType oarg;
-    oarg.s.valid = 0;
     uint32_t is_imm_dummy;
     oarg = get_operand(ptr, 0, &is_imm_dummy);
     assert(!is_imm_dummy && oarg.s.valid);
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
-    // For cc_compute_all/c, the arguments are: cc_dst, cc_src, cc_src2, cc_op
-    // For cc_compute_nz, the arguments are: cc_dst, cc_src, cc_op
-    int initial_imm_idx = -1;
-    int imm_cnt = 0;
-    for (int i = 0; i < 4; ++i) {
-        operands[i] = get_operand(ptr, (i + 1), &(is_imm[i]));
-        if (is_imm[i]) {
-            imm_cnt += 1;
-            if (initial_imm_idx == -1) {
-                initial_imm_idx = i;
-            }
-        } else {
-            assert(initial_imm_idx == -1);
-        }
-    }
-    assert(h != helper_cc_compute_c || (!is_imm[0] && !is_imm[1] && !is_imm[2] && !is_imm[3] &&
-           operands[0].s.valid && operands[0].s.slot_type == SUB_SLOT_XREG && operands[0].s.slot_idx == cc_dst &&
-           operands[1].s.valid && operands[1].s.slot_type == SUB_SLOT_XREG && operands[1].s.slot_idx == cc_src &&
-           operands[2].s.valid && operands[2].s.slot_type == SUB_SLOT_ENVVAR && operands[2].s.slot_idx == cc_src2 &&
-           operands[3].s.valid && operands[3].s.slot_type == SUB_SLOT_XREG && operands[3].s.slot_idx == cc_op));
     int operands_cnt = 0;
-    if (h == helper_cc_compute_c) {
-        operands[0] = operands[2];
-        is_imm[0] = is_imm[2];
-        operands_cnt = 1;
-    } else if (h == helper_cc_compute_all) {
-        if (imm_cnt == 0) {
-            operands[0] = operands[2];
-            is_imm[0] = is_imm[2];
-            operands_cnt = 1;
-        } else if (imm_cnt == 1 || imm_cnt == 2) {
-            operands[0] = operands[2];
-            is_imm[0] = is_imm[2];
-            operands[1] = operands[3];
-            is_imm[1] = is_imm[3];
-            operands_cnt = 2;
-            h += 1;
-        } else if (imm_cnt == 3) {
-            operands[0] = operands[1];
-            is_imm[0] = is_imm[1];
-            operands[1] = operands[2];
-            is_imm[1] = is_imm[2];
-            operands[2] = operands[3];
-            is_imm[2] = is_imm[3];
-            operands_cnt = 3;
-            h += 2;
-        } else {
-            assert(0);
+    for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
+        operands[i] = get_operand(ptr, (i + (helper_return_type[h] != LLVMInvalidType ? 1 : 0)), &(is_imm[i]));
+        if (is_imm[i] == 0 && operands[i].s.valid == 0) {
+            break;
         }
+        operands_cnt += 1;
     }
-
     char helper_func_name[256] = {0};
     sprintf(helper_func_name, "%s_inband", helper_str[h]);
     LLVMValueRef helper = LLVMGetNamedFunction(module, helper_func_name);
