@@ -2071,7 +2071,7 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     if (type_mem < type_reg) {
-        val = LLVMBuildTrunc(builder, val, llvm_int_types[type_reg], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        val = LLVMBuildTrunc(builder, val, llvm_int_types[type_mem], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     }
     LLVMValueRef result = LLVMBuildStore(builder, val, pointer);
     if (a1.p.storage.attr.alignment == UNALIGN) {
@@ -2081,7 +2081,7 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
     } else if (a1.p.storage.attr.alignment == ALIGN_32) {
         LLVMSetAlignment(result, 32);
     } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
-        LLVMSetAlignment(result, llvm_vector_elem_bit_counts[type_reg*2+1]/8);
+        LLVMSetAlignment(result, llvm_vector_elem_bit_counts[type_mem*2+1]/8);
     }
 }
 
