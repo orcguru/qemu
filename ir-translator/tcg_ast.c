@@ -1820,8 +1820,8 @@ void translate_ld_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
 
-    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand0, type_mem, 0);
-    src = api(builder, src, llvm_int_types[type_reg], get_next_var_name(opcode_type_str[opc], operand0));
+    LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, type_mem, 0);
+    src = api(builder, src, llvm_int_types[type_reg], get_next_var_name(opcode_type_str[opc], operand1));
     do_store(opc, src, type_reg, operand0);
 }
 
