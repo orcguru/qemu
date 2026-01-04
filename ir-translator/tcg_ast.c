@@ -576,7 +576,7 @@ static uint8_t is_tail_call(HelperType h);
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr);
 static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_ret, LLVMAttributeRef attr_inline_ctrl);
 static void setup_func_stack();
-static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs);
+static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int helper_jit_hack);
 static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr);
 static void translate_cc_compute_inband(OpCodeType opc, void *ptr);
 static void translate_helper_outband(OpCodeType opc, void *ptr);
@@ -2462,9 +2462,9 @@ void translate_discard(OpCodeType opc, void *ptr) {
     }
 }
 
-static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs) {
+static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int helper_jit_hack) {
     char trampoline_name[4096] = {0};
-    sprintf(trampoline_name, "trampoline%s_r%d_param%d_spill%d", do_return ? "" : "_noreturn", with_ret, operands_cnt, spill_cnt);
+    sprintf(trampoline_name, "trampoline%s_r%d_param%d_spill%d%s", do_return ? "" : "_noreturn", with_ret, operands_cnt, spill_cnt, helper_jit_hack ? "_for_helper_jit" : "");
     assert(strlen(trampoline_name) < sizeof(trampoline_name));
     LLVMValueRef trampoline = LLVMGetNamedFunction(module, trampoline_name);
     if (trampoline) {
@@ -2534,8 +2534,6 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     LLVMValueRef call_args[MAX_OPERANDS_COUNT] = {NULL};
     call_arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_DEFAULT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, trampoline, NULL, call_args, trampoline_name);
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
-    LLVMValueRef helper_addr = LLVMGetParam(trampoline, (FIXED_VECTOR_PARAM_COUNT + operands_cnt));
-    LLVMValueRef the_helper = LLVMBuildIntToPtr(builder, helper_addr, LLVMPointerType(helper_type, 0), get_next_var_name("helper", dummy_slot_for_debug));
     LLVMValueRef env_alloca = NULL;
     if (do_return) {
         env_alloca = LLVMBuildAlloca(builder, llvm_int_types[OPC_ADDR_T], "env_alloca");
@@ -2545,7 +2543,15 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
 #ifdef DEBUG
     printf("BuildCall2:%s\n", LLVMGetValueName(helper_func)); fflush(NULL);
 #endif
-    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, the_helper, call_args, call_arg_cnt, with_ret ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
+    // Get the helper call target from argument, since I would like to reuse trampoline for different helper targets
+    LLVMValueRef call_helper_inst;
+    if (!helper_jit_hack) {
+        LLVMValueRef helper_addr = LLVMGetParam(trampoline, (FIXED_VECTOR_PARAM_COUNT + operands_cnt));
+        LLVMValueRef the_helper = LLVMBuildIntToPtr(builder, helper_addr, LLVMPointerType(helper_type, 0), get_next_var_name("helper", dummy_slot_for_debug));
+        call_helper_inst = LLVMBuildCall2(builder, helper_type, the_helper, call_args, call_arg_cnt, with_ret ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
+    } else {
+        call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, call_arg_cnt, with_ret ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
+    }
     if (!do_return) {
         LLVMSetTailCall(call_helper_inst, 1);
         LLVMBuildRetVoid(builder);
@@ -2993,7 +2999,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         helper_jit_func = LLVMAddFunction(module, helper_str[helper_jit], helper_jit_type);
     }
 
-    LLVMValueRef jit_trampoline = get_trampoline(helper_jit_func, 0, 0, operands, is_imm, operands_cnt, NULL, 0, NULL);
+    LLVMValueRef jit_trampoline = get_trampoline(helper_jit_func, 0, 0, operands, is_imm, operands_cnt, NULL, 0, NULL, 1);
     LLVMValueRef jit_trampoline_addr = LLVMBuildPtrToInt(builder, jit_trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, second_half_addr, jit_trampoline_addr, llvm_func, NULL, call_args, helper_str[h]);
@@ -3362,7 +3368,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         }
         // FIXME: verify that stack point does not need adjustment, since QEMUAOT CC does not have prolog/epilog
         // Trampoline handles register-context switch
-        exception_path_trampoline = get_trampoline(helper_func, 1, helper_return_type[h] != LLVMInvalidType ? 1 : 0, operands, is_imm, operands_cnt, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs);
+        exception_path_trampoline = get_trampoline(helper_func, 1, helper_return_type[h] != LLVMInvalidType ? 1 : 0, operands, is_imm, operands_cnt, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs, 0);
     }
 
     // Generate the fast path inlined helper
@@ -3639,7 +3645,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
 
     // Trampoline handles register-context switch
-    LLVMValueRef trampoline = get_trampoline(helper_func, second_half_disabled ? 0 : 1, HELPER_DEFINES_OUTPUT(h), operands, is_imm, operands_cnt, second_half_func, 0, NULL);
+    LLVMValueRef trampoline = get_trampoline(helper_func, second_half_disabled ? 0 : 1, HELPER_DEFINES_OUTPUT(h), operands, is_imm, operands_cnt, second_half_func, 0, NULL, 0);
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER, TYPE_AND_VALUE, operands, is_imm, operands_cnt, helper_addr, second_half_addr, llvm_func, call_types, call_args, LLVMGetValueName(trampoline));
