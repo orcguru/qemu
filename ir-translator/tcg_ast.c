@@ -3723,7 +3723,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         OpCodeType opc = get_opcode(ptr_tmp);
         handle_single_instr(opc, ptr_tmp);
         memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-        if (is_opc_end_of_control_flow(opc, ptr)) {
+        if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
             while (get_current_active_label_cnt(second_half_func)) {
                 uint8_t *current_active_labels = get_current_active_labels(second_half_func);
                 uint8_t tgt_lbl = current_active_labels[0];
@@ -3739,7 +3739,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
                     OpCodeType opc = get_opcode(ptr_tmp);
                     handle_single_instr(opc, ptr_tmp);
                     memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-                    if (is_opc_end_of_control_flow(opc, ptr)) {
+                    if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
                         break;
                     }
                 }
