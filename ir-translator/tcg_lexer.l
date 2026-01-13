@@ -321,6 +321,7 @@ bndstx32                        bndstx32
 bndstx64                        bndstx64
 boundl                          boundl
 boundw                          boundw
+br                              br
 brcond_i32                      brcond_i32
 brcond_i64                      brcond_i64
 bswap16_i32                     bswap16_i32
@@ -1441,7 +1442,7 @@ xsetbv                          xsetbv
 {IZ}              { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_SWAP; yylval->ai.p.swap = IZ; return SWAPATTR; }
 {OS}              { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_SWAP; yylval->ai.p.swap = OS; return SWAPATTR; }
 {IS}              { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_SWAP; yylval->ai.p.swap = IS; return SWAPATTR; }
-
+{br}              { HANDLE_COLUMN; yylval->oh.o = br; return BR; }
 {brcond_i32}    { HANDLE_COLUMN; yylval->oh.o = brcond_i32; return SYMBOL; }
 {add_i32}       { HANDLE_COLUMN; yylval->oh.o = add_i32; return SYMBOL; }
 {andc_i32}      { HANDLE_COLUMN; yylval->oh.o = andc_i32; return SYMBOL; }

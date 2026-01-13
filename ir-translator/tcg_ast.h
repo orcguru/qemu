@@ -1195,6 +1195,7 @@ typedef enum {
     X(and_i64)           \
     X(and_vec)           \
     X(bitsel_vec)        \
+    X(br)                \
     X(brcond_i32)        \
     X(brcond_i64)        \
     X(bswap16_i32)       \
@@ -1765,6 +1766,7 @@ size_t create_branch_condition_slot(void *ptr, OperandType s0, OperandType s1, u
 size_t create_slot_imm2(void *ptr, OHType op, OperandType s0, uint64_t i0, uint64_t i1);
 size_t create_jmpdirect(void *ptr, uint64_t val);
 size_t create_setlabel(void *ptr, OHType op, uint8_t label);
+size_t create_br_label(void *ptr, OHType op, uint8_t label);
 void *get_instr_buffer();
 size_t get_instr_buffer_size();
 void reset_instr_buffer(void);

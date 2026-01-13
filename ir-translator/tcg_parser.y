@@ -48,7 +48,7 @@ extern uint8_t instr_buf[64];
 %token <ai> MEMATTR SWAPATTR ELEMENTSIZEATTR V64 V128
 %token <si> SLOT
 %token <r> RELOP TSTREL
-%token <oh> SYMBOL BSWAP SETLABL BRCOND CALL JMPDIR CALLDIR DISCARD
+%token <oh> SYMBOL BSWAP SETLABL BRCOND CALL JMPDIR CALLDIR DISCARD BR
 %token COMMA COLON PLUS ENV XMMTMP
 
 %%
@@ -152,7 +152,8 @@ BRCOND SLOT COMMA IMMX COMMA RELOP COMMA LABEL      { insert_instr(instr_buf, cr
 | BRCOND SLOT COMMA IMMX COMMA TSTREL COMMA LABEL   { insert_instr(instr_buf, create_branch_condition(instr_buf, $2, $4, $6, $8)); }
 | CALLDIR SLOT COMMA IMMX COMMA IMMX                { insert_instr(instr_buf, create_slot_imm2(instr_buf, $1, $2, $4, $6)); }
 | JMPDIR IMMX                                       { insert_instr(instr_buf, create_jmpdirect(instr_buf, $2)); }
-| SETLABL LABEL                                     { insert_instr(instr_buf, create_setlabel(instr_buf, $1, $2)); };
+| SETLABL LABEL                                     { insert_instr(instr_buf, create_setlabel(instr_buf, $1, $2)); }
+| BR LABEL                                          { insert_instr(instr_buf, create_br_label(instr_buf, $1, $2)); };
 
 %%
 void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s) {

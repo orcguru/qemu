@@ -564,6 +564,18 @@ size_t create_setlabel(void *ptr, OHType op, uint8_t label) {
     return sizeof(*i);
 }
 
+size_t create_br_label(void *ptr, OHType op, uint8_t label) {
+#ifdef DEBUG
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
+#endif
+    Instr1B2 *i = (Instr1B2 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1B2_ext;
+    i->opc = op.o;
+    i->label = label;
+    return sizeof(*i);
+}
+
 size_t create_helper_slot4(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3) {
 #ifdef DEBUG
     printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);

@@ -1772,6 +1772,37 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
     br_cnt += 1;
 }
 
+void translate_br(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    DECLARE_AND_INIT_TYPE_FOR_SCALAR;
+    uint8_t l = get_label(ptr);
+    char lstr[16];
+    sprintf(lstr, "bb_L%d", l);
+    LLVMBasicBlockRef label = get_bb(lstr);
+    if (!label) {
+        uint8_t current_active_label_cnt = get_current_active_label_cnt(llvm_func);
+        uint8_t *current_active_labels = get_current_active_labels(llvm_func);
+        label = LLVMAppendBasicBlock(llvm_func, lstr);
+        for (int i = 0; i < current_active_label_cnt; ++i) {
+            assert(current_active_labels[i] != l);
+        }
+        current_active_labels[current_active_label_cnt] = l;
+        current_active_label_cnt += 1;
+        set_current_active_label_cnt(current_active_label_cnt);
+    }
+    assert(last_active_bb);
+    LLVMBuildBr(builder, label);
+
+    char false_bb_name[16] = {0};
+    sprintf(false_bb_name, "bb_false%d", br_cnt);
+    LLVMBasicBlockRef bb_false = LLVMAppendBasicBlock(llvm_func, false_bb_name);
+    LLVMPositionBuilderAtEnd(builder, bb_false);
+    last_active_bb = bb_false;
+    br_cnt += 1;
+}
+
 void translate_push_ret_addr(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
@@ -4643,6 +4674,9 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
         break;
     case call:
         translate_call(opc, ptr);
+        break;
+    case br:
+        translate_br(opc, ptr);
         break;
     default: assert(0);
     }
