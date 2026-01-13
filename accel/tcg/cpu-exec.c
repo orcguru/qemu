@@ -1062,7 +1062,7 @@ static void gen_tcg_ir(CPUState *cpu)
 {
     uint32_t flags = get_hflags_for_codegen(cpu);
     uint64_t cs_base = 0;
-#if 0
+#if 1
     int cflags = 0xff0303ff/*cflags: CF_CLUSTER_MASK | CF_PCREL | CF_NOIRQ | CF_NO_GOTO_TB*/;
 #else
     int cflags = 0xff030201/*cflags: CF_CLUSTER_MASK | CF_PCREL | CF_NOIRQ | CF_NO_GOTO_TB | one-shot TB with 1 insn in it*/;

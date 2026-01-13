@@ -119,6 +119,7 @@ SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT                         
 
 call_helper:
 CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT                                     { insert_instr(instr_buf, create_helper_env_slot2(instr_buf, $2, $4, $6, $10, $12)); }
+| CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT                                   { insert_instr(instr_buf, create_helper_slot2(instr_buf, $2, $4, $6, $8, $10)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT                        { insert_instr(instr_buf, create_helper_slot3(instr_buf, $2, $4, $6, $8, $10, $12)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA IMMX                        { insert_instr(instr_buf, create_helper_slot2_imm(instr_buf, $2, $4, $6, $8, $10, $12)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT             { insert_instr(instr_buf, create_helper_slot4(instr_buf, $2, $4, $6, $8, $10, $12, $14)); }

@@ -1088,6 +1088,22 @@ size_t create_scalar_slot_imm_slot(void *ptr, OHType op, OperandType s0, uint64_
     return sizeof(*i);
 }
 
+size_t create_helper_slot2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1) {
+#ifdef DEBUG
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
+#endif
+    Instr1BH4S2 *i = (Instr1BH4S2 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH4S2_ext;
+    i->helper_l = (uint8_t)h.h;
+    i->helper_h = h.h >> 8;
+    assert(noargs < 2);
+    i->noargs = noargs;
+    SET_SLOT(0);
+    SET_SLOT(1);
+    return sizeof(*i);
+}
+
 size_t create_helper_slot3(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2) {
 #ifdef DEBUG
     printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);

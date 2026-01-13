@@ -1573,6 +1573,7 @@ typedef enum {
     X(Instr1BH2_ENV0_ext) \
     X(Instr1BH21S_ENV0_ext) \
     X(Instr1B281_ext) \
+    X(Instr1BH4S2_ext) \
     X(Instr1BH4S3_ext) \
     X(Instr1BH4S3_ENV0_ext) \
     X(Instr1B4112_ext) \
@@ -1715,6 +1716,7 @@ size_t create_vector_slot2_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandType
 size_t create_vector_slot_env_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, uint64_t i0);
 size_t create_vector_slot5_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, uint8_t relop);
 
+size_t create_helper_slot2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1);
 size_t create_helper_slot3(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2);
 size_t create_helper_slot2_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, uint32_t i0);
 size_t create_helper_slot4(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2, OperandType s3);
