@@ -943,7 +943,18 @@ EOF
     foreach my $p (@qemuaot_gp_params) {
       print OUT "$qemuaot_gp_params_map{$p} $p, ";
     }
-    print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
+    print OUT "$qemuaot_vec_declare";
+    my $func_ptr = $funcs{$f};
+    foreach my $si (@{$func_ptr->{'SCALAR_ARGS'}}) {
+      print OUT ", unsigned long $si->{'VAR_NAME'}";
+    }
+    my $total_arg_cnt = $#{$func_ptr->{'SCALAR_ARGS'}} + $#{$func_ptr->{'VECTOR_ARGS'}} + 2;
+    die "" if $total_arg_cnt > 6;
+    if ($total_arg_cnt < 6) {
+      print OUT ", unsigned long func_secondary);\n";
+    } else {
+      print OUT ");\n";
+    }
   }
   my %order_to_func = ();
   foreach my $sf (keys %defined_func) {
@@ -1355,6 +1366,9 @@ sub gen_replicated_func
     }
     my %empty = ();
     my @pis = keys %{$func_replicate_info->{$target_func}};
+    if ($target_func eq $exception_exit) {
+      &gen_restore_info($target_func, $order_to_func);
+    }
     my $new_func_body = &get_func_body($funcs{$target_func}, $pis[0], \%empty, $exception_exit, $fc);
     if ($target_func eq $exception_exit) {
       $new_func_body = &add_context_backup($new_func_body, $target_func, $order_to_func);
@@ -1423,6 +1437,9 @@ sub gen_replicated_func
           $current_func = $current_func."#define $arg_entry->{'VAR_NAME'} VEC$vec_idx\n";
         }
       }
+      if ($target_func eq $exception_exit) {
+        &gen_restore_info($target_func, $order_to_func);
+      }
       my $new_func_body = &get_func_body($funcs{$target_func}, $pi, \%macro_def, $exception_exit, $fc);
       if ($target_func eq $exception_exit) {
         $new_func_body = &add_context_backup($new_func_body, $order_to_func);
@@ -1440,6 +1457,43 @@ sub gen_replicated_func
     }
   }
   return $new_func;
+}
+
+sub gen_restore_info
+{
+  my ($target_func, $order_to_func) = @_;
+  my %backups = ();
+  my %restore_info = ();
+  my $need_env = 0;
+  foreach my $ok (keys %{$order_to_func}) {
+    foreach my $bv (keys %{$funcs{$order_to_func->{$ok}}->{'ENVVAR_AND_VECTORS'}}) {
+      $backups{$bv} = 1;
+      if ($bv =~ /^env/) {
+        $need_env = 1;
+      }
+    }
+  }
+  foreach my $bk (keys %backups) {
+    if ($bk =~ /^xmm/) {
+      $restore_info{"backup_$bk"} = $bk;
+    } else {
+      die "" if not exists $qemuaot_gp_params_map{$bk};
+      my $var_name = $bk;
+      if ($var_name =~ /^env/) {
+        my $short_name = $var_name;
+        $short_name =~ s/^env\-\>//;
+        $restore_info{"backup_$short_name"} = $bk;
+      } else {
+        $restore_info{"backup_$var_name"} = $bk;
+      }
+    }
+  }
+  if (exists $funcs{$target_func}->{'IS_FOREIGN'}) {
+    foreach my $v (@{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
+      $restore_info{"backup_$v->{'VAR_NAME'}"} = $v->{'VAR_NAME'};
+    }
+  }
+  $funcs{$target_func}->{'RESTORE_INFO'} = \%restore_info;
 }
 
 sub add_context_backup
@@ -1484,7 +1538,6 @@ sub add_context_backup
   }
   $backup_vars = $backup_vars."\n";
   $new_func_body =~ s/^\{/\{\n$backup_vars/;
-  $funcs{$target_func}->{'RESTORE_INFO'} = \%restore_info;
   return $new_func_body;
 }
 
@@ -1740,10 +1793,20 @@ sub get_exception_path
     $body = $body."  $func_ptr->{'RESTORE_INFO'}->{$rk} = $rk;\n";
   }
   $body = $body."  return ((FUNC_EXCEPTION_RET)exception_return)(";
-    foreach my $p (@qemuaot_gp_params) {
-      $body = $body."$p, ";
-    }
-    $body = $body.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)normal_return);\n";
+  foreach my $p (@qemuaot_gp_params) {
+    $body = $body."$p, ";
+  }
+  $body = $body.$qemuaot_vec_invoke;
+  foreach my $si (@{$func_ptr->{'SCALAR_ARGS'}}) {
+    $body = $body.", $si->{'VAR_NAME'}";
+  }
+  my $total_arg_cnt = $#{$func_ptr->{'SCALAR_ARGS'}} + $#{$func_ptr->{'VECTOR_ARGS'}} + 2;
+  die "" if $total_arg_cnt > 6;
+  if ($total_arg_cnt < 6) {
+    $body = $body.", (unsigned long)normal_return);\n";
+  } else {
+    $body = $body.");\n";
+  }
   $body = $body."}\n";
   return $body;
 }

@@ -130,6 +130,7 @@ CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT               
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA IMMX COMMA IMMX                         { insert_instr(instr_buf, create_helper_env_imm2(instr_buf, $2, $4, $6, $10, $12)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT COMMA SLOT COMMA IMMX   { insert_instr(instr_buf, create_helper_env_slot3_imm(instr_buf, $2, $4, $6, $10, $12, $14, $16)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT COMMA IMMX   { insert_instr(instr_buf, create_helper_env_slot4_imm(instr_buf, $2, $4, $6, $10, $12, $14, $16, $18)); }
+| CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT COMMA IMMX COMMA IMMX   { insert_instr(instr_buf, create_helper_env_slot4_imm2(instr_buf, $2, $4, $6, $10, $12, $14, $16, $18, $20)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA SLOT COMMA IMMX COMMA IMMX             { insert_instr(instr_buf, create_helper_slot2_imm2(instr_buf, $2, $4, $6, $8, $10, $12, $14)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA ENV COMMA SLOT                         { insert_instr(instr_buf, create_helper_slot_env_slot(instr_buf, $2, $4, $6, $8, $12)); }
 | CALL SYMBOL COMMA IMMX COMMA IMMD COMMA SLOT COMMA ENV                                    { insert_instr(instr_buf, create_helper_slot_env(instr_buf, $2, $4, $6, $8)); }
