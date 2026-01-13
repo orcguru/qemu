@@ -5,6 +5,7 @@
 #include <llvm-c/Types.h>
 
 #define MAX_ADDED_ARGS              6
+#define LLVMMAXType                 LLVMInt128
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -1416,6 +1417,7 @@ typedef enum {
 
 #define ATTR_TYPE_LIST \
     X(SUB_ATTR_STORAGE) \
+    X(SUB_ATTR_VECTORSIZE) \
     X(SUB_ATTR_ELEMENTSIZE) \
     X(SUB_ATTR_SWAP) \
     X(SUB_ATTR_INVALID) \
@@ -1428,6 +1430,18 @@ typedef enum {
     ATTR_TYPE_LIST
     #undef X
 } AttrType;
+
+#define VECTOR_SIZE_LIST \
+    X(VS_INVALID) \
+    X(VS64) \
+    X(VS128) \
+    X(VS256)
+
+typedef enum {
+    #define X(name) name,
+    VECTOR_SIZE_LIST
+    #undef X
+} VectorSizeType;
 
 #define VECTOR_ELEMSIZE_LIST \
     X(VES8) \
@@ -1444,6 +1458,7 @@ typedef enum {
 typedef struct {
     AttrType subt;
     union {
+        VectorSizeType vs;
         VectorElemSizeType ves;
         struct {
             union {
@@ -1606,6 +1621,10 @@ typedef enum {
     X(LLVMInt16) \
     X(LLVMInt32) \
     X(LLVMInt64) \
+    X(LLVMVector8xi8) \
+    X(LLVMVector4xi16) \
+    X(LLVMVector2xi32) \
+    X(LLVMVector1xi64) \
     X(LLVMVector16xi8) \
     X(LLVMVector8xi16) \
     X(LLVMVector4xi32) \
@@ -1614,8 +1633,7 @@ typedef enum {
     X(LLVMVector16xi16) \
     X(LLVMVector8xi32) \
     X(LLVMVector4xi64) \
-    X(LLVMInt128) \
-    X(LLVMMAXType)
+    X(LLVMInt128)
 
 typedef enum {
     #define X(name) name,
@@ -1655,7 +1673,7 @@ typedef union {
 } OperandType;
 
 typedef struct {
-    uint8_t attr_type  :2;
+    uint16_t attr_type  :4;
     /*
     union {
         struct {
@@ -1667,7 +1685,7 @@ typedef struct {
         uint32_t attr_val :7;
     } p;
     */
-    uint8_t attr_val   :7;
+    uint16_t attr_val   :7;
 } AttributeType;
 
 #ifdef __GNUC__
@@ -1707,14 +1725,14 @@ size_t create_scalar_slot2_imm_slot_imm_relop(void *ptr, OHType op, OperandType 
 size_t create_scalar_slot2_imm2_slot_relop(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0, uint64_t i1, OperandType s2, RelopType r);
 size_t create_scalar_slot2_imm3_relop(void *ptr, OHType op, OperandType s0, OperandType s1, uint64_t i0, uint64_t i1, uint64_t i2, RelopType r);
 
-size_t create_vector_slot2(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1);
-size_t create_vector_slot3(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2);
-size_t create_vector_slot3_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, uint8_t relop);
-size_t create_vector_slot4(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, OperandType s3);
-size_t create_vector_slot_vimm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, uint64_t vi0);
-size_t create_vector_slot2_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t i0);
-size_t create_vector_slot_env_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, uint64_t i0);
-size_t create_vector_slot5_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, uint8_t relop);
+size_t create_vector_slot2(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1);
+size_t create_vector_slot3(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2);
+size_t create_vector_slot3_relop(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2, uint8_t relop);
+size_t create_vector_slot4(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2, OperandType s3);
+size_t create_vector_slot_vimm(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, uint64_t vi0);
+size_t create_vector_slot2_imm(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, uint64_t i0);
+size_t create_vector_slot_env_imm(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, uint64_t i0);
+size_t create_vector_slot5_relop(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, uint8_t relop);
 
 size_t create_helper_slot2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1);
 size_t create_helper_slot3(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1, OperandType s2);

@@ -29,9 +29,18 @@
 #define OPC_MEM_T           opciosz[opc][0]
 #define OPC_REG_T           opciosz[opc][1]
 #define OPC_ADDR_T          LLVMInt64
-#define OPC_FIXED_TO_VECTOR(T)      (T + 4)
-#define OPC_VECTOR_TO_FIXED(T)      (T - 4)
-#define OPC_DUAL_VECTOR_TO_FIXED(T)      (T - 8)
+#define OPC_FIRST_SCALAR_TYPE   LLVMInt8
+#define OPC_FIRST_VECTOR_TYPE   LLVMVector8xi8
+#define OPC_SCALAR_TYPE_CNT     4
+#define OPC_FIXED_TO_VECTOR128(T)   (OPC_FIRST_VECTOR_TYPE + (VS128 - VS64) * OPC_SCALAR_TYPE_CNT + (T - OPC_FIRST_SCALAR_TYPE))
+#define OPC_VECTOR_TO_FIXED(T)      (((T - OPC_FIRST_SCALAR_TYPE) % 4) + OPC_FIRST_SCALAR_TYPE)
+#define OPC_VECTOR_SIZE(T)          (\
+  (LLVMVector16xi8 <= T && T <= LLVMVector2xi64) ? VS128 : ( \
+    (LLVMVector32xi8 <= T && T <= LLVMVector4xi64) ? VS256 : (  \
+      (LLVMVector8xi8 <= T && T <= LLVMVector1xi64) ? VS64 : VS_INVALID \
+      ) \
+    ) \
+  )
 
 #define DECLARE_AND_INIT_TYPE_FOR_ALL   \
     uint8_t is_vec = is_vector(ptr);    \
@@ -104,9 +113,11 @@
         OHType tmp_opc;                             \
         if (is_vec) {                               \
             tmp_opc.o = not_vec;                    \
-            AttrSrcInfo ai;                         \
-            ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
-            create_vector_slot2(buf, tmp_opc, ai, OUT, IN); \
+            AttrSrcInfo vs;                         \
+            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+            AttrSrcInfo ves;                        \
+            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            create_vector_slot2(buf, tmp_opc, vs, ves, OUT, IN); \
         } else {                                    \
             tmp_opc.o = type_out == LLVMInt32 ? not_i32 : not_i64;      \
             create_scalar_slot2(buf, tmp_opc, OUT, IN); \
@@ -120,9 +131,11 @@
         OHType tmp_opc;                             \
         if (is_vec) {                               \
             tmp_opc.o = and_vec;                    \
-            AttrSrcInfo ai;                         \
-            ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
-            create_vector_slot3(buf, tmp_opc, ai, OUT, IN0, IN1); \
+            AttrSrcInfo vs;                         \
+            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+            AttrSrcInfo ves;                        \
+            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         } else {                                    \
             assert(OPC_OUTPUT_T != LLVMInvalidType);  \
             tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? not_i32 : not_i64;      \
@@ -137,9 +150,11 @@
         OHType tmp_opc;                             \
         assert(is_vec);                             \
         tmp_opc.o = andc_vec;                    \
-        AttrSrcInfo ai;                         \
-        ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
-        create_vector_slot3(buf, tmp_opc, ai, OUT, IN0, IN1); \
+        AttrSrcInfo vs;                         \
+        vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+        AttrSrcInfo ves;                         \
+        ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+        create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         translate_andc(tmp_opc.o, buf);     \
     } while (0)
 
@@ -149,9 +164,11 @@
         OHType tmp_opc;                             \
         if (is_vec) {                               \
             tmp_opc.o = xor_vec;                    \
-            AttrSrcInfo ai;                         \
-            ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
-            create_vector_slot3(buf, tmp_opc, ai, OUT, IN0, IN1); \
+            AttrSrcInfo vs;                         \
+            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+            AttrSrcInfo ves;                         \
+            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         } else {                                    \
             assert(OPC_OUTPUT_T != LLVMInvalidType);  \
             tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? xor_i32 : xor_i64;      \
@@ -166,9 +183,11 @@
         OHType tmp_opc;                             \
         if (is_vec) {                               \
             tmp_opc.o = xor_vec;                    \
-            AttrSrcInfo ai;                         \
-            ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
-            create_vector_slot2_imm(buf, tmp_opc, ai, OUT, IN0, IN1); \
+            AttrSrcInfo vs;                         \
+            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+            AttrSrcInfo ves;                         \
+            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            create_vector_slot2_imm(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         } else {                                    \
             assert(OPC_OUTPUT_T != LLVMInvalidType);  \
             tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? xor_i32 : xor_i64;      \
@@ -213,13 +232,15 @@
         OHType tmp_opc;                             \
         assert(is_vec);                             \
         tmp_opc.o = shri_vec;                    \
-        AttrSrcInfo ai;                         \
-        ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+        AttrSrcInfo vs;                         \
+        vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+        AttrSrcInfo ves;                         \
+        ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
         if (SPLAT) {                            \
-            create_vector_slot2_imm(buf, tmp_opc, ai, OUT, IN0, IN1.i); \
+            create_vector_slot2_imm(buf, tmp_opc, vs, ves, OUT, IN0, IN1.i); \
             translate_binary_splat_immediate(tmp_opc.o, buf, LLVMBuildLShr);   \
         } else {                                \
-            create_vector_slot3(buf, tmp_opc, ai, OUT, IN0, IN1); \
+            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
             translate_binary(tmp_opc.o, buf, LLVMBuildLShr);   \
         }                                       \
     } while (0)
@@ -250,13 +271,15 @@
         OHType tmp_opc;                             \
         assert(is_vec);                             \
         tmp_opc.o = shli_vec;                    \
-        AttrSrcInfo ai;                         \
-        ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+        AttrSrcInfo vs;                         \
+        vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+        AttrSrcInfo ves;                         \
+        ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
         if (SPLAT) {                                \
-            create_vector_slot2_imm(buf, tmp_opc, ai, OUT, IN0, IN1.i); \
+            create_vector_slot2_imm(buf, tmp_opc, vs, ves, OUT, IN0, IN1.i); \
             translate_binary_splat_immediate(tmp_opc.o, buf, LLVMBuildShl);   \
         } else {                                    \
-            create_vector_slot3(buf, tmp_opc, ai, OUT, IN0, IN1); \
+            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
             translate_binary(tmp_opc.o, buf, LLVMBuildShl);   \
         }                                           \
     } while (0)
@@ -267,9 +290,11 @@
         OHType tmp_opc;                             \
         if (is_vec) {                               \
             tmp_opc.o = or_vec;                     \
-            AttrSrcInfo ai;                         \
-            ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
-            create_vector_slot3(buf, tmp_opc, ai, OUT, IN0, IN1); \
+            AttrSrcInfo vs;                         \
+            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+            AttrSrcInfo ves;                         \
+            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
             translate_binary(tmp_opc.o, buf, LLVMBuildOr);     \
         } else {                                        \
             assert(OPC_OUTPUT_T != LLVMInvalidType);    \
@@ -324,9 +349,11 @@
         OHType tmp_opc;                             \
         if (is_vec) {                               \
             tmp_opc.o = sub_vec;                     \
-            AttrSrcInfo ai;                         \
-            ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
-            create_vector_slot3(buf, tmp_opc, ai, OUT, IN0, IN1); \
+            AttrSrcInfo vs;                         \
+            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+            AttrSrcInfo ves;                         \
+            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         } else {                                        \
             assert(OPC_OUTPUT_T != LLVMInvalidType);    \
             tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? sub_i32 : sub_i64;      \
@@ -345,21 +372,21 @@
         translate_mov(tmp_opc.o, buf);  \
     } while (0)
 
-#define CREATE_MOV_VEC(ATTR, OUT, IN)           \
+#define CREATE_MOV_VEC(VS, VES, OUT, IN)           \
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
         tmp_opc.o = mov_vec;      \
-        create_vector_slot2(buf, tmp_opc, ATTR, OUT, IN); \
+        create_vector_slot2(buf, tmp_opc, VS, VES, OUT, IN); \
         translate_mov(tmp_opc.o, buf);  \
     } while (0)
 
-#define CREATE_MOVCOND_VEC(ATTR, OUT, IN0, IN1, CMP0, CMP1, ROP)           \
+#define CREATE_MOVCOND_VEC(VS, VES, OUT, IN0, IN1, CMP0, CMP1, ROP)           \
     do {                                            \
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
         tmp_opc.o = movcond_vec;      \
-        create_vector_slot5_relop(buf, tmp_opc, ATTR, OUT, IN0, IN1, CMP0, CMP1, ROP); \
+        create_vector_slot5_relop(buf, tmp_opc, VS, VES, OUT, IN0, IN1, CMP0, CMP1, ROP); \
         translate_mov(tmp_opc.o, buf);  \
     } while (0)
 
@@ -368,9 +395,11 @@
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
         tmp_opc.o = cmp_vec;      \
-        AttrSrcInfo ai;                         \
-        ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
-        create_vector_slot3_relop(buf, tmp_opc, ai, OUT, IN0, IN1, ROP); \
+        AttrSrcInfo vs;                         \
+        vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+        AttrSrcInfo ves;                         \
+        ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+        create_vector_slot3_relop(buf, tmp_opc, vs, ves, OUT, IN0, IN1, ROP); \
         translate_cmp_vec(tmp_opc.o, buf);  \
     } while (0)
 
@@ -379,9 +408,11 @@
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
         tmp_opc.o = cmp_vec;      \
-        AttrSrcInfo ai;                         \
-        ai.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
-        create_vector_slot4(buf, tmp_opc, ai, OUT, IN0, IN1, IN2); \
+        AttrSrcInfo vs;                         \
+        vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
+        AttrSrcInfo ves;                         \
+        ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+        create_vector_slot4(buf, tmp_opc, vs, ves, OUT, IN0, IN1, IN2); \
         translate_bitsel_vec(tmp_opc.o, buf);  \
     } while (0)
 
@@ -1046,7 +1077,7 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
             assert(llvm_vector_elem_bit_counts[tidx*2] == 1);
             LLVMTypeRef vtype = NULL;
             int elem_idx = 0;
-            vtype = llvm_int_types[OPC_FIXED_TO_VECTOR(tidx)];
+            vtype = llvm_int_types[OPC_FIXED_TO_VECTOR128(tidx)];
             if (operand.s.offset % 8 == 0) {
                 elem_idx = operand.s.offset/8;
             } else if (operand.s.offset % 4 == 0) {
@@ -1974,10 +2005,10 @@ void translate_st(OpCodeType opc, void *ptr) {
         assert((alias.s.offset * 8) % llvm_vector_elem_bit_counts[type_mem*2+1] == 0);
         OperandType out = alias;
         out.s.offset = 0;
-        LLVMValueRef src_val = get_source_node_imm_or_stack(opc, 0, out, OPC_FIXED_TO_VECTOR(type_mem), 0);
+        LLVMValueRef src_val = get_source_node_imm_or_stack(opc, 0, out, OPC_FIXED_TO_VECTOR128(type_mem), 0);
         LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], (alias.s.offset * 8) / llvm_vector_elem_bit_counts[type_mem*2+1], 0);
         val = LLVMBuildInsertElement(builder, src_val, val, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-        do_store(opc, val, OPC_FIXED_TO_VECTOR(type_mem), out);
+        do_store(opc, val, OPC_FIXED_TO_VECTOR128(type_mem), out);
     } else {
         if (operand1.s.slot_type == SUB_SLOT_TMP && has_alias(operand1)) {
             operand1 = get_alias(operand1);
@@ -2307,14 +2338,16 @@ void translate_maxmin_vec(OpCodeType opc, void *ptr, RelopType r) {
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
-    AttrSrcInfo ai;
-    ai.p.ves = OPC_VECTOR_TO_FIXED(type_out);
+    AttrSrcInfo vs;
+    vs.p.vs = OPC_VECTOR_SIZE(type_out);
+    AttrSrcInfo ves;
+    ves.p.ves = OPC_VECTOR_TO_FIXED(type_out);
     OperandType tmp1 = get_tmp_and_do_alloc(type_out);
     OperandType tmp2 = get_tmp_and_do_alloc(type_out);
 
-    CREATE_MOV_VEC(ai, tmp1, operand1);
-    CREATE_MOV_VEC(ai, tmp2, operand2);
-    CREATE_MOVCOND_VEC(ai, operand0, operand1, operand2, tmp1, tmp2, r);
+    CREATE_MOV_VEC(vs, ves, tmp1, operand1);
+    CREATE_MOV_VEC(vs, ves, tmp2, operand2);
+    CREATE_MOVCOND_VEC(vs, ves, operand0, operand1, operand2, tmp1, tmp2, r);
 }
 
 static uint8_t *get_current_active_labels(LLVMValueRef func) {

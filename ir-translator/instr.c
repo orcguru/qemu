@@ -452,7 +452,7 @@ size_t create_scalar_slot3(void *ptr, OHType op, OperandType s0, OperandType s1,
     return sizeof(*i);
 }
 
-size_t create_vector_slot_env_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, uint64_t i0) {
+size_t create_vector_slot_env_imm(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, uint64_t i0) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
@@ -462,7 +462,8 @@ size_t create_vector_slot_env_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandT
         i->instr_type = SIZEXB;
         i->instr_type_ext = Instr1BV4X_ext;
         i->opc = op.o;
-        i->es = ai.p.ves;
+        i->vs = vs.p.vs;
+        i->es = ves.p.ves;
         SET_SLOT(0);
         i->xmm_idx = x.xmm_idx;
         i->xmm_offset = x.xmm_offset;
@@ -472,7 +473,8 @@ size_t create_vector_slot_env_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandT
         i->instr_type = SIZEXB;
         i->instr_type_ext = Instr1BV4XE_ext;
         i->opc = op.o;
-        i->es = ai.p.ves;
+        i->vs = vs.p.vs;
+        i->es = ves.p.ves;
         SET_SLOT(0);
         i->env_offset = i0;
         return sizeof(*i);
@@ -580,7 +582,7 @@ size_t create_helper_slot4(void *ptr, OHType h, uint16_t cflags, uint8_t noargs,
     return sizeof(*i);
 }
 
-size_t create_vector_slot3(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2) {
+size_t create_vector_slot3(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
@@ -588,14 +590,15 @@ size_t create_vector_slot3(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0,
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BV4_ext;
     i->opc = op.o;
-    i->es = ai.p.ves;
+    i->vs = vs.p.vs;
+    i->es = ves.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
     return sizeof(*i);
 }
 
-size_t create_vector_slot4(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, OperandType s3) {
+size_t create_vector_slot4(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2, OperandType s3) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
@@ -603,7 +606,8 @@ size_t create_vector_slot4(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0,
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BV42_ext;
     i->opc = op.o;
-    i->es = ai.p.ves;
+    i->vs = vs.p.vs;
+    i->es = ves.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
@@ -611,7 +615,7 @@ size_t create_vector_slot4(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0,
     return sizeof(*i);
 }
 
-size_t create_vector_slot5_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, uint8_t relop) {
+size_t create_vector_slot5_relop(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, uint8_t relop) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
@@ -619,7 +623,8 @@ size_t create_vector_slot5_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandTy
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BV8_ext;
     i->opc = op.o;
-    i->es = ai.p.ves;
+    i->vs = vs.p.vs;
+    i->es = ves.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);
@@ -667,7 +672,7 @@ size_t create_helper_slot4_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noa
     return sizeof(*i);
 }
 
-size_t create_vector_slot_vimm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, uint64_t vi0) {
+size_t create_vector_slot_vimm(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, uint64_t vi0) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
@@ -675,7 +680,8 @@ size_t create_vector_slot_vimm(void *ptr, OHType op, AttrSrcInfo ai, OperandType
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BV21_ext;
     i->opc = op.o;
-    i->es = ai.p.ves;
+    i->vs = vs.p.vs;
+    i->es = ves.p.ves;
     SET_SLOT(0);
     i->imm = vi0;
     return sizeof(*i);
@@ -699,7 +705,7 @@ size_t create_scalar_slot3_attr3_num(void *ptr, OHType op, OperandType s0, Opera
     return sizeof(*i);
 }
 
-size_t create_vector_slot2_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, uint64_t i0) {
+size_t create_vector_slot2_imm(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, uint64_t i0) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
@@ -707,7 +713,8 @@ size_t create_vector_slot2_imm(void *ptr, OHType op, AttrSrcInfo ai, OperandType
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BV4I_ext;
     i->opc = op.o;
-    i->es = ai.p.ves;
+    i->vs = vs.p.vs;
+    i->es = ves.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
     i->imm = i0;
@@ -728,7 +735,7 @@ size_t create_slot_imm2(void *ptr, OHType op, OperandType s0, uint64_t i0, uint6
     return sizeof(*i);
 }
 
-size_t create_vector_slot2(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1) {
+size_t create_vector_slot2(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
@@ -736,13 +743,14 @@ size_t create_vector_slot2(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0,
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BV4S2_ext;
     i->opc = op.o;
-    i->es = ai.p.ves;
+    i->vs = vs.p.vs;
+    i->es = ves.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
     return sizeof(*i);
 }
 
-size_t create_vector_slot3_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandType s0, OperandType s1, OperandType s2, uint8_t relop) {
+size_t create_vector_slot3_relop(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2, uint8_t relop) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
 #endif
@@ -750,7 +758,8 @@ size_t create_vector_slot3_relop(void *ptr, OHType op, AttrSrcInfo ai, OperandTy
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BV41_ext;
     i->opc = op.o;
-    i->es = ai.p.ves;
+    i->vs = vs.p.vs;
+    i->es = ves.p.ves;
     SET_SLOT(0);
     SET_SLOT(1);
     SET_SLOT(2);

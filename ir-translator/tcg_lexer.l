@@ -123,6 +123,7 @@ al16            al16
 leo             leo
 al32            al32
 ENV             env
+V64             v64
 V128            v128
 E8              e8
 E16             e16
@@ -1430,7 +1431,8 @@ xsetbv                          xsetbv
 {tsteq}           { HANDLE_COLUMN; yylval->r = tsteq; return TSTREL; }
 {tstne}           { HANDLE_COLUMN; yylval->r = tstne; return TSTREL; }
 {ENV}             { HANDLE_COLUMN; return ENV; }
-{V128}            { HANDLE_COLUMN; return V128; }
+{V64}             { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_VECTORSIZE; yylval->ai.p.vs = VS64; return V64; }
+{V128}            { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_VECTORSIZE; yylval->ai.p.vs = VS128; return V128; }
 {E8}              { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ELEMENTSIZE; yylval->ai.p.ves = VES8; return ELEMENTSIZEATTR; }
 {E16}             { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ELEMENTSIZE; yylval->ai.p.ves = VES16; return ELEMENTSIZEATTR; }
 {E32}             { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ELEMENTSIZE; yylval->ai.p.ves = VES32; return ELEMENTSIZEATTR; }

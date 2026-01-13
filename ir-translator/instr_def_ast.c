@@ -290,7 +290,7 @@ void gen_api() {
             printf("    return -1;\n");
         } else {
             printf("    %s *i_%s = (%s *)ptr;\n", instr, instr, instr);
-            printf("    return (i_%s->es + LLVMVector16xi8);\n", instr);
+            printf("    return (LLVMVector8xi8 + (i_%s->vs - VS64) * 4 + i_%s->es);\n", instr, instr);
         }
     }
 

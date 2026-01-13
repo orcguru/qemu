@@ -45,11 +45,11 @@ extern uint8_t instr_buf[64];
 %}
 
 %token <val> NUM IMMX IMMD E8 E16 E32 E64 LABEL XMMVAR
-%token <ai> MEMATTR SWAPATTR ELEMENTSIZEATTR
+%token <ai> MEMATTR SWAPATTR ELEMENTSIZEATTR V64 V128
 %token <si> SLOT
 %token <r> RELOP TSTREL
 %token <oh> SYMBOL BSWAP SETLABL BRCOND CALL JMPDIR CALLDIR DISCARD
-%token COMMA COLON PLUS ENV V128 XMMTMP
+%token COMMA COLON PLUS ENV XMMTMP
 
 %%
 top: xmm_def_list program;
@@ -108,14 +108,16 @@ SYMBOL SLOT                                                             { insert
 | DISCARD SLOT                                                                      { insert_instr(instr_buf, create_scalar_slot(instr_buf, $1, $2)); };
 
 vector:
-SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT                             { insert_instr(instr_buf, create_vector_slot2(instr_buf, $1, $4, $6, $8)); }
-| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT                { insert_instr(instr_buf, create_vector_slot3(instr_buf, $1, $4, $6, $8, $10)); }
-| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT     { insert_instr(instr_buf, create_vector_slot4(instr_buf, $1, $4, $6, $8, $10, $12)); }
-| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT COMMA RELOP    { insert_instr(instr_buf, create_vector_slot3_relop(instr_buf, $1, $4, $6, $8, $10, $12)); }
-| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA V128 IMMX                      { insert_instr(instr_buf, create_vector_slot_vimm(instr_buf, $1, $4, $6, $9)); }
-| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA IMMX                { insert_instr(instr_buf, create_vector_slot2_imm(instr_buf, $1, $4, $6, $8, $10)); }
-| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA V128 IMMX           { insert_instr(instr_buf, create_vector_slot2_imm(instr_buf, $1, $4, $6, $8, $11)); }
-| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA ENV COMMA IMMX                 { insert_instr(instr_buf, create_vector_slot_env_imm(instr_buf, $1, $4, $6, $10)); };
+SYMBOL V64 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT COMMA RELOP    { insert_instr(instr_buf, create_vector_slot3_relop(instr_buf, $1, $2, $4, $6, $8, $10, $12)); }
+| SYMBOL V64 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA ENV COMMA IMMX                 { insert_instr(instr_buf, create_vector_slot_env_imm(instr_buf, $1, $2, $4, $6, $10)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT                             { insert_instr(instr_buf, create_vector_slot2(instr_buf, $1, $2, $4, $6, $8)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT                { insert_instr(instr_buf, create_vector_slot3(instr_buf, $1, $2, $4, $6, $8, $10)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT COMMA SLOT     { insert_instr(instr_buf, create_vector_slot4(instr_buf, $1, $2, $4, $6, $8, $10, $12)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT COMMA RELOP    { insert_instr(instr_buf, create_vector_slot3_relop(instr_buf, $1, $2, $4, $6, $8, $10, $12)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA V128 IMMX                      { insert_instr(instr_buf, create_vector_slot_vimm(instr_buf, $1, $2, $4, $6, $9)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA IMMX                { insert_instr(instr_buf, create_vector_slot2_imm(instr_buf, $1, $2, $4, $6, $8, $10)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA V128 IMMX           { insert_instr(instr_buf, create_vector_slot2_imm(instr_buf, $1, $2, $4, $6, $8, $11)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA ENV COMMA IMMX                 { insert_instr(instr_buf, create_vector_slot_env_imm(instr_buf, $1, $2, $4, $6, $10)); }
 
 call_helper:
 CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT                                     { insert_instr(instr_buf, create_helper_env_slot2(instr_buf, $2, $4, $6, $10, $12)); }
