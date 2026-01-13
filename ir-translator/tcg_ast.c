@@ -972,7 +972,7 @@ static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, Operan
     } else if (out.s.slot_type == SUB_SLOT_ENV) {
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
-        assert(out.s.offset >= (ENV_XMM_START + XMM_COUNT * 0x40));
+        // v64 type stores into MMX region
         CREATE_ADD64(tmp, env, out.s.offset);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(val_type, 0), get_next_var_name("store_env_ptr_offset", out));
@@ -4719,11 +4719,16 @@ void module_prolog() {
     llvm_int_types[LLVMInt32] = LLVMInt32Type();
     llvm_int_types[LLVMInt64] = LLVMInt64Type();
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+    llvm_int_types[LLVMVector8xi8] = LLVMVectorType(LLVMInt8Type(), 8);
+    llvm_int_types[LLVMVector4xi16] = LLVMVectorType(LLVMInt16Type(), 4);
+    llvm_int_types[LLVMVector2xi32] = LLVMVectorType(LLVMInt32Type(), 2);
+    llvm_int_types[LLVMVector1xi64] = LLVMVectorType(LLVMInt64Type(), 1);
     llvm_int_types[LLVMVector16xi8] = LLVMVectorType(LLVMInt8Type(), 16);
     llvm_int_types[LLVMVector8xi16] = LLVMVectorType(LLVMInt16Type(), 8);
     llvm_int_types[LLVMVector4xi32] = LLVMVectorType(LLVMInt32Type(), 4);
     llvm_int_types[LLVMVector2xi64] = LLVMVectorType(LLVMInt64Type(), 2);
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
+    // FIXME: v64
     llvm_int_types[LLVMVector16xi8] = LLVMScalableVectorType(LLVMInt8Type(), 8);
     llvm_int_types[LLVMVector8xi16] = LLVMScalableVectorType(LLVMInt16Type(), 4);
     llvm_int_types[LLVMVector4xi32] = LLVMScalableVectorType(LLVMInt32Type(), 2);
@@ -4742,6 +4747,14 @@ void module_prolog() {
     llvm_vector_elem_bit_counts[LLVMInt32*2+1] = 32;
     llvm_vector_elem_bit_counts[LLVMInt64*2] = 1;
     llvm_vector_elem_bit_counts[LLVMInt64*2+1] = 64;
+    llvm_vector_elem_bit_counts[LLVMVector8xi8*2] = 8;
+    llvm_vector_elem_bit_counts[LLVMVector8xi8*2+1] = 8;
+    llvm_vector_elem_bit_counts[LLVMVector4xi16*2] = 4;
+    llvm_vector_elem_bit_counts[LLVMVector4xi16*2+1] = 16;
+    llvm_vector_elem_bit_counts[LLVMVector2xi32*2] = 2;
+    llvm_vector_elem_bit_counts[LLVMVector2xi32*2+1] = 32;
+    llvm_vector_elem_bit_counts[LLVMVector1xi64*2] = 1;
+    llvm_vector_elem_bit_counts[LLVMVector1xi64*2+1] = 64;
     llvm_vector_elem_bit_counts[LLVMVector16xi8*2] = 16;
     llvm_vector_elem_bit_counts[LLVMVector16xi8*2+1] = 8;
     llvm_vector_elem_bit_counts[LLVMVector8xi16*2] = 8;
