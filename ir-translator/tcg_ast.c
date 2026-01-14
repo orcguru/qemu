@@ -518,6 +518,7 @@ extern const XRegType helper_compress_arg_expectations[HELPER_MAX][MAX_COMPRESSE
 */
 extern const int helper_require_exception_path[HELPER_MAX];
 
+static char func_name_postfix[33] = {0};
 static LLVMAttributeRef target_features_attr = NULL;
 static LLVMAttributeRef NoInlineAttr = NULL;
 static LLVMAttributeRef AlwaysInlineAttr = NULL;
@@ -1822,7 +1823,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     LLVMBuildStore(builder, x64_ret_addr, shadow_ptr0);
 
     char func_name[64] = {0};
-    sprintf(func_name, "func_%lx", func_hex.i);
+    sprintf(func_name, "%s_func_%lx", func_name_postfix, func_hex.i);
     assert(strlen(func_name) < sizeof(func_name));
     LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, 0, NoInlineAttr), llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     CREATE_ADD(ptr_val, ptr_val, -8UL);
@@ -2502,7 +2503,7 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
     assert(is_imm);
 
     char func_name[64] = {0};
-    sprintf(func_name, "func_%lx", (current_func_offset + delta.i));
+    sprintf(func_name, "%s_func_%lx", func_name_postfix, (current_func_offset + delta.i));
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT] = {NULL};
     int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_AND_VALUE, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, call_args, func_name);
@@ -3545,7 +3546,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
 
     char second_half_name[64];
     uint8_t call_idx = get_idx_for_call_helper(ptr);
-    sprintf(second_half_name, "func_%lx_call%d", current_func_offset, call_idx);
+    sprintf(second_half_name, "%s_func_%lx_call%d", func_name_postfix, current_func_offset, call_idx);
 
     char helper_func_name[1024] = {0};
     char bc_name[1024] = {0};
@@ -3830,7 +3831,7 @@ void translate_call(OpCodeType opc, void *ptr) {
 
     char second_half_name[64];
     uint8_t call_idx = get_idx_for_call_helper(ptr);
-    sprintf(second_half_name, "func_%lx_call%d", current_func_offset, call_idx);
+    sprintf(second_half_name, "%s_func_%lx_call%d", func_name_postfix, current_func_offset, call_idx);
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
 
@@ -4255,7 +4256,7 @@ void handle_func(uint64_t val) {
     memcpy(tmp_var_available_backup, tmp_var_available, sizeof(tmp_var_available_backup));
 
     char func_name[64];
-    sprintf(func_name, "func_%lx", val);
+    sprintf(func_name, "%s_func_%lx", func_name_postfix, val);
     llvm_func = get_or_add_func_with_qemuaot_cc(func_name, 0, NoInlineAttr);
     for (int j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
         LLVMValueRef param = LLVMGetParam(llvm_func, j);
@@ -4842,7 +4843,7 @@ void module_epilog() {
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
         if (LLVMIsAFunction(function)) {
-            if (LLVMIsDeclaration(function) && strstr(LLVMGetValueName(function), "func_")) {
+            if (LLVMIsDeclaration(function) && strstr(LLVMGetValueName(function), "_func_")) {
                 LLVMSetLinkage(function, LLVMWeakAnyLinkage);
                 LLVMAddAttributeAtIndex(function, -1, NoInlineAttr);
                 LLVMAddAttributeAtIndex(function, -1, target_features_attr);
@@ -4921,11 +4922,13 @@ void parse_tcg_instructions(const char *filename) {
 }
 
 int main(int argc, const char *argv[]) {
-    if (argc < 2) {
-        printf("Usage: ./app <tcg-ir>\n");
+    if (argc < 3) {
+        printf("Usage: ./app <tcg-ir> <func_name_postfix>\n");
         return -1;
     }
 
+    assert(strlen(argv[2]) <= (sizeof(func_name_postfix)-1));
+    strcpy(func_name_postfix, argv[2]);
     sprintf(output_file, "%s.o", argv[1]);
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
     LLVMInitializeAArch64TargetInfo();
