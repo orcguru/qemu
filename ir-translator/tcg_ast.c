@@ -575,7 +575,7 @@ static uint64_t tmp_valid[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
 static uint64_t tmp_var_available[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
 static uint64_t tmp_var_available_backup[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
 static LLVMType tmp_bits_type[1<<STACK_INDEX_SHIFT] = {0};
-static char output_file[128] = {0};
+static char output_file[4096] = {0};
 static OperandType dummy_slot_for_debug;
 static int32_t tmp_shadow_offset[1<<STACK_INDEX_SHIFT] = {0};
 #define LLVMNoInlineAttribute       32
