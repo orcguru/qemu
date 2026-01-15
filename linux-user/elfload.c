@@ -2716,7 +2716,8 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
     NEW_AUX_ENT(AT_PHDR, (abi_ulong)(info->load_addr + exec->e_phoff));
     NEW_AUX_ENT(AT_PHENT, (abi_ulong)(sizeof (struct elf_phdr)));
     NEW_AUX_ENT(AT_PHNUM, (abi_ulong)(exec->e_phnum));
-    NEW_AUX_ENT(AT_PAGESZ, (abi_ulong)(TARGET_PAGE_SIZE));
+    //NEW_AUX_ENT(AT_PAGESZ, (abi_ulong)(TARGET_PAGE_SIZE));
+    NEW_AUX_ENT(AT_PAGESZ, (abi_ulong)0x4000);
     NEW_AUX_ENT(AT_BASE, (abi_ulong)(interp_info ? interp_info->load_addr : 0));
     NEW_AUX_ENT(AT_FLAGS, (abi_ulong)0);
     NEW_AUX_ENT(AT_ENTRY, info->entry);
@@ -3279,7 +3280,7 @@ static bool parse_elf_properties(const ImageSource *src,
 
 #ifdef AOT
 #include "tcg/tcg-aot.h"
-extern void *invoke_jitlink(const char *, uint64_t, uint64_t, void (*)(uint64_t, uint64_t), void (*)(const char *, uint64_t), void *, size_t, int);
+extern void *invoke_jitlink(const char *, uint64_t, uint64_t, void (*)(uint64_t, uint64_t), void (*)(const char *, uint64_t), void *, size_t, int, const char *);
 extern helper_func_t helper_funcs[];
 extern size_t helper_funcs_count;
 extern int enable_llvm_debug;
@@ -3291,19 +3292,70 @@ static void load_aot_image(const char *image_name, struct image_info *info)
     snprintf(aotnamebuf, PATH_MAX, "%s.aot", image_name);
     int fp = open(image_name, O_RDONLY);
     if (!fp) {
-      perror("Failed to open image_name\n");
-      return;
+        perror("Failed to open image_name\n");
+        return;
     }
     struct stat st;
     if (fstat(fp, &st) != 0) {
-      perror("Failed fstat image_name\n");
-      return;
+        perror("Failed fstat image_name\n");
+        return;
     }
     // log helper functions
     for (int i = 0; i < helper_funcs_count; ++i) {
-      qemu_log_mask(LOG_AOT, "%s %016lx\n", helper_funcs[i].name, helper_funcs[i].addr);
+        qemu_log_mask(LOG_AOT, "%s %016lx\n", helper_funcs[i].name, helper_funcs[i].addr);
     }
-    invoke_jitlink((const char *)aotnamebuf, info->start_code, (info->start_code + st.st_size), tb_aot_insert, tb_aot_log, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug);
+    char tag_buf[PATH_MAX];
+    strcpy(tag_buf, image_name);
+    char *tag_start = tag_buf;
+    char *ptr = strstr(tag_start, "/");
+    while (ptr) {
+        tag_start = ptr + 1;
+        ptr = strstr(tag_start, "/");
+    }
+    char *tag_end = tag_start;
+    while (tag_end[0]) {
+        if (tag_end[0] == '.' || tag_end[0] == '_' || tag_end[0] == '-') {
+            tag_end[0] = '\0';
+            break;
+        }
+        tag_end += 1;
+    }
+    char entry_func[128] = {0};
+    sprintf(entry_func, "--entry=%s_func_%x", tag_start, (info->entry - info->start_code));
+    invoke_jitlink((const char *)aotnamebuf, info->start_code, (info->start_code + st.st_size), tb_aot_insert, tb_aot_log, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug, (const char *)entry_func);
+}
+#endif
+
+#ifdef AOT
+static void update_code_start(struct image_info *info, struct elfhdr *hdr, const ImageSource *src)
+{
+    int i, shnum;
+    g_autofree struct elf_shdr *shdr = NULL;
+    shnum = hdr->e_shnum;
+    shdr = imgsrc_read_alloc(hdr->e_shoff, shnum * sizeof(struct elf_shdr),
+                             src, NULL);
+    if (shdr == NULL) {
+        return;
+    }
+    bswap_shdr(shdr, shnum);
+    abi_long load_begin = (1UL << 63)-1;
+    abi_long exec_begin = (1UL << 63)-1;
+    abi_long exec_end = 0;
+    for (i = 0; i < shnum; ++i) {
+        if (shdr[i].sh_flags &= SHF_EXECINSTR) {
+            if (shdr[i].sh_addr < exec_begin) {
+                exec_begin = shdr[i].sh_addr;
+            }
+            if ((shdr[i].sh_addr + shdr[i].sh_size) > exec_end) {
+                exec_end = (shdr[i].sh_addr + shdr[i].sh_size);
+            }
+        }
+        if (shdr[i].sh_addr < load_begin) {
+            load_begin = shdr[i].sh_addr;
+        }
+    }
+    info->start_code += (exec_begin - load_begin);
+    return;
 }
 #endif
 
@@ -3624,6 +3676,10 @@ static void load_elf_image(const char *image_name, const ImageSource *src,
         load_symbols(ehdr, src, load_bias);
     }
 
+#ifdef AOT
+    update_code_start(info, ehdr, src);
+#endif
+
     debuginfo_report_elf(image_name, src->fd, load_bias);
 
     mmap_unlock();
@@ -3666,6 +3722,9 @@ static void load_elf_interp(const char *filename, struct image_info *info,
     src.cache_size = retval;
 
     load_elf_image(filename, &src, info, &ehdr, NULL);
+#ifdef AOT
+    load_aot_image(filename, info);
+#endif
 }
 
 #ifndef vdso_image_info
