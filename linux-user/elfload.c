@@ -3330,28 +3330,65 @@ static void load_aot_image(const char *image_name, struct image_info *info)
 static void update_code_start(struct image_info *info, struct elfhdr *hdr, const ImageSource *src)
 {
     int i, shnum;
+    abi_long load_begin = (1UL << 63)-1;
+    struct elfhdr ehdr;
+    if (!imgsrc_read(&ehdr, 0, sizeof(ehdr), src, NULL)) {
+        assert(0);
+    }
+    if (!elf_check_ident(&ehdr)) {
+        assert(0);
+    }
+    bswap_ehdr(&ehdr);
+    if (!elf_check_ehdr(&ehdr)) {
+        assert(0);
+    }
+    g_autofree struct elf_phdr *phdr = NULL;
+    phdr = imgsrc_read_alloc(ehdr.e_phoff,
+                             ehdr.e_phnum * sizeof(struct elf_phdr),
+                             src, NULL);
+    if (phdr == NULL) {
+        assert(0);
+    }
+    bswap_phdr(phdr, ehdr.e_phnum);
+    for (int i = 0; i < ehdr.e_phnum; i++) {
+        struct elf_phdr *eppnt = phdr + i;
+        if (eppnt->p_type == PT_LOAD) {
+            abi_ulong vaddr;
+            int elf_prot = 0;
+
+            if (eppnt->p_flags & PF_R) {
+                elf_prot |= PROT_READ;
+            }
+            if (eppnt->p_flags & PF_W) {
+                elf_prot |= PROT_WRITE;
+            }
+            if (eppnt->p_flags & PF_X) {
+                elf_prot |= PROT_EXEC;
+            }
+
+            vaddr = eppnt->p_vaddr;
+            if (elf_prot & PROT_EXEC) {
+                if (vaddr < load_begin) {
+                    load_begin = vaddr;
+                }
+            }
+        }
+    }
+
     g_autofree struct elf_shdr *shdr = NULL;
     shnum = hdr->e_shnum;
     shdr = imgsrc_read_alloc(hdr->e_shoff, shnum * sizeof(struct elf_shdr),
                              src, NULL);
     if (shdr == NULL) {
-        return;
+        assert(0);
     }
     bswap_shdr(shdr, shnum);
-    abi_long load_begin = (1UL << 63)-1;
     abi_long exec_begin = (1UL << 63)-1;
-    abi_long exec_end = 0;
     for (i = 0; i < shnum; ++i) {
         if (shdr[i].sh_flags &= SHF_EXECINSTR) {
             if (shdr[i].sh_addr < exec_begin) {
                 exec_begin = shdr[i].sh_addr;
             }
-            if ((shdr[i].sh_addr + shdr[i].sh_size) > exec_end) {
-                exec_end = (shdr[i].sh_addr + shdr[i].sh_size);
-            }
-        }
-        if (shdr[i].sh_addr < load_begin) {
-            load_begin = shdr[i].sh_addr;
         }
     }
     info->start_code += (exec_begin - load_begin);
