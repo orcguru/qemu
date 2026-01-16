@@ -2208,7 +2208,8 @@ static inline void memcpy_fromfs(void * to, const void * from, unsigned long n)
     memcpy(to, from, n);
 }
 
-static void bswap_ehdr(struct elfhdr *ehdr)
+void bswap_ehdr(struct elfhdr *ehdr);
+void bswap_ehdr(struct elfhdr *ehdr)
 {
     if (!target_needs_bswap()) {
         return;
@@ -2229,7 +2230,8 @@ static void bswap_ehdr(struct elfhdr *ehdr)
     bswap16s(&ehdr->e_shstrndx);        /* Section header string table index */
 }
 
-static void bswap_phdr(struct elf_phdr *phdr, int phnum)
+void bswap_phdr(struct elf_phdr *phdr, int phnum);
+void bswap_phdr(struct elf_phdr *phdr, int phnum)
 {
     if (!target_needs_bswap()) {
         return;
@@ -2247,7 +2249,8 @@ static void bswap_phdr(struct elf_phdr *phdr, int phnum)
     }
 }
 
-static void bswap_shdr(struct elf_shdr *shdr, int shnum)
+void bswap_shdr(struct elf_shdr *shdr, int shnum);
+void bswap_shdr(struct elf_shdr *shdr, int shnum)
 {
     if (!target_needs_bswap()) {
         return;
@@ -2302,7 +2305,8 @@ static void load_symbols(struct elfhdr *hdr, const ImageSource *src,
 
 /* Verify the portions of EHDR within E_IDENT for the target.
    This can be performed before bswapping the entire header.  */
-static bool elf_check_ident(struct elfhdr *ehdr)
+bool elf_check_ident(struct elfhdr *ehdr);
+bool elf_check_ident(struct elfhdr *ehdr)
 {
     return (ehdr->e_ident[EI_MAG0] == ELFMAG0
             && ehdr->e_ident[EI_MAG1] == ELFMAG1
@@ -2315,7 +2319,8 @@ static bool elf_check_ident(struct elfhdr *ehdr)
 
 /* Verify the portions of EHDR outside of E_IDENT for the target.
    This has to wait until after bswapping the header.  */
-static bool elf_check_ehdr(struct elfhdr *ehdr)
+bool elf_check_ehdr(struct elfhdr *ehdr);
+bool elf_check_ehdr(struct elfhdr *ehdr)
 {
     return (elf_check_arch(ehdr->e_machine)
             && elf_check_abi(ehdr->e_flags)
@@ -3285,9 +3290,10 @@ extern helper_func_t helper_funcs[];
 extern size_t helper_funcs_count;
 extern int enable_llvm_debug;
 
-// FIXME: probably this function need be moved to some other space
-static void load_aot_image(const char *image_name, struct image_info *info)
+void load_aot_image(const char *image_name, unsigned long start_code, unsigned long entry);
+void load_aot_image(const char *image_name, unsigned long start_code, unsigned long entry)
 {
+    qemu_log_mask(LOG_AOT, "%s %s start_code:%lx entry:%lx\n", __FUNCTION__, image_name, start_code, entry);
     char aotnamebuf[PATH_MAX];
     snprintf(aotnamebuf, PATH_MAX, "%s.aot", image_name);
     int fp = open(image_name, O_RDONLY);
@@ -3300,10 +3306,15 @@ static void load_aot_image(const char *image_name, struct image_info *info)
         perror("Failed fstat image_name\n");
         return;
     }
-    // log helper functions
-    for (int i = 0; i < helper_funcs_count; ++i) {
-        qemu_log_mask(LOG_AOT, "%s %016lx\n", helper_funcs[i].name, helper_funcs[i].addr);
+    static int log_helper = 0;
+    if (!log_helper) {
+        // log helper functions
+        for (int i = 0; i < helper_funcs_count; ++i) {
+            qemu_log_mask(LOG_AOT, "%s %016lx\n", helper_funcs[i].name, helper_funcs[i].addr);
+        }
+        log_helper = 1;
     }
+    // Figure out the func_name_prefix
     char tag_buf[PATH_MAX];
     strcpy(tag_buf, image_name);
     char *tag_start = tag_buf;
@@ -3321,8 +3332,9 @@ static void load_aot_image(const char *image_name, struct image_info *info)
         tag_end += 1;
     }
     char entry_func[128] = {0};
-    sprintf(entry_func, "--entry=%s_func_%x", tag_start, (info->entry - info->start_code));
-    invoke_jitlink((const char *)aotnamebuf, info->start_code, (info->start_code + st.st_size), tb_aot_insert, tb_aot_log, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug, (const char *)entry_func);
+    sprintf(entry_func, "--entry=%s_func_%x", tag_start, (entry - start_code));
+    qemu_log_mask(LOG_AOT, "invoke_jitlink on %s with entry_info:%s\n", aotnamebuf, entry_func);
+    invoke_jitlink((const char *)aotnamebuf, start_code, (start_code + st.st_size), tb_aot_insert, tb_aot_log, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug, (const char *)entry_func);
 }
 #endif
 
@@ -3760,7 +3772,7 @@ static void load_elf_interp(const char *filename, struct image_info *info,
 
     load_elf_image(filename, &src, info, &ehdr, NULL);
 #ifdef AOT
-    load_aot_image(filename, info);
+    load_aot_image(filename, info->start_code, info->entry);
 #endif
 }
 
@@ -4028,7 +4040,7 @@ int load_elf_binary(struct linux_binprm *bprm, struct image_info *info)
 
     load_elf_image(bprm->filename, &bprm->src, info, &ehdr, &elf_interpreter);
 #ifdef AOT
-    load_aot_image(bprm->filename, info);
+    load_aot_image(bprm->filename, info->start_code, info->entry);
 #endif
 
     /* Do this so that we can load the interpreter, if need be.  We will

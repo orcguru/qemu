@@ -161,10 +161,163 @@ void register_for_aot_helper_jmp_ind()
     register_for_aot_helper("helper_jmp_ind", (uint64_t)helper_jmp_ind, "void");
 }
 
+extern void load_aot_image(const char *image_name, unsigned long start_code, unsigned long entry);
+
+#include <unistd.h>
+#include <stddef.h>
+#define ELF_CLASS       ELFCLASS64
+#define ELF_DATA        ELFDATA2LSB
+#include "include/elf.h"
+#include "user/cpu_loop.h"
+#include "user/abitypes.h"
+#include "linux-user/qemu.h"
+#include "linux-user/loader.h"
+extern void bswap_ehdr(struct elfhdr *ehdr);
+extern bool elf_check_ident(struct elfhdr *ehdr);
+extern bool elf_check_ehdr(struct elfhdr *ehdr);
+extern void bswap_phdr(struct elf_phdr *phdr, int phnum);
+extern void bswap_shdr(struct elf_shdr *shdr, int shnum);
+
+void find_and_load_missing_aot(uintptr_t x_addr)
+{
+    char fn[64] = {0};
+    sprintf(fn, "/proc/%d/maps", getpid());
+    FILE *fp = fopen(fn, "r");
+    assert(fp);
+    char *line = NULL;
+    size_t len = 0;
+    size_t rd;
+    char elf_fn[256] = {0};
+    char aot_fn[256] = {0};
+    uintptr_t start = -1UL;
+    uintptr_t end = -1UL;
+    uintptr_t offset = -1UL;
+    while ((rd = getline(&line, &len, fp)) != -1) {
+        char* p2;
+        start = strtol(line, (char **)&p2, 16);
+        p2++;
+        end = strtol(p2, (char **)&p2, 16);
+        p2 += 6;
+        offset = strtol(p2, NULL, 16);
+        if (x_addr >= start && x_addr < end) {
+            char *ptr = strstr(line, "/");
+            if (ptr) {
+                if (strlen(ptr) > 250) {
+                    assert(0);
+                }
+                strcpy(elf_fn, ptr);
+                elf_fn[strlen(elf_fn) - 1] = '\0';
+                sprintf(aot_fn, "%s.aot", elf_fn);
+            }
+            break;
+        } else {
+            start = -1UL;
+            end = -1UL;
+            continue;
+        }
+    }
+    fclose(fp);
+    assert(elf_fn[0]);
+    // FIXME: handle offset
+    assert(start != -1UL && end != -1UL && offset == 0);
+
+    // Figure out start_code/entry
+    unsigned long start_code = -1UL;
+    unsigned long entry = -1UL;
+    char bprm_buf[BPRM_BUF_SIZE] = {0};
+    struct elfhdr ehdr;
+    ImageSource src;
+    int fd, retval;
+    fd = open(elf_fn, O_RDONLY);
+    assert(fd != -1);
+    retval = read(fd, bprm_buf, BPRM_BUF_SIZE);
+    assert(retval != -1);
+    src.fd = fd;
+    src.cache = bprm_buf;
+    src.cache_size = retval;
+
+    g_autofree struct elf_phdr *phdr = NULL;
+    Error *err = NULL;
+
+    if (!imgsrc_read(&ehdr, 0, sizeof(ehdr), &src, &err)) {
+        assert(0);
+    }
+    if (!elf_check_ident(&ehdr)) {
+        assert(0);
+    }
+    bswap_ehdr(&ehdr);
+    if (!elf_check_ehdr(&ehdr)) {
+        assert(0);
+    }
+    phdr = imgsrc_read_alloc(ehdr.e_phoff,
+                             ehdr.e_phnum * sizeof(struct elf_phdr),
+                             &src, &err);
+    if (phdr == NULL) {
+        assert(0);
+    }
+    bswap_phdr(phdr, ehdr.e_phnum);
+    for (int i = 0; i < ehdr.e_phnum; i++) {
+        struct elf_phdr *eppnt = phdr + i;
+        if (eppnt->p_type == PT_LOAD) {
+            abi_ulong vaddr;
+            int elf_prot = 0;
+
+            if (eppnt->p_flags & PF_R) {
+                elf_prot |= PROT_READ;
+            }
+            if (eppnt->p_flags & PF_W) {
+                elf_prot |= PROT_WRITE;
+            }
+            if (eppnt->p_flags & PF_X) {
+                elf_prot |= PROT_EXEC;
+            }
+
+            vaddr = eppnt->p_vaddr;
+            if (elf_prot & PROT_EXEC) {
+                if (vaddr < start_code) {
+                    start_code = start + vaddr;
+                }
+            }
+        }
+    }
+    entry = start + ehdr.e_entry;
+    assert(start_code != -1UL && entry != -1UL);
+
+    g_autofree struct elf_shdr *shdr = NULL;
+    shdr = imgsrc_read_alloc(ehdr.e_shoff, ehdr.e_shnum * sizeof(struct elf_shdr),
+                             &src, NULL);
+    if (shdr == NULL) {
+        assert(0);
+    }
+    bswap_shdr(shdr, ehdr.e_shnum);
+    abi_long load_begin = (1UL << 63)-1;
+    abi_long exec_begin = (1UL << 63)-1;
+    abi_long exec_end = 0;
+    for (int i = 0; i < ehdr.e_shnum; ++i) {
+        if (shdr[i].sh_flags &= SHF_EXECINSTR) {
+            if (shdr[i].sh_addr < exec_begin) {
+                exec_begin = shdr[i].sh_addr;
+            }
+            if ((shdr[i].sh_addr + shdr[i].sh_size) > exec_end) {
+                exec_end = (shdr[i].sh_addr + shdr[i].sh_size);
+            }
+        }
+        if (shdr[i].sh_addr < load_begin) {
+            load_begin = shdr[i].sh_addr;
+        }
+    }
+    start_code += (exec_begin - load_begin);
+
+    qemu_log_mask(LOG_AOT, "Load %s start_code:%lx entry:%lx\n", elf_fn, start_code, entry);
+    load_aot_image(elf_fn, start_code, entry);
+}
+
+// Triggers AOT file load
 void helper_jit(CPUX86State *env, unsigned long target)
 {
+    // FIXME: need an RBTree to decide if we need to load_aot
+    find_and_load_missing_aot(target);
     CPUState *cs = env_cpu(env);
-
     cs->exception_index = EXCP_TCGJIT;
     env->exception_is_int = 0;
     env->exception_next_eip = target;
