@@ -273,10 +273,10 @@ TranslationBlock *tb_gen_code(CPUState *cpu, TCGTBCPUState s)
 
     phys_pc = get_page_addr_code_hostp(env, s.pc, &host_pc);
 
-    //if (phys_pc == -1) {
+    if (phys_pc == -1) {
         /* Generate a one-shot TB with 1 insn in it */
         s.cflags = (s.cflags & ~CF_COUNT_MASK) | 1;
-    //}
+    }
 
     max_insns = s.cflags & CF_COUNT_MASK;
     if (max_insns == 0) {
