@@ -222,6 +222,7 @@ void find_and_load_missing_aot(uintptr_t x_addr)
     assert(start != -1UL && end != -1UL && offset == 0);
 
     // Figure out start_code/entry
+    unsigned long start_vaddr = -1UL;
     unsigned long start_code = -1UL;
     unsigned long entry = -1UL;
     char bprm_buf[BPRM_BUF_SIZE] = {0};
@@ -273,14 +274,20 @@ void find_and_load_missing_aot(uintptr_t x_addr)
             }
 
             vaddr = eppnt->p_vaddr;
+            if (start_vaddr == -1UL) {
+                start_vaddr = vaddr;
+            } else {
+                assert(start_vaddr < vaddr);
+            }
+
             if (elf_prot & PROT_EXEC) {
                 if (vaddr < start_code) {
-                    start_code = start + vaddr;
+                    start_code = start + (vaddr - start_vaddr);
                 }
             }
         }
     }
-    entry = start + ehdr.e_entry;
+    entry = start + (ehdr.e_entry - start_vaddr);
     assert(start_code != -1UL && entry != -1UL);
 
     g_autofree struct elf_shdr *shdr = NULL;
@@ -301,9 +308,9 @@ void find_and_load_missing_aot(uintptr_t x_addr)
             if ((shdr[i].sh_addr + shdr[i].sh_size) > exec_end) {
                 exec_end = (shdr[i].sh_addr + shdr[i].sh_size);
             }
-        }
-        if (shdr[i].sh_addr < load_begin) {
-            load_begin = shdr[i].sh_addr;
+            if (shdr[i].sh_addr < load_begin) {
+                load_begin = shdr[i].sh_addr;
+            }
         }
     }
     start_code += (exec_begin - load_begin);
