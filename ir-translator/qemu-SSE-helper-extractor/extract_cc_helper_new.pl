@@ -107,7 +107,9 @@ while (<FD>) {
     $info{'CALL_TARGET'} = &GetText($info{'NAME_START'}, $info{'NAME_STOP'}, $ARGV[0]);
     $info{'CALL_ARGUMENTS'} = &GetText($info{'PAREN_START'}, $info{'PAREN_STOP'}, $ARGV[0]);
     my $func_idx = &lookup_func($info{'NAME_START'});
-    $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'CALLS'}->{$info{'NAME_START'}} = \%info;
+    if ($func_idx != -1 and $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'FUNC_NAME'} ne $info{'CALL_TARGET'}) {
+      $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'CALLS'}->{$info{'NAME_START'}} = \%info;
+    }
   } elsif ($line =~ /^<RETURN_VOID>/) {
     my @fields = split(/\$\$/, $line);
     my %info = ();
@@ -121,8 +123,10 @@ while (<FD>) {
       die "RETURN_VOID format error:$txt\n";
     }
     my $func_idx = &lookup_func($info{'RETURN_START'});
-    $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'RETURNS'}->{$info{'RETURN_START'}} = \%info;
-    $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'ENTRIES'}->{$info{'RETURN_START'}} = \%info;
+    if ($func_idx != -1) {
+      $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'RETURNS'}->{$info{'RETURN_START'}} = \%info;
+      $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'ENTRIES'}->{$info{'RETURN_START'}} = \%info;
+    }
   } elsif ($line =~ /^<RETURN_EXPR>/) {
     my @fields = split(/\$\$/, $line);
     my %info = ();
@@ -136,8 +140,10 @@ while (<FD>) {
     $info{'EXPR_START'} = $f3[1];
     $info{'EXPR_STOP'} = $f4[1];
     my $func_idx = &lookup_func($info{'RETURN_START'});
-    $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'RETURNS'}->{$info{'RETURN_START'}} = \%info;
-    $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'ENTRIES'}->{$info{'RETURN_START'}} = \%info;
+    if ($func_idx != -1) {
+      $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'RETURNS'}->{$info{'RETURN_START'}} = \%info;
+      $funcs{$addr_to_func{$sorted_addr[$func_idx]}}->{'ENTRIES'}->{$info{'RETURN_START'}} = \%info;
+    }
   }
 }
 close FD;
@@ -184,10 +190,10 @@ foreach my $f (keys %helpers_ret) {
       $funcs{$call_target}->{'TAIL_RETURN'} = 1;
     }
     unshift @sf, $call_target;
-    if (exists $funcs{$call_target}) {
+    if (exists $funcs{$call_target} and (not exists $defined_funcs_total{$call_target})) {
       $defined_funcs_total{$call_target} = 1;
+      push @sub_call_stack, $call_target;
     }
-    push @sub_call_stack, $call_target;
   }
   while (@sub_call_stack > 0) {
     my @new_call_stack = ();
@@ -203,10 +209,10 @@ foreach my $f (keys %helpers_ret) {
           $funcs{$call_target}->{'TAIL_RETURN'} = 1;
         }
         unshift @sf, $call_target;
-        if (exists $funcs{$call_target}) {
+        if (exists $funcs{$call_target} and (not exists $defined_funcs_total{$call_target})) {
           $defined_funcs_total{$call_target} = 1;
+          push @new_call_stack, $call_target;
         }
-        push @new_call_stack, $call_target;
       }
     }
     @sub_call_stack = @new_call_stack;
@@ -231,7 +237,7 @@ foreach my $f (keys %defined_funcs_total) {
           $hit = 0;
         }
         if ($hit != $expect_tail_return) {
-          die "Check $f non-uniform tail return\n";
+          die "Check $f non-uniform tail return $cf $call_target\n";
         }
       }
     }
@@ -749,9 +755,9 @@ sub lookup_func
   my ($loc) = @_;
   my $low_idx = 0;
   my $high_idx = $#sorted_addr;
-  while (($high_idx - $low_idx) != 1) {
+  while (($high_idx - $low_idx) > 1) {
     if (!($funcs{$addr_to_func{$sorted_addr[$low_idx]}}->{'FULL_START'} < $loc and $funcs{$addr_to_func{$sorted_addr[$high_idx]}}->{'FULL_START'} > $loc)) {
-      die "BUG2\n";
+      return -1;
     }
     my $middle_idx = int(($high_idx + $low_idx)/2);
     if ($funcs{$addr_to_func{$sorted_addr[$middle_idx]}}->{'FULL_START'} < $loc) {
@@ -760,10 +766,12 @@ sub lookup_func
       $high_idx = $middle_idx;
     }
   }
-  if (!($funcs{$addr_to_func{$sorted_addr[$low_idx]}}->{'FULL_START'} < $loc and $funcs{$addr_to_func{$sorted_addr[$low_idx]}}->{'FULL_STOP'} > $loc)) {
-    die "BUG3\n";
+  if ($funcs{$addr_to_func{$sorted_addr[$low_idx]}}->{'FULL_START'} < $loc and $funcs{$addr_to_func{$sorted_addr[$low_idx]}}->{'FULL_STOP'} > $loc) {
+    return $low_idx;
+  } elsif ($funcs{$addr_to_func{$sorted_addr[$high_idx]}}->{'FULL_START'} < $loc and $funcs{$addr_to_func{$sorted_addr[$high_idx]}}->{'FULL_STOP'} > $loc) {
+    return $high_idx;
   }
-  return $low_idx;
+  return -1;
 }
 
 sub extract_func_name
