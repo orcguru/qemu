@@ -190,10 +190,10 @@ foreach my $f (keys %helpers_ret) {
       $funcs{$call_target}->{'TAIL_RETURN'} = 1;
     }
     unshift @sf, $call_target;
-    if (exists $funcs{$call_target} and (not exists $defined_funcs_total{$call_target})) {
+    if (exists $funcs{$call_target}) {
       $defined_funcs_total{$call_target} = 1;
-      push @sub_call_stack, $call_target;
     }
+    push @sub_call_stack, $call_target;
   }
   while (@sub_call_stack > 0) {
     my @new_call_stack = ();
@@ -209,10 +209,10 @@ foreach my $f (keys %helpers_ret) {
           $funcs{$call_target}->{'TAIL_RETURN'} = 1;
         }
         unshift @sf, $call_target;
-        if (exists $funcs{$call_target} and (not exists $defined_funcs_total{$call_target})) {
+        if (exists $funcs{$call_target}) {
           $defined_funcs_total{$call_target} = 1;
-          push @new_call_stack, $call_target;
         }
+        push @new_call_stack, $call_target;
       }
     }
     @sub_call_stack = @new_call_stack;
