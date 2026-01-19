@@ -2721,8 +2721,11 @@ static abi_ulong create_elf_tables(abi_ulong p, int argc, int envc,
     NEW_AUX_ENT(AT_PHDR, (abi_ulong)(info->load_addr + exec->e_phoff));
     NEW_AUX_ENT(AT_PHENT, (abi_ulong)(sizeof (struct elf_phdr)));
     NEW_AUX_ENT(AT_PHNUM, (abi_ulong)(exec->e_phnum));
-    //NEW_AUX_ENT(AT_PAGESZ, (abi_ulong)(TARGET_PAGE_SIZE));
+#if defined(__aarch64__)
     NEW_AUX_ENT(AT_PAGESZ, (abi_ulong)0x4000);
+#elif defined(__riscv)
+    NEW_AUX_ENT(AT_PAGESZ, (abi_ulong)(TARGET_PAGE_SIZE));
+#endif
     NEW_AUX_ENT(AT_BASE, (abi_ulong)(interp_info ? interp_info->load_addr : 0));
     NEW_AUX_ENT(AT_FLAGS, (abi_ulong)0);
     NEW_AUX_ENT(AT_ENTRY, info->entry);
@@ -3332,7 +3335,7 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
         tag_end += 1;
     }
     char entry_func[128] = {0};
-    sprintf(entry_func, "--entry=%s_func_%x", tag_start, (entry - start_code));
+    sprintf(entry_func, "--entry=%s_func_%lx", tag_start, (entry - start_code));
     qemu_log_mask(LOG_AOT, "invoke_jitlink on %s with entry_info:%s\n", aotnamebuf, entry_func);
     invoke_jitlink((const char *)aotnamebuf, start_code, (start_code + st.st_size), tb_aot_insert, tb_aot_log, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug, (const char *)entry_func);
 }
