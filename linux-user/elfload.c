@@ -3335,7 +3335,7 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
         tag_end += 1;
     }
     char entry_func[128] = {0};
-    sprintf(entry_func, "--entry=%s_func_0", tag_start, (entry - start_code));
+    sprintf(entry_func, "--entry=%s_func_0", tag_start);
     qemu_log_mask(LOG_AOT, "invoke_jitlink on %s with entry_info:%s\n", aotnamebuf, entry_func);
     invoke_jitlink((const char *)aotnamebuf, start_code, (start_code + st.st_size), tb_aot_insert, tb_aot_log, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug, (const char *)entry_func);
 }
