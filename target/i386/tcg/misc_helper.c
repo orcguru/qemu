@@ -180,6 +180,7 @@ extern void bswap_shdr(struct elf_shdr *shdr, int shnum);
 
 void find_and_load_missing_aot(uintptr_t x_addr)
 {
+    qemu_log_mask(LOG_AOT, "%s x_addr:%lx\n", __FUNCTION__, x_addr);
     char fn[64] = {0};
     sprintf(fn, "/proc/%d/maps", getpid());
     FILE *fp = fopen(fn, "r");
@@ -218,6 +219,7 @@ void find_and_load_missing_aot(uintptr_t x_addr)
     }
     fclose(fp);
     assert(elf_fn[0]);
+    qemu_log_mask(LOG_AOT, "load aot for:%s\n", elf_fn);
     // FIXME: handle offset
     assert(start != -1UL && end != -1UL && offset == 0);
 
@@ -257,6 +259,25 @@ void find_and_load_missing_aot(uintptr_t x_addr)
         assert(0);
     }
     bswap_phdr(phdr, ehdr.e_phnum);
+#if 0
+    // shdr
+    g_autofree struct elf_shdr *shdr = NULL;
+    shdr = imgsrc_read_alloc(ehdr.e_shoff, ehdr.e_shnum * sizeof(struct elf_shdr),
+                             &src, NULL);
+    if (shdr == NULL) {
+        assert(0);
+    }
+    bswap_shdr(shdr, ehdr.e_shnum);
+    ///
+    abi_long exec_init_load_vaddr = -1UL;
+    for (int i = 0; i < ehdr.e_shnum; ++i) {
+        if (shdr[i].sh_flags &= SHF_EXECINSTR) {
+            exec_init_load_vaddr = shdr[i].sh_addr;
+            break;
+        }
+    }
+    assert(exec_init_load_vaddr != -1UL);
+#endif
     for (int i = 0; i < ehdr.e_phnum; i++) {
         struct elf_phdr *eppnt = phdr + i;
         if (eppnt->p_type == PT_LOAD) {
@@ -276,6 +297,7 @@ void find_and_load_missing_aot(uintptr_t x_addr)
             vaddr = eppnt->p_vaddr;
             if (start_vaddr == -1UL) {
                 start_vaddr = vaddr;
+                qemu_log_mask(LOG_AOT, "start_vaddr:%lx\n", start_vaddr);
             } else {
                 assert(start_vaddr < vaddr);
             }
@@ -283,13 +305,14 @@ void find_and_load_missing_aot(uintptr_t x_addr)
             if (elf_prot & PROT_EXEC) {
                 if (vaddr < start_code) {
                     start_code = start + (vaddr - start_vaddr);
+                    qemu_log_mask(LOG_AOT, "start_code:%lx = start:%lx + (vaddr:%lx - start_vaddr:%lx)\n", start_code, start, vaddr, start_vaddr);
                 }
             }
         }
     }
     entry = start + (ehdr.e_entry - start_vaddr);
+    qemu_log_mask(LOG_AOT, "entry:%lx = start:%lx + (ehdr.e_entry:%lx - start_vaddr:%lx)\n", entry, start, ehdr.e_entry, start_vaddr);
     assert(start_code != -1UL && entry != -1UL);
-
     g_autofree struct elf_shdr *shdr = NULL;
     shdr = imgsrc_read_alloc(ehdr.e_shoff, ehdr.e_shnum * sizeof(struct elf_shdr),
                              &src, NULL);
@@ -304,16 +327,19 @@ void find_and_load_missing_aot(uintptr_t x_addr)
         if (shdr[i].sh_flags &= SHF_EXECINSTR) {
             if (shdr[i].sh_addr < exec_begin) {
                 exec_begin = shdr[i].sh_addr;
+                qemu_log_mask(LOG_AOT, "updated exec_begin:%lx on i:%d\n", exec_begin, i);
             }
             if ((shdr[i].sh_addr + shdr[i].sh_size) > exec_end) {
                 exec_end = (shdr[i].sh_addr + shdr[i].sh_size);
             }
             if (shdr[i].sh_addr < load_begin) {
                 load_begin = shdr[i].sh_addr;
+                qemu_log_mask(LOG_AOT, "updated load_begin:%lx on i:%d\n", load_begin, i);
             }
         }
     }
     start_code += (exec_begin - load_begin);
+    qemu_log_mask(LOG_AOT, "start_code:%lx += (exec_begin:%lx - load_begin:%lx)\n", start_code, exec_begin, load_begin);
 
     qemu_log_mask(LOG_AOT, "Load %s start_code:%lx entry:%lx\n", elf_fn, start_code, entry);
     load_aot_image(elf_fn, start_code, entry);
