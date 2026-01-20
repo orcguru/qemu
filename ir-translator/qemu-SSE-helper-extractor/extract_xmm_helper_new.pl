@@ -11,6 +11,8 @@ if ($#ARGV < 1) {
   exit 1;
 }
 
+my $arch_info = `uname -m`;
+chomp($arch_info);
 my %VecCodeToCType = (
   "VecQ" => "v2ulong",
   "VecL" => "v4uint",
@@ -1516,7 +1518,11 @@ sub add_context_backup
   }
   if ($need_env or exists $funcs{$target_func}->{'DO_DEFINE_ENV'}) {
     $backup_vars = $backup_vars."CPUX86State *env;\n";
-    $backup_vars = $backup_vars."asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
+    if ($arch_info eq "riscv64") {
+      $backup_vars = $backup_vars."asm volatile (\"mv %0, x25\" : \"=r\" (env) : :);\n";
+    } else {
+      $backup_vars = $backup_vars."asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
+    }
   }
   foreach my $bk (keys %backups) {
     if ($bk =~ /^xmm/) {
@@ -1579,8 +1585,11 @@ sub get_func_body
   if (exists $func_ptr->{'DO_DEFINE_ENV'} and $func_ptr->{'NAME'} ne $exception_exit) {
     $body = "{\n";
     $body = $body."   $func_ptr->{'ENV_TYPE'}env;\n";
-    # FIXME: cross platform
-    $body = $body."   asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
+    if ($arch_info eq "riscv64") {
+      $body = $body."   asm volatile (\"mv %0, x25\" : \"=r\" (env) : :);\n";
+    } else {
+      $body = $body."   asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
+    }
     $current_pos = $func_ptr->{'BODY_START'} + 1;
   } else {
     $current_pos = $func_ptr->{'BODY_START'};
