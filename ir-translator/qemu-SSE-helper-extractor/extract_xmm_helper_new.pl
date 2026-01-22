@@ -1172,6 +1172,8 @@ sub parse_func_head
   my $head_copy = $head;
   if (not $head_copy =~ /__attribute__\(\(always_inline\)\)/) {
     $head_copy = "__attribute__((always_inline,weak)) ".$head_copy;
+    # disable inline for debug
+    #$head_copy = "__attribute__((noinline,weak)) ".$head_copy;
   } elsif (not $head_copy =~ /__attribute__\(\(weak\)\)/) {
     $head_copy = "__attribute__((weak)) ".$head_copy;
   }
