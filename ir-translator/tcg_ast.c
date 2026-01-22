@@ -3519,6 +3519,21 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
                 assert(new_idx != -1);
                 operands[i].s.slot_type = SUB_SLOT_XMM;
                 operands[i].s.slot_idx = spilled_xmm_regs[new_idx];
+
+                // Now load passenger into the slot
+                if (!fixed_vector_param_in_stack[FIXED_PARAM_COUNT + new_idx]) {
+                    LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + new_idx]], fixed_vector_stack_names[FIXED_PARAM_COUNT + new_idx]);
+                    func_xmm_alloca[new_idx] = alloca_inst;
+                    func_xmm_llvmtype[new_idx] = fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + new_idx];
+                    LLVMSetAlignment(alloca_inst, 16);
+                    fixed_vector_param_in_stack[FIXED_PARAM_COUNT + new_idx] = 1;
+                }
+                OperandType op;
+                op.s.valid = 1;
+                op.s.slot_type = SUB_SLOT_ENV;
+                op.s.offset = alias.s.offset;
+                LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_xmm_llvmtype[new_idx], 0);
+                LLVMBuildStore(builder, val, func_xmm_alloca[new_idx]);
             }
         }
     }
