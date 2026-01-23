@@ -4,12 +4,17 @@
 #include <stddef.h>
 #include <llvm-c/Types.h>
 
-#define MAX_ADDED_ARGS              6
 #define LLVMMAXType                 LLVMInt128
 #define AOT_LEVEL_0                 0
 #define AOT_LEVEL_MAX               3
 #define AOT_LEVEL                   AOT_LEVEL_0
 #define XMM_COUNT                   0
+
+#if AOT_LEVEL == AOT_LEVEL_MAX
+#define MAX_ADDED_ARGS              6
+#elif AOT_LEVEL == AOT_LEVEL_0
+#define MAX_ADDED_ARGS              7
+#endif
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
