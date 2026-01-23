@@ -3509,6 +3509,8 @@ static void tcg_target_qemu_prologue(TCGContext *s)
     tcg_out_insn(s, 3207, RET, TCG_REG_LR);
 }
 
+#include "tcg/tcg-aot.h"
+
 #ifdef AOT
 #define CONTEXT_RAX       TCG_REG_X6
 #define CONTEXT_RCX       TCG_REG_X7
@@ -3526,10 +3528,14 @@ static void tcg_target_qemu_prologue(TCGContext *s)
 #define CONTEXT_R13       TCG_REG_X26
 #define CONTEXT_R14       TCG_REG_X27
 #define CONTEXT_R15       TCG_REG_X28
+#if AOT_LEVEL == AOT_LEVEL_MAX
 #define CONTEXT_CC_SRC    TCG_REG_X0
 #define CONTEXT_CC_DST    TCG_REG_X1
 #define CONTEXT_CC_OP     TCG_REG_X2
 #define CONTEXT_RIP       TCG_REG_X3
+#elif AOT_LEVEL == AOT_LEVEL_0
+#define CONTEXT_RIP       TCG_REG_X0
+#endif
 
 static void tcg_target_qemu_aot_prologue(TCGContext *s)
 {
@@ -3553,16 +3559,6 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     /* Make stack space for TCG locals.  */
     tcg_out_insn(s, 3401, SUBI, TCG_TYPE_I64, TCG_REG_SP, TCG_REG_SP,
                  FRAME_SIZE - PUSH_SIZE);
-
-#if 0
-    // Save TCG_REG_SP to BACKUP_SP_BASE_ADDR
-    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 0), 0);
-    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 16), 16);
-    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 32), 32);
-    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 48), 48);
-    tcg_out32(s, 0x910003f1/*mov x17, sp*/);
-    tcg_out32(s, 0xf9000211/*str x17, [x16]*/);
-#endif
 
     /* Inform TCG about how to find TCG locals with register, offset, size.  */
     tcg_set_frame(s, TCG_REG_SP, TCG_STATIC_CALL_ARGS_SIZE,
@@ -3599,9 +3595,11 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R13, TCG_AREG0, 13 * 8);  // r13
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R14, TCG_AREG0, 14 * 8);  // r14
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R15, TCG_AREG0, 15 * 8);  // r15
+#if AOT_LEVEL == AOT_LEVEL_MAX
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_SRC, TCG_AREG0, 19 * 8);  // cc_src
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_DST, TCG_AREG0, 18 * 8);  // cc_dst
     tcg_out_ld(s, TCG_TYPE_I32, CONTEXT_CC_OP, TCG_AREG0, 21 * 8);  // cc_op
+#endif
     // Vectors
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V0, TCG_AREG0, 0x360 + 0*16);
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V1, TCG_AREG0, 0x360 + 1*16);
@@ -3649,16 +3647,6 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     /* TB epilogue */
     tb_ret_addr = tcg_splitwx_to_rx(s->code_ptr);
     tcg_out_bti(s, BTI_J);
-
-#if 0
-    // Restore TCG_REG_SP from BACKUP_SP_BASE_ADDR
-    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 0), 0);
-    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 16), 16);
-    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 32), 32);
-    tcg_out_insn(s, 3405, MOVK, TCG_TYPE_I64, TCG_REG_TMP0, (uint16_t)((uintptr_t)BACKUP_SP_BASE_ADDR >> 48), 48);
-    tcg_out32(s, 0xf9400211/*ldr x17, [x16]*/);
-    tcg_out32(s, 0x9100023f/*mov sp, x17*/);
-#endif
 
     /* Remove TCG locals stack space.  */
     tcg_out_insn(s, 3401, ADDI, TCG_TYPE_I64, TCG_REG_SP, TCG_REG_SP,
