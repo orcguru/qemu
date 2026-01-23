@@ -8,7 +8,6 @@
 //#define BUILD_RISCV_ON_AARCH      1
 //#define DEBUG                     1
 #define STACK_INDEX_SHIFT           10
-#define XMM_COUNT                   15
 #define SET_SLOT(IDX)                               \
     do {                                            \
         s##IDX = get_mapped_slot(s##IDX);    \
@@ -55,7 +54,7 @@ static XMMReg lookup_xmm(uint64_t offset) {
     XMMReg x;
     x.xmm_idx = NON_XMM;
     x.xmm_offset = 0;
-    if (xmm_offsets[0] <= off && off < (xmm_offsets[XMM_COUNT-1] + 0x20)) {
+    if (XMM_COUNT > 0 && xmm_offsets[0] <= off && off < (xmm_offsets[XMM_COUNT-1] + 0x20)) {
         uint16_t idx = (off - xmm_offsets[0]) / 0x40;
         uint16_t delta = (off - xmm_offsets[0]) % 0x40;
         if (delta < 0x10) {
@@ -1723,17 +1722,6 @@ const uint8_t opcmem_addr_nzidx[OPCODE_MAX] = {
     [st_vec] = 1,
 };
 
-/*
-const int helper_compress_arg_cnt[HELPER_MAX] = {
-    [helper_cc_compute_nz] = 3,
-};
-
-#define MAX_COMPRESSED_ARGS         3
-const XRegType helper_compress_arg_expectations[HELPER_MAX][MAX_COMPRESSED_ARGS] = {
-    [helper_cc_compute_nz] = {cc_dst, cc_src, cc_op},
-};
-*/
-
 const int helper_require_exception_path[HELPER_MAX] = {
     [helper_cc_compute_nz] = 1,
     [helper_addps_xmm] = 1,
@@ -2103,26 +2091,28 @@ const LLVMType helper_return_type[HELPER_MAX] = {
 };
 
 const uint64_t xreg_offsets[XREG_MAX] = {
-    [rax] = 0x0,
-    [rcx] = 0x8,
-    [rdx] = 0x10,
-    [rbx] = 0x18,
-    [rsp] = 0x20,
-    [rbp] = 0x28,
-    [rsi] = 0x30,
-    [rdi] = 0x38,
-    [r8] = 0x40,
-    [r9] = 0x48,
-    [r10] = 0x50,
-    [r11] = 0x58,
-    [r12] = 0x60,
-    [r13] = 0x68,
-    [r14] = 0x70,
-    [r15] = 0x78,
-    [cc_src] = 0x98,
-    [cc_dst] = 0x90,
-    [cc_op] = 0xa8,
-    [rip] = 0x80,
+    [rax] = ENV_OFFSET_rax,
+    [rcx] = ENV_OFFSET_rcx,
+    [rdx] = ENV_OFFSET_rdx,
+    [rbx] = ENV_OFFSET_rbx,
+    [rsp] = ENV_OFFSET_rsp,
+    [rbp] = ENV_OFFSET_rbp,
+    [rsi] = ENV_OFFSET_rsi,
+    [rdi] = ENV_OFFSET_rdi,
+    [r8] = ENV_OFFSET_r8,
+    [r9] = ENV_OFFSET_r9,
+    [r10] = ENV_OFFSET_r10,
+    [r11] = ENV_OFFSET_r11,
+    [r12] = ENV_OFFSET_r12,
+    [r13] = ENV_OFFSET_r13,
+    [r14] = ENV_OFFSET_r14,
+    [r15] = ENV_OFFSET_r15,
+#if AOT_LEVEL == AOT_LEVEL_MAX
+    [cc_src] = ENV_OFFSET_cc_src,
+    [cc_dst] = ENV_OFFSET_cc_dst,
+    [cc_op] = ENV_OFFSET_cc_op,
+#endif
+    [rip] = ENV_OFFSET_rip,
 };
 
 const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {

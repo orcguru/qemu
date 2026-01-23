@@ -1415,9 +1415,33 @@ xsetbv                          xsetbv
 {r13}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r13; return SLOT; }
 {r14}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r14; return SLOT; }
 {r15}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r15; return SLOT; }
-{cc_src}          { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = cc_src; return SLOT; }
-{cc_dst}          { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = cc_dst; return SLOT; }
-{cc_op}           { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = cc_op; return SLOT; }
+{cc_src}          { HANDLE_COLUMN;
+                    #if AOT_LEVEL == AOT_LEVEL_MAX
+                    yylval->si.s.slot_type = SUB_SLOT_XREG;
+                    yylval->si.s.slot_idx = cc_src;
+                    #elif AOT_LEVEL == AOT_LEVEL_0
+                    yylval->si.s.slot_type = SUB_SLOT_ENVVAR;
+                    yylval->si.s.slot_idx = cc_src;
+                    #endif
+                    return SLOT; }
+{cc_dst}          { HANDLE_COLUMN;
+                    #if AOT_LEVEL == AOT_LEVEL_MAX
+                    yylval->si.s.slot_type = SUB_SLOT_XREG;
+                    yylval->si.s.slot_idx = cc_dst;
+                    #elif AOT_LEVEL == AOT_LEVEL_0
+                    yylval->si.s.slot_type = SUB_SLOT_ENVVAR;
+                    yylval->si.s.slot_idx = cc_dst;
+                    #endif
+                    return SLOT; }
+{cc_op}           { HANDLE_COLUMN;
+                    #if AOT_LEVEL == AOT_LEVEL_MAX
+                    yylval->si.s.slot_type = SUB_SLOT_XREG;
+                    yylval->si.s.slot_idx = cc_op;
+                    #elif AOT_LEVEL == AOT_LEVEL_0
+                    yylval->si.s.slot_type = SUB_SLOT_ENVVAR;
+                    yylval->si.s.slot_idx = cc_op;
+                    #endif
+                    return SLOT; }
 {rip}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = rip; return SLOT; }
 {eq}              { HANDLE_COLUMN; yylval->r = eq; return RELOP; }
 {ge}              { HANDLE_COLUMN; yylval->r = ge; return RELOP; }

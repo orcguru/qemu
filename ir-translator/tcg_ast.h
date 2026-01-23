@@ -6,6 +6,10 @@
 
 #define MAX_ADDED_ARGS              6
 #define LLVMMAXType                 LLVMInt128
+#define AOT_LEVEL_0                 0
+#define AOT_LEVEL_MAX               3
+#define AOT_LEVEL                   AOT_LEVEL_0
+#define XMM_COUNT                   0
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -27,6 +31,7 @@ typedef enum {
     OP_ATTR,
 } TcgOpType;
 
+#if AOT_LEVEL == AOT_LEVEL_MAX
 #define ENVVAR_TYPE_LIST \
     X(cc_src2) \
     X(es_base) \
@@ -36,6 +41,20 @@ typedef enum {
     X(fs_base) \
     X(gs_base) \
     X(ENVVarMAX)
+#elif AOT_LEVEL == AOT_LEVEL_0
+#define ENVVAR_TYPE_LIST \
+    X(cc_src) \
+    X(cc_dst) \
+    X(cc_op) \
+    X(cc_src2) \
+    X(es_base) \
+    X(cs_base) \
+    X(ss_base) \
+    X(ds_base) \
+    X(fs_base) \
+    X(gs_base) \
+    X(ENVVarMAX)
+#endif
 
 typedef enum {
     #define X(name) name,
@@ -43,6 +62,7 @@ typedef enum {
     #undef X
 } EnvVarType;
 
+#if AOT_LEVEL == AOT_LEVEL_MAX
 #define XREG_TYPE_LIST \
     X(rax) \
     X(rcx) \
@@ -65,12 +85,61 @@ typedef enum {
     X(cc_op) \
     X(rip) \
     X(XREG_MAX)
+#elif AOT_LEVEL == AOT_LEVEL_0
+#define XREG_TYPE_LIST \
+    X(rax) \
+    X(rcx) \
+    X(rdx) \
+    X(rbx) \
+    X(rsp) \
+    X(rbp) \
+    X(rsi) \
+    X(rdi) \
+    X(r8) \
+    X(r9) \
+    X(r10) \
+    X(r11) \
+    X(r12) \
+    X(r13) \
+    X(r14) \
+    X(r15) \
+    X(rip) \
+    X(XREG_MAX)
+#endif
 
 typedef enum {
     #define X(name) name,
     XREG_TYPE_LIST
     #undef X
 } XRegType;
+
+#define ENV_OFFSET_rax  0x0
+#define ENV_OFFSET_rcx  0x8
+#define ENV_OFFSET_rdx  0x10
+#define ENV_OFFSET_rbx  0x18
+#define ENV_OFFSET_rsp  0x20
+#define ENV_OFFSET_rbp  0x28
+#define ENV_OFFSET_rsi  0x30
+#define ENV_OFFSET_rdi  0x38
+#define ENV_OFFSET_r8   0x40
+#define ENV_OFFSET_r9   0x48
+#define ENV_OFFSET_r10  0x50
+#define ENV_OFFSET_r11  0x58
+#define ENV_OFFSET_r12  0x60
+#define ENV_OFFSET_r13  0x68
+#define ENV_OFFSET_r14  0x70
+#define ENV_OFFSET_r15  0x78
+#define ENV_OFFSET_cc_src   0x98
+#define ENV_OFFSET_cc_dst   0x90
+#define ENV_OFFSET_cc_op    0xa8
+#define ENV_OFFSET_rip  0x80
+#define ENV_OFFSET_cc_src2  160
+#define ENV_OFFSET_es_base  192
+#define ENV_OFFSET_cs_base  216
+#define ENV_OFFSET_ss_base  240
+#define ENV_OFFSET_ds_base  264
+#define ENV_OFFSET_fs_base  288
+#define ENV_OFFSET_gs_base  312
 
 #define RELOP_TYPE_LIST \
     X(eq) \

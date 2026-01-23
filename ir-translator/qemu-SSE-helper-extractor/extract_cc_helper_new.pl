@@ -379,7 +379,11 @@ sub gen_template
     print OUT "typedef __attribute__((qemuaot)) void (*FUNC_NORMAL_RET)(";
     foreach my $idx (0 .. $#qemuaot_gp_params) {
       my $p = $custom_list[$idx];
-      print OUT "$custom_map{$p} $p, ";
+      if ($idx != $#qemuaot_gp_params) {
+        print OUT "$custom_map{$p} $p, ";
+      } else {
+        print OUT "$custom_map{$p} $p ";
+      }
     }
     if ($helpers_ret{$f}) {
       print OUT "$qemuaot_vec_declare, unsigned long ret_val);\n";
@@ -390,7 +394,11 @@ sub gen_template
       print OUT "typedef __attribute__((qemuaot,noreturn)) void (*FUNC_EXCEPTION_RET)(";
       foreach my $idx (0 .. $#custom_list) {
         my $p = $custom_list[$idx];
-        print OUT "$custom_map{$p} $p, ";
+        if ($idx != $#custom_list) {
+          print OUT "$custom_map{$p} $p, ";
+        } else {
+          print OUT "$custom_map{$p} $p ";
+        }
       }
       print OUT "$qemuaot_vec_declare, unsigned long helper, unsigned long func_secondary);\n";
       my $extern_func = &GetText($funcs{$f}->{'FULL_START'}, $funcs{$f}->{'NAME_STOP'}, $ARGV[0]);
@@ -479,6 +487,7 @@ sub gen_new_func
     }
     $new_func = $new_func.", ";
   }
+  $new_func =~ s/,\s+$/ /;
   $new_func = $new_func.$qemuaot_vec_declare;
   foreach my $k (@{$func->{'PARAM_ARRAY'}}) {
     if ($k->{'QEMUAOT'} eq "NA") {
@@ -514,6 +523,7 @@ sub gen_new_func
             }
             $new_func = $new_func.", ";
           }
+          $new_func =~ s/,\s+$/ /;
           $new_func = $new_func.$qemuaot_vec_invoke.", (unsigned long)$exception_exit, (unsigned long)normal_return)";
         }
       } else {
@@ -527,6 +537,7 @@ sub gen_new_func
           }
           $new_func = $new_func.", ";
         }
+        $new_func =~ s/,\s+$/ /;
         $new_func = $new_func.$qemuaot_vec_invoke;
         my $param_list = &get_call_param_list($func->{'ENTRIES'}->{$e}->{'PAREN_START'}, $func->{'ENTRIES'}->{$e}->{'PAREN_STOP'});
         foreach my $idx (0 .. $#{$funcs{$call_target}->{'PARAM_ARRAY'}}) {
@@ -584,6 +595,7 @@ sub gen_new_func
                 }
                 $new_func = $new_func.", ";
               }
+              $new_func =~ s/,\s+$/ /;
               $new_func = $new_func.$qemuaot_vec_invoke;
               my $txt = &GetText($func->{'ENTRIES'}->{$e}->{'EXPR_START'}, $func->{'ENTRIES'}->{$e}->{'EXPR_STOP'}, $ARGV[0]);
               $new_func = $new_func.", (unsigned long)(".$txt.")";
@@ -635,6 +647,7 @@ sub handle_call_hit_return_expr
     }
     $str = $str.", ";
   }
+  $str =~ s/,\s+$/ /;
   $str = $str.$qemuaot_vec_invoke;
   foreach my $idx (0 .. $#{$funcs{$call->{'CALL_TARGET'}}->{'PARAM_ARRAY'}}) {
     if ($funcs{$call->{'CALL_TARGET'}}->{'PARAM_ARRAY'}->[$idx]->{'QEMUAOT'} eq "NA") {

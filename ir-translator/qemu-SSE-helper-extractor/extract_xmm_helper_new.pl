@@ -51,8 +51,6 @@ my %qemuaot_gp_params_map = (
 );
 my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
 my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
-#my $qemuaot_vec_invoke = "xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h";
-#my $qemuaot_vec_declare = "v2ulong xmm0, v2ulong ymm0_h, v2ulong xmm1, v2ulong ymm1_h, v2ulong xmm2, v2ulong ymm2_h, v2ulong xmm3, v2ulong ymm3_h, v2ulong xmm4, v2ulong ymm4_h, v2ulong xmm5, v2ulong ymm5_h, v2ulong xmm6, v2ulong ymm6_h, v2ulong xmm7, v2ulong ymm7_h, v2ulong xmm8, v2ulong ymm8_h, v2ulong xmm9, v2ulong ymm9_h, v2ulong xmm10, v2ulong ymm10_h, v2ulong xmm11, v2ulong ymm11_h, v2ulong xmm12, v2ulong ymm12_h, v2ulong xmm13, v2ulong ymm13_h, v2ulong xmm14, v2ulong ymm14_h";
 my %env_reg_idx_map = (
   "R_EAX" => "rax",
   "R_ECX" => "rcx",
@@ -932,8 +930,13 @@ EOF
     $foreign_types{$foreign_calls{$ff}} = $type_name;
   }
   print OUT "typedef __attribute__((qemuaot)) void (*FUNC_NORMAL_RET)(";
-  foreach my $p (@qemuaot_gp_params) {
-    print OUT "$qemuaot_gp_params_map{$p} $p, ";
+  foreach my $idx (0 .. $#qemuaot_gp_params) {
+    my $p = $qemuaot_gp_params[$idx];
+    if ($idx != $#qemuaot_gp_params) {
+      print OUT "$qemuaot_gp_params_map{$p} $p, ";
+    } else {
+      print OUT "$qemuaot_gp_params_map{$p} $p ";
+    }
   }
   print OUT "$qemuaot_vec_declare";
   if ($funcs{$f}->{'FUNC_TYPE'} ne "void") {
@@ -942,8 +945,13 @@ EOF
   print OUT ");\n";
   if (keys %foreign_types > 0) {
     print OUT "typedef __attribute__((qemuaot,noreturn)) void (*FUNC_EXCEPTION_RET)(";
-    foreach my $p (@qemuaot_gp_params) {
-      print OUT "$qemuaot_gp_params_map{$p} $p, ";
+    foreach my $idx (0 .. $#qemuaot_gp_params) {
+      my $p = $qemuaot_gp_params[$idx];
+      if ($idx != $#qemuaot_gp_params) {
+        print OUT "$qemuaot_gp_params_map{$p} $p, ";
+      } else {
+        print OUT "$qemuaot_gp_params_map{$p} $p ";
+      }
     }
     print OUT "$qemuaot_vec_declare";
     my $func_ptr = $funcs{$f};
@@ -1741,6 +1749,7 @@ sub get_func_body
             foreach my $p (@qemuaot_gp_params) {
               $body = $body."$p, ";
             }
+            $body =~ s/,\s+$/ /;
             $body = $body.$qemuaot_vec_invoke.");\n}\n";
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
           } else {
@@ -1749,6 +1758,7 @@ sub get_func_body
             foreach my $p (@qemuaot_gp_params) {
               $body = $body."$p, ";
             }
+            $body =~ s/,\s+$/ /;
             $body = $body.$qemuaot_vec_invoke.", $expr);\n}\n";
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'} + 2;
           }
@@ -1758,6 +1768,7 @@ sub get_func_body
             foreach my $p (@qemuaot_gp_params) {
               $body = $body."$p, ";
             }
+            $body =~ s/,\s+$/ /;
             $body = $body.$qemuaot_vec_invoke.");\n";
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
           } else {
@@ -1766,6 +1777,7 @@ sub get_func_body
             foreach my $p (@qemuaot_gp_params) {
               $body = $body."$p, ";
             }
+            $body =~ s/,\s+$/ /;
             $body = $body.$qemuaot_vec_invoke.", $expr);\n";
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'} + 2;
           }
@@ -1789,6 +1801,7 @@ sub get_func_body
     foreach my $p (@qemuaot_gp_params) {
       $normal_logic = $normal_logic."$p, ";
     }
+    $normal_logic =~ s/,\s+$/ /;
     $normal_logic = $normal_logic.$qemuaot_vec_invoke.");\n";
     $body =~ s/\}$/\n$exp_logic$normal_logic\}/;
   }
@@ -1807,6 +1820,7 @@ sub get_exception_path
   foreach my $p (@qemuaot_gp_params) {
     $body = $body."$p, ";
   }
+  $body =~ s/,\s+$/ /;
   $body = $body.$qemuaot_vec_invoke;
   foreach my $si (@{$func_ptr->{'SCALAR_ARGS'}}) {
     $body = $body.", $si->{'VAR_NAME'}";
@@ -1947,6 +1961,7 @@ sub collect_func_args
     foreach my $g (@qemuaot_gp_params) {
       $args = $args.$qemuaot_gp_params_map{$g}." ".$g.", ";
     }
+    $args =~ s/,\s+$/ /;
     $args = $args.$qemuaot_vec_declare;
   } else {
     my @sorted_keys = sort {$a cmp $b} keys %{$func_ptr->{'ENVVAR_AND_VECTORS'}};
