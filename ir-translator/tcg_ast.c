@@ -1663,7 +1663,7 @@ void translate_movcond(OpCodeType opc, void *ptr) {
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
-        c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        c1 = LLVMBuildSub(builder, c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
         c2 = LLVMConstInt(llvm_int_types[type_in], 0, 0);
     }
     assert(r < RELOPMAX && llvm_predicate[r]);
@@ -1710,7 +1710,7 @@ void translate_setcond(OpCodeType opc, void *ptr) {
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
-        c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        c1 = LLVMBuildSub(builder, c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
         c2 = LLVMConstInt(llvm_int_types[type_in], 0, 0);
     }
     assert(r < RELOPMAX && llvm_predicate[r]);
@@ -1733,7 +1733,7 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
     RelopType r = get_relop(ptr);
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
-        c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        c1 = LLVMBuildSub(builder, c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
         c2 = LLVMConstInt(llvm_int_types[type_in], 0, 0);
     }
     assert(r < RELOPMAX && llvm_predicate[r]);
