@@ -1048,8 +1048,17 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
         OperandType env = get_env_ptr(opc);
         CREATE_ADD64(tmp, env, env_var_offset[operand.s.slot_idx]);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
-        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset", operand));
-        ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val", operand));
+        LLVMTypeRef val_type = type;
+#if AOT_LEVEL == AOT_LEVEL_0
+        if (operand.s.slot_idx == cc_op) {
+            val_type = llvm_int_types[LLVMInt32];
+        }
+#endif
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(val_type, 0), get_next_var_name("source_env_ptr_offset", operand));
+        ret = LLVMBuildLoad2(builder, val_type, ptr, get_next_var_name("source_val", operand));
+        if (val_type != type) {
+            ret = LLVMBuildZExt(builder, ret, type, get_next_var_name("store_val_ext", operand));
+        }
     } else if (operand.s.slot_type == SUB_SLOT_ENV) {
         if (operand.s.offset == 0) {
             ret = get_env_ptr_raw();
@@ -4717,6 +4726,7 @@ void module_prolog() {
         "rip"
 #endif
     };
+#if AOT_LEVEL == AOT_LEVEL_MAX
     for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
         if (i < 16) {
             fixed_llvmtyperef[i] = LLVMInt64Type();
@@ -4730,6 +4740,13 @@ void module_prolog() {
         }
         fixed_vector_arg_names[i] = base_names[i];
     }
+#elif AOT_LEVEL == AOT_LEVEL_0
+    for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
+        fixed_llvmtyperef[i] = LLVMInt64Type();
+        fixed_vector_param_llvmtypes[i] = LLVMInt64;
+        fixed_vector_arg_names[i] = base_names[i];
+    }
+#endif
     static char extra_name_buf[32][16];
     static char stack_name_buf[FIXED_VECTOR_PARAM_COUNT][16];
     static char tmp_name_buf[1<<STACK_INDEX_SHIFT][16];
