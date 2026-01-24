@@ -2557,7 +2557,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         param = LLVMGetParam(trampoline, j);
         LLVMSetValueName(param, fixed_vector_arg_names[j]);
     }
-    for (j = FIXED_VECTOR_PARAM_COUNT; j < (operands_cnt - env_cnt); j++) {
+    for (j = FIXED_VECTOR_PARAM_COUNT; j < (FIXED_VECTOR_PARAM_COUNT + operands_cnt - env_cnt); j++) {
         param = LLVMGetParam(trampoline, j);
         char var[16] = {0};
         sprintf(var, "param%d", (j - FIXED_VECTOR_PARAM_COUNT));
