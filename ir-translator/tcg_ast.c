@@ -541,6 +541,7 @@ static const char *tmp_stack_names[1<<STACK_INDEX_SHIFT] = {NULL};
 static const char *ir_var_name[('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)*('z'-'a'+1)] = {NULL};
 static int ir_var_name_idx = 0;
 static LLVMTypeRef llvm_int_types[LLVMMAXType] = {0};
+static LLVMTypeRef llvm_int_store_types[LLVMMAXType] = {0};
 static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
 static LLVMValueRef func_xreg_alloca[1<<REGISTER_INDEX_SHIFT] = {NULL};
 static LLVMValueRef func_tmp_alloca[1<<STACK_INDEX_SHIFT] = {NULL};
@@ -950,24 +951,60 @@ static OperandType get_env_ptr(OpCodeType opc) {
     return tmp;
 }
 
+static LLVMValueRef check_scalable_vector_perform_load(LLVMType val_tidx, LLVMValueRef addr) {
+    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_store_types[val_tidx], 0), get_next_var_name("check_scalable_store", dummy_slot_for_debug));
+    LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_store_types[val_tidx], ptr, get_next_var_name("check_scalable_load", dummy_slot_for_debug));
+    if (llvm_int_types[val_tidx] != llvm_int_store_types[val_tidx]) {
+        LLVMTypeRef intrinsic_types[] = {llvm_int_types[val_tidx], llvm_int_store_types[val_tidx], llvm_int_types[OPC_ADDR_T]};
+        LLVMTypeRef intrinsic_func_type = LLVMFunctionType(llvm_int_types[val_tidx], intrinsic_types, 3, 0);
+        char intrinsic_func_name[128] = {0};
+        sprintf(intrinsic_func_name, "llvm.vector.insert.nxv%di%d.v%di%d", llvm_vector_elem_bit_counts[val_tidx*2]/2, llvm_vector_elem_bit_counts[val_tidx*2+1], llvm_vector_elem_bit_counts[val_tidx*2], llvm_vector_elem_bit_counts[val_tidx*2+1]);
+        assert(strlen(intrinsic_func_name) < sizeof(intrinsic_func_name));
+        LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, intrinsic_func_name);
+        if (!intrinsic_func) {
+            intrinsic_func = LLVMAddFunction(module, intrinsic_func_name, intrinsic_func_type);
+        }
+        LLVMValueRef index_0 = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
+        LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(llvm_int_types[val_tidx]), val, index_0};
+        val = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, intrinsic_call_args, 3, get_next_var_name("check_scalable_load", dummy_slot_for_debug));
+    }
+    return val;
+}
+
+static LLVMValueRef check_scalable_vector_perform_store(LLVMValueRef val, LLVMType val_tidx, LLVMValueRef addr) {
+    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_store_types[val_tidx], 0), get_next_var_name("check_scalable_store", dummy_slot_for_debug));
+    if (llvm_int_types[val_tidx] != llvm_int_store_types[val_tidx]) {
+        LLVMTypeRef intrinsic_types[] = {llvm_int_types[val_tidx], llvm_int_types[OPC_ADDR_T]};
+        LLVMTypeRef intrinsic_func_type = LLVMFunctionType(llvm_int_store_types[val_tidx], intrinsic_types, 2, 0);
+        char intrinsic_func_name[128] = {0};
+        sprintf(intrinsic_func_name, "llvm.vector.extract.v%di%d.nxv%di%d", llvm_vector_elem_bit_counts[val_tidx*2], llvm_vector_elem_bit_counts[val_tidx*2+1], llvm_vector_elem_bit_counts[val_tidx*2]/2, llvm_vector_elem_bit_counts[val_tidx*2+1]);
+        assert(strlen(intrinsic_func_name) < sizeof(intrinsic_func_name));
+        LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, intrinsic_func_name);
+        if (!intrinsic_func) {
+            intrinsic_func = LLVMAddFunction(module, intrinsic_func_name, intrinsic_func_type);
+        }
+        LLVMValueRef index_0 = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
+        LLVMValueRef intrinsic_call_args[] = {val, index_0};
+        val = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, intrinsic_call_args, 2, get_next_var_name("check_scalable_store", dummy_slot_for_debug));
+    }
+    return LLVMBuildStore(builder, val, ptr);
+}
+
 static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, OperandType out) {
     assert(val_tidx != LLVMInvalidType && val_tidx < LLVMMAXType);
-    LLVMTypeRef val_type = llvm_int_types[val_tidx];
     if (out.s.slot_type == SUB_SLOT_ENVVAR) {
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
         CREATE_ADD64(tmp, env, env_var_offset[out.s.slot_idx]);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
-        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(val_type, 0), get_next_var_name("store_env_ptr_offset", out));
-        LLVMBuildStore(builder, val, ptr);
+        check_scalable_vector_perform_store(val, val_tidx, tmp_src);
     } else if (out.s.slot_type == SUB_SLOT_ENV) {
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
         // v64 type stores into MMX region
         CREATE_ADD64(tmp, env, out.s.offset);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
-        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(val_type, 0), get_next_var_name("store_env_ptr_offset", out));
-        LLVMBuildStore(builder, val, ptr);
+        check_scalable_vector_perform_store(val, val_tidx, tmp_src);
     } else {
         LLVMType out_idx = get_stack_llvmtype(out);
         assert((val_tidx <= LLVMInt64 && out_idx <= LLVMInt64 && val_tidx <= out_idx) ||
@@ -2052,8 +2089,7 @@ void translate_st(OpCodeType opc, void *ptr) {
             assert(0);
         }
         addr_val = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-        LLVMValueRef addr_ptr = LLVMBuildIntToPtr(builder, addr_val, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-        LLVMBuildStore(builder, val, addr_ptr);
+        check_scalable_vector_perform_store(val, type_mem, addr_val);
     }
 }
 
@@ -2086,8 +2122,7 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
     LLVMValueRef src1 = get_source_node_imm_or_stack(opc, 0, operand0, type_reg, 0);
     LLVMValueRef src2 = get_source_node_imm_or_stack(opc, 0, operand1, type_reg, 0);
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T, 0);
-    LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMValueRef result = LLVMBuildStore(builder, src1, pointer);
+    LLVMValueRef result = check_scalable_vector_perform_store(src1, type_mem, addr);
     if (a1.p.storage.attr.alignment == UNALIGN) {
         LLVMSetAlignment(result, 1);
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
@@ -2100,8 +2135,7 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
     OperandType high_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
     CREATE_ADD(high_addr, operand2, 8UL);
     addr = get_source_node_imm_or_stack(opc, 0, high_addr, OPC_ADDR_T, 0);
-    pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    result = LLVMBuildStore(builder, src2, pointer);
+    result = check_scalable_vector_perform_store(src2, type_mem, addr);
     if (a1.p.storage.attr.alignment == UNALIGN) {
         LLVMSetAlignment(result, 1);
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
@@ -2131,12 +2165,11 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
     assert(type_mem <= type_reg);
 
     LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, operand0, type_reg, 0);
-    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T, 0);
-    LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     if (type_mem < type_reg) {
         val = LLVMBuildTrunc(builder, val, llvm_int_types[type_mem], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     }
-    LLVMValueRef result = LLVMBuildStore(builder, val, pointer);
+    LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T, 0);
+    LLVMValueRef result = check_scalable_vector_perform_store(val, type_mem, addr);
     if (a1.p.storage.attr.alignment == UNALIGN) {
         LLVMSetAlignment(result, 1);
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
@@ -2606,8 +2639,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         uint64_t xmm_offset = get_xmm_offset((i - FIXED_PARAM_COUNT)/2) + 16 * ((i - FIXED_PARAM_COUNT) % 2);
         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
         LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("spill_vec_addr", dummy_slot_for_debug));
-        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_vector_parameter_type_for_arch(), 0), get_next_var_name("spill_vec_ptr", dummy_slot_for_debug));
-        LLVMBuildStore(builder, vec_val, ptr);
+        check_scalable_vector_perform_store(vec_val, LLVMVector2xi64, addr);
     }
 
     LLVMValueRef call_args[MAX_OPERANDS_COUNT] = {NULL};
@@ -2654,8 +2686,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         uint64_t env_xmm_offset = get_xmm_offset((i - FIXED_PARAM_COUNT)/2) + 16 * ((i - FIXED_PARAM_COUNT) % 2);
         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xmm_offset, 0);
         LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("reload_vec_addr", dummy_slot_for_debug));
-        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_vector_parameter_type_for_arch(), 0), get_next_var_name("reload_vec_ptr", dummy_slot_for_debug));
-        return_args[i] = LLVMBuildLoad2(builder, get_vector_parameter_type_for_arch(), ptr, get_next_var_name("reload_vec_val", dummy_slot_for_debug));
+        return_args[i] = check_scalable_vector_perform_load(LLVMVector2xi64, addr);
     }
 
     LLVMTypeRef next_type = LLVMGlobalGetValueType(next_func);
@@ -3331,8 +3362,7 @@ static void spill_vector(LLVMValueRef xmm_val, XMMRegType xmm_reg) {
     uint64_t xmm_offset = get_xmm_offset(xmm_reg/2) + 16*(xmm_reg%2);
     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
     LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(debug_name, dummy_slot_for_debug));
-    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_vector_parameter_type_for_arch(), 0), get_next_var_name(debug_name, dummy_slot_for_debug));
-    LLVMBuildStore(builder, xmm_val, ptr);
+    check_scalable_vector_perform_store(xmm_val, LLVMVector2xi64, addr);
 }
 
 static LLVMValueRef reload_vector(XMMRegType xmm_reg) {
@@ -3344,8 +3374,7 @@ static LLVMValueRef reload_vector(XMMRegType xmm_reg) {
     uint64_t xmm_offset = get_xmm_offset(xmm_reg/2) + 16*(xmm_reg%2);
     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
     LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(debug_name, dummy_slot_for_debug));
-    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_vector_parameter_type_for_arch(), 0), get_next_var_name(debug_name, dummy_slot_for_debug));
-    return LLVMBuildLoad2(builder, get_vector_parameter_type_for_arch(), ptr, get_next_var_name(debug_name, dummy_slot_for_debug));
+    return check_scalable_vector_perform_load(LLVMVector2xi64, addr);
 }
 
 static void translate_helper_outband(OpCodeType opc, void *ptr) {
@@ -4791,6 +4820,13 @@ void module_prolog() {
     llvm_int_types[LLVMInt16] = LLVMInt16Type();
     llvm_int_types[LLVMInt32] = LLVMInt32Type();
     llvm_int_types[LLVMInt64] = LLVMInt64Type();
+
+    llvm_int_store_types[LLVMInvalidType] = llvm_int_types[LLVMInvalidType];
+    llvm_int_store_types[LLVMInt8] = llvm_int_types[LLVMInt8];
+    llvm_int_store_types[LLVMInt16] = llvm_int_types[LLVMInt16];
+    llvm_int_store_types[LLVMInt32] = llvm_int_types[LLVMInt32];
+    llvm_int_store_types[LLVMInt64] = llvm_int_types[LLVMInt64];
+
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
     llvm_int_types[LLVMVector8xi8] = LLVMVectorType(LLVMInt8Type(), 8);
     llvm_int_types[LLVMVector4xi16] = LLVMVectorType(LLVMInt16Type(), 4);
@@ -4800,6 +4836,15 @@ void module_prolog() {
     llvm_int_types[LLVMVector8xi16] = LLVMVectorType(LLVMInt16Type(), 8);
     llvm_int_types[LLVMVector4xi32] = LLVMVectorType(LLVMInt32Type(), 4);
     llvm_int_types[LLVMVector2xi64] = LLVMVectorType(LLVMInt64Type(), 2);
+
+    llvm_int_store_types[LLVMVector8xi8] = llvm_int_types[LLVMVector8xi8];
+    llvm_int_store_types[LLVMVector4xi16] = llvm_int_types[LLVMVector4xi16];
+    llvm_int_store_types[LLVMVector2xi32] = llvm_int_types[LLVMVector2xi32];
+    llvm_int_store_types[LLVMVector1xi64] = llvm_int_types[LLVMVector1xi64];
+    llvm_int_store_types[LLVMVector16xi8] = llvm_int_types[LLVMVector16xi8];
+    llvm_int_store_types[LLVMVector8xi16] = llvm_int_types[LLVMVector8xi16];
+    llvm_int_store_types[LLVMVector4xi32] = llvm_int_types[LLVMVector4xi32];
+    llvm_int_store_types[LLVMVector2xi64] = llvm_int_types[LLVMVector2xi64];
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
     // FIXME: v64
     llvm_int_types[LLVMVector16xi8] = LLVMScalableVectorType(LLVMInt8Type(), 8);
@@ -4810,6 +4855,15 @@ void module_prolog() {
     llvm_int_types[LLVMVector16xi16] = LLVMScalableVectorType(LLVMInt16Type(), 8);
     llvm_int_types[LLVMVector8xi32] = LLVMScalableVectorType(LLVMInt32Type(), 4);
     llvm_int_types[LLVMVector4xi64] = LLVMScalableVectorType(LLVMInt64Type(), 2);
+
+    llvm_int_store_types[LLVMVector16xi8] = LLVMVectorType(LLVMInt8Type(), 16);
+    llvm_int_store_types[LLVMVector8xi16] = LLVMVectorType(LLVMInt16Type(), 8);
+    llvm_int_store_types[LLVMVector4xi32] = LLVMVectorType(LLVMInt32Type(), 4);
+    llvm_int_store_types[LLVMVector2xi64] = LLVMVectorType(LLVMInt64Type(), 2);
+    llvm_int_store_types[LLVMVector32xi8] = LLVMVectorType(LLVMInt8Type(), 32);
+    llvm_int_store_types[LLVMVector16xi16] = LLVMVectorType(LLVMInt16Type(), 16);
+    llvm_int_store_types[LLVMVector8xi32] = LLVMVectorType(LLVMInt32Type(), 8);
+    llvm_int_store_types[LLVMVector4xi64] = LLVMVectorType(LLVMInt64Type(), 4);
 #endif
 
     llvm_vector_elem_bit_counts[LLVMInt8*2] = 1;
