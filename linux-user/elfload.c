@@ -3550,6 +3550,7 @@ static void load_elf_image(const char *image_name, const ImageSource *src,
                     info->code_mmap_start = vaddr_ps;
                     info->code_mmap_len = eppnt->p_filesz + vaddr_po;
                     info->code_mmap_prot = elf_prot;
+                    info->code_mmap_start_vaddr = eppnt->p_vaddr;
                 }
 #endif
             }
@@ -3927,14 +3928,10 @@ void fill_section_gap_with_nop_and_update_end_code(struct image_info *info, stru
     }
     abi_long exec_begin = (1UL << 63)-1;
     abi_long exec_end = 0;
-    unsigned long init_sht_progbits_addr = -1UL;
     for (i = 0; i < shnum; ++i) {
         if (shdr[i].sh_type == SHT_PROGBITS && ((i + 1) < shnum) && shdr[i + 1].sh_type == SHT_PROGBITS) {
-            if (init_sht_progbits_addr == -1UL) {
-                init_sht_progbits_addr = shdr[i].sh_addr;
-            }
             if ((shdr[i].sh_addr + shdr[i].sh_size) < shdr[i + 1].sh_addr) {
-                abi_long begin = (shdr[i].sh_addr + shdr[i].sh_size) - init_sht_progbits_addr + info->code_mmap_start;
+                abi_long begin = (shdr[i].sh_addr + shdr[i].sh_size) + info->code_mmap_start - info->code_mmap_start_vaddr;
                 abi_long size = shdr[i + 1].sh_addr - (shdr[i].sh_addr + shdr[i].sh_size);
                 if (info->code_mmap_start <= begin && (begin + size) <= (info->code_mmap_start + info->code_mmap_len)) {
                     memset((void *)begin, 0x90, size);

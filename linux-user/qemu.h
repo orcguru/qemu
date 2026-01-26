@@ -80,6 +80,7 @@ struct image_info {
         abi_ulong       code_mmap_start;
         abi_ulong       code_mmap_len;
         int             code_mmap_prot;
+        abi_ulong       code_mmap_start_vaddr;
 #endif
 
 #ifdef AOT_IR
