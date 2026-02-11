@@ -49,7 +49,7 @@ extern uint8_t instr_buf[64];
 %token <si> SLOT
 %token <r> RELOP TSTREL
 %token <oh> SYMBOL BSWAP SETLABL BRCOND CALL JMPDIR CALLDIR DISCARD BR
-%token COMMA COLON PLUS ENV XMMTMP
+%token COMMA COLON PLUS ENV XMMTMP EXTERNAL INTERNAL
 
 %%
 top: xmm_def_list program;
@@ -66,7 +66,8 @@ program: func_list;
 func_list: func
 | func_list func;
 
-func: IMMX COLON instruction_list { handle_func($1); };
+func: INTERNAL COLON IMMX COLON instruction_list { handle_func($3, 0); }
+      | EXTERNAL COLON IMMX COLON instruction_list { handle_func($3, 1); }
 
 instruction_list: instruction
 | instruction_list instruction;

@@ -133,6 +133,8 @@ OZ              oz
 IZ              iz
 OS              os
 IS              is
+INTERNAL        INTERNAL
+EXTERNAL        EXTERNAL
 
 aaa                             aaa
 aad                             aad
@@ -1456,6 +1458,8 @@ xsetbv                          xsetbv
 {tsteq}           { HANDLE_COLUMN; yylval->r = tsteq; return TSTREL; }
 {tstne}           { HANDLE_COLUMN; yylval->r = tstne; return TSTREL; }
 {ENV}             { HANDLE_COLUMN; return ENV; }
+{INTERNAL}        { HANDLE_COLUMN; return INTERNAL; }
+{EXTERNAL}        { HANDLE_COLUMN; return EXTERNAL; }
 {V64}             { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_VECTORSIZE; yylval->ai.p.vs = VS64; return V64; }
 {V128}            { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_VECTORSIZE; yylval->ai.p.vs = VS128; return V128; }
 {E8}              { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ELEMENTSIZE; yylval->ai.p.ves = VES8; return ELEMENTSIZEATTR; }

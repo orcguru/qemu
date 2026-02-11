@@ -594,7 +594,7 @@ static void handle_single_instr(OpCodeType opc, void *ptr);
 static uint8_t do_link_helper(HelperType h, const char *build_macro, const char *bc_name, const char *c_file);
 static uint8_t is_tail_call(HelperType h);
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr);
-static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_ret, LLVMAttributeRef attr_inline_ctrl);
+static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_ret);
 static void setup_func_stack();
 static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain);
 static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr);
@@ -1861,7 +1861,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     char func_name[64] = {0};
     sprintf(func_name, "%s%sfunc_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", func_hex.i);
     assert(strlen(func_name) < sizeof(func_name));
-    LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, 0, NoInlineAttr), llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, 0), llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     CREATE_ADD(ptr_val, ptr_val, -8UL);
     LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
     LLVMValueRef shadow_ptr1 = LLVMBuildIntToPtr(builder, shadow_val1, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -2541,7 +2541,7 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
     int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_AND_VALUE, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, FIXED_VECTOR_PARAM_COUNT, call_args, func_name);
     LLVMTypeRef ret_type = LLVMVoidType();
     LLVMTypeRef func_type = LLVMFunctionType(ret_type, call_types, arg_cnt, 0);
-    LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, get_or_add_func_with_qemuaot_cc(func_name, 0, NoInlineAttr), call_args, arg_cnt, "");
+    LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, get_or_add_func_with_qemuaot_cc(func_name, 0), call_args, arg_cnt, "");
     LLVMSetTailCall(call_inst, 1);
     LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
     LLVMBuildRetVoid(builder);
@@ -2724,9 +2724,9 @@ static uint8_t do_link_helper(HelperType h, const char *build_macro, const char 
     if (!check_fp) {
         char cmd[4096] = {0};
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
-        sprintf(cmd, "clang -c %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+        sprintf(cmd, "clang -c %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
-        sprintf(cmd, "clang -c %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+        sprintf(cmd, "clang -c %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
 #endif
 #ifdef DEBUG
         printf("%s\n", cmd); fflush(NULL);
@@ -3194,7 +3194,7 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
     }
 }
 
-static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_ret, LLVMAttributeRef attr_inline_ctrl) {
+static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_ret) {
 #ifdef DEBUG
     printf("%s %s\n", __FUNCTION__, name); fflush(NULL);
 #endif
@@ -3204,7 +3204,6 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_r
         int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_ONLY, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, FIXED_VECTOR_PARAM_COUNT, NULL, name);
         LLVMTypeRef func_type = LLVMFunctionType(with_ret ? LLVMInt64Type() : LLVMVoidType(), call_types, arg_cnt, 0);
         func = LLVMAddFunction(module, name, func_type);
-        LLVMAddAttributeAtIndex(func, -1, attr_inline_ctrl);
         LLVMAddAttributeAtIndex(func, -1, target_features_attr);
         LLVMSetFunctionCallConv(func, QEMUAOT_CC);
     }
@@ -4254,7 +4253,7 @@ static int process_op_type(uint32_t slot_idx, void *ptr, OpCodeType opc, LLVMTyp
     return 1;
 }
 
-void handle_func(uint64_t val) {
+void handle_func(uint64_t val, int is_external) {
 #ifdef DEBUG
     printf("func %lx\n", val); fflush(NULL);
 #endif
@@ -4312,7 +4311,15 @@ void handle_func(uint64_t val) {
 
     char func_name[64];
     sprintf(func_name, "%s%sfunc_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", val);
-    llvm_func = get_or_add_func_with_qemuaot_cc(func_name, 0, NoInlineAttr);
+    if (is_external == 0) {
+        llvm_func = get_or_add_func_with_qemuaot_cc(func_name, 0);
+        LLVMSetLinkage(llvm_func, LLVMInternalLinkage);
+        LLVMAddAttributeAtIndex(llvm_func, -1, AlwaysInlineAttr);
+    } else {
+        llvm_func = get_or_add_func_with_qemuaot_cc(func_name, 0);
+        LLVMSetLinkage(llvm_func, LLVMExternalLinkage);
+        LLVMAddAttributeAtIndex(llvm_func, -1, NoInlineAttr);
+    }
     for (int j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
         LLVMValueRef param = LLVMGetParam(llvm_func, j);
         LLVMSetValueName(param, fixed_vector_arg_names[j]);
@@ -4974,12 +4981,22 @@ void module_epilog() {
 
     // Remove helper_cc_compute_*, helper_*_xmm_*
     LLVMValueRef currentFunction = LLVMGetFirstFunction(module);
+    /*
+    char search_name[64] = {0};
+    sprintf(search_name, "%s%sfunc_", func_name_prefix, func_name_prefix[0] ? "_" : "");
+    */
     while (currentFunction != NULL) {
         const char* funcName = LLVMGetValueName(currentFunction);
         LLVMValueRef deleteCandidate = NULL;
         //if (strstr(funcName, "helper_") && (strstr(funcName, "_xmm_") || strstr(funcName, "_inband") || strstr(funcName, "_outband"))) {
         if (strstr(funcName, "helper_") && strstr(funcName, "_inband")) {
             deleteCandidate = currentFunction;
+        /*
+        } else if (strstr(funcName, search_name)) {
+            if (LLVMGetLinkage(currentFunction) == LLVMInternalLinkage) {
+                deleteCandidate = currentFunction;
+            }
+        */
         }
         currentFunction = LLVMGetNextFunction(currentFunction);
         if (deleteCandidate) {

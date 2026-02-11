@@ -1844,7 +1844,7 @@ size_t create_br_label(void *ptr, OHType op, uint8_t label);
 void *get_instr_buffer();
 size_t get_instr_buffer_size();
 void reset_instr_buffer(void);
-void handle_func(uint64_t val);
+void handle_func(uint64_t val, int is_external);
 void module_prolog(void);
 void module_epilog(void);
 void insert_instr(void *ptr_src, size_t sz);
