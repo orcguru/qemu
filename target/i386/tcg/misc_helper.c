@@ -23,6 +23,7 @@
 #include "exec/helper-proto.h"
 #include "exec/cputlb.h"
 #include "helper-tcg.h"
+#include <pthread.h>
 
 #ifdef AOT
 #include "accel/tcg/tb-context.h"
@@ -169,7 +170,7 @@ void register_for_aot_helper_jmp_ind()
     register_for_aot_helper("helper_jmp_ind", (uint64_t)helper_jmp_ind, "void");
 }
 
-extern void load_aot_image(const char *image_name, unsigned long start_code, unsigned long entry);
+extern void load_aot_image(const char *image_name, unsigned long start_code, unsigned long end_code, unsigned long entry);
 
 #include <unistd.h>
 #include <stddef.h>
@@ -180,12 +181,17 @@ extern void load_aot_image(const char *image_name, unsigned long start_code, uns
 #include "user/abitypes.h"
 #include "linux-user/qemu.h"
 #include "linux-user/loader.h"
+#include "tcg/tcg-aot.h"
 extern void bswap_ehdr(struct elfhdr *ehdr);
 extern bool elf_check_ident(struct elfhdr *ehdr);
 extern bool elf_check_ehdr(struct elfhdr *ehdr);
 extern void bswap_phdr(struct elf_phdr *phdr, int phnum);
 extern void bswap_shdr(struct elf_shdr *shdr, int shnum);
 
+pthread_mutex_t aot_range_info_mutex = PTHREAD_MUTEX_INITIALIZER;
+aot_range_info_t *aot_info_list = NULL;
+
+// Caller should grab the lock
 void find_and_load_missing_aot(uintptr_t x_addr)
 {
     qemu_log_mask(LOG_AOT, "%s x_addr:%lx\n", __FUNCTION__, x_addr);
@@ -234,6 +240,7 @@ void find_and_load_missing_aot(uintptr_t x_addr)
     // Figure out start_code/entry
     unsigned long start_vaddr = -1UL;
     unsigned long start_code = -1UL;
+    unsigned long end_code = -1UL;
     unsigned long entry = -1UL;
     char bprm_buf[BPRM_BUF_SIZE] = {0};
     struct elfhdr ehdr;
@@ -285,11 +292,15 @@ void find_and_load_missing_aot(uintptr_t x_addr)
     }
     bswap_shdr(shdr, ehdr.e_shnum);
     abi_long exec_begin = (1UL << 63)-1;
+    abi_long exec_end = 0;
     for (int i = 0; i < ehdr.e_shnum; ++i) {
         if (shdr[i].sh_flags &= SHF_EXECINSTR) {
             if (shdr[i].sh_addr < exec_begin) {
                 exec_begin = shdr[i].sh_addr;
                 qemu_log_mask(LOG_AOT, "updated exec_begin:%lx on i:%d\n", exec_begin, i);
+            }
+            if ((shdr[i].sh_addr + shdr[i].sh_size) > exec_end) {
+                exec_end = shdr[i].sh_addr + shdr[i].sh_size;
             }
         }
     }
@@ -297,14 +308,27 @@ void find_and_load_missing_aot(uintptr_t x_addr)
     qemu_log_mask(LOG_AOT, "start_code:%lx = start:%lx + (exec_begin:%lx - start_vaddr:%lx)\n", start_code, start, exec_begin, start_vaddr);
     assert(start_code != -1UL && entry != -1UL);
     qemu_log_mask(LOG_AOT, "Load %s start_code:%lx entry:%lx\n", elf_fn, start_code, entry);
-    load_aot_image(elf_fn, start_code, entry);
+    end_code = start_code + (exec_end - exec_begin);
+    load_aot_image(elf_fn, start_code, end_code, entry);
 }
 
 // Triggers AOT file load
 void helper_jit(CPUX86State *env, unsigned long target)
 {
-    // FIXME: need an RBTree to decide if we need to load_aot
-    find_and_load_missing_aot(target);
+    // Check if AOT file need be loaded
+    pthread_mutex_lock(&aot_range_info_mutex);
+    aot_range_info_t *info_ptr = aot_info_list;
+    while (info_ptr) {
+        if (info_ptr->x_addr_range_begin <= target && target < info_ptr->x_addr_range_end) {
+            break;
+        }
+        info_ptr = info_ptr->next;
+    }
+    if (!info_ptr) {
+        find_and_load_missing_aot(target);
+    }
+    pthread_mutex_unlock(&aot_range_info_mutex);
+
     CPUState *cs = env_cpu(env);
     cs->exception_index = EXCP_TCGJIT;
     env->exception_is_int = 0;

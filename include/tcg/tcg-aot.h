@@ -42,4 +42,11 @@ typedef struct helper_func {
 
 typedef unsigned long __attribute__((__vector_size__(16))) v2long;
 
+typedef struct aot_range_info {
+    uint64_t x_addr_range_begin;
+    uint64_t x_addr_range_end;
+    char elf_name[256];
+    struct aot_range_info *next;
+} aot_range_info_t;
+
 #endif /* TCG_AOT_H */

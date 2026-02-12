@@ -3288,13 +3288,17 @@ static bool parse_elf_properties(const ImageSource *src,
 
 #ifdef AOT
 #include "tcg/tcg-aot.h"
-extern void *invoke_jitlink(const char *, uint64_t, uint64_t, void (*)(uint64_t, uint64_t, uint64_t), void (*)(const char *, uint64_t), void *, size_t, int, const char *);
+#include <pthread.h>
+extern void *invoke_jitlink(const char *, uint64_t, void (*)(uint64_t, uint64_t, uint64_t), void (*)(const char *, uint64_t), void *, size_t, int, const char *);
 extern helper_func_t helper_funcs[];
 extern size_t helper_funcs_count;
 extern int enable_llvm_debug;
+extern pthread_mutex_t aot_range_info_mutex;
+extern aot_range_info_t *aot_info_list;
 
-void load_aot_image(const char *image_name, unsigned long start_code, unsigned long entry);
-void load_aot_image(const char *image_name, unsigned long start_code, unsigned long entry)
+// load_aot_image should have been called with aot_range_info_mutex locked
+void load_aot_image(const char *image_name, unsigned long start_code, unsigned long end_code, unsigned long entry);
+void load_aot_image(const char *image_name, unsigned long start_code, unsigned long end_code, unsigned long entry)
 {
     qemu_log_mask(LOG_AOT, "%s %s start_code:%lx entry:%lx\n", __FUNCTION__, image_name, start_code, entry);
     char aotnamebuf[PATH_MAX];
@@ -3302,11 +3306,6 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
     int fp = open(image_name, O_RDONLY);
     if (!fp) {
         perror("Failed to open image_name\n");
-        return;
-    }
-    struct stat st;
-    if (fstat(fp, &st) != 0) {
-        perror("Failed fstat image_name\n");
         return;
     }
     static int log_helper = 0;
@@ -3337,7 +3336,23 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
     char entry_func[128] = {0};
     sprintf(entry_func, "--entry=%s_func_0", tag_start);
     qemu_log_mask(LOG_AOT, "invoke_jitlink on %s with entry_info:%s\n", aotnamebuf, entry_func);
-    invoke_jitlink((const char *)aotnamebuf, start_code, (start_code + st.st_size), tb_aot_insert, tb_aot_log, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug, (const char *)entry_func);
+    invoke_jitlink((const char *)aotnamebuf, start_code, tb_aot_insert, tb_aot_log, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug, (const char *)entry_func);
+
+    aot_range_info_t *info_ptr = g_malloc(sizeof(aot_range_info_t));
+    info_ptr->x_addr_range_begin = start_code;
+    info_ptr->x_addr_range_end = end_code;
+    assert((strlen(image_name) + 1) <= sizeof(info_ptr->elf_name));
+    strcpy(info_ptr->elf_name, image_name);
+    info_ptr->next = NULL;
+    if (!aot_info_list) {
+        aot_info_list = info_ptr;
+    } else {
+        aot_range_info_t *info_ptr2 = aot_info_list;
+        while (info_ptr2->next) {
+            info_ptr2 = info_ptr2->next;
+        }
+        info_ptr2->next = info_ptr;
+    }
 }
 #endif
 
@@ -3775,7 +3790,9 @@ static void load_elf_interp(const char *filename, struct image_info *info,
 
     load_elf_image(filename, &src, info, &ehdr, NULL);
 #ifdef AOT
-    load_aot_image(filename, info->start_code, info->entry);
+    pthread_mutex_lock(&aot_range_info_mutex);
+    load_aot_image(filename, info->start_code, info->end_code, info->entry);
+    pthread_mutex_unlock(&aot_range_info_mutex);
 #endif
 }
 
@@ -4043,7 +4060,9 @@ int load_elf_binary(struct linux_binprm *bprm, struct image_info *info)
 
     load_elf_image(bprm->filename, &bprm->src, info, &ehdr, &elf_interpreter);
 #ifdef AOT
-    load_aot_image(bprm->filename, info->start_code, info->entry);
+    pthread_mutex_lock(&aot_range_info_mutex);
+    load_aot_image(bprm->filename, info->start_code, info->end_code, info->entry);
+    pthread_mutex_unlock(&aot_range_info_mutex);
 #endif
 
     /* Do this so that we can load the interpreter, if need be.  We will

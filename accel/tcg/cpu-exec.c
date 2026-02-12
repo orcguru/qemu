@@ -911,6 +911,10 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
 }
 
 /* main execution loop */
+#ifdef AOT
+#include "tcg/tcg-aot.h"
+extern aot_range_info_t *aot_info_list;
+#endif
 
 static int __attribute__((noinline))
 cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
@@ -948,6 +952,16 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
             uint64_t entry = tb_aot_lookup_host_addr(s.pc);
             if (entry) {
                 tcg_qemu_aot_exec(cpu_env(cpu), (void *)entry, (void *)s.pc);
+            } else {
+                aot_range_info_t *info_ptr = aot_info_list;
+                while (info_ptr) {
+                    if (info_ptr->x_addr_range_begin <= s.pc && s.pc < info_ptr->x_addr_range_end) {
+                        break;
+                    }
+                    info_ptr = info_ptr->next;
+                }
+                assert(info_ptr);
+                qemu_log_mask(LOG_AOT, "QEMU TCG JIT on %s offset:%lx\n", info_ptr->elf_name, (s.pc - info_ptr->x_addr_range_begin));
             }
 #endif
             tb = tb_lookup(cpu, s);
