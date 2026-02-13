@@ -59,8 +59,8 @@ typedef enum {
 #else
     // TMP0 touched in tcg_target_qemu_aot_prologue
     TCG_REG_TMP0       = TCG_REG_T3,
-    TCG_REG_TMP1       = TCG_REG_A4,
-    TCG_REG_TMP2       = TCG_REG_A3,
+    TCG_REG_TMP1       = TCG_REG_T6,
+    TCG_REG_TMP2       = TCG_REG_T5,
 #endif
 } TCGReg;
 
