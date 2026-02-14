@@ -3304,7 +3304,7 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
     char aotnamebuf[PATH_MAX];
     snprintf(aotnamebuf, PATH_MAX, "%s.aot", image_name);
     int fp = open(image_name, O_RDONLY);
-    if (!fp) {
+    if (fp < 0) {
         perror("Failed to open image_name\n");
         return;
     }

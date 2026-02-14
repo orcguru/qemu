@@ -232,7 +232,16 @@ void find_and_load_missing_aot(uintptr_t x_addr)
         }
     }
     fclose(fp);
-    assert(elf_fn[0]);
+    if (!elf_fn[0]) {
+        return;
+    }
+    char aotnamebuf[PATH_MAX];
+    snprintf(aotnamebuf, PATH_MAX, "%s.aot", elf_fn);
+    int fp_check = open(aotnamebuf, O_RDONLY);
+    if (fp_check < 0) {
+        return;
+    }
+    close(fp_check);
     qemu_log_mask(LOG_AOT, "load aot for:%s\n", elf_fn);
     // FIXME: handle offset
     assert(start != -1UL && end != -1UL && offset == 0);

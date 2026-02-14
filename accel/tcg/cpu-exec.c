@@ -960,8 +960,9 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
                     }
                     info_ptr = info_ptr->next;
                 }
-                assert(info_ptr);
-                qemu_log_mask(LOG_AOT, "QEMU TCG JIT on %s offset:%lx\n", info_ptr->elf_name, (s.pc - info_ptr->x_addr_range_begin));
+                if (info_ptr) {
+                    qemu_log_mask(LOG_AOT, "QEMU TCG JIT on %s offset:%lx\n", info_ptr->elf_name, (s.pc - info_ptr->x_addr_range_begin));
+                }
             }
 #endif
             tb = tb_lookup(cpu, s);
