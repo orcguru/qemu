@@ -2319,7 +2319,7 @@ void translate_dupm_vec(OpCodeType opc, void *ptr) {
     LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
     LLVMValueRef first_element = LLVMBuildExtractElement(builder, src, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef single_element_vector = LLVMBuildInsertElement(builder, LLVMGetUndef(llvm_int_types[type_in]), first_element, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMValueRef zero_mask = LLVMGetUndef(llvm_int_types[type_in]);
+    LLVMValueRef zero_mask = LLVMConstNull(llvm_int_types[type_in]);
     LLVMValueRef splat_vector = LLVMBuildShuffleVector(builder, single_element_vector, LLVMGetUndef(llvm_int_types[type_in]), zero_mask, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     do_store(opc, splat_vector, type_out, operand0);
 #endif
