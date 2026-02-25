@@ -3303,11 +3303,13 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
     qemu_log_mask(LOG_AOT, "%s %s start_code:%lx entry:%lx\n", __FUNCTION__, image_name, start_code, entry);
     char aotnamebuf[PATH_MAX];
     snprintf(aotnamebuf, PATH_MAX, "%s.aot", image_name);
-    int fp = open(image_name, O_RDONLY);
+    int fp = open(aotnamebuf, O_RDONLY);
     if (fp < 0) {
-        perror("Failed to open image_name\n");
+        //perror("Failed to open image_name\n");
         return;
     }
+    close(fp);
+    fp = 0;
     static int log_helper = 0;
     if (!log_helper) {
         // log helper functions
