@@ -1376,11 +1376,21 @@ void translate_rotl(OpCodeType opc, void *ptr) {
     OperandType t0 = get_tmp_and_do_alloc(type_out);
     OperandType t1 = get_tmp_and_do_alloc(type_out);
     OperandType operand0, operand1, operand2;
-    GET_3_OPERANDS();
+    uint32_t is_imm2;
+    GET_2_OPERANDS();
+    operand2 = get_operand(ptr, 2, &is_imm2);
 
-    CREATE_SHL_SLOT(t0, operand1, operand2);
-    OperandType constant = get_tmp_and_do_alloc_with_init(type_out, type_out == LLVMInt32 ? 32 : 64);
-    CREATE_SUB(t1, constant, operand2);
+    if (is_imm2) {
+        CREATE_SHL(t0, operand1, operand2.i);
+    } else {
+        CREATE_SHL_SLOT(t0, operand1, operand2);
+    }
+    if (is_imm2) {
+        t1 = get_tmp_and_do_alloc_with_init(type_out, ((type_out == LLVMInt32 ? 32 : 64) - operand2.i));
+    } else {
+        OperandType constant = get_tmp_and_do_alloc_with_init(type_out, type_out == LLVMInt32 ? 32 : 64);
+        CREATE_SUB(t1, constant, operand2);
+    }
     CREATE_SHR_SLOT(t1, operand1, t1);
     CREATE_OR(operand0, t0, t1);
 }
