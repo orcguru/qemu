@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include <glib.h>
 
+//#define DEBUG_RET                   1
 //#define BUILD_RISCV_ON_AARCH        1
 //#define VERBOSE_VAR                 1
 //#define DEBUG                       1
@@ -449,7 +450,11 @@
         uint8_t buf[16];                            \
         OHType tmp_opc;                             \
         tmp_opc.o = OPC;                 \
-        create_scalar_slot_env_imm(buf, tmp_opc, OUT, get_xmm_offset(ALIAS.s.slot_idx/2) + 16*(ALIAS.s.slot_idx%2) + ALIAS.s.offset);    \
+        if (ALIAS.s.slot_type == SUB_SLOT_ENV) {    \
+            create_scalar_slot_env_imm(buf, tmp_opc, OUT, ALIAS.s.offset);    \
+        } else {                                    \
+            create_scalar_slot_env_imm(buf, tmp_opc, OUT, get_xmm_offset(ALIAS.s.slot_idx/2) + 16*(ALIAS.s.slot_idx%2) + ALIAS.s.offset);    \
+        }                                           \
         translate_ld_env_xmm(tmp_opc.o, buf); \
     } while (0)
 
@@ -1896,7 +1901,6 @@ void translate_ret(OpCodeType opc, void *ptr) {
     OperandType loc610 = get_tmp_and_do_alloc(type_out);
     OperandType loc611 = get_tmp_and_do_alloc(type_out);
     OperandType shadow_stack = get_shadow_stack_pointer(opc);
-    uint8_t new_label = 42;
 
     CREATE_MOV(loc606, shadow_stack);
     CREATE_ADD(loc607, loc606, 8);
@@ -1905,6 +1909,8 @@ void translate_ret(OpCodeType opc, void *ptr) {
     CREATE_SUB(loc610, operand0, loc609);
     CREATE_ADD(loc611, loc606, 0x10);
     set_shadow_stack_pointer(opc, loc611);
+#ifndef DEBUG_RET
+    uint8_t new_label = 42;
     CREATE_BRCOND(loc610, 0, ne, new_label);
 
     // The fast path: branch to the next translated qemuaot CC func
@@ -1920,6 +1926,7 @@ void translate_ret(OpCodeType opc, void *ptr) {
     LLVMBuildRetVoid(builder);
 
     CREATE_LABEL(new_label);
+#endif
 }
 
 void translate_ld_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
