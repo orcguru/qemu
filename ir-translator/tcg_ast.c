@@ -592,6 +592,8 @@ static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, Operan
 static LLVMValueRef get_env_ptr_raw();
 static void set_env_ptr_raw(LLVMValueRef env_stack);
 static OperandType get_env_ptr(OpCodeType opc);
+static OperandType get_shadow_stack_top_bound(OpCodeType opc);
+static OperandType get_shadow_stack_bottom_bound(OpCodeType opc);
 static OperandType get_shadow_stack_pointer(OpCodeType opc);
 static void set_shadow_stack_pointer(OpCodeType opc, OperandType val);
 static LLVMBasicBlockRef get_bb(const char *name);
@@ -830,6 +832,24 @@ static const char *get_next_var_name(const char *tag, OperandType slot_name_for_
     assert(strlen(verbose_name) < sizeof(verbose_name));
     return (const char *)verbose_name;
 #endif
+}
+
+static OperandType get_shadow_stack_top_bound(OpCodeType opc) {
+    OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
+    OperandType env = get_env_ptr(opc);
+    CREATE_ADD64(ptr_addr, env, -24UL);
+    OperandType ptr_val = get_tmp_and_do_alloc(OPC_ADDR_T);
+    CREATE_LD(ptr_val, ptr_addr);
+    return ptr_val;
+}
+
+static OperandType get_shadow_stack_bottom_bound(OpCodeType opc) {
+    OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
+    OperandType env = get_env_ptr(opc);
+    CREATE_ADD64(ptr_addr, env, -16UL);
+    OperandType ptr_val = get_tmp_and_do_alloc(OPC_ADDR_T);
+    CREATE_LD(ptr_val, ptr_addr);
+    return ptr_val;
 }
 
 static OperandType get_shadow_stack_pointer(OpCodeType opc) {
@@ -1868,6 +1888,18 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
 
     LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(opc, is_imm0, operand0, type_in, 0);
     OperandType ptr_val = get_shadow_stack_pointer(opc);
+    LLVMValueRef shadow_ptr_val = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
+    OperandType bottom_bound = get_shadow_stack_bottom_bound(opc);
+    LLVMValueRef shadow_bottom_bound = get_source_node_imm_or_stack(opc, 0, bottom_bound, OPC_ADDR_T, 0);
+
+    LLVMValueRef bool1 = LLVMBuildICmp(builder, LLVMIntUGT, shadow_ptr_val, shadow_bottom_bound, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+
+    LLVMBasicBlockRef bb_ss_valid = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMBasicBlockRef bb_ss_overflow = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMBasicBlockRef bb_ss_merge = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+
+    LLVMBuildCondBr(builder, bool1, bb_ss_valid, bb_ss_overflow);
+    LLVMPositionBuilderAtEnd(builder, bb_ss_valid);
     CREATE_ADD(ptr_val, ptr_val, -8UL);
     LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
     LLVMValueRef shadow_ptr0 = LLVMBuildIntToPtr(builder, shadow_val0, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -1883,6 +1915,13 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     LLVMBuildStore(builder, func_addr, shadow_ptr1);
 
     set_shadow_stack_pointer(opc, ptr_val);
+    LLVMBuildBr(builder, bb_ss_merge);
+
+    LLVMPositionBuilderAtEnd(builder, bb_ss_overflow);
+    LLVMBuildBr(builder, bb_ss_merge);
+
+    LLVMPositionBuilderAtEnd(builder, bb_ss_merge);
+    last_active_bb = bb_ss_merge;
 }
 
 void translate_ret(OpCodeType opc, void *ptr) {
@@ -1900,8 +1939,20 @@ void translate_ret(OpCodeType opc, void *ptr) {
     OperandType loc609 = get_tmp_and_do_alloc(type_out);
     OperandType loc610 = get_tmp_and_do_alloc(type_out);
     OperandType loc611 = get_tmp_and_do_alloc(type_out);
-    OperandType shadow_stack = get_shadow_stack_pointer(opc);
 
+    OperandType shadow_stack = get_shadow_stack_pointer(opc);
+    LLVMValueRef shadow_ptr_val = get_source_node_imm_or_stack(opc, 0, shadow_stack, OPC_ADDR_T, 0);
+    OperandType top_bound = get_shadow_stack_top_bound(opc);
+    LLVMValueRef shadow_top_bound = get_source_node_imm_or_stack(opc, 0, top_bound, OPC_ADDR_T, 0);
+
+    LLVMValueRef bool1 = LLVMBuildICmp(builder, LLVMIntULT, shadow_ptr_val, shadow_top_bound, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+
+    LLVMBasicBlockRef bb_ss_valid = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMBasicBlockRef bb_ss_underflow = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMBasicBlockRef bb_ss_merge = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+
+    LLVMBuildCondBr(builder, bool1, bb_ss_valid, bb_ss_underflow);
+    LLVMPositionBuilderAtEnd(builder, bb_ss_valid);
     CREATE_MOV(loc606, shadow_stack);
     CREATE_ADD(loc607, loc606, 8);
     CREATE_LD(loc608, loc606);
@@ -1927,6 +1978,13 @@ void translate_ret(OpCodeType opc, void *ptr) {
 
     CREATE_LABEL(new_label);
 #endif
+    LLVMBuildBr(builder, bb_ss_merge);
+
+    LLVMPositionBuilderAtEnd(builder, bb_ss_underflow);
+    LLVMBuildBr(builder, bb_ss_merge);
+
+    LLVMPositionBuilderAtEnd(builder, bb_ss_merge);
+    last_active_bb = bb_ss_merge;
 }
 
 void translate_ld_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
