@@ -379,7 +379,7 @@
         OHType tmp_opc;                             \
         tmp_opc.o = movcond_vec;      \
         create_vector_slot5_relop(buf, tmp_opc, VS, VES, OUT, IN0, IN1, CMP0, CMP1, ROP); \
-        translate_mov(tmp_opc.o, buf);  \
+        translate_movcond(tmp_opc.o, buf);  \
     } while (0)
 
 #define CREATE_CMP_VEC(OUT, IN0, IN1, ROP)           \
