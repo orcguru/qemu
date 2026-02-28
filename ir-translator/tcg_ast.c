@@ -438,13 +438,6 @@
         translate_set_label(tmp_opc.o, buf);  \
     } while (0)
 
-#define CREATE_BRCOND(SLOT, I, ROP, LABEL)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        create_branch_condition(buf, SLOT, I, ROP, LABEL); \
-        translate_brcond_i64(brcond_i64, buf); \
-    } while (0)
-
 #define CREATE_LD_ENV_XMM(OPC, OUT, ALIAS)           \
     do {                                            \
         uint8_t buf[16];                            \
@@ -1928,6 +1921,9 @@ void translate_ret(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
+#ifndef DEBUG_RET
+    uint8_t new_label = 42;
+#endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm;
     OperandType operand0;
@@ -1950,9 +1946,18 @@ void translate_ret(OpCodeType opc, void *ptr) {
     LLVMBasicBlockRef bb_ss_valid = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMBasicBlockRef bb_ss_underflow = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMBasicBlockRef bb_ss_merge = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-
+#ifndef DEBUG_RET
+    char false_bb_name[16] = {0};
+    sprintf(false_bb_name, "bb_false%d", br_cnt);
+    LLVMBasicBlockRef bb_false = LLVMAppendBasicBlock(llvm_func, false_bb_name);
+    char true_bb_name[16] = {0};
+    sprintf(true_bb_name, "bb_L%d", new_label);
+    assert(!get_bb(true_bb_name));
+    LLVMBasicBlockRef bb_true = LLVMAppendBasicBlock(llvm_func, true_bb_name);
+#endif
     LLVMBuildCondBr(builder, bool1, bb_ss_valid, bb_ss_underflow);
     LLVMPositionBuilderAtEnd(builder, bb_ss_valid);
+
     CREATE_MOV(loc606, shadow_stack);
     CREATE_ADD(loc607, loc606, 8);
     CREATE_LD(loc608, loc606);
@@ -1961,8 +1966,14 @@ void translate_ret(OpCodeType opc, void *ptr) {
     CREATE_ADD(loc611, loc606, 0x10);
     set_shadow_stack_pointer(opc, loc611);
 #ifndef DEBUG_RET
-    uint8_t new_label = 42;
-    CREATE_BRCOND(loc610, 0, ne, new_label);
+    OperandType op_imm;
+    op_imm.i = 0;
+    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, 0, loc610, type_in, 0);
+    LLVMValueRef c2 = get_source_node_imm_or_stack(opc, 1, op_imm, type_in, 0);
+    LLVMValueRef bool_val = LLVMBuildICmp(builder, llvm_predicate[ne], c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMBuildCondBr(builder, bool_val, bb_true, bb_false);
+    LLVMPositionBuilderAtEnd(builder, bb_false);
+    br_cnt += 1;
 
     // The fast path: branch to the next translated qemuaot CC func
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
@@ -1975,16 +1986,18 @@ void translate_ret(OpCodeType opc, void *ptr) {
     LLVMSetTailCall(call_inst, 1);
     LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
     LLVMBuildRetVoid(builder);
-
-    CREATE_LABEL(new_label);
-#endif
+#else
     LLVMBuildBr(builder, bb_ss_merge);
-
+#endif
     LLVMPositionBuilderAtEnd(builder, bb_ss_underflow);
     LLVMBuildBr(builder, bb_ss_merge);
 
     LLVMPositionBuilderAtEnd(builder, bb_ss_merge);
     last_active_bb = bb_ss_merge;
+
+#ifndef DEBUG_RET
+    CREATE_LABEL(new_label);
+#endif
 }
 
 void translate_ld_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
