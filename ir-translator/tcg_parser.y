@@ -119,6 +119,7 @@ SYMBOL V64 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA SLOT COMMA RELOP   
 | SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA IMMX                { insert_instr(instr_buf, create_vector_slot2_imm(instr_buf, $1, $2, $4, $6, $8, $10)); }
 | SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA SLOT COMMA V128 IMMX           { insert_instr(instr_buf, create_vector_slot2_imm(instr_buf, $1, $2, $4, $6, $8, $11)); }
 | SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA ENV COMMA IMMX                 { insert_instr(instr_buf, create_vector_slot_env_imm(instr_buf, $1, $2, $4, $6, $10)); }
+| SYMBOL V128 COMMA ELEMENTSIZEATTR COMMA SLOT COMMA V128 IMMX COMMA SLOT           { insert_instr(instr_buf, create_vector_slot_vimm_slot(instr_buf, $1, $2, $4, $6, $9, $11)); }
 
 call_helper:
 CALL SYMBOL COMMA IMMX COMMA IMMD COMMA ENV COMMA SLOT COMMA SLOT                                     { insert_instr(instr_buf, create_helper_env_slot2(instr_buf, $2, $4, $6, $10, $12)); }

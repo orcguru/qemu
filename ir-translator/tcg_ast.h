@@ -1639,6 +1639,7 @@ typedef enum {
     X(Instr1BV8_ext) \
     X(Instr1BH141_ext) \
     X(Instr1BV21_ext) \
+    X(Instr1BV212_ext) \
     X(Instr1B41_ext) \
     X(Instr1BV4I_ext) \
     X(Instr1B24_ext) \
@@ -1806,6 +1807,7 @@ size_t create_vector_slot3(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves
 size_t create_vector_slot3_relop(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2, uint8_t relop);
 size_t create_vector_slot4(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2, OperandType s3);
 size_t create_vector_slot_vimm(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, uint64_t vi0);
+size_t create_vector_slot_vimm_slot(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, uint64_t vi0, OperandType s1);
 size_t create_vector_slot2_imm(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, uint64_t i0);
 size_t create_vector_slot_env_imm(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, uint64_t i0);
 size_t create_vector_slot5_relop(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, OperandType s1, OperandType s2, OperandType s3, OperandType s4, uint8_t relop);

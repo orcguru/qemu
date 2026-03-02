@@ -698,6 +698,22 @@ size_t create_vector_slot_vimm(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo
     return sizeof(*i);
 }
 
+size_t create_vector_slot_vimm_slot(void *ptr, OHType op, AttrSrcInfo vs, AttrSrcInfo ves, OperandType s0, uint64_t vi0, OperandType s1) {
+#ifdef DEBUG
+    printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
+#endif
+    Instr1BV212 *i = (Instr1BV212 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BV212_ext;
+    i->opc = op.o;
+    i->vs = vs.p.vs;
+    i->es = ves.p.ves;
+    SET_SLOT(0);
+    i->imm = vi0;
+    SET_SLOT(1);
+    return sizeof(*i);
+}
+
 // Ignore num which is used as mmuidx for now.
 size_t create_scalar_slot3_attr3_num(void *ptr, OHType op, OperandType s0, OperandType s1, OperandType s2, AttrSrcInfo a0, AttrSrcInfo a1, AttrSrcInfo a2, uint64_t n0) {
 #ifdef DEBUG
