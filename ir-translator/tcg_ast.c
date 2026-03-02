@@ -4941,7 +4941,15 @@ void module_prolog() {
     llvm_int_store_types[LLVMVector4xi32] = llvm_int_types[LLVMVector4xi32];
     llvm_int_store_types[LLVMVector2xi64] = llvm_int_types[LLVMVector2xi64];
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
-    // FIXME: v64
+    llvm_int_types[LLVMVector8xi8] = LLVMScalableVectorType(LLVMInt8Type(), 8);
+    llvm_int_types[LLVMVector4xi16] = LLVMScalableVectorType(LLVMInt16Type(), 4);
+    llvm_int_types[LLVMVector2xi32] = LLVMScalableVectorType(LLVMInt32Type(), 2);
+    llvm_int_types[LLVMVector1xi64] = LLVMScalableVectorType(LLVMInt64Type(), 1);
+    llvm_int_store_types[LLVMVector8xi8] = LLVMVectorType(LLVMInt8Type(), 8);
+    llvm_int_store_types[LLVMVector4xi16] = LLVMVectorType(LLVMInt16Type(), 4);
+    llvm_int_store_types[LLVMVector2xi32] = LLVMVectorType(LLVMInt32Type(), 2);
+    llvm_int_store_types[LLVMVector1xi64] = LLVMVectorType(LLVMInt64Type(), 1);
+
     llvm_int_types[LLVMVector16xi8] = LLVMScalableVectorType(LLVMInt8Type(), 8);
     llvm_int_types[LLVMVector8xi16] = LLVMScalableVectorType(LLVMInt16Type(), 4);
     llvm_int_types[LLVMVector4xi32] = LLVMScalableVectorType(LLVMInt32Type(), 2);
