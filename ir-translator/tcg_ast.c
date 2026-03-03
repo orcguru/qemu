@@ -354,6 +354,16 @@
         translate_binary(tmp_opc.o, buf, LLVMBuildSub);  \
     } while (0)
 
+#define CREATE_SETCOND(OUT, IN0, IN1, RELOP)        \
+    do {                                            \
+        uint8_t buf[16];                            \
+        OHType tmp_opc;                             \
+        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
+        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? setcond_i32 : setcond_i64;      \
+        create_scalar_slot3_relop(buf, tmp_opc, OUT, IN0, IN1, RELOP); \
+        translate_setcond(tmp_opc.o, buf);  \
+    } while (0)
+
 #define CREATE_MOV(OUT, IN)           \
     do {                                            \
         uint8_t buf[16];                            \
@@ -1755,23 +1765,24 @@ void translate_negsetcond(OpCodeType opc, void *ptr) {
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS_NOCHECK();
+    assert(!is_imm0);
+    OperandType in0, in1;
 
-    LLVMValueRef arg1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
-    LLVMValueRef arg2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
-
-    RelopType r = get_relop(ptr);
-    if (r == tsteq || r == tstne) {
-        r -= (tsteq - eq);
-        arg1 = LLVMBuildAnd(builder, arg1, arg2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-        arg2 = LLVMConstInt(llvm_int_types[type_in], 0, 0);
+    if (is_imm1) {
+        in0 = get_tmp_and_do_alloc_with_init(type_out, operand1.i);
+    } else {
+        in0 = operand1;
     }
-    assert(r < RELOPMAX && llvm_predicate[r]);
-    LLVMValueRef bool_val = LLVMBuildICmp(builder, llvm_predicate[r], arg1, arg2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-
-    LLVMValueRef result = LLVMBuildSExt(builder, bool_val, llvm_int_types[type_out], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMValueRef neg_one = LLVMConstInt(llvm_int_types[type_in], -1UL, 0);
-    result = LLVMBuildXor(builder, result, neg_one, get_next_var_name(opcode_type_str[opc], operand0));
-    do_store(opc, result, type_out, operand0);
+    if (is_imm2) {
+        in1 = get_tmp_and_do_alloc_with_init(type_out, operand2.i);
+    } else {
+        in1 = operand2;
+    }
+    RelopType r = get_relop(ptr);
+    OperandType tmp0 = get_tmp_and_do_alloc(type_out);
+    CREATE_SETCOND(tmp0, in0, in1, r);
+    OperandType z = get_tmp_and_do_alloc_with_init(type_out, 0);
+    CREATE_SUB(operand0, z, tmp0);
 }
 
 void translate_setcond(OpCodeType opc, void *ptr) {
