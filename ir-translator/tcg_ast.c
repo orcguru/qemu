@@ -1760,6 +1760,11 @@ void translate_negsetcond(OpCodeType opc, void *ptr) {
     LLVMValueRef arg2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
 
     RelopType r = get_relop(ptr);
+    if (r == tsteq || r == tstne) {
+        r -= (tsteq - eq);
+        arg1 = LLVMBuildAnd(builder, arg1, arg2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        arg2 = LLVMConstInt(llvm_int_types[type_in], 0, 0);
+    }
     assert(r < RELOPMAX && llvm_predicate[r]);
     LLVMValueRef bool_val = LLVMBuildICmp(builder, llvm_predicate[r], arg1, arg2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
 
