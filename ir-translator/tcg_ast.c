@@ -495,6 +495,10 @@
         translate_qemu_st(tmp_opc.o, buf);        \
     } while (0)
 
+#define GET_LLVM_TYPE_ALIGNMENT(type)       (type <= LLVMInt64 ? 8 : 16)
+
+#define GET_ALIGNMENT_FROM_CONSTANT(c)      ((c) % 8 == 0 ? 8 : ((c) % 4 == 0 ? 4 : ((c) % 2 == 0 ? 2 : 1)))
+
 extern char *lineptr;
 extern const char *opcode_type_str[];
 extern const char *llvm_type_str[];
@@ -540,6 +544,11 @@ static LLVMBasicBlockRef last_active_bb = NULL;
 
 #define HELPER_DEFINES_OUTPUT(h)        (helper_return_type[h] != LLVMInvalidType)
 
+typedef struct AllocaWithAlignment {
+    LLVMValueRef alloca;
+    unsigned alignment;
+} AllocaWithAlignment;
+
 static LLVMTypeRef fixed_llvmtyperef[FIXED_VECTOR_PARAM_COUNT] = {NULL};
 static LLVMType fixed_vector_param_llvmtypes[FIXED_VECTOR_PARAM_COUNT] = {0};
 static uint8_t fixed_vector_param_in_stack[FIXED_VECTOR_PARAM_COUNT] = {0};
@@ -551,9 +560,9 @@ static int ir_var_name_idx = 0;
 static LLVMTypeRef llvm_int_types[LLVMMAXType] = {0};
 static LLVMTypeRef llvm_int_store_types[LLVMMAXType] = {0};
 static uint8_t llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {0};
-static LLVMValueRef func_xreg_alloca[1<<REGISTER_INDEX_SHIFT] = {NULL};
-static LLVMValueRef func_tmp_alloca[1<<STACK_INDEX_SHIFT] = {NULL};
-static LLVMValueRef func_xmm_alloca[1<<REGISTER_INDEX_SHIFT] = {NULL};
+static AllocaWithAlignment func_xreg_alloca[1<<REGISTER_INDEX_SHIFT] = {NULL};
+static AllocaWithAlignment func_tmp_alloca[1<<STACK_INDEX_SHIFT] = {NULL};
+static AllocaWithAlignment func_xmm_alloca[1<<REGISTER_INDEX_SHIFT] = {NULL};
 static LLVMType func_xreg_llvmtype[1<<REGISTER_INDEX_SHIFT] = {0};
 static LLVMType func_tmp_llvmtype[1<<STACK_INDEX_SHIFT] = {0};
 static LLVMType func_xmm_llvmtype[1<<REGISTER_INDEX_SHIFT] = {0};
@@ -710,6 +719,20 @@ static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr) {
     return 0;
 }
 
+static LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val,
+                            LLVMValueRef PointerVal, unsigned Bytes) {
+    LLVMValueRef ST = LLVMBuildStore(B, Val, PointerVal);
+    LLVMSetAlignment(ST, Bytes);
+    return ST;
+}
+
+static LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty,
+                            LLVMValueRef PointerVal, const char *Name, unsigned Bytes) {
+    LLVMValueRef LD = LLVMBuildLoad2(B, Ty, PointerVal, Name);
+    LLVMSetAlignment(LD, Bytes);
+    return LD;
+}
+
 static uint8_t tmp_available_test(uint64_t *ptr, uint16_t idx) {
     int group_idx = idx / (8*sizeof(uint64_t));
     int element_idx = idx % (8*sizeof(uint64_t));
@@ -754,7 +777,8 @@ static OperandType get_tmp_and_do_alloc(LLVMType type) {
     printf("  allocate tmp%d\n", tmp.s.slot_idx); fflush(NULL);
 #endif
     LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[type], tmp_stack_names[tmp.s.slot_idx]);
-    func_tmp_alloca[tmp.s.slot_idx] = alloca_inst;
+    func_tmp_alloca[tmp.s.slot_idx].alloca = alloca_inst;
+    func_tmp_alloca[tmp.s.slot_idx].alignment = GET_LLVM_TYPE_ALIGNMENT(type);
     func_tmp_llvmtype[tmp.s.slot_idx] = type;
     return tmp;
 }
@@ -793,25 +817,27 @@ static uint32_t has_alias_env(OperandType operand) {
     }
 }
 
-static LLVMValueRef get_stack_alloca(OperandType operand) {
-    LLVMValueRef alloca = NULL;
+static AllocaWithAlignment get_stack_alloca(OperandType operand) {
+    AllocaWithAlignment alloca_w_align;
+    alloca_w_align.alloca = NULL;
+    alloca_w_align.alignment = 0;
     if (operand.s.slot_type == SUB_SLOT_XREG) {
-        alloca = func_xreg_alloca[operand.s.slot_idx];
+        alloca_w_align = func_xreg_alloca[operand.s.slot_idx];
     } else if (operand.s.slot_type == SUB_SLOT_TMP) {
         assert(has_alias(operand) == 0);
-        alloca = func_tmp_alloca[operand.s.slot_idx];
+        alloca_w_align = func_tmp_alloca[operand.s.slot_idx];
     } else if (operand.s.slot_type == SUB_SLOT_XMM) {
-        alloca = func_xmm_alloca[operand.s.slot_idx];
+        alloca_w_align = func_xmm_alloca[operand.s.slot_idx];
     } else {
         assert(0);
     }
-    return alloca;
+    return alloca_w_align;
 }
 
 static OperandType get_tmp_and_do_alloc_with_init(LLVMType type, uint64_t val) {
     OperandType tmp = get_tmp_and_do_alloc(type);
     LLVMValueRef constant = LLVMConstInt(llvm_int_types[type], val, 0);
-    LLVMBuildStore(builder, constant, get_stack_alloca(tmp));
+    build_store_with_alignment(builder, constant, get_stack_alloca(tmp).alloca, get_stack_alloca(tmp).alignment);
     return tmp;
 }
 
@@ -979,9 +1005,9 @@ static OperandType get_env_ptr(OpCodeType opc) {
     return tmp;
 }
 
-static LLVMValueRef check_scalable_vector_perform_load(LLVMType val_tidx, LLVMValueRef addr) {
+static LLVMValueRef check_scalable_vector_perform_load(LLVMType val_tidx, LLVMValueRef addr, unsigned align) {
     LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_store_types[val_tidx], 0), get_next_var_name("check_scalable_store", dummy_slot_for_debug));
-    LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_store_types[val_tidx], ptr, get_next_var_name("check_scalable_load", dummy_slot_for_debug));
+    LLVMValueRef val = build_load_with_alignment(builder, llvm_int_store_types[val_tidx], ptr, get_next_var_name("check_scalable_load", dummy_slot_for_debug), align);
     if (llvm_int_types[val_tidx] != llvm_int_store_types[val_tidx]) {
         LLVMTypeRef intrinsic_types[] = {llvm_int_types[val_tidx], llvm_int_store_types[val_tidx], llvm_int_types[OPC_ADDR_T]};
         LLVMTypeRef intrinsic_func_type = LLVMFunctionType(llvm_int_types[val_tidx], intrinsic_types, 3, 0);
@@ -999,7 +1025,7 @@ static LLVMValueRef check_scalable_vector_perform_load(LLVMType val_tidx, LLVMVa
     return val;
 }
 
-static LLVMValueRef check_scalable_vector_perform_store(LLVMValueRef val, LLVMType val_tidx, LLVMValueRef addr) {
+static LLVMValueRef check_scalable_vector_perform_store(LLVMValueRef val, LLVMType val_tidx, LLVMValueRef addr, unsigned align) {
     LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_store_types[val_tidx], 0), get_next_var_name("check_scalable_store", dummy_slot_for_debug));
     if (llvm_int_types[val_tidx] != llvm_int_store_types[val_tidx]) {
         LLVMTypeRef intrinsic_types[] = {llvm_int_types[val_tidx], llvm_int_types[OPC_ADDR_T]};
@@ -1015,7 +1041,7 @@ static LLVMValueRef check_scalable_vector_perform_store(LLVMValueRef val, LLVMTy
         LLVMValueRef intrinsic_call_args[] = {val, index_0};
         val = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, intrinsic_call_args, 2, get_next_var_name("check_scalable_store", dummy_slot_for_debug));
     }
-    return LLVMBuildStore(builder, val, ptr);
+    return build_store_with_alignment(builder, val, ptr, align);
 }
 
 static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, OperandType out) {
@@ -1025,14 +1051,14 @@ static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, Operan
         OperandType env = get_env_ptr(opc);
         CREATE_ADD64(tmp, env, env_var_offset[out.s.slot_idx]);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
-        check_scalable_vector_perform_store(val, val_tidx, tmp_src);
+        check_scalable_vector_perform_store(val, val_tidx, tmp_src, 8);
     } else if (out.s.slot_type == SUB_SLOT_ENV) {
         OperandType tmp = get_tmp_and_do_alloc(OPC_ADDR_T);
         OperandType env = get_env_ptr(opc);
         // v64 type stores into MMX region
         CREATE_ADD64(tmp, env, out.s.offset);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
-        check_scalable_vector_perform_store(val, val_tidx, tmp_src);
+        check_scalable_vector_perform_store(val, val_tidx, tmp_src, GET_ALIGNMENT_FROM_CONSTANT(out.s.offset));
     } else {
         LLVMType out_idx = get_stack_llvmtype(out);
         assert((val_tidx <= LLVMInt64 && out_idx <= LLVMInt64 && val_tidx <= out_idx) ||
@@ -1058,7 +1084,7 @@ static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, Operan
         } else if (val_tidx > LLVMInt64 && out_idx > LLVMInt64 && val_tidx != out_idx) {
             val = LLVMBuildBitCast(builder, val, llvm_int_types[out_idx], get_next_var_name("store_val_bitcast", out));
         }
-        LLVMBuildStore(builder, val, get_stack_alloca(out));
+        build_store_with_alignment(builder, val, get_stack_alloca(out).alloca, get_stack_alloca(out).alignment);
     }
 }
 
@@ -1120,7 +1146,7 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
         }
 #endif
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(val_type, 0), get_next_var_name("source_env_ptr_offset", operand));
-        ret = LLVMBuildLoad2(builder, val_type, ptr, get_next_var_name("source_val", operand));
+        ret = build_load_with_alignment(builder, val_type, ptr, get_next_var_name("source_val", operand), 8);
         if (val_type != type) {
             ret = LLVMBuildZExt(builder, ret, type, get_next_var_name("store_val_ext", operand));
         }
@@ -1133,7 +1159,7 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
             CREATE_ADD64(tmp, env, operand.s.offset);
             LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
             LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(type, 0), get_next_var_name("source_env_ptr_offset", operand));
-            ret = LLVMBuildLoad2(builder, type, ptr, get_next_var_name("source_val", operand));
+            ret = build_load_with_alignment(builder, type, ptr, get_next_var_name("source_val", operand), GET_ALIGNMENT_FROM_CONSTANT(operand.s.offset));
         }
     } else if (operand.s.slot_type == SUB_SLOT_XMM) {
         if (operand.s.offset) {
@@ -1155,14 +1181,14 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
                 assert(tidx == LLVMInt8);
                 elem_idx = operand.s.offset;
             }
-            LLVMValueRef vec = LLVMBuildLoad2(builder, vtype, get_stack_alloca(operand), get_next_var_name("source_vec", operand));
+            LLVMValueRef vec = build_load_with_alignment(builder, vtype, get_stack_alloca(operand).alloca, get_next_var_name("source_vec", operand), get_stack_alloca(operand).alignment);
             LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], elem_idx, 0);
             ret = LLVMBuildExtractElement(builder, vec, index, get_next_var_name("source_val", operand));
         } else {
-            ret = LLVMBuildLoad2(builder, type, get_stack_alloca(operand), get_next_var_name("source_val", operand));
+            ret = build_load_with_alignment(builder, type, get_stack_alloca(operand).alloca, get_next_var_name("source_val", operand), get_stack_alloca(operand).alignment);
         }
     } else {
-        ret = LLVMBuildLoad2(builder, type, get_stack_alloca(operand), get_next_var_name("source_val", operand));
+        ret = build_load_with_alignment(builder, type, get_stack_alloca(operand).alloca, get_next_var_name("source_val", operand), get_stack_alloca(operand).alignment);
     }
     return ret;
 }
@@ -1912,7 +1938,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     CREATE_ADD(ptr_val, ptr_val, -8UL);
     LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
     LLVMValueRef shadow_ptr0 = LLVMBuildIntToPtr(builder, shadow_val0, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMBuildStore(builder, x64_ret_addr, shadow_ptr0);
+    build_store_with_alignment(builder, x64_ret_addr, shadow_ptr0, 8);
 
     char func_name[64] = {0};
     sprintf(func_name, "%s%sfunc_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", func_hex.i);
@@ -1921,7 +1947,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     CREATE_ADD(ptr_val, ptr_val, -8UL);
     LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
     LLVMValueRef shadow_ptr1 = LLVMBuildIntToPtr(builder, shadow_val1, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMBuildStore(builder, func_addr, shadow_ptr1);
+    build_store_with_alignment(builder, func_addr, shadow_ptr1, 8);
 
     set_shadow_stack_pointer(opc, ptr_val);
     LLVMBuildBr(builder, bb_ss_merge);
@@ -2082,31 +2108,25 @@ void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
 
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMValueRef result = LLVMBuildLoad2(builder, llvm_int_types[type_mem], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    unsigned align = 1;
     if (a1.p.storage.attr.alignment == UNALIGN) {
-        LLVMSetAlignment(result, 1);
+        align = 1;
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
-        LLVMSetAlignment(result, 16);
+        align = 16;
     } else if (a1.p.storage.attr.alignment == ALIGN_32) {
-        LLVMSetAlignment(result, 32);
+        align = 32;
     } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
-        LLVMSetAlignment(result, llvm_vector_elem_bit_counts[type_mem*2+1]/8);
+        align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
+    } else {
+        assert(0);
     }
+    LLVMValueRef result = build_load_with_alignment(builder, llvm_int_types[type_mem], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug), align);
     do_store(opc, result, type_reg, operand0);
     OperandType high_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
     CREATE_ADD(high_addr, operand2, 8UL);
     addr = get_source_node_imm_or_stack(opc, 0, high_addr, OPC_ADDR_T, 0);
     pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    result = LLVMBuildLoad2(builder, llvm_int_types[type_mem], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    if (a1.p.storage.attr.alignment == UNALIGN) {
-        LLVMSetAlignment(result, 1);
-    } else if (a1.p.storage.attr.alignment == ALIGN_16) {
-        LLVMSetAlignment(result, 16);
-    } else if (a1.p.storage.attr.alignment == ALIGN_32) {
-        LLVMSetAlignment(result, 32);
-    } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
-        LLVMSetAlignment(result, llvm_vector_elem_bit_counts[type_mem*2+1]/8);
-    }
+    result = build_load_with_alignment(builder, llvm_int_types[type_mem], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug), align);
     do_store(opc, result, type_reg, operand1);
 }
 
@@ -2129,16 +2149,19 @@ void translate_qemu_ld(OpCodeType opc, void *ptr) {
 
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMValueRef result = LLVMBuildLoad2(builder, llvm_int_types[type_mem], pointer, get_next_var_name(opcode_type_str[opc], operand0));
+    unsigned align = 1;
     if (a1.p.storage.attr.alignment == UNALIGN) {
-        LLVMSetAlignment(result, 1);
+        align = 1;
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
-        LLVMSetAlignment(result, 16);
+        align = 16;
     } else if (a1.p.storage.attr.alignment == ALIGN_32) {
-        LLVMSetAlignment(result, 32);
+        align = 32;
     } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
-        LLVMSetAlignment(result, llvm_vector_elem_bit_counts[type_mem*2+1]/8);
+        align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
+    } else {
+        assert(0);
     }
+    LLVMValueRef result = build_load_with_alignment(builder, llvm_int_types[type_mem], pointer, get_next_var_name(opcode_type_str[opc], operand0), align);
     if (type_mem < type_reg) {
         if (a2.p.storage.attr.ext == ZERO) {
             result = LLVMBuildZExt(builder, result, llvm_int_types[type_reg], get_next_var_name(opcode_type_str[opc], operand0));
@@ -2193,7 +2216,7 @@ void translate_st(OpCodeType opc, void *ptr) {
             assert(0);
         }
         addr_val = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-        check_scalable_vector_perform_store(val, type_mem, addr_val);
+        check_scalable_vector_perform_store(val, type_mem, addr_val, GET_ALIGNMENT_FROM_CONSTANT(operand1.s.offset));
     }
 }
 
@@ -2226,29 +2249,23 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
     LLVMValueRef src1 = get_source_node_imm_or_stack(opc, 0, operand0, type_reg, 0);
     LLVMValueRef src2 = get_source_node_imm_or_stack(opc, 0, operand1, type_reg, 0);
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand2, OPC_ADDR_T, 0);
-    LLVMValueRef result = check_scalable_vector_perform_store(src1, type_mem, addr);
+    unsigned align = 1;
     if (a1.p.storage.attr.alignment == UNALIGN) {
-        LLVMSetAlignment(result, 1);
+        align = 1;
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
-        LLVMSetAlignment(result, 16);
+        align = 16;
     } else if (a1.p.storage.attr.alignment == ALIGN_32) {
-        LLVMSetAlignment(result, 32);
+        align = 32;
     } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
-        LLVMSetAlignment(result, llvm_vector_elem_bit_counts[type_mem*2+1]/8);
+        align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
+    } else {
+        assert(0);
     }
+    check_scalable_vector_perform_store(src1, type_mem, addr, align);
     OperandType high_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
     CREATE_ADD(high_addr, operand2, 8UL);
     addr = get_source_node_imm_or_stack(opc, 0, high_addr, OPC_ADDR_T, 0);
-    result = check_scalable_vector_perform_store(src2, type_mem, addr);
-    if (a1.p.storage.attr.alignment == UNALIGN) {
-        LLVMSetAlignment(result, 1);
-    } else if (a1.p.storage.attr.alignment == ALIGN_16) {
-        LLVMSetAlignment(result, 16);
-    } else if (a1.p.storage.attr.alignment == ALIGN_32) {
-        LLVMSetAlignment(result, 32);
-    } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
-        LLVMSetAlignment(result, llvm_vector_elem_bit_counts[type_mem*2+1]/8);
-    }
+    check_scalable_vector_perform_store(src2, type_mem, addr, align);
 }
 
 void translate_qemu_st(OpCodeType opc, void *ptr) {
@@ -2273,16 +2290,19 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
         val = LLVMBuildTrunc(builder, val, llvm_int_types[type_mem], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     }
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, operand1, OPC_ADDR_T, 0);
-    LLVMValueRef result = check_scalable_vector_perform_store(val, type_mem, addr);
+    unsigned align = 1;
     if (a1.p.storage.attr.alignment == UNALIGN) {
-        LLVMSetAlignment(result, 1);
+        align = 1;
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
-        LLVMSetAlignment(result, 16);
+        align = 16;
     } else if (a1.p.storage.attr.alignment == ALIGN_32) {
-        LLVMSetAlignment(result, 32);
+        align = 32;
     } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
-        LLVMSetAlignment(result, llvm_vector_elem_bit_counts[type_mem*2+1]/8);
+        align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
+    } else {
+        assert(0);
     }
+    check_scalable_vector_perform_store(val, type_mem, addr, align);
 }
 
 // Vector
@@ -2660,7 +2680,7 @@ void translate_discard(OpCodeType opc, void *ptr) {
     OperandType operand0 = get_operand(ptr, 0, &is_imm);
     assert(!is_imm && operand0.s.valid);
     if (operand0.s.slot_type == SUB_SLOT_XREG) {
-        LLVMBuildStore(builder, LLVMGetPoison(llvm_int_types[func_xreg_llvmtype[operand0.s.slot_idx]]), func_xreg_alloca[operand0.s.slot_idx]);
+        build_store_with_alignment(builder, LLVMGetPoison(llvm_int_types[func_xreg_llvmtype[operand0.s.slot_idx]]), func_xreg_alloca[operand0.s.slot_idx].alloca, func_xreg_alloca[operand0.s.slot_idx].alignment);
     }
 }
 
@@ -2726,7 +2746,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xreg_offset, 0);
         LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("spill_fixed_addr", dummy_slot_for_debug));
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[fixed_vector_param_llvmtypes[i]], 0), get_next_var_name("spill_fixed_ptr", dummy_slot_for_debug));
-        LLVMBuildStore(builder, fixed_val, ptr);
+        build_store_with_alignment(builder, fixed_val, ptr, 8);
     }
 
     // Store all vectors to ENV
@@ -2743,7 +2763,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         uint64_t xmm_offset = get_xmm_offset((i - FIXED_PARAM_COUNT)/2) + 16 * ((i - FIXED_PARAM_COUNT) % 2);
         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
         LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("spill_vec_addr", dummy_slot_for_debug));
-        check_scalable_vector_perform_store(vec_val, LLVMVector2xi64, addr);
+        check_scalable_vector_perform_store(vec_val, LLVMVector2xi64, addr, 16);
     }
 
     LLVMValueRef call_args[MAX_OPERANDS_COUNT] = {NULL};
@@ -2753,7 +2773,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     if (do_return) {
         env_alloca = LLVMBuildAlloca(builder, llvm_int_types[OPC_ADDR_T], "env_alloca");
         LLVMSetAlignment(env_alloca, 8);
-        LLVMBuildStore(builder, env_raw, env_alloca);
+        build_store_with_alignment(builder, env_raw, env_alloca, 8);
     }
 #ifdef DEBUG
     printf("BuildCall2:%s\n", LLVMGetValueName(helper_func)); fflush(NULL);
@@ -2768,7 +2788,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         LLVMPositionBuilderAtEnd(builder, last_active_bb);
         return trampoline;
     } else {
-        env_raw = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], env_alloca, get_next_var_name("env_ptr", dummy_slot_for_debug));
+        env_raw = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], env_alloca, get_next_var_name("env_ptr", dummy_slot_for_debug), 8);
         set_env_ptr_raw(env_raw);
     }
 
@@ -2782,7 +2802,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xreg_offset, 0);
         LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("reload_fixed_addr", dummy_slot_for_debug));
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[fixed_vector_param_llvmtypes[i]], 0), get_next_var_name("reload_fixed_ptr", dummy_slot_for_debug));
-        return_args[i] = LLVMBuildLoad2(builder, llvm_int_types[fixed_vector_param_llvmtypes[i]], ptr, get_next_var_name("reload_fixed_val", dummy_slot_for_debug));
+        return_args[i] = build_load_with_alignment(builder, llvm_int_types[fixed_vector_param_llvmtypes[i]], ptr, get_next_var_name("reload_fixed_val", dummy_slot_for_debug), 8);
     }
 
     // Load all vectors from ENV
@@ -2790,7 +2810,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         uint64_t env_xmm_offset = get_xmm_offset((i - FIXED_PARAM_COUNT)/2) + 16 * ((i - FIXED_PARAM_COUNT) % 2);
         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xmm_offset, 0);
         LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("reload_vec_addr", dummy_slot_for_debug));
-        return_args[i] = check_scalable_vector_perform_load(LLVMVector2xi64, addr);
+        return_args[i] = check_scalable_vector_perform_load(LLVMVector2xi64, addr, 16);
     }
 
     LLVMTypeRef next_type = LLVMGlobalGetValueType(next_func);
@@ -3465,7 +3485,7 @@ static void spill_vector(LLVMValueRef xmm_val, XMMRegType xmm_reg) {
     uint64_t xmm_offset = get_xmm_offset(xmm_reg/2) + 16*(xmm_reg%2);
     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
     LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(debug_name, dummy_slot_for_debug));
-    check_scalable_vector_perform_store(xmm_val, LLVMVector2xi64, addr);
+    check_scalable_vector_perform_store(xmm_val, LLVMVector2xi64, addr, 16);
 }
 
 static LLVMValueRef reload_vector(XMMRegType xmm_reg) {
@@ -3477,7 +3497,7 @@ static LLVMValueRef reload_vector(XMMRegType xmm_reg) {
     uint64_t xmm_offset = get_xmm_offset(xmm_reg/2) + 16*(xmm_reg%2);
     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
     LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(debug_name, dummy_slot_for_debug));
-    return check_scalable_vector_perform_load(LLVMVector2xi64, addr);
+    return check_scalable_vector_perform_load(LLVMVector2xi64, addr, 16);
 }
 
 static void translate_helper_outband(OpCodeType opc, void *ptr) {
@@ -3501,13 +3521,13 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
                     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
                     LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
                     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                    shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                    shadow_pointer = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug), 8);
                 }
                 char var_name[128] = {0};
                 sprintf(var_name, "cross_call_spill_tmp_%d_offset_%d", i, tmp_shadow_offset[i]);
                 LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name(var_name, dummy_slot_for_debug));
                 LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                LLVMBuildStore(builder, val, shadow_p);
+                build_store_with_alignment(builder, val, shadow_p, 8);
             }
         }
     }
@@ -3663,9 +3683,10 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
                 // Now load passenger into the slot
                 if (!fixed_vector_param_in_stack[FIXED_PARAM_COUNT + new_idx]) {
                     LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + new_idx]], fixed_vector_stack_names[FIXED_PARAM_COUNT + new_idx]);
-                    func_xmm_alloca[new_idx] = alloca_inst;
+                    LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + new_idx]));
+                    func_xmm_alloca[new_idx].alloca = alloca_inst;
+                    func_xmm_alloca[new_idx].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + new_idx]);
                     func_xmm_llvmtype[new_idx] = fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + new_idx];
-                    LLVMSetAlignment(alloca_inst, 16);
                     fixed_vector_param_in_stack[FIXED_PARAM_COUNT + new_idx] = 1;
                 }
                 OperandType op;
@@ -3673,7 +3694,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
                 op.s.slot_type = SUB_SLOT_ENV;
                 op.s.offset = alias.s.offset;
                 LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_xmm_llvmtype[new_idx], 0);
-                LLVMBuildStore(builder, val, func_xmm_alloca[new_idx]);
+                build_store_with_alignment(builder, val, func_xmm_alloca[new_idx].alloca, func_xmm_alloca[new_idx].alignment);
             }
         }
     }
@@ -3856,23 +3877,25 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
             }
 
             xmm_val = reload_vector(spilled_xmm_regs[i]);
-            if (!func_xmm_alloca[spilled_xmm_regs[i]]) {
+            if (!func_xmm_alloca[spilled_xmm_regs[i]].alloca) {
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]]], fixed_vector_stack_names[XREG_MAX + spilled_xmm_regs[i]]);
-                func_xmm_alloca[spilled_xmm_regs[i]] = alloca_inst;
+                LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]]));
+                func_xmm_alloca[spilled_xmm_regs[i]].alloca = alloca_inst;
+                func_xmm_alloca[spilled_xmm_regs[i]].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]]);
                 func_xmm_llvmtype[spilled_xmm_regs[i]] = fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]];
-                LLVMSetAlignment(alloca_inst, 16);
             }
-            LLVMBuildStore(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i]]);
+            build_store_with_alignment(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i]].alloca, func_xmm_alloca[spilled_xmm_regs[i]].alignment);
             fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i]] = 1;
             if (IS_YMM_HELPER(h)) {
                 xmm_val = reload_vector(spilled_xmm_regs[i] + 1);
-                if (!func_xmm_alloca[spilled_xmm_regs[i] + 1]) {
+                if (!func_xmm_alloca[spilled_xmm_regs[i] + 1].alloca) {
                     LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1]], fixed_vector_stack_names[XREG_MAX + spilled_xmm_regs[i] + 1]);
-                    func_xmm_alloca[spilled_xmm_regs[i] + 1] = alloca_inst;
+                    LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1]));
+                    func_xmm_alloca[spilled_xmm_regs[i] + 1].alloca = alloca_inst;
+                    func_xmm_alloca[spilled_xmm_regs[i] + 1].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1]);
                     func_xmm_llvmtype[spilled_xmm_regs[i] + 1] = fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1];
-                    LLVMSetAlignment(alloca_inst, 16);
                 }
-                LLVMBuildStore(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i] + 1]);
+                build_store_with_alignment(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i] + 1].alloca, func_xmm_alloca[spilled_xmm_regs[i] + 1].alignment);
                 fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1] = 1;
             }
         }
@@ -3893,14 +3916,14 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
                     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
                     LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
                     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                    shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                    shadow_pointer = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug), 8);
                 }
                 char var_name[128] = {0};
                 sprintf(var_name, "cross_call_reload_tmp_%d_offset_%d", i, tmp_shadow_offset[i]);
                 LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name(var_name, dummy_slot_for_debug));
                 LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                LLVMBuildStore(builder, val, get_stack_alloca(op));
+                LLVMValueRef val = build_load_with_alignment(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug), 8);
+                build_store_with_alignment(builder, val, get_stack_alloca(op).alloca, get_stack_alloca(op).alignment);
             }
         }
     }
@@ -3975,13 +3998,13 @@ void translate_call(OpCodeType opc, void *ptr) {
                     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
                     LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
                     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                    shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                    shadow_pointer = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug), 8);
                 }
                 char var_name[128] = {0};
                 sprintf(var_name, "cross_call_spill_tmp_%d_offset_%d", i, tmp_shadow_offset[i]);
                 LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name(var_name, dummy_slot_for_debug));
                 LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                LLVMBuildStore(builder, val, shadow_p);
+                build_store_with_alignment(builder, val, shadow_p, 8);
             }
         }
     }
@@ -4140,14 +4163,14 @@ void translate_call(OpCodeType opc, void *ptr) {
                     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], -8UL, 0);
                     LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
                     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                    shadow_pointer = LLVMBuildLoad2(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+                    shadow_pointer = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug), 8);
                 }
                 char var_name[128] = {0};
                 sprintf(var_name, "cross_call_reload_tmp_%d_offset_%d", i, tmp_shadow_offset[i]);
                 LLVMValueRef shadow_addr = LLVMBuildAdd(builder, shadow_pointer, shadow_off, get_next_var_name(var_name, dummy_slot_for_debug));
                 LLVMValueRef shadow_p = LLVMBuildIntToPtr(builder, shadow_addr, LLVMPointerType(llvm_int_types[func_tmp_llvmtype[i]], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                LLVMValueRef val = LLVMBuildLoad2(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-                LLVMBuildStore(builder, val, get_stack_alloca(op));
+                LLVMValueRef val = build_load_with_alignment(builder, llvm_int_types[func_tmp_llvmtype[i]], shadow_p, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug), 8);
+                build_store_with_alignment(builder, val, get_stack_alloca(op).alloca, get_stack_alloca(op).alignment);
             }
         }
     }
@@ -4240,10 +4263,11 @@ static void setup_func_stack() {
         for (XRegType x = 0; x < XREG_MAX; ++x) {
             if (xreg_valid & (1UL<<x)) {
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[x]], fixed_vector_stack_names[x]);
-                LLVMSetAlignment(alloca_inst, 8);
-                func_xreg_alloca[x] = alloca_inst;
+                LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[x]));
+                func_xreg_alloca[x].alloca = alloca_inst;
+                func_xreg_alloca[x].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[x]);
                 func_xreg_llvmtype[x] = fixed_vector_param_llvmtypes[x];
-                LLVMBuildStore(builder, LLVMGetParam(llvm_func, x), alloca_inst);
+                build_store_with_alignment(builder, LLVMGetParam(llvm_func, x), func_xreg_alloca[x].alloca, func_xreg_alloca[x].alignment);
                 fixed_vector_param_in_stack[x] = 1;
             }
         }
@@ -4267,9 +4291,10 @@ static void setup_func_stack() {
                 }
 #endif
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[tmp_bits_type[i]], tmp_stack_names[i]);
-                func_tmp_alloca[i] = alloca_inst;
+                LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(tmp_bits_type[i]));
+                func_tmp_alloca[i].alloca = alloca_inst;
+                func_tmp_alloca[i].alignment = GET_LLVM_TYPE_ALIGNMENT(tmp_bits_type[i]);
                 func_tmp_llvmtype[i] = tmp_bits_type[i];
-                LLVMSetAlignment(alloca_inst, tmp_bits_type[i] <= LLVMInt64 ? 8 : 16);
             }
         }
     }
@@ -4278,10 +4303,11 @@ static void setup_func_stack() {
             if (xmm_valid & (1UL<<i)) {
                 assert((XREG_MAX + i) < FIXED_VECTOR_PARAM_COUNT);
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + i]], fixed_vector_stack_names[XREG_MAX + i]);
-                func_xmm_alloca[i] = alloca_inst;
+                LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + i]));
+                func_xmm_alloca[i].alloca = alloca_inst;
+                func_xmm_alloca[i].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + i]);
                 func_xmm_llvmtype[i] = fixed_vector_param_llvmtypes[XREG_MAX + i];
-                LLVMSetAlignment(alloca_inst, 16);
-                LLVMBuildStore(builder, LLVMGetParam(llvm_func, FIXED_PARAM_COUNT + i), func_xmm_alloca[i]);
+                build_store_with_alignment(builder, LLVMGetParam(llvm_func, FIXED_PARAM_COUNT + i), func_xmm_alloca[i].alloca, func_xmm_alloca[i].alignment);
                 fixed_vector_param_in_stack[FIXED_PARAM_COUNT + i] = 1;
             }
         }
