@@ -1111,7 +1111,7 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
                     if (i == half_cnt) {
                         val = operand.i;
                     }
-                    LLVMValueRef element_value = LLVMConstInt(llvm_int_types[OPC_VECTOR_TO_FIXED(tidx)], val & ((1UL<<bit_cnt)-1), 0);
+                    LLVMValueRef element_value = LLVMConstInt(llvm_int_types[OPC_VECTOR_TO_FIXED(tidx)], bit_cnt < 64 ? (val & ((1UL<<bit_cnt)-1)) : val, 0);
                     constants[i] = element_value;
                     val = val >> bit_cnt;
                 }
