@@ -1447,6 +1447,9 @@ typedef struct {
 #define ALIGNMENT_TYPE_LIST \
     X(UNALIGN) \
     X(ALIGN_MEM_SIZE) \
+    X(ALIGN_2) \
+    X(ALIGN_4) \
+    X(ALIGN_8) \
     X(ALIGN_16) \
     X(ALIGN_32)
 

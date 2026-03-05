@@ -2111,6 +2111,12 @@ void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
     unsigned align = 1;
     if (a1.p.storage.attr.alignment == UNALIGN) {
         align = 1;
+    } else if (a1.p.storage.attr.alignment == ALIGN_2) {
+        align = 2;
+    } else if (a1.p.storage.attr.alignment == ALIGN_4) {
+        align = 4;
+    } else if (a1.p.storage.attr.alignment == ALIGN_8) {
+        align = 8;
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
         align = 16;
     } else if (a1.p.storage.attr.alignment == ALIGN_32) {
@@ -2152,6 +2158,12 @@ void translate_qemu_ld(OpCodeType opc, void *ptr) {
     unsigned align = 1;
     if (a1.p.storage.attr.alignment == UNALIGN) {
         align = 1;
+    } else if (a1.p.storage.attr.alignment == ALIGN_2) {
+        align = 2;
+    } else if (a1.p.storage.attr.alignment == ALIGN_4) {
+        align = 4;
+    } else if (a1.p.storage.attr.alignment == ALIGN_8) {
+        align = 8;
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
         align = 16;
     } else if (a1.p.storage.attr.alignment == ALIGN_32) {
@@ -2252,6 +2264,12 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
     unsigned align = 1;
     if (a1.p.storage.attr.alignment == UNALIGN) {
         align = 1;
+    } else if (a1.p.storage.attr.alignment == ALIGN_2) {
+        align = 2;
+    } else if (a1.p.storage.attr.alignment == ALIGN_4) {
+        align = 4;
+    } else if (a1.p.storage.attr.alignment == ALIGN_8) {
+        align = 8;
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
         align = 16;
     } else if (a1.p.storage.attr.alignment == ALIGN_32) {
@@ -2293,6 +2311,12 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
     unsigned align = 1;
     if (a1.p.storage.attr.alignment == UNALIGN) {
         align = 1;
+    } else if (a1.p.storage.attr.alignment == ALIGN_2) {
+        align = 2;
+    } else if (a1.p.storage.attr.alignment == ALIGN_4) {
+        align = 4;
+    } else if (a1.p.storage.attr.alignment == ALIGN_8) {
+        align = 8;
     } else if (a1.p.storage.attr.alignment == ALIGN_16) {
         align = 16;
     } else if (a1.p.storage.attr.alignment == ALIGN_32) {

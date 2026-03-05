@@ -109,7 +109,11 @@ ltu             ltu
 ne              ne
 tsteq           tsteq
 tstne           tstne
+unal            unal
 al              al
+al2             al2
+al4             al4
+al8             al8
 leq             leq
 lesl            lesl
 lesw            lesw
@@ -1383,7 +1387,11 @@ xsetbv                          xsetbv
 {LABEL}           { HANDLE_COLUMN; yylval->val = atoi(yytext + 2); return LABEL; }
 {noat}            { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ATOMIC; yylval->ai.p.storage.attr.atomic = NONATOMIC; return MEMATTR; }
 {un}              { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ALIGNMENT; yylval->ai.p.storage.attr.alignment = UNALIGN; return MEMATTR; }
+{unal}            { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ALIGNMENT; yylval->ai.p.storage.attr.alignment = UNALIGN; return MEMATTR; }
 {al}              { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ALIGNMENT; yylval->ai.p.storage.attr.alignment = ALIGN_MEM_SIZE; return MEMATTR; }
+{al2}             { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ALIGNMENT; yylval->ai.p.storage.attr.alignment = ALIGN_2; return MEMATTR; }
+{al4}             { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ALIGNMENT; yylval->ai.p.storage.attr.alignment = ALIGN_4; return MEMATTR; }
+{al8}             { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ALIGNMENT; yylval->ai.p.storage.attr.alignment = ALIGN_8; return MEMATTR; }
 {al16}            { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ALIGNMENT; yylval->ai.p.storage.attr.alignment = ALIGN_16; return MEMATTR; }
 {al32}            { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_ALIGNMENT; yylval->ai.p.storage.attr.alignment = ALIGN_32; return MEMATTR; }
 {sb}              { HANDLE_COLUMN; yylval->ai.subt = SUB_ATTR_SRCSIZEEXT; yylval->ai.p.storage.attr.ext = SIGN; yylval->ai.p.storage.size = SRC1B; return MEMATTR; }
