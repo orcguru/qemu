@@ -296,12 +296,12 @@ typedef struct __attribute__((packed)) {
     /*
     struct {
         uint32_t atomic :1;
-        uint32_t alignment :2;
+        uint32_t alignment :3;
         uint32_t sign_ext :1;
         uint32_t src_size :3;
     } storage_attr;
     */
-    uint8_t attr_val        :7;
+    uint8_t attr_val;
 } Instr1B41;
 
 typedef struct __attribute__((packed)) {
@@ -801,12 +801,12 @@ typedef struct __attribute__((packed)) {
     union {
         struct {
             uint32_t atomic :1;
-            uint32_t alignment :2;
+            uint32_t alignment :3;
             uint32_t sign_ext :1;
             uint32_t src_size :3;
         } storage_attr;
-        uint32_t attr_val :7;
+        uint32_t attr_val :8;
     } p;
     */
-    uint8_t attr_val        :7;
+    uint8_t attr_val;
 } Instr4B;

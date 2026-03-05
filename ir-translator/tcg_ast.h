@@ -1758,14 +1758,14 @@ typedef struct {
     union {
         struct {
             uint32_t atomic :1;
-            uint32_t alignment :2;
+            uint32_t alignment :3;
             uint32_t sign_ext :1;
             uint32_t src_size :3;
         } storage_attr;
-        uint32_t attr_val :7;
+        uint32_t attr_val :8;
     } p;
     */
-    uint16_t attr_val   :7;
+    uint16_t attr_val   :8;
 } AttributeType;
 
 #ifdef __GNUC__

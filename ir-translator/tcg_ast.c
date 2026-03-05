@@ -695,8 +695,8 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 
 #define GET_STORAGE_ATTR()                                      \
     do {                                                        \
-        a0.p.storage.attr.atomic = attr.attr_val >> 6;          \
-        a1.p.storage.attr.alignment = (attr.attr_val >> 4) & 0x3;   \
+        a0.p.storage.attr.atomic = attr.attr_val >> 7;          \
+        a1.p.storage.attr.alignment = (attr.attr_val >> 4) & 0x7;   \
         a2.p.storage.attr.ext = (attr.attr_val >> 3) & 0x1;     \
         a2.p.storage.size = attr.attr_val & 0x7;                \
     } while (0)
