@@ -3296,11 +3296,17 @@ extern int enable_llvm_debug;
 extern pthread_mutex_t aot_range_info_mutex;
 extern aot_range_info_t *aot_info_list;
 
+const char *qemu_legacy_load_target = "cpugcc_r_base.mytest-m64";
+unsigned long qemu_legacy_log_func = 0xb550;
+
 // load_aot_image should have been called with aot_range_info_mutex locked
 void load_aot_image(const char *image_name, unsigned long start_code, unsigned long end_code, unsigned long entry);
 void load_aot_image(const char *image_name, unsigned long start_code, unsigned long end_code, unsigned long entry)
 {
     qemu_log_mask(LOG_AOT, "%s %s start_code:%lx entry:%lx\n", __FUNCTION__, image_name, start_code, entry);
+    if (strstr(image_name, qemu_legacy_load_target)) {
+        qemu_legacy_log_func += start_code;
+    }
     char aotnamebuf[PATH_MAX];
     snprintf(aotnamebuf, PATH_MAX, "%s.aot", image_name);
     int fp = open(aotnamebuf, O_RDONLY);

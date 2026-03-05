@@ -261,10 +261,12 @@ hit:
     return tb;
 }
 
+extern unsigned long qemu_legacy_log_func;
+
 static void log_cpu_exec(vaddr pc, CPUState *cpu,
                          const TranslationBlock *tb)
 {
-    if (qemu_log_in_addr_range(pc)) {
+    if (qemu_log_in_addr_range(pc) && (qemu_legacy_log_func == 0 || ((pc - qemu_legacy_log_func) < 0x100))) {
         qemu_log_mask(CPU_LOG_EXEC,
                       "Trace %d: %p [%08" PRIx64
                       "/%016" VADDR_PRIx "/%08x/%08x] %s\n",
