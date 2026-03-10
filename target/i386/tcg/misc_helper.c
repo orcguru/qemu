@@ -453,7 +453,7 @@ unsigned long dump_cnt = 0;
 void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
 {
     uint64_t *shadow_stack_pointer_ptr = (uint64_t *)((unsigned long)env - 8);
-    uint64_t shadow_stack_pointer_lower_bound = (*(uint64_t *)((unsigned long)env - 16)) - 16 - 1024;  // remove margin
+    uint64_t shadow_stack_pointer_lower_bound = (*(uint64_t *)((unsigned long)env - 16)) - 16 - 4096;  // remove margin
     uint64_t shadow_stack_pointer_upper_bound = (*(uint64_t *)((unsigned long)env - 24)) + 16;  // remove margin
     assert(shadow_stack_pointer_lower_bound < shadow_stack_pointer_ptr[0]);
     assert(shadow_stack_pointer_ptr[0] <= shadow_stack_pointer_upper_bound);
