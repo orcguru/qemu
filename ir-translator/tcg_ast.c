@@ -35,6 +35,7 @@
 #define OPC_SCALAR_TYPE_CNT     4
 #define OPC_FIXED_TO_VECTOR128(T)   (OPC_FIRST_VECTOR_TYPE + (VS128 - VS64) * OPC_SCALAR_TYPE_CNT + (T - OPC_FIRST_SCALAR_TYPE))
 #define OPC_VECTOR_TO_FIXED(T)      (((T - OPC_FIRST_SCALAR_TYPE) % 4) + OPC_FIRST_SCALAR_TYPE)
+#define OPC_VECTOR_TO_VES(T)      ((T - OPC_FIRST_SCALAR_TYPE) % 4)
 #define OPC_VECTOR_SIZE(T)          (\
   (LLVMVector16xi8 <= T && T <= LLVMVector2xi64) ? VS128 : ( \
     (LLVMVector32xi8 <= T && T <= LLVMVector4xi64) ? VS256 : (  \
@@ -108,7 +109,7 @@
             AttrSrcInfo vs;                         \
             vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
             AttrSrcInfo ves;                        \
-            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
             create_vector_slot2(buf, tmp_opc, vs, ves, OUT, IN); \
         } else {                                    \
             tmp_opc.o = type_out == LLVMInt32 ? not_i32 : not_i64;      \
@@ -126,7 +127,7 @@
             AttrSrcInfo vs;                         \
             vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
             AttrSrcInfo ves;                        \
-            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
             create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         } else {                                    \
             assert(OPC_OUTPUT_T != LLVMInvalidType);  \
@@ -145,7 +146,7 @@
         AttrSrcInfo vs;                         \
         vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
         AttrSrcInfo ves;                         \
-        ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+        ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
         create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         translate_andc(tmp_opc.o, buf);     \
     } while (0)
@@ -159,7 +160,7 @@
             AttrSrcInfo vs;                         \
             vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
             AttrSrcInfo ves;                         \
-            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
             create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         } else {                                    \
             assert(OPC_OUTPUT_T != LLVMInvalidType);  \
@@ -178,7 +179,7 @@
             AttrSrcInfo vs;                         \
             vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
             AttrSrcInfo ves;                         \
-            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
             create_vector_slot2_imm(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         } else {                                    \
             assert(OPC_OUTPUT_T != LLVMInvalidType);  \
@@ -227,7 +228,7 @@
         AttrSrcInfo vs;                         \
         vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
         AttrSrcInfo ves;                         \
-        ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+        ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
         if (SPLAT) {                            \
             create_vector_slot2_imm(buf, tmp_opc, vs, ves, OUT, IN0, IN1.i); \
             translate_binary_splat_immediate(tmp_opc.o, buf, LLVMBuildLShr);   \
@@ -266,7 +267,7 @@
         AttrSrcInfo vs;                         \
         vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
         AttrSrcInfo ves;                         \
-        ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+        ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
         if (SPLAT) {                                \
             create_vector_slot2_imm(buf, tmp_opc, vs, ves, OUT, IN0, IN1.i); \
             translate_binary_splat_immediate(tmp_opc.o, buf, LLVMBuildShl);   \
@@ -285,7 +286,7 @@
             AttrSrcInfo vs;                         \
             vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
             AttrSrcInfo ves;                         \
-            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
             create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
             translate_binary(tmp_opc.o, buf, LLVMBuildOr);     \
         } else {                                        \
@@ -344,7 +345,7 @@
             AttrSrcInfo vs;                         \
             vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
             AttrSrcInfo ves;                         \
-            ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
             create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         } else {                                        \
             assert(OPC_OUTPUT_T != LLVMInvalidType);    \
@@ -400,7 +401,7 @@
         AttrSrcInfo vs;                         \
         vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
         AttrSrcInfo ves;                         \
-        ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+        ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
         create_vector_slot3_relop(buf, tmp_opc, vs, ves, OUT, IN0, IN1, ROP); \
         translate_cmp_vec(tmp_opc.o, buf);  \
     } while (0)
@@ -413,7 +414,7 @@
         AttrSrcInfo vs;                         \
         vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
         AttrSrcInfo ves;                         \
-        ves.p.ves = OPC_VECTOR_TO_FIXED(type_out); \
+        ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
         create_vector_slot4(buf, tmp_opc, vs, ves, OUT, IN0, IN1, IN2); \
         translate_bitsel_vec(tmp_opc.o, buf);  \
     } while (0)
@@ -1062,6 +1063,11 @@ static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, Operan
         check_scalable_vector_perform_store(val, val_tidx, tmp_src, GET_ALIGNMENT_FROM_CONSTANT(out.s.offset));
     } else {
         LLVMType out_idx = get_stack_llvmtype(out);
+#ifdef DEBUG
+        if (out_idx != val_tidx) {
+            printf("%s need to convert type val_tidx:%d out_idx:%d\n", __FUNCTION__, val_tidx, out_idx); fflush(NULL);
+        }
+#endif
         assert((val_tidx <= LLVMInt64 && out_idx <= LLVMInt64 && val_tidx <= out_idx) ||
                (val_tidx <= LLVMInt64 && out_idx > LLVMInt64) ||
                (val_tidx > LLVMInt64 && out_idx > LLVMInt64));
@@ -1092,6 +1098,9 @@ static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, Operan
 static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm, OperandType operand, LLVMType tidx, int splat) {
     assert(tidx != LLVMInvalidType && tidx < LLVMMAXType);
     LLVMTypeRef type = llvm_int_types[tidx];
+#ifdef DEBUG
+    printf("%s LLVMType:%d\n", __FUNCTION__, tidx); fflush(NULL);
+#endif
     LLVMValueRef ret = NULL;
     if (is_imm) {
         if (tidx <= LLVMInt64) {
@@ -2554,7 +2563,7 @@ void translate_maxmin_vec(OpCodeType opc, void *ptr, RelopType r) {
     AttrSrcInfo vs;
     vs.p.vs = OPC_VECTOR_SIZE(type_out);
     AttrSrcInfo ves;
-    ves.p.ves = OPC_VECTOR_TO_FIXED(type_out);
+    ves.p.ves = OPC_VECTOR_TO_VES(type_out);
     OperandType tmp1 = get_tmp_and_do_alloc(type_out);
     OperandType tmp2 = get_tmp_and_do_alloc(type_out);
 
