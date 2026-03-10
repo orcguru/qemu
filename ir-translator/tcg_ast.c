@@ -572,6 +572,7 @@ static LLVMIntPredicate llvm_predicate[RELOPMAX] = {0};
 static uint32_t br_cnt = 0;
 static uint64_t current_func_offset = 0;
 static uint8_t current_call_idx = 0;
+#define SHADOW_CALL_OFFSET_MAX      (256 - 32)
 static int32_t shadow_call_offset = 16;
 static uint32_t xreg_valid = 0, xmm_valid = 0;
 static uint8_t tmp_valid_non_zero = 0;
@@ -4396,6 +4397,7 @@ static int process_op_type(uint32_t slot_idx, void *ptr, OpCodeType opc, LLVMTyp
                     if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
                         tmp_shadow_offset[operand.s.slot_idx] = (0 - shadow_call_offset);
                         shadow_call_offset += 16;
+                        assert(shadow_call_offset <= SHADOW_CALL_OFFSET_MAX);
                     }
                 }
             }
