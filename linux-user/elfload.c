@@ -3296,8 +3296,8 @@ extern int enable_llvm_debug;
 extern pthread_mutex_t aot_range_info_mutex;
 extern aot_range_info_t *aot_info_list;
 
-const char *qemu_legacy_load_target = "libc.so.6";
-unsigned long qemu_legacy_log_func = 0x99a30;
+const char *qemu_legacy_load_target = "DUMMY_LIB";
+unsigned long qemu_legacy_log_func = 0;
 unsigned long qemu_aot_target = 0;
 unsigned long qemu_aot_target_exec_cnt = 0;
 
