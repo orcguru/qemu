@@ -262,11 +262,17 @@ hit:
 }
 
 extern unsigned long qemu_legacy_log_func;
+unsigned long log_cnt = 0;
 
 static void log_cpu_exec(vaddr pc, CPUState *cpu,
                          const TranslationBlock *tb)
 {
-    if (qemu_log_in_addr_range(pc) && (qemu_legacy_log_func == 0 || (pc >= qemu_legacy_log_func && (pc - qemu_legacy_log_func) < 0x100))) {
+    if (qemu_log_in_addr_range(pc) && (qemu_legacy_log_func == 0 || log_cnt || pc == qemu_legacy_log_func)) {
+        if (log_cnt) {
+            log_cnt -= 1;
+        } else if (pc == qemu_legacy_log_func) {
+            log_cnt = 30;
+        }
         qemu_log_mask(CPU_LOG_EXEC,
                       "Trace %d: %p [%08" PRIx64
                       "/%016" VADDR_PRIx "/%08x/%08x] %s\n",
@@ -916,6 +922,8 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
 #ifdef AOT
 #include "tcg/tcg-aot.h"
 extern aot_range_info_t *aot_info_list;
+extern unsigned long qemu_aot_target;
+extern unsigned long qemu_aot_target_exec_cnt;
 #endif
 
 static int __attribute__((noinline))
@@ -964,6 +972,13 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
                 }
                 if (info_ptr) {
                     qemu_log_mask(LOG_AOT, "QEMU TCG JIT on %s offset:%lx\n", info_ptr->elf_name, (s.pc - info_ptr->x_addr_range_begin));
+                    if (s.pc == qemu_legacy_log_func) {
+                        if (qemu_aot_target_exec_cnt != 0) {
+                            qemu_aot_target_exec_cnt -= 1;
+                            qemu_log_mask(LOG_AOT, "%s do trigger\n", __FUNCTION__);
+                            tcg_qemu_aot_exec(cpu_env(cpu), (void *)qemu_aot_target, (void *)s.pc);
+                        }
+                    }
                 }
             }
 #endif

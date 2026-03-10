@@ -381,6 +381,12 @@ static void handle_arg_cpu(const char *arg)
     }
 }
 
+extern unsigned long qemu_aot_target_exec_cnt;
+static void handle_qemu_aot_target_exec_cnt(const char *arg)
+{
+    qemu_aot_target_exec_cnt = (unsigned long)atoll(arg);
+}
+
 static void handle_arg_guest_base(const char *arg)
 {
     guest_base = strtol(arg, NULL, 0);
@@ -497,6 +503,8 @@ struct qemu_argument {
 static const struct qemu_argument arg_table[] = {
     {"a",          "",                 false, handle_arg_llvm_debug,
      "",           "enable LLVM-JITLINK debug"},
+    {"qemu_aot_target_exec_cnt",        "",         true,  handle_qemu_aot_target_exec_cnt,
+     "count",      "set global variable qemu_aot_target_exec_cnt"},
     {"h",          "",                 false, handle_arg_help,
      "",           "print this help"},
     {"help",       "",                 false, handle_arg_help,
