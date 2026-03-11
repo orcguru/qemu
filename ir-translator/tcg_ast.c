@@ -531,8 +531,10 @@ static LLVMBasicBlockRef last_active_bb = NULL;
 #define FIXED_VECTOR_PARAM_COUNT   (XREG_MAX + XMM_COUNT * 2)
 
 #define TARGET_QEMUAOT_FASTPATH                                     0
-#define TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_WO_VECTOR      1
-#define TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_WI_VECTOR      2
+#define TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_DROP_ALIAS_POINTER     1
+#define TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER   2
+#define TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER   \
+        TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER
 #define TARGET_QEMUAOT_CC_COMPUTE                                   3
 #define TARGET_QEMUAOT_HELPER                                       4
 #define TARGET_DEFAULT_HELPER_PASSTHROUGH_VECTOR                    5
@@ -2801,7 +2803,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     }
 
     LLVMValueRef call_args[MAX_OPERANDS_COUNT] = {NULL};
-    call_arg_cnt = collect_arguments_and_types(not_a_helper, target_domain == TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_WO_VECTOR ? TARGET_DEFAULT_HELPER_CONSTRUCT_VECTOR : TARGET_DEFAULT_HELPER_PASSTHROUGH_VECTOR, VALUE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, trampoline, NULL, 0, call_args, trampoline_name);
+    call_arg_cnt = collect_arguments_and_types(not_a_helper, target_domain == TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_DROP_ALIAS_POINTER ? TARGET_DEFAULT_HELPER_CONSTRUCT_VECTOR : TARGET_DEFAULT_HELPER_PASSTHROUGH_VECTOR, VALUE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, trampoline, NULL, 0, call_args, trampoline_name);
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
     LLVMValueRef env_alloca = NULL;
     if (do_return) {
@@ -2851,7 +2853,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     LLVMValueRef call_next_inst;
     if (!fix_second_half_addr) {
         int next_addr_param_idx = (FIXED_VECTOR_PARAM_COUNT + (operands_cnt - env_cnt));
-        if (target_domain == TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_WO_VECTOR) {
+        if (target_domain == TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_DROP_ALIAS_POINTER) {
             for (int k = 0; k < operands_cnt; ++k) {
                 if (is_imm[k] == 0 && operands[k].s.valid && ((operands[k].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[k])) || operands[k].s.slot_type == SUB_SLOT_XMM)) {
                     next_addr_param_idx -= 1;
@@ -3048,7 +3050,7 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
             }
         }
         return FIXED_VECTOR_PARAM_COUNT;
-    } else if (target_domain == TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_WI_VECTOR) {
+    } else if (target_domain == TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER) {
         if (gen_flag != VALUE_ONLY) {
             int idx = 0;
             for (; idx < FIXED_VECTOR_PARAM_COUNT; ++idx) {
@@ -3133,7 +3135,7 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
             out_valref[idx++] = appendix2;
         }
         return idx;
-    } else if (target_domain == TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_WO_VECTOR) {
+    } else if (target_domain == TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_DROP_ALIAS_POINTER) {
         if (gen_flag != VALUE_ONLY) {
             int idx = 0;
             for (; idx < FIXED_VECTOR_PARAM_COUNT; ++idx) {
@@ -3415,7 +3417,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         helper_jit_func = LLVMAddFunction(module, helper_str[helper_jit], helper_jit_type);
     }
 
-    LLVMValueRef jit_trampoline = get_trampoline(helper_jit_func, 0, 0, operands, is_imm, operands_cnt, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_WI_VECTOR);
+    LLVMValueRef jit_trampoline = get_trampoline(helper_jit_func, 0, 0, operands, is_imm, operands_cnt, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER);
     LLVMValueRef jit_trampoline_addr = LLVMBuildPtrToInt(builder, jit_trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, second_half_addr, jit_trampoline_addr, llvm_func, NULL, 0, call_args, helper_str[h]);
@@ -3808,7 +3810,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
             }
             param_cnt += 1;
         }
-        exception_path_trampoline = get_trampoline(helper_func, 1, helper_return_type[h] != LLVMInvalidType ? 1 : 0, operands, is_imm, operands_cnt, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_WO_VECTOR);
+        exception_path_trampoline = get_trampoline(helper_func, 1, helper_return_type[h] != LLVMInvalidType ? 1 : 0, operands, is_imm, operands_cnt, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
     }
 
     // Generate the fast path inlined helper
@@ -4013,6 +4015,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         return translate_helper_outband(opc, ptr);
 #endif
     }
+    // We cannot inline below helpers currently, so their invocations incur context backup penalty.
 #ifdef DEBUG
     printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
@@ -4100,10 +4103,10 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
         param_cnt += 1;
     }
-    LLVMValueRef trampoline = get_trampoline(helper_func, second_half_disabled ? 0 : 1, HELPER_DEFINES_OUTPUT(h), operands, is_imm, operands_cnt, second_half_func, 0, NULL, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_WI_VECTOR);
+    LLVMValueRef trampoline = get_trampoline(helper_func, second_half_disabled ? 0 : 1, HELPER_DEFINES_OUTPUT(h), operands, is_imm, operands_cnt, second_half_func, 0, NULL, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
-    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_WI_VECTOR, TYPE_AND_VALUE, operands, is_imm, operands_cnt, param_cnt == MAX_ADDED_ARGS ? NULL : second_half_addr, NULL, llvm_func, call_types, (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT), call_args, LLVMGetValueName(trampoline));
+    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER, TYPE_AND_VALUE, operands, is_imm, operands_cnt, param_cnt == MAX_ADDED_ARGS ? NULL : second_half_addr, NULL, llvm_func, call_types, (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT), call_args, LLVMGetValueName(trampoline));
     assert(call_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
     LLVMTypeRef trampoline_type = LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnt, 0);
     LLVMValueRef call_trampoline_inst = LLVMBuildCall2(builder, trampoline_type, trampoline, call_args, call_arg_cnt, "");
