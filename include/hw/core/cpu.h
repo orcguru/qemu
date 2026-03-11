@@ -352,6 +352,11 @@ typedef union IcountDecr {
 } IcountDecr;
 
 #ifdef AOT
+typedef struct __attribute__((packed)) InstrExecCounters {
+    uint64_t aot_cnt;
+    uint64_t reserved;
+} InstrExecCounters;
+
 typedef struct __attribute__((packed)) PackedShadowStackInfo {
     uint64_t pad;
     uint64_t shadow_stack_pointer_upper_bound;
@@ -382,6 +387,7 @@ typedef struct CPUNegativeOffsetState {
     IcountDecr icount_decr;
     bool can_do_io;
 #ifdef AOT
+    InstrExecCounters iec __attribute__((aligned(16)));
     PackedShadowStackInfo ssi __attribute__((aligned(16)));
 #endif
 } CPUNegativeOffsetState;

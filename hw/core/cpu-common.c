@@ -65,6 +65,7 @@ CPUState *cpu_create(const char *typename)
         exit(EXIT_FAILURE);
     }
 #ifdef AOT
+    cpu->neg.iec.aot_cnt = 0;
 #define SHADOW_STACK_SIZE   (16 * 4096)
     uint64_t ptr = (uint64_t)g_malloc0(SHADOW_STACK_SIZE);
     cpu->neg.ssi.shadow_stack_pointer = ptr + SHADOW_STACK_SIZE - 32;
