@@ -14,6 +14,23 @@
 #include "qemu/plugin.h"
 #include "exec/log.h"
 
+#include "hw/core/cpu.h"
+QEMU_PLUGIN_EXPORT
+void *qemu_plugin_get_current_cpu(void)
+{
+    return (void *)current_cpu;
+}
+
+QEMU_PLUGIN_EXPORT
+uint64_t *qemu_plugin_get_aot_cnt_ptr(void)
+{
+    CPUState *cpu = current_cpu;
+    if (!cpu) {
+        return NULL;
+    }
+    return &cpu->neg.iec.aot_cnt;
+}
+
 /*
  * Virtual Memory queries - these are all NOPs for user-mode which
  * only ever has visibility of virtual addresses.

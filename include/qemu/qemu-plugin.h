@@ -595,6 +595,12 @@ bool qemu_plugin_mem_is_store(qemu_plugin_meminfo_t info);
 QEMU_PLUGIN_API
 qemu_plugin_mem_value qemu_plugin_mem_get_value(qemu_plugin_meminfo_t info);
 
+QEMU_PLUGIN_API
+void *qemu_plugin_get_current_cpu(void);
+
+QEMU_PLUGIN_API
+uint64_t *qemu_plugin_get_aot_cnt_ptr(void);
+
 /**
  * qemu_plugin_get_hwaddr() - return handle for memory operation
  * @info: opaque memory info structure
