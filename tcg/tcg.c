@@ -2960,7 +2960,7 @@ void tcg_dump_ops(TCGContext *s, FILE *f, bool have_prefs)
                                   tcg_get_insn_start_param(op, i));
             }
             */
-            col += ne_fprintf(f, " $0x%lx:", tcg_get_insn_start_param(op, 0));
+            col += ne_fprintf(f, " $0x%lx:icount:%d:", tcg_get_insn_start_param(op, 0), s->gen_tb->icount);
         } else if (c == INDEX_op_call) {
             const TCGHelperInfo *info = tcg_call_info(op);
             void *func = tcg_call_func(op);
