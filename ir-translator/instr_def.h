@@ -113,7 +113,7 @@ typedef struct __attribute__((packed)) {
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
-    uint16_t env_offset;
+    uint64_t env_offset;
 } Instr1B22;
 
 typedef struct __attribute__((packed)) {
