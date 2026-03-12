@@ -515,6 +515,7 @@ size_t create_scalar_slot_env_imm(void *ptr, OHType op, OperandType s0, uint64_t
         i->instr_type_ext = Instr1B22_ext;
         i->opc = op.o;
         SET_SLOT(0);
+        assert(i0 < (1<<16));
         i->env_offset = i0;
         return sizeof(*i);
     }

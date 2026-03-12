@@ -821,6 +821,22 @@ static uint32_t has_alias_env(OperandType operand) {
     }
 }
 
+static void register_alias(OperandType lval, OperandType rval) {
+    if (lval.s.slot_type == SUB_SLOT_TMP) {
+        alias_tmp[lval.s.slot_idx] = rval;
+    } else {
+        assert(0);
+    }
+}
+
+static void unregister_alias(OperandType operand) {
+    if (operand.s.slot_type == SUB_SLOT_TMP) {
+        alias_tmp[operand.s.slot_idx].i = 0;
+    } else {
+        assert(0);
+    }
+}
+
 static AllocaWithAlignment get_stack_alloca(OperandType operand) {
     AllocaWithAlignment alloca_w_align;
     alloca_w_align.alloca = NULL;
@@ -828,8 +844,16 @@ static AllocaWithAlignment get_stack_alloca(OperandType operand) {
     if (operand.s.slot_type == SUB_SLOT_XREG) {
         alloca_w_align = func_xreg_alloca[operand.s.slot_idx];
     } else if (operand.s.slot_type == SUB_SLOT_TMP) {
-        assert(has_alias(operand) == 0);
-        alloca_w_align = func_tmp_alloca[operand.s.slot_idx];
+        if (has_alias(operand) == 0) {
+            alloca_w_align = func_tmp_alloca[operand.s.slot_idx];
+        } else {
+            OperandType alias = get_alias(operand);
+            assert(alias.s.valid && alias.s.slot_type == SUB_SLOT_ENV && alias.s.offset == 0);
+            unregister_alias(operand);
+            LLVMValueRef env_raw = get_env_ptr_raw();
+            do_store(0/*dummy*/, env_raw, OPC_ADDR_T, operand);
+            return get_stack_alloca(operand);
+        }
     } else if (operand.s.slot_type == SUB_SLOT_XMM) {
         alloca_w_align = func_xmm_alloca[operand.s.slot_idx];
     } else {
@@ -941,22 +965,6 @@ static void create_module(const char *module_name) {
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
     LLVMSetTarget(module, "riscv64-unknown-linux-gnu");
 #endif
-}
-
-static void register_alias(OperandType lval, OperandType rval) {
-    if (lval.s.slot_type == SUB_SLOT_TMP) {
-        alias_tmp[lval.s.slot_idx] = rval;
-    } else {
-        assert(0);
-    }
-}
-
-static void unregister_alias(OperandType operand) {
-    if (operand.s.slot_type == SUB_SLOT_TMP) {
-        alias_tmp[operand.s.slot_idx].i = 0;
-    } else {
-        assert(0);
-    }
 }
 
 static LLVMType get_stack_llvmtype(OperandType operand) {
