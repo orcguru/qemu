@@ -8,7 +8,7 @@ typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;
 
 #define AOT_LEVEL_0                 0
 #define AOT_LEVEL_MAX               3
-#define AOT_LEVEL                   AOT_LEVEL_0
+#define AOT_LEVEL                   AOT_LEVEL_MAX
 
 #if AOT_LEVEL == AOT_LEVEL_MAX
 typedef __attribute__((qemuaot)) void (*FuncPtrType1)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip XMM_PARAM_DECLARE_COMMON);

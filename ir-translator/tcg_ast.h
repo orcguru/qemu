@@ -7,8 +7,8 @@
 #define LLVMMAXType                 LLVMInt128
 #define AOT_LEVEL_0                 0
 #define AOT_LEVEL_MAX               3
-#define AOT_LEVEL                   AOT_LEVEL_0
-#define XMM_COUNT                   0
+#define AOT_LEVEL                   AOT_LEVEL_MAX
+#define XMM_COUNT                   15
 
 #if AOT_LEVEL == AOT_LEVEL_MAX
 #define MAX_ADDED_ARGS              6
