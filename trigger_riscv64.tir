@@ -1,0 +1,302 @@
+XMM0:$0x360
+XMM1:$0x3a0
+XMM2:$0x3e0
+XMM3:$0x420
+XMM4:$0x460
+XMM5:$0x4a0
+XMM6:$0x4e0
+XMM7:$0x520
+XMM8:$0x560
+XMM9:$0x5a0
+XMM10:$0x5e0
+XMM11:$0x620
+XMM12:$0x660
+XMM13:$0x6a0
+XMM14:$0x6e0
+XMM15:$0x720
+XMM_t0:$0xb60
+
+EXTERNAL:$0x18df1e:
+ add_i64 loc641,env,$0x0
+ sub_i64 loc641,loc641,$0x30
+ qemu_ld_i64 loc642,loc641,noat+al8+leq,2
+ add_i64 loc642,loc642,$0x34
+ qemu_st_i64 loc642,loc641,noat+al8+leq,2
+ mov_i64 loc0,rbx
+ mov_i64 rax,loc0
+ mov_i64 loc0,rbx
+ mov_i64 rcx,loc0
+ mov_i64 loc0,rbx
+ mov_i64 rdx,loc0
+ mov_i64 loc0,rbx
+ mov_i64 r11,loc0
+ mov_i64 loc0,rax
+ mov_i64 loc1,$0x30
+ mov_i64 loc7,$0x30
+ add_i64 loc8,loc7,$0xffffffffffffffff
+ sar_i64 loc8,loc0,loc8
+ sar_i64 loc0,loc0,loc7
+ mov_i64 rax,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc8
+ discard cc_src2
+ discard cc_op
+ mov_i64 loc0,rcx
+ mov_i64 loc1,$0x10
+ mov_i64 loc11,$0x10
+ add_i64 loc12,loc11,$0xffffffffffffffff
+ sar_i64 loc12,loc0,loc12
+ sar_i64 loc0,loc0,loc11
+ mov_i64 rcx,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc12
+ mov_i64 loc0,rbx
+ mov_i64 r10,loc0
+ mov_i64 loc0,rbx
+ mov_i64 r9,loc0
+ add_i64 loc2,rsp,$0x40
+ mov_i64 loc0,rax
+ qemu_st_i64 loc0,loc2,noat+un+leq,2
+ mov_i64 loc0,r12
+ mov_i64 rax,loc0
+ mov_i64 loc0,rdx
+ mov_i64 loc1,$0x20
+ mov_i64 loc15,$0x20
+ add_i64 loc16,loc15,$0xffffffffffffffff
+ sar_i64 loc16,loc0,loc16
+ sar_i64 loc0,loc0,loc15
+ mov_i64 rdx,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc16
+ mov_i64 loc0,rbx
+ mov_i64 rdi,loc0
+ mov_i64 loc0,rax
+ mov_i64 loc1,$0x10
+ mov_i64 loc17,$0x10
+ add_i64 loc18,loc17,$0xffffffffffffffff
+ sar_i64 loc18,loc0,loc18
+ sar_i64 loc0,loc0,loc17
+ mov_i64 rax,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc18
+ mov_i64 loc0,r12
+ mov_i64 rsi,loc0
+ mov_i64 loc0,r11
+ mov_i64 loc1,$0x8
+ mov_i64 loc20,$0x8
+ add_i64 loc21,loc20,$0xffffffffffffffff
+ sar_i64 loc21,loc0,loc21
+ sar_i64 loc0,loc0,loc20
+ mov_i64 r11,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc21
+ mov_i64 loc1,rbx
+mov_vec v128,e8,tmp22,v128$0x0
+st_vec v128,e8,tmp22,env,$0x360
+ st32_i64 loc1,env,$0x360
+mov_vec v128,e8,tmp24,v128$0x0
+st_vec v128,e8,tmp24,env,$0x370
+ mov_i64 loc0,r10
+ mov_i64 loc1,$0x18
+ mov_i64 loc26,$0x18
+ add_i64 loc27,loc26,$0xffffffffffffffff
+ sar_i64 loc27,loc0,loc27
+ sar_i64 loc0,loc0,loc26
+ mov_i64 r10,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc27
+ mov_i64 loc0,r9
+ mov_i64 loc1,$0x28
+ mov_i64 loc29,$0x28
+ add_i64 loc30,loc29,$0xffffffffffffffff
+ sar_i64 loc30,loc0,loc30
+ sar_i64 loc0,loc0,loc29
+ mov_i64 r9,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc30
+ mov_i64 loc1,rcx
+mov_vec v128,e8,tmp31,v128$0x0
+st_vec v128,e8,tmp31,env,$0x520
+ st32_i64 loc1,env,$0x520
+mov_vec v128,e8,tmp32,v128$0x0
+st_vec v128,e8,tmp32,env,$0x530
+ mov_i64 loc1,rdx
+mov_vec v128,e8,tmp33,v128$0x0
+st_vec v128,e8,tmp33,env,$0x420
+ st32_i64 loc1,env,$0x420
+mov_vec v128,e8,tmp34,v128$0x0
+st_vec v128,e8,tmp34,env,$0x430
+ add_i64 loc2,rsp,$0x38
+ mov_i64 loc0,rax
+ qemu_st_i64 loc0,loc2,noat+un+leq,2
+ mov_i64 loc0,r12
+ mov_i64 rax,loc0
+ mov_i64 loc0,rdi
+ mov_i64 loc1,$0x38
+ mov_i64 loc36,$0x38
+ add_i64 loc37,loc36,$0xffffffffffffffff
+ sar_i64 loc37,loc0,loc37
+ sar_i64 loc0,loc0,loc36
+ mov_i64 rdi,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc37
+ add_i64 loc2,rsp,$0x40
+ qemu_ld_i64 loc1,loc2,noat+un+leul,2
+mov_vec v128,e8,tmp38,v128$0x0
+st_vec v128,e8,tmp38,env,$0x4e0
+ st32_i64 loc1,env,$0x4e0
+mov_vec v128,e8,tmp39,v128$0x0
+st_vec v128,e8,tmp39,env,$0x4f0
+ mov_i64 loc0,rax
+ mov_i64 loc1,$0x18
+ mov_i64 loc40,$0x18
+ add_i64 loc41,loc40,$0xffffffffffffffff
+ sar_i64 loc41,loc0,loc41
+ sar_i64 loc0,loc0,loc40
+ mov_i64 rax,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc41
+ mov_i64 loc0,rsi
+ mov_i64 loc1,$0x8
+ mov_i64 loc42,$0x8
+ add_i64 loc43,loc42,$0xffffffffffffffff
+ sar_i64 loc43,loc0,loc43
+ sar_i64 loc0,loc0,loc42
+ mov_i64 rsi,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc43
+ mov_i64 loc1,r12
+mov_vec v128,e8,tmp44,v128$0x0
+st_vec v128,e8,tmp44,env,$0x3a0
+ st32_i64 loc1,env,$0x3a0
+mov_vec v128,e8,tmp45,v128$0x0
+st_vec v128,e8,tmp45,env,$0x3b0
+ mov_i64 loc1,r11
+ st8_i64 loc1,env,$0x361
+mov_vec v128,e8,tmp46,v128$0x0
+st_vec v128,e8,tmp46,env,$0x370
+ add_i64 loc2,rsp,$0x30
+ mov_i64 loc0,rax
+ qemu_st_i64 loc0,loc2,noat+un+leq,2
+ mov_i64 loc0,r12
+ mov_i64 rax,loc0
+ mov_i64 loc1,r10
+ st8_i64 loc1,env,$0x521
+mov_vec v128,e8,tmp47,v128$0x0
+st_vec v128,e8,tmp47,env,$0x530
+ mov_i64 loc1,r9
+ st8_i64 loc1,env,$0x421
+mov_vec v128,e8,tmp48,v128$0x0
+st_vec v128,e8,tmp48,env,$0x430
+ mov_i64 loc0,rax
+ mov_i64 loc1,$0x20
+ mov_i64 loc49,$0x20
+ add_i64 loc50,loc49,$0xffffffffffffffff
+ sar_i64 loc50,loc0,loc50
+ sar_i64 loc0,loc0,loc49
+ mov_i64 rax,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc50
+ add_i64 loc2,rsp,$0x38
+ qemu_ld_i64 loc1,loc2,noat+un+leul,2
+mov_vec v128,e8,tmp51,v128$0x0
+st_vec v128,e8,tmp51,env,$0x4a0
+ st32_i64 loc1,env,$0x4a0
+mov_vec v128,e8,tmp52,v128$0x0
+st_vec v128,e8,tmp52,env,$0x4b0
+ mov_i64 loc1,rdi
+ st8_i64 loc1,env,$0x4e1
+mov_vec v128,e8,tmp53,v128$0x0
+st_vec v128,e8,tmp53,env,$0x4f0
+ add_i64 loc2,rsp,$0x28
+ mov_i64 loc0,rax
+ qemu_st_i64 loc0,loc2,noat+un+leq,2
+ mov_i64 loc0,r12
+ mov_i64 rax,loc0
+ add_i64 loc54,env,$0x360
+ add_i64 loc56,env,$0x360
+ add_i64 loc57,env,$0x520
+ call punpcklwd_xmm,$0x0,$0,env,loc54,loc56,loc57
+mov_vec v128,e8,tmp59,v128$0x0
+st_vec v128,e8,tmp59,env,$0x370
+ add_i64 loc60,env,$0x420
+ add_i64 loc62,env,$0x420
+ add_i64 loc63,env,$0x4e0
+ call punpcklwd_xmm,$0x0,$0,env,loc60,loc62,loc63
+mov_vec v128,e8,tmp65,v128$0x0
+st_vec v128,e8,tmp65,env,$0x430
+ mov_i64 loc0,rax
+ mov_i64 loc1,$0x28
+ mov_i64 loc66,$0x28
+ add_i64 loc67,loc66,$0xffffffffffffffff
+ sar_i64 loc67,loc0,loc67
+ sar_i64 loc0,loc0,loc66
+ mov_i64 rax,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc67
+ add_i64 loc2,rsp,$0x30
+ qemu_ld_i64 loc1,loc2,noat+al+ub,2
+ st8_i64 loc1,env,$0x4a1
+mov_vec v128,e8,tmp68,v128$0x0
+st_vec v128,e8,tmp68,env,$0x4b0
+ mov_i64 loc1,rsi
+ st8_i64 loc1,env,$0x3a1
+mov_vec v128,e8,tmp69,v128$0x0
+st_vec v128,e8,tmp69,env,$0x3b0
+ add_i64 loc2,rsp,$0x20
+ mov_i64 loc0,rax
+ qemu_st_i64 loc0,loc2,noat+un+leq,2
+ mov_i64 loc0,r12
+ mov_i64 rax,loc0
+ add_i64 loc70,env,$0x360
+ add_i64 loc71,env,$0x360
+ add_i64 loc72,env,$0x420
+ call punpckldq_xmm,$0x0,$0,env,loc70,loc71,loc72
+mov_vec v128,e8,tmp73,v128$0x0
+st_vec v128,e8,tmp73,env,$0x370
+ mov_i64 loc0,rax
+ mov_i64 loc1,$0x30
+ mov_i64 loc74,$0x30
+ add_i64 loc75,loc74,$0xffffffffffffffff
+ sar_i64 loc75,loc0,loc75
+ sar_i64 loc0,loc0,loc74
+ mov_i64 rax,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc75
+ add_i64 loc2,rsp,$0x28
+ qemu_ld_i64 loc1,loc2,noat+un+leul,2
+mov_vec v128,e8,tmp76,v128$0x0
+st_vec v128,e8,tmp76,env,$0x3e0
+ st32_i64 loc1,env,$0x3e0
+mov_vec v128,e8,tmp77,v128$0x0
+st_vec v128,e8,tmp77,env,$0x3f0
+ add_i64 loc78,env,$0x3a0
+ add_i64 loc80,env,$0x3a0
+ add_i64 loc81,env,$0x4a0
+ call punpcklwd_xmm,$0x0,$0,env,loc78,loc80,loc81
+mov_vec v128,e8,tmp83,v128$0x0
+st_vec v128,e8,tmp83,env,$0x3b0
+ add_i64 loc2,rsp,$0x18
+ mov_i64 loc0,rax
+ qemu_st_i64 loc0,loc2,noat+un+leq,2
+ mov_i64 loc0,r12
+ mov_i64 rax,loc0
+ add_i64 loc2,rsp,$0x20
+ qemu_ld_i64 loc1,loc2,noat+al+ub,2
+ st8_i64 loc1,env,$0x3e1
+mov_vec v128,e8,tmp84,v128$0x0
+st_vec v128,e8,tmp84,env,$0x3f0
+ mov_i64 loc0,rax
+ mov_i64 loc1,$0x38
+ mov_i64 loc85,$0x38
+ add_i64 loc86,loc85,$0xffffffffffffffff
+ sar_i64 loc86,loc0,loc86
+ sar_i64 loc0,loc0,loc85
+ mov_i64 rax,loc0
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc86
+ mov_i32 cc_op,$0x2b
+ add_i64 rip,rip,$0xe1
+ jmp_direct $0xe1
+
+

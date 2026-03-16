@@ -2141,7 +2141,10 @@ const uint64_t xreg_offsets[XREG_MAX] = {
     [r13] = ENV_OFFSET_r13,
     [r14] = ENV_OFFSET_r14,
     [r15] = ENV_OFFSET_r15,
-#if AOT_LEVEL == AOT_LEVEL_MAX || AOT_LEVEL == AOT_LEVEL_1
+#if AOT_LEVEL == AOT_LEVEL_1
+    [cc_src] = ENV_OFFSET_cc_src,
+    [cc_dst] = ENV_OFFSET_cc_dst,
+#elif AOT_LEVEL == AOT_LEVEL_MAX
     [cc_src] = ENV_OFFSET_cc_src,
     [cc_dst] = ENV_OFFSET_cc_dst,
     [cc_op] = ENV_OFFSET_cc_op,

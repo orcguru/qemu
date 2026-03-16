@@ -37,8 +37,19 @@ typedef enum {
     OP_ATTR,
 } TcgOpType;
 
-#if AOT_LEVEL == AOT_LEVEL_MAX || AOT_LEVEL == AOT_LEVEL_1
+#if AOT_LEVEL == AOT_LEVEL_MAX
 #define ENVVAR_TYPE_LIST \
+    X(cc_src2) \
+    X(es_base) \
+    X(cs_base) \
+    X(ss_base) \
+    X(ds_base) \
+    X(fs_base) \
+    X(gs_base) \
+    X(ENVVarMAX)
+#elif AOT_LEVEL == AOT_LEVEL_1
+#define ENVVAR_TYPE_LIST \
+    X(cc_op) \
     X(cc_src2) \
     X(es_base) \
     X(cs_base) \
@@ -68,7 +79,7 @@ typedef enum {
     #undef X
 } EnvVarType;
 
-#if AOT_LEVEL == AOT_LEVEL_MAX || AOT_LEVEL == AOT_LEVEL_1
+#if AOT_LEVEL == AOT_LEVEL_MAX
 #define XREG_TYPE_LIST \
     X(rax) \
     X(rcx) \
@@ -89,6 +100,28 @@ typedef enum {
     X(cc_src) \
     X(cc_dst) \
     X(cc_op) \
+    X(rip) \
+    X(XREG_MAX)
+#elif AOT_LEVEL == AOT_LEVEL_1
+#define XREG_TYPE_LIST \
+    X(rax) \
+    X(rcx) \
+    X(rdx) \
+    X(rbx) \
+    X(rsp) \
+    X(rbp) \
+    X(rsi) \
+    X(rdi) \
+    X(r8) \
+    X(r9) \
+    X(r10) \
+    X(r11) \
+    X(r12) \
+    X(r13) \
+    X(r14) \
+    X(r15) \
+    X(cc_src) \
+    X(cc_dst) \
     X(rip) \
     X(XREG_MAX)
 #elif AOT_LEVEL == AOT_LEVEL_0
