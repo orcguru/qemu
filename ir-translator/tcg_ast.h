@@ -6,13 +6,14 @@
 
 #define LLVMMAXType                 LLVMInt128
 #define AOT_LEVEL_0                 0
+#define AOT_LEVEL_1                 1
 #define AOT_LEVEL_MAX               3
-#define AOT_LEVEL                   AOT_LEVEL_MAX
+#define AOT_LEVEL                   AOT_LEVEL_1
 #define XMM_COUNT                   15
 
 #if AOT_LEVEL == AOT_LEVEL_MAX
 #define MAX_ADDED_ARGS              6
-#elif AOT_LEVEL == AOT_LEVEL_0
+#elif AOT_LEVEL == AOT_LEVEL_0 || AOT_LEVEL == AOT_LEVEL_1
 #define MAX_ADDED_ARGS              7
 #endif
 
@@ -36,7 +37,7 @@ typedef enum {
     OP_ATTR,
 } TcgOpType;
 
-#if AOT_LEVEL == AOT_LEVEL_MAX
+#if AOT_LEVEL == AOT_LEVEL_MAX || AOT_LEVEL == AOT_LEVEL_1
 #define ENVVAR_TYPE_LIST \
     X(cc_src2) \
     X(es_base) \
@@ -67,7 +68,7 @@ typedef enum {
     #undef X
 } EnvVarType;
 
-#if AOT_LEVEL == AOT_LEVEL_MAX
+#if AOT_LEVEL == AOT_LEVEL_MAX || AOT_LEVEL == AOT_LEVEL_1
 #define XREG_TYPE_LIST \
     X(rax) \
     X(rcx) \

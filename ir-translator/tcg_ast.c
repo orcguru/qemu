@@ -716,7 +716,7 @@ static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr) {
         } else {
             return 1;
         }
-#elif AOT_LEVEL == AOT_LEVEL_0
+#elif AOT_LEVEL == AOT_LEVEL_0 || AOT_LEVEL == AOT_LEVEL_1
         return 1;
 #endif
     }
@@ -1160,7 +1160,7 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
         CREATE_ADD64(tmp, env, env_var_offset[operand.s.slot_idx]);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
         LLVMTypeRef val_type = type;
-#if AOT_LEVEL == AOT_LEVEL_0
+#if AOT_LEVEL == AOT_LEVEL_0 || AOT_LEVEL == AOT_LEVEL_1
         if (operand.s.slot_idx == cc_op) {
             val_type = llvm_int_types[LLVMInt32];
         }
@@ -4932,13 +4932,13 @@ void module_prolog() {
         "rsp", "rbp", "rsi", "rdi",
         "r8", "r9", "r10", "r11",
         "r12", "r13", "r14", "r15",
-#if AOT_LEVEL == AOT_LEVEL_MAX
+#if AOT_LEVEL == AOT_LEVEL_MAX || AOT_LEVEL == AOT_LEVEL_1
         "cc_src", "cc_dst", "cc_op", "rip"
 #elif AOT_LEVEL == AOT_LEVEL_0
         "rip"
 #endif
     };
-#if AOT_LEVEL == AOT_LEVEL_MAX
+#if AOT_LEVEL == AOT_LEVEL_MAX || AOT_LEVEL == AOT_LEVEL_1
     for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
         if (i < 16) {
             fixed_llvmtyperef[i] = LLVMInt64Type();
