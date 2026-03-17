@@ -631,7 +631,12 @@ while (<FD>) {
               }
             }
           }
-          if (not ($sym_info[0]->{'SYM'} eq "cc_src" or $sym_info[0]->{'SYM'} eq "cc_dst" or $sym_info[0]->{'SYM'} eq "cc_op" or $sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs")) {
+          if ($aot_level == 3 and (not ($sym_info[0]->{'SYM'} eq "cc_src" or $sym_info[0]->{'SYM'} eq "cc_dst" or $sym_info[0]->{'SYM'} eq "cc_op" or $sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs"))) {
+            die "" if $sym_info[0]->{'IS_ARRAY'} == 1;
+            die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
+            $func_ptr->{'DO_DEFINE_ENV'} = 1;
+            $func_ptr->{'ENVVAR_AND_VECTORS'}->{"env->$sym_info[0]->{'SYM'}"} = 1;
+          elsif ($aot_level == 1 and (not ($sym_info[0]->{'SYM'} eq "cc_src" or $sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs"))) {
             die "" if $sym_info[0]->{'IS_ARRAY'} == 1;
             die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
             $func_ptr->{'DO_DEFINE_ENV'} = 1;
