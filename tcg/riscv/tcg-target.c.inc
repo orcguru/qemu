@@ -3165,6 +3165,9 @@ void tcg_register_jit(const void *buf, size_t buf_size)
 #define CONTEXT_CC_DST    TCG_REG_T0
 #define CONTEXT_CC_OP     TCG_REG_T1
 #define CONTEXT_RIP       TCG_REG_A0
+#elif AOT_LEVEL == AOT_LEVEL_1
+#define CONTEXT_CC_SRC    TCG_REG_A5
+#define CONTEXT_RIP       TCG_REG_T0
 #elif AOT_LEVEL == AOT_LEVEL_0
 #define CONTEXT_RIP       TCG_REG_A5
 #endif
@@ -3212,6 +3215,8 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_SRC, TCG_AREG0, 19 * 8);  // cc_src
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_DST, TCG_AREG0, 18 * 8);  // cc_dst
     tcg_out_ld(s, TCG_TYPE_I32, CONTEXT_CC_OP, TCG_AREG0, 21 * 8);  // cc_op
+#elif AOT_LEVEL == AOT_LEVEL_1
+    tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_SRC, TCG_AREG0, 19 * 8);  // cc_src
 #endif
     // Vectors
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V0, TCG_AREG0, 0x360 + 0*16);
