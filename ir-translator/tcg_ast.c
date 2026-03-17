@@ -4932,13 +4932,27 @@ void module_prolog() {
         "rsp", "rbp", "rsi", "rdi",
         "r8", "r9", "r10", "r11",
         "r12", "r13", "r14", "r15",
-#if AOT_LEVEL == AOT_LEVEL_MAX || AOT_LEVEL == AOT_LEVEL_1
-        "cc_src", "cc_dst", "cc_op", "rip"
-#elif AOT_LEVEL == AOT_LEVEL_0
+#if AOT_LEVEL == AOT_LEVEL_0
         "rip"
+#elif AOT_LEVEL == AOT_LEVEL_1
+        "cc_src", "rip"
+#elif AOT_LEVEL == AOT_LEVEL_MAX
+        "cc_src", "cc_dst", "cc_op", "rip"
 #endif
     };
-#if AOT_LEVEL == AOT_LEVEL_MAX || AOT_LEVEL == AOT_LEVEL_1
+#if AOT_LEVEL == AOT_LEVEL_0
+    for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
+        fixed_llvmtyperef[i] = LLVMInt64Type();
+        fixed_vector_param_llvmtypes[i] = LLVMInt64;
+        fixed_vector_arg_names[i] = base_names[i];
+    }
+#elif AOT_LEVEL == AOT_LEVEL_1
+    for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
+        fixed_llvmtyperef[i] = LLVMInt64Type();
+        fixed_vector_param_llvmtypes[i] = LLVMInt64;
+        fixed_vector_arg_names[i] = base_names[i];
+    }
+#elif AOT_LEVEL == AOT_LEVEL_MAX
     for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
         if (i < 16) {
             fixed_llvmtyperef[i] = LLVMInt64Type();
@@ -4950,12 +4964,6 @@ void module_prolog() {
             fixed_llvmtyperef[i] = LLVMInt32Type();
             fixed_vector_param_llvmtypes[i] = LLVMInt32;
         }
-        fixed_vector_arg_names[i] = base_names[i];
-    }
-#elif AOT_LEVEL == AOT_LEVEL_0
-    for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
-        fixed_llvmtyperef[i] = LLVMInt64Type();
-        fixed_vector_param_llvmtypes[i] = LLVMInt64;
         fixed_vector_arg_names[i] = base_names[i];
     }
 #endif
@@ -5094,6 +5102,9 @@ void module_prolog() {
 
 #if AOT_LEVEL == AOT_LEVEL_0
     env_var_offset[cc_src] = ENV_OFFSET_cc_src;
+    env_var_offset[cc_dst] = ENV_OFFSET_cc_dst;
+    env_var_offset[cc_op] = ENV_OFFSET_cc_op;
+#elif AOT_LEVEL == AOT_LEVEL_1
     env_var_offset[cc_dst] = ENV_OFFSET_cc_dst;
     env_var_offset[cc_op] = ENV_OFFSET_cc_op;
 #endif
