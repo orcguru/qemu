@@ -5,6 +5,7 @@ use IO::Handle;
 use File::Basename;
 use Cwd 'abs_path';
 
+my $aot_level = 1;
 if ($#ARGV < 1) {
   print "Usage: ./script <antlr-in> <antlr-out>\n";
   exit 1;
@@ -244,29 +245,62 @@ foreach my $f (keys %defined_funcs_total) {
   }
 }
 
-my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
-my %qemuaot_gp_params_map = (
-  "rax" => "unsigned long",
-  "rcx" => "unsigned long",
-  "rdx" => "unsigned long",
-  "rbx" => "unsigned long",
-  "rsp" => "unsigned long",
-  "rbp" => "unsigned long",
-  "rsi" => "unsigned long",
-  "rdi" => "unsigned long",
-  "r8" => "unsigned long",
-  "r9" => "unsigned long",
-  "r10" => "unsigned long",
-  "r11" => "unsigned long",
-  "r12" => "unsigned long",
-  "r13" => "unsigned long",
-  "r14" => "unsigned long",
-  "r15" => "unsigned long",
-  "qemuaot_src1" => "unsigned long",
-  "qemuaot_dst" => "unsigned long",
-  "qemuaot_op" => "unsigned int",
-  "rip" => "unsigned long",
-);
+my @qemuaot_gp_params;
+if ($aot_level == 3) {
+  @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
+} elsif ($aot_level == 1) {
+  @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "rip");
+} else {
+  die "";
+}
+my %qemuaot_gp_params_map;
+if ($aot_level == 3) {
+  %qemuaot_gp_params_map = (
+    "rax" => "unsigned long",
+    "rcx" => "unsigned long",
+    "rdx" => "unsigned long",
+    "rbx" => "unsigned long",
+    "rsp" => "unsigned long",
+    "rbp" => "unsigned long",
+    "rsi" => "unsigned long",
+    "rdi" => "unsigned long",
+    "r8" => "unsigned long",
+    "r9" => "unsigned long",
+    "r10" => "unsigned long",
+    "r11" => "unsigned long",
+    "r12" => "unsigned long",
+    "r13" => "unsigned long",
+    "r14" => "unsigned long",
+    "r15" => "unsigned long",
+    "qemuaot_src1" => "unsigned long",
+    "qemuaot_dst" => "unsigned long",
+    "qemuaot_op" => "unsigned int",
+    "rip" => "unsigned long",
+  );
+} elsif ($aot_level == 1) {
+  %qemuaot_gp_params_map = (
+    "rax" => "unsigned long",
+    "rcx" => "unsigned long",
+    "rdx" => "unsigned long",
+    "rbx" => "unsigned long",
+    "rsp" => "unsigned long",
+    "rbp" => "unsigned long",
+    "rsi" => "unsigned long",
+    "rdi" => "unsigned long",
+    "r8" => "unsigned long",
+    "r9" => "unsigned long",
+    "r10" => "unsigned long",
+    "r11" => "unsigned long",
+    "r12" => "unsigned long",
+    "r13" => "unsigned long",
+    "r14" => "unsigned long",
+    "r15" => "unsigned long",
+    "qemuaot_src1" => "unsigned long",
+    "rip" => "unsigned long",
+  );
+} else {
+  die "";
+}
 my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
 my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
 

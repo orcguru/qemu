@@ -716,7 +716,14 @@ static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr) {
         } else {
             return 1;
         }
-#elif AOT_LEVEL == AOT_LEVEL_0 || AOT_LEVEL == AOT_LEVEL_1
+#elif AOT_LEVEL == AOT_LEVEL_1
+        HelperType h = get_helper(ptr);
+        if (h == helper_cc_compute_all || h == helper_cc_compute_c) {
+            return 0;
+        } else {
+            return 1;
+        }
+#elif AOT_LEVEL == AOT_LEVEL_0
         return 1;
 #endif
     }
@@ -4021,6 +4028,13 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
     } else if (IS_XMM_HELPER(h)) {
         return translate_helper_outband(opc, ptr);
+#elif AOT_LEVEL == AOT_LEVEL_1
+    } else if (h == helper_cc_compute_all || h == helper_cc_compute_c || h == helper_cc_compute_nz) {
+        if (helper_require_exception_path[h]) {
+            return translate_helper_outband(opc, ptr);
+        } else {
+            return translate_cc_compute_inband(opc, ptr);
+        }
 #endif
     }
     // We cannot inline below helpers currently, so their invocations incur context backup penalty.
