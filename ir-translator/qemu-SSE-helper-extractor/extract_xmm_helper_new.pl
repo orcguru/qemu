@@ -1529,7 +1529,7 @@ sub gen_restore_info
     if ($bk =~ /^xmm/) {
       $restore_info{"backup_$bk"} = $bk;
     } else {
-      die "$bk" if not exists $qemuaot_gp_params_map{$bk};
+      die "$bk" if ($aot_level == 3 and (not exists $qemuaot_gp_params_map{$bk}));
       my $var_name = $bk;
       if ($var_name =~ /^env/) {
         my $short_name = $var_name;
@@ -1579,10 +1579,20 @@ sub add_context_backup
       $backup_vars = $backup_vars."v2ulong backup_$bk = $bk;\n";
       $restore_info{"backup_$bk"} = $bk;
     } else {
-      die "" if not exists $qemuaot_gp_params_map{$bk};
+      die "$bk" if ($aot_level == 3 and (not exists $qemuaot_gp_params_map{$bk}));
       my $var_name = $bk;
       $var_name =~ s/^env\-\>//;
-      $backup_vars = $backup_vars."$qemuaot_gp_params_map{$bk} backup_$var_name = $bk;\n";
+      my $type_info = "";
+      if (exists $qemuaot_gp_params_map{$bk}) {
+        $type_info = $qemuaot_gp_params_map{$bk};
+      } elsif ($bk eq "env->cc_op") {
+        $type_info = "unsigned int";
+      } elsif ($bk eq "env->cc_dst") {
+        $type_info = "unsigned long";
+      } else {
+        die "";
+      }
+      $backup_vars = $backup_vars."$type_info backup_$var_name = $bk;\n";
       $restore_info{"backup_$var_name"} = $bk;
     }
   }
