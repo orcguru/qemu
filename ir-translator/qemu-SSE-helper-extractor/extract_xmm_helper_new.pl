@@ -6,6 +6,7 @@ use File::Basename;
 use IO::Select;
 use Cwd 'abs_path';
 
+my $aot_level = 1;
 if ($#ARGV < 1) {
   print "Usage: ./script <antlr-in> <antlr-out>\n";
   exit 1;
@@ -25,30 +26,64 @@ my %VecSymbolToCType = (
   "_w_ZMMReg" => "v8ushort",
   "_b_ZMMReg" => "v16uchar"
 );
-my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
-my %qemuaot_gp_params_map = (
-  "rax" => "unsigned long",
-  "rcx" => "unsigned long",
-  "rdx" => "unsigned long",
-  "rbx" => "unsigned long",
-  "rsp" => "unsigned long",
-  "rbp" => "unsigned long",
-  "rsi" => "unsigned long",
-  "rdi" => "unsigned long",
-  "r8" => "unsigned long",
-  "r9" => "unsigned long",
-  "r10" => "unsigned long",
-  "r11" => "unsigned long",
-  "r12" => "unsigned long",
-  "r13" => "unsigned long",
-  "r14" => "unsigned long",
-  "r15" => "unsigned long",
-  "qemuaot_src1" => "unsigned long",
-  "qemuaot_dst" => "unsigned long",
-  "qemuaot_op" => "unsigned int",
-  "rip" => "unsigned long",
-  "env->sse_status" => "float_status"
-);
+my @qemuaot_gp_params;
+if ($aot_level == 3) {
+  @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
+} elsif ($aot_level == 1) {
+  @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "rip");
+} else {
+  die "";
+}
+my %qemuaot_gp_params_map;
+if ($aot_level == 3) {
+  %qemuaot_gp_params_map = (
+    "rax" => "unsigned long",
+    "rcx" => "unsigned long",
+    "rdx" => "unsigned long",
+    "rbx" => "unsigned long",
+    "rsp" => "unsigned long",
+    "rbp" => "unsigned long",
+    "rsi" => "unsigned long",
+    "rdi" => "unsigned long",
+    "r8" => "unsigned long",
+    "r9" => "unsigned long",
+    "r10" => "unsigned long",
+    "r11" => "unsigned long",
+    "r12" => "unsigned long",
+    "r13" => "unsigned long",
+    "r14" => "unsigned long",
+    "r15" => "unsigned long",
+    "qemuaot_src1" => "unsigned long",
+    "qemuaot_dst" => "unsigned long",
+    "qemuaot_op" => "unsigned int",
+    "rip" => "unsigned long",
+    "env->sse_status" => "float_status"
+  );
+} elsif ($aot_level == 1) {
+  %qemuaot_gp_params_map = (
+    "rax" => "unsigned long",
+    "rcx" => "unsigned long",
+    "rdx" => "unsigned long",
+    "rbx" => "unsigned long",
+    "rsp" => "unsigned long",
+    "rbp" => "unsigned long",
+    "rsi" => "unsigned long",
+    "rdi" => "unsigned long",
+    "r8" => "unsigned long",
+    "r9" => "unsigned long",
+    "r10" => "unsigned long",
+    "r11" => "unsigned long",
+    "r12" => "unsigned long",
+    "r13" => "unsigned long",
+    "r14" => "unsigned long",
+    "r15" => "unsigned long",
+    "qemuaot_src1" => "unsigned long",
+    "rip" => "unsigned long",
+    "env->sse_status" => "float_status"
+  );
+} else {
+  die "";
+}
 my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
 my $qemuaot_vec_declare = "XMM_PARAM_DECLARE_COMMON";
 my %env_reg_idx_map = (
@@ -605,10 +640,10 @@ while (<FD>) {
             if ($sym_info[0]->{'SYM'} eq "cc_src") {
               $func_ptr->{'ENVVAR_AND_VECTORS'}->{"qemuaot_src1"} = 1;
             }
-            if ($sym_info[0]->{'SYM'} eq "cc_dst") {
+            if ($sym_info[0]->{'SYM'} eq "cc_dst" and $aot_level == 3) {
               $func_ptr->{'ENVVAR_AND_VECTORS'}->{"qemuaot_dst"} = 1;
             }
-            if ($sym_info[0]->{'SYM'} eq "cc_op") {
+            if ($sym_info[0]->{'SYM'} eq "cc_op" and $aot_level == 3) {
               $func_ptr->{'ENVVAR_AND_VECTORS'}->{"qemuaot_op"} = 1;
             }
             if ($sym_info[0]->{'SYM'} eq "regs") {
@@ -1489,7 +1524,7 @@ sub gen_restore_info
     if ($bk =~ /^xmm/) {
       $restore_info{"backup_$bk"} = $bk;
     } else {
-      die "" if not exists $qemuaot_gp_params_map{$bk};
+      die "$bk" if not exists $qemuaot_gp_params_map{$bk};
       my $var_name = $bk;
       if ($var_name =~ /^env/) {
         my $short_name = $var_name;
@@ -2191,13 +2226,13 @@ sub replace_env_var
     } else {
       $new_var = "(*qemuaot_src1_ptr)";
     }
-  } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_dst") {
+  } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_dst" and $aot_level == 3) {
     if ($func_ptr->{'HELPER_INTERFACE'}) {
       $new_var = "qemuaot_dst";
     } else {
       $new_var = "(*qemuaot_dst_ptr)";
     }
-  } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_op") {
+  } elsif ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_op" and $aot_level == 3) {
     if ($func_ptr->{'HELPER_INTERFACE'}) {
       $new_var = "qemuaot_op";
     } else {

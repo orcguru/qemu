@@ -4035,6 +4035,8 @@ void translate_call(OpCodeType opc, void *ptr) {
         } else {
             return translate_cc_compute_inband(opc, ptr);
         }
+    } else if (IS_XMM_HELPER(h)) {
+        return translate_helper_outband(opc, ptr);
 #endif
     }
     // We cannot inline below helpers currently, so their invocations incur context backup penalty.
