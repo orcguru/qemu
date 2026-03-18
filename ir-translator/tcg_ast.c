@@ -3680,6 +3680,9 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
             }
             assert(candidate != NON_XMM);
             spilled_xmm_regs[passenger_xmm_regs_cnt] = candidate;
+#ifdef DEBUG
+            printf("%s passenger_xmm_reg:%s spilled_xmm_reg:%s\n", __FUNCTION__, xmmreg_str[passenger_xmm_regs[passenger_xmm_regs_cnt]], xmmreg_str[spilled_xmm_regs[passenger_xmm_regs_cnt]]); fflush(NULL);
+#endif
             passenger_xmm_regs_cnt += 1;
         }
     }
@@ -3720,16 +3723,17 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
             assert(alias.s.valid);
             XMMReg equivalent_xmm = lookup_xmm_map(alias.s.offset);
             if (equivalent_xmm.xmm_idx != NON_XMM && equivalent_xmm.xmm_offset == 0) {
-                int new_idx = -1;
+                int spill_idx = -1;
                 for (int j = 0; j < passenger_xmm_regs_cnt; ++j) {
                     if (passenger_xmm_regs[j] == equivalent_xmm.xmm_idx) {
-                        new_idx = j;
+                        spill_idx = j;
                         break;
                     }
                 }
-                assert(new_idx != -1);
+                assert(spill_idx != -1);
                 operands[i].s.slot_type = SUB_SLOT_XMM;
-                operands[i].s.slot_idx = spilled_xmm_regs[new_idx];
+                operands[i].s.slot_idx = spilled_xmm_regs[spill_idx];
+                int new_idx = spilled_xmm_regs[spill_idx];
 
                 // Now load passenger into the slot
                 if (!fixed_vector_param_in_stack[FIXED_PARAM_COUNT + new_idx]) {
