@@ -3166,7 +3166,7 @@ void tcg_register_jit(const void *buf, size_t buf_size)
 #define CONTEXT_CC_OP     TCG_REG_T1
 #define CONTEXT_RIP       TCG_REG_A0
 #elif AOT_LEVEL == AOT_LEVEL_1
-#define CONTEXT_RIP       TCG_REG_T0
+#define CONTEXT_RIP       TCG_REG_A5
 #elif AOT_LEVEL == AOT_LEVEL_0
 #define CONTEXT_RIP       TCG_REG_A5
 #endif

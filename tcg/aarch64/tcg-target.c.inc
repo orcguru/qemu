@@ -3534,7 +3534,7 @@ static void tcg_target_qemu_prologue(TCGContext *s)
 #define CONTEXT_CC_OP     TCG_REG_X2
 #define CONTEXT_RIP       TCG_REG_X3
 #elif AOT_LEVEL == AOT_LEVEL_1
-#define CONTEXT_RIP       TCG_REG_X1
+#define CONTEXT_RIP       TCG_REG_X0
 #elif AOT_LEVEL == AOT_LEVEL_0
 #define CONTEXT_RIP       TCG_REG_X0
 #endif
