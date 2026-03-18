@@ -1426,10 +1426,10 @@ xsetbv                          xsetbv
 {r14}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r14; return SLOT; }
 {r15}             { HANDLE_COLUMN; yylval->si.s.slot_type = SUB_SLOT_XREG; yylval->si.s.slot_idx = r15; return SLOT; }
 {cc_src}          { HANDLE_COLUMN;
-                    #if AOT_LEVEL == AOT_LEVEL_MAX || AOT_LEVEL == AOT_LEVEL_1
+                    #if AOT_LEVEL == AOT_LEVEL_MAX
                     yylval->si.s.slot_type = SUB_SLOT_XREG;
                     yylval->si.s.slot_idx = cc_src;
-                    #elif AOT_LEVEL == AOT_LEVEL_0
+                    #elif AOT_LEVEL == AOT_LEVEL_0 || AOT_LEVEL == AOT_LEVEL_1
                     yylval->si.s.slot_type = SUB_SLOT_ENVVAR;
                     yylval->si.s.slot_idx = cc_src;
                     #endif

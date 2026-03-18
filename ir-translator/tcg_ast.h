@@ -49,6 +49,7 @@ typedef enum {
     X(ENVVarMAX)
 #elif AOT_LEVEL == AOT_LEVEL_1
 #define ENVVAR_TYPE_LIST \
+    X(cc_src) \
     X(cc_dst) \
     X(cc_op) \
     X(cc_src2) \
@@ -121,7 +122,6 @@ typedef enum {
     X(r13) \
     X(r14) \
     X(r15) \
-    X(cc_src) \
     X(rip) \
     X(XREG_MAX)
 #elif AOT_LEVEL == AOT_LEVEL_0

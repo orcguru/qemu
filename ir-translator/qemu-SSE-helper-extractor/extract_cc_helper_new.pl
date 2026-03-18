@@ -249,7 +249,7 @@ my @qemuaot_gp_params;
 if ($aot_level == 3) {
   @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
 } elsif ($aot_level == 1) {
-  @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "rip");
+  @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "rip");
 } else {
   die "";
 }
@@ -295,7 +295,6 @@ if ($aot_level == 3) {
     "r13" => "unsigned long",
     "r14" => "unsigned long",
     "r15" => "unsigned long",
-    "qemuaot_src1" => "unsigned long",
     "rip" => "unsigned long",
   );
 } else {

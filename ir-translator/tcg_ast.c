@@ -4951,7 +4951,7 @@ void module_prolog() {
 #if AOT_LEVEL == AOT_LEVEL_0
         "rip"
 #elif AOT_LEVEL == AOT_LEVEL_1
-        "cc_src", "rip"
+        "rip"
 #elif AOT_LEVEL == AOT_LEVEL_MAX
         "cc_src", "cc_dst", "cc_op", "rip"
 #endif
@@ -5121,6 +5121,7 @@ void module_prolog() {
     env_var_offset[cc_dst] = ENV_OFFSET_cc_dst;
     env_var_offset[cc_op] = ENV_OFFSET_cc_op;
 #elif AOT_LEVEL == AOT_LEVEL_1
+    env_var_offset[cc_src] = ENV_OFFSET_cc_src;
     env_var_offset[cc_dst] = ENV_OFFSET_cc_dst;
     env_var_offset[cc_op] = ENV_OFFSET_cc_op;
 #endif

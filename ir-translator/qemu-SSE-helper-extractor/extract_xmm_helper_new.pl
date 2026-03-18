@@ -30,7 +30,7 @@ my @qemuaot_gp_params;
 if ($aot_level == 3) {
   @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
 } elsif ($aot_level == 1) {
-  @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "rip");
+  @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "rip");
 } else {
   die "";
 }
@@ -77,7 +77,6 @@ if ($aot_level == 3) {
     "r13" => "unsigned long",
     "r14" => "unsigned long",
     "r15" => "unsigned long",
-    "qemuaot_src1" => "unsigned long",
     "rip" => "unsigned long",
     "env->sse_status" => "float_status"
   );
@@ -636,13 +635,13 @@ while (<FD>) {
             die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
             $func_ptr->{'DO_DEFINE_ENV'} = 1;
             $func_ptr->{'ENVVAR_AND_VECTORS'}->{"env->$sym_info[0]->{'SYM'}"} = 1;
-          } elsif ($aot_level == 1 and (not ($sym_info[0]->{'SYM'} eq "cc_src" or $sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs"))) {
+          } elsif ($aot_level == 1 and (not ($sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs"))) {
             die "" if $sym_info[0]->{'IS_ARRAY'} == 1;
             die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
             $func_ptr->{'DO_DEFINE_ENV'} = 1;
             $func_ptr->{'ENVVAR_AND_VECTORS'}->{"env->$sym_info[0]->{'SYM'}"} = 1;
           } else {
-            if ($sym_info[0]->{'SYM'} eq "cc_src") {
+            if ($sym_info[0]->{'SYM'} eq "cc_src" and $aot_level == 3) {
               $func_ptr->{'ENVVAR_AND_VECTORS'}->{"qemuaot_src1"} = 1;
             }
             if ($sym_info[0]->{'SYM'} eq "cc_dst" and $aot_level == 3) {
@@ -1587,6 +1586,8 @@ sub add_context_backup
         $type_info = $qemuaot_gp_params_map{$bk};
       } elsif ($bk eq "env->cc_op") {
         $type_info = "unsigned int";
+      } elsif ($bk eq "env->cc_src") {
+        $type_info = "unsigned long";
       } elsif ($bk eq "env->cc_dst") {
         $type_info = "unsigned long";
       } else {
@@ -2235,7 +2236,7 @@ sub replace_env_var
     return "env";
   }
   my $new_var = "";
-  if ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_src") {
+  if ($entry->{'DEF_SYM_INFO'}->[0]->{'SYM'} eq "cc_src" and $aot_level == 3) {
     if ($func_ptr->{'HELPER_INTERFACE'}) {
       $new_var = "qemuaot_src1";
     } else {
