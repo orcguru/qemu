@@ -5,7 +5,7 @@ use IO::Handle;
 use File::Basename;
 use Cwd 'abs_path';
 
-my $aot_level = 1;
+my $aot_level = 3;
 if ($#ARGV < 1) {
   print "Usage: ./script <antlr-in> <antlr-out>\n";
   exit 1;
