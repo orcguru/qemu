@@ -1932,8 +1932,17 @@ sub collect_func_args
       $args = $args.", $qemuaot_gp_params_map{$sk} *".$sk."_ptr";
     }
   }
+  if ($func_ptr->{'HELPER_INTERFACE'} and @{$func_ptr->{'SCALAR_ARGS'}} > 0) {
+    print "$func_ptr->{'NAME'}";
+  }
   foreach my $i (@{$func_ptr->{'SCALAR_ARGS'}}) {
     $args = $args.", ".$i->{'TYPE'}." ".$i->{'VAR_NAME'};
+    if ($func_ptr->{'HELPER_INTERFACE'}) {
+      print " $i->{'TYPE'}";
+    }
+  }
+  if ($func_ptr->{'HELPER_INTERFACE'} and @{$func_ptr->{'SCALAR_ARGS'}} > 0) {
+    print "\n";
   }
   if ($func_ptr->{'HELPER_INTERFACE'}) {
     if (exists $func_ptr->{'IS_FOREIGN'}) {

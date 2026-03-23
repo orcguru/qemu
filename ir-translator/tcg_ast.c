@@ -85,7 +85,7 @@
 #include "xymm_def.h"
 #define IS_YMM_HELPER(h)            (h > ymm_helper_begin && h < HELPER_MAX)
 #define IS_XMM_HELPER(h)            (h > xmm_helper_begin && h < ymm_helper_begin)
-#define INLINE_HELPER_ENABLED(h)    IS_XMM_HELPER(h)
+#define INLINE_HELPER_ENABLED(h)    (IS_XMM_HELPER(h) || IS_YMM_HELPER(h))
 
 #define DEBUG_VALUE_TYPE(v)                                     \
     do {                                                        \
@@ -511,7 +511,6 @@ extern const char *helper_str[];
 extern const char *xmmreg_str[];
 extern const uint64_t xreg_offsets[XREG_MAX];
 extern const CVectorType cvector_type_for_llvm_type[LLVMMAXType];
-extern const char *ymm_str[NON_XMM];
 extern const int helper_qemuaot_with_env[HELPER_MAX];
 extern const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS];
 extern const LLVMType helper_return_type[HELPER_MAX];
@@ -3750,6 +3749,22 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
                 op.s.offset = alias.s.offset;
                 LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_xmm_llvmtype[new_idx], 0);
                 build_store_with_alignment(builder, val, func_xmm_alloca[new_idx].alloca, func_xmm_alloca[new_idx].alignment);
+                if (IS_YMM_HELPER(h)) {
+                    if (!fixed_vector_param_in_stack[FIXED_PARAM_COUNT + new_idx + 1]) {
+                        LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + new_idx + 1]], fixed_vector_stack_names[FIXED_PARAM_COUNT + new_idx + 1]);
+                        LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + new_idx + 1]));
+                        func_xmm_alloca[new_idx + 1].alloca = alloca_inst;
+                        func_xmm_alloca[new_idx + 1].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + new_idx + 1]);
+                        func_xmm_llvmtype[new_idx + 1] = fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + new_idx + 1];
+                        fixed_vector_param_in_stack[FIXED_PARAM_COUNT + new_idx + 1] = 1;
+                    }
+                    OperandType op;
+                    op.s.valid = 1;
+                    op.s.slot_type = SUB_SLOT_ENV;
+                    op.s.offset = alias.s.offset + 16;
+                    LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op, func_xmm_llvmtype[new_idx + 1], 0);
+                    build_store_with_alignment(builder, val, func_xmm_alloca[new_idx + 1].alloca, func_xmm_alloca[new_idx + 1].alignment);
+                }
             }
         }
     }
@@ -3767,9 +3782,13 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
                 break;
             }
         }
-        char element1[32];
+        char element1[64];
         char element2[32];
-        sprintf(element1, " -DVEC%d=%s", i, xmmreg_str[xmm_idx]);
+        if (IS_XMM_HELPER(h)) {
+            sprintf(element1, " -DVEC%d=%s", i, xmmreg_str[xmm_idx]);
+        } else if (IS_YMM_HELPER(h)) {
+            sprintf(element1, " -DVEC%dX=%s -DVEC%dY=%s", i, xmmreg_str[xmm_idx], i, xmmreg_str[xmm_idx + 1]);
+        }
         sprintf(element2, "_VEC%d_%s", i, xmmreg_str[xmm_idx]);
         strcat(build_macro, element1);
         strcat(vector_seq_name, element2);
@@ -4030,7 +4049,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         } else {
             return translate_cc_compute_inband(opc, ptr);
         }
-    } else if (IS_XMM_HELPER(h)) {
+    } else if (INLINE_HELPER_ENABLED(h)) {
         return translate_helper_outband(opc, ptr);
 #elif AOT_LEVEL == AOT_LEVEL_1
     } else if (h == helper_cc_compute_all || h == helper_cc_compute_c || h == helper_cc_compute_nz) {
@@ -4039,7 +4058,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         } else {
             return translate_cc_compute_inband(opc, ptr);
         }
-    } else if (IS_XMM_HELPER(h)) {
+    } else if (INLINE_HELPER_ENABLED(h)) {
         return translate_helper_outband(opc, ptr);
 #endif
     }
