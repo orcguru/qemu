@@ -987,6 +987,9 @@ sub lookup
   my ($loc, $lookup_info) = @_;
   my $low_idx = 0;
   my $high_idx = $#{$lookup_info->{'SORTED_ADDR'}};
+  if ($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_START'} <= $loc) {
+    return ($high_idx, $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]});
+  }
   while (($high_idx - $low_idx) > 1) {
     if (!($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$low_idx]}->{'LOOKUP_START'} < $loc and $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_START'} > $loc)) {
       return -1;
@@ -1932,18 +1935,18 @@ sub collect_func_args
       $args = $args.", $qemuaot_gp_params_map{$sk} *".$sk."_ptr";
     }
   }
-  if ($func_ptr->{'HELPER_INTERFACE'} and @{$func_ptr->{'SCALAR_ARGS'}} > 0) {
-    print "$func_ptr->{'NAME'}";
-  }
+  #if ($func_ptr->{'HELPER_INTERFACE'} and @{$func_ptr->{'SCALAR_ARGS'}} > 0) {
+  #  print "$func_ptr->{'NAME'}";
+  #}
   foreach my $i (@{$func_ptr->{'SCALAR_ARGS'}}) {
     $args = $args.", ".$i->{'TYPE'}." ".$i->{'VAR_NAME'};
-    if ($func_ptr->{'HELPER_INTERFACE'}) {
-      print " $i->{'TYPE'}";
-    }
+    #if ($func_ptr->{'HELPER_INTERFACE'}) {
+    #  print " $i->{'TYPE'}";
+    #}
   }
-  if ($func_ptr->{'HELPER_INTERFACE'} and @{$func_ptr->{'SCALAR_ARGS'}} > 0) {
-    print "\n";
-  }
+  #if ($func_ptr->{'HELPER_INTERFACE'} and @{$func_ptr->{'SCALAR_ARGS'}} > 0) {
+  #  print "\n";
+  #}
   if ($func_ptr->{'HELPER_INTERFACE'}) {
     if (exists $func_ptr->{'IS_FOREIGN'}) {
       $args = $args.", unsigned long normal_return, unsigned long exception_return";

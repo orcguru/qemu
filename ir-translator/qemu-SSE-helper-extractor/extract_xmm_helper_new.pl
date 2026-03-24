@@ -1043,6 +1043,9 @@ sub lookup
   my ($loc, $lookup_info) = @_;
   my $low_idx = 0;
   my $high_idx = $#{$lookup_info->{'SORTED_ADDR'}};
+  if ($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_START'} <= $loc) {
+    return ($high_idx, $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]});
+  }
   while (($high_idx - $low_idx) > 1) {
     if (!($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$low_idx]}->{'LOOKUP_START'} < $loc and $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_START'} > $loc)) {
       return -1;
