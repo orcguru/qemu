@@ -1194,7 +1194,8 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
             assert(llvm_vector_elem_bit_counts[tidx*2] == 1);
             LLVMTypeRef vtype = NULL;
             int elem_idx = 0;
-            vtype = llvm_int_types[OPC_FIXED_TO_VECTOR128(tidx)];
+            LLVMType vec_type = OPC_FIXED_TO_VECTOR128(tidx);
+            vtype = llvm_int_types[vec_type];
             if (operand.s.offset % 8 == 0) {
                 elem_idx = operand.s.offset/8;
             } else if (operand.s.offset % 4 == 0) {
@@ -1209,6 +1210,20 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
             }
             LLVMValueRef vec = build_load_with_alignment(builder, vtype, get_stack_alloca(operand).alloca, get_next_var_name("source_vec", operand), get_stack_alloca(operand).alignment);
             LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], elem_idx, 0);
+            if (llvm_int_types[vec_type] != llvm_int_store_types[vec_type]) {
+                LLVMTypeRef intrinsic_types[] = {llvm_int_types[vec_type], llvm_int_types[OPC_ADDR_T]};
+                LLVMTypeRef intrinsic_func_type = LLVMFunctionType(llvm_int_store_types[vec_type], intrinsic_types, 2, 0);
+                char intrinsic_func_name[128] = {0};
+                sprintf(intrinsic_func_name, "llvm.vector.extract.v%di%d.nxv%di%d", llvm_vector_elem_bit_counts[vec_type*2], llvm_vector_elem_bit_counts[vec_type*2+1], llvm_vector_elem_bit_counts[vec_type*2]/2, llvm_vector_elem_bit_counts[vec_type*2+1]);
+                assert(strlen(intrinsic_func_name) < sizeof(intrinsic_func_name));
+                LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, intrinsic_func_name);
+                if (!intrinsic_func) {
+                    intrinsic_func = LLVMAddFunction(module, intrinsic_func_name, intrinsic_func_type);
+                }
+                LLVMValueRef index_0 = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
+                LLVMValueRef intrinsic_call_args[] = {vec, index_0};
+                vec = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, intrinsic_call_args, 2, get_next_var_name("check_scalable_store", dummy_slot_for_debug));
+            }
             ret = LLVMBuildExtractElement(builder, vec, index, get_next_var_name("source_val", operand));
         } else {
             ret = build_load_with_alignment(builder, type, get_stack_alloca(operand).alloca, get_next_var_name("source_val", operand), get_stack_alloca(operand).alignment);
@@ -2491,6 +2506,20 @@ void translate_dupm_vec(OpCodeType opc, void *ptr) {
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
     LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, operand1, type_in, 0);
     LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
+    if (llvm_int_types[type_in] != llvm_int_store_types[type_in]) {
+        LLVMTypeRef intrinsic_types[] = {llvm_int_types[type_in], llvm_int_types[OPC_ADDR_T]};
+        LLVMTypeRef intrinsic_func_type = LLVMFunctionType(llvm_int_store_types[type_in], intrinsic_types, 2, 0);
+        char intrinsic_func_name[128] = {0};
+        sprintf(intrinsic_func_name, "llvm.vector.extract.v%di%d.nxv%di%d", llvm_vector_elem_bit_counts[type_in*2], llvm_vector_elem_bit_counts[type_in*2+1], llvm_vector_elem_bit_counts[type_in*2]/2, llvm_vector_elem_bit_counts[type_in*2+1]);
+        assert(strlen(intrinsic_func_name) < sizeof(intrinsic_func_name));
+        LLVMValueRef intrinsic_func = LLVMGetNamedFunction(module, intrinsic_func_name);
+        if (!intrinsic_func) {
+            intrinsic_func = LLVMAddFunction(module, intrinsic_func_name, intrinsic_func_type);
+        }
+        LLVMValueRef index_0 = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 0, 0);
+        LLVMValueRef intrinsic_call_args[] = {src, index_0};
+        src = LLVMBuildCall2(builder, intrinsic_func_type, intrinsic_func, intrinsic_call_args, 2, get_next_var_name("check_scalable_store", dummy_slot_for_debug));
+    }
     LLVMValueRef first_element = LLVMBuildExtractElement(builder, src, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef single_element_vector = LLVMBuildInsertElement(builder, LLVMGetUndef(llvm_int_types[type_in]), first_element, index, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef zero_mask = LLVMConstNull(llvm_int_types[type_in]);
