@@ -1960,6 +1960,7 @@ const int helper_require_exception_path[HELPER_MAX] = {
     [helper_divpd_ymm] = 1,
     [helper_divps_ymm] = 1,
     [helper_dpps_ymm] = 1,
+    [helper_fma4pd_ymm] = 1,
     [helper_fma4ps_ymm] = 1,
     [helper_haddpd_ymm] = 1,
     [helper_haddps_ymm] = 1,
