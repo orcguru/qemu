@@ -2982,7 +2982,7 @@ static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func
     }
     int drop_cnt = 0;
     for (int i = 0; i < operands_cnt; ++i) {
-        if (is_imm[i] == 0 && operands[i].s.valid && ((operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[i])) || operands[i].s.slot_type == SUB_SLOT_XMM)) {
+        if (is_imm[i] == 0 && operands[i].s.valid && ((operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_env(operands[i])) || (operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[i])) || operands[i].s.slot_type == SUB_SLOT_XMM)) {
             drop_cnt += 1;
         }
     }
@@ -3227,6 +3227,13 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
                         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
                         LLVMValueRef env_raw = get_env_ptr_raw();
                         out_valref[i] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("env_ptr_offset", dummy_slot_for_debug));
+                    } else if (is_imm[i] == 0 && operands[i].s.valid && operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_env(operands[i])) {
+                        OperandType alias = get_alias(operands[i]);
+                        assert(alias.s.valid);
+                        uint64_t xmm_offset = (uint64_t)alias.s.offset;
+                        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+                        LLVMValueRef env_raw = get_env_ptr_raw();
+                        out_valref[i] = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("env_ptr_offset", dummy_slot_for_debug));
                     } else if (is_imm[i] == 0 && operands[i].s.valid && operands[i].s.slot_type == SUB_SLOT_XMM) {
                         uint64_t xmm_offset = get_xmm_offset(operands[i].s.slot_idx/2) + 16*(operands[i].s.slot_idx%2) + operands[i].s.offset;
                         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
@@ -3368,7 +3375,7 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
                 define_type(out_typeref, idx, fixed_vector_param_llvmtypes[idx], out_typeref_limit);
             }
             for (int i = 0; i < operands_cnt; ++i) {
-                if (is_imm[i] == 0 && operands[i].s.valid && ((operands[i].s.slot_type == SUB_SLOT_ENV && operands[i].s.offset == 0) || (operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[i])) || operands[i].s.slot_type == SUB_SLOT_XMM)) {
+                if (is_imm[i] == 0 && operands[i].s.valid && ((operands[i].s.slot_type == SUB_SLOT_ENV && operands[i].s.offset == 0) || (operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_env(operands[i])) || (operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[i])) || operands[i].s.slot_type == SUB_SLOT_XMM)) {
                     continue;
                 }
                 define_type(out_typeref, idx, LLVMInt64, out_typeref_limit);
