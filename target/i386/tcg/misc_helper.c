@@ -430,6 +430,13 @@ void helper_jit(CPUX86State *env, unsigned long target)
     cpu_loop_exit(cs);
 }
 
+extern const uint8_t AES_sbox[256];
+void register_for_aot_helper_AES_sbox(void) __attribute__((weak,constructor));
+void register_for_aot_helper_AES_sbox()
+{
+    register_for_aot_helper("AES_sbox", (uint64_t)AES_sbox, "void");
+}
+
 void register_for_aot_helper_jit(void) __attribute__((weak,constructor));
 void register_for_aot_helper_jit()
 {
