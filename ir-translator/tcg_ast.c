@@ -619,6 +619,7 @@ static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr);
 static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_ret);
 static void setup_func_stack();
 static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain);
+static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, XMMRegType *passenger_xmm_regs, int fix_second_half_addr);
 static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr);
 static void translate_cc_compute_inband(OpCodeType opc, void *ptr);
 static void translate_helper_outband(OpCodeType opc, void *ptr);
@@ -2833,7 +2834,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         LLVMValueRef vec_val = LLVMGetParam(trampoline, i);
         if (spill_cnt) {
             for (int j = 0; j < spill_cnt; ++j) {
-                if (spilled_xmm_regs[j] == (XMMRegType)i) {
+                if (spilled_xmm_regs[j] == (XMMRegType)(i - FIXED_PARAM_COUNT)) {
                     vec_val = reload_vector(spilled_xmm_regs[j]);
                     break;
                 }
@@ -2920,6 +2921,188 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     assert(last_active_bb);
     LLVMPositionBuilderAtEnd(builder, last_active_bb);
     return trampoline;
+}
+
+static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, XMMRegType *passenger_xmm_regs, int fix_second_half_addr) {
+    char handler_name[4096] = {0};
+    sprintf(handler_name, "%s%sexception_handler_r%d_param_cnt%d", func_name_prefix, func_name_prefix[0] ? "_" : "", with_ret, operands_cnt);
+    int env_cnt = 0;
+    for (int i = 0; i < operands_cnt; ++i) {
+        if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_ENV && operands[i].s.offset == 0) {
+            char env_part[32] = {0};
+            sprintf(env_part, "_env%d", i);
+            strcat(handler_name, env_part);
+            env_cnt += 1;
+        } else if (is_imm[i] == 0 && operands[i].s.valid && ((operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[i])) || operands[i].s.slot_type == SUB_SLOT_XMM)) {
+            char xmm_part[32] = {0};
+            OperandType alias = get_alias(operands[i]);
+            sprintf(xmm_part, "_p%dxmm%d", i, alias.s.slot_idx);
+            strcat(handler_name, xmm_part);
+        } else if (is_imm[i] == 0 && operands[i].s.valid && (operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_env(operands[i]))) {
+            char xmm_part[32] = {0};
+            OperandType alias = get_alias(operands[i]);
+            sprintf(xmm_part, "_p%dxmmenv0x%x", i, alias.s.offset);
+            strcat(handler_name, xmm_part);
+        }
+    }
+    char name_tail[128] = {0};
+    sprintf(name_tail, "_spill%d", spill_cnt);
+    strcat(handler_name, name_tail);
+    if (spill_cnt) {
+        for (int si = 0; si < spill_cnt; ++si) {
+            sprintf(name_tail, "_s%d", spilled_xmm_regs[si]);
+            strcat(handler_name, name_tail);
+        }
+    }
+    sprintf(name_tail, "_%s", LLVMGetValueName(helper_func));
+    strcat(handler_name, name_tail);
+    if (fix_second_half_addr) {
+        sprintf(name_tail, "_sec_%s", LLVMGetValueName(next_func));
+        strcat(handler_name, name_tail);
+    }
+    assert(strlen(handler_name) < sizeof(handler_name));
+    LLVMValueRef handler = LLVMGetNamedFunction(module, handler_name);
+    if (handler) {
+        return handler;
+    }
+    LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS] = {NULL};
+    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_DROP_ALIAS_POINTER, TYPE_ONLY, operands, is_imm, operands_cnt, (!fix_second_half_addr) ? (LLVMValueRef)1 : NULL, NULL, llvm_func, call_types, (FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS), NULL, handler_name);
+    assert(call_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS));
+
+    handler = LLVMAddFunction(module, handler_name,
+        LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnt, 0));
+    LLVMAddAttributeAtIndex(handler, -1, NoInlineAttr);
+    LLVMAddAttributeAtIndex(handler, -1, target_features_attr);
+    LLVMSetLinkage(handler, LLVMWeakAnyLinkage);
+    int j = 0;
+    LLVMValueRef param = NULL;
+    for (j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
+        param = LLVMGetParam(handler, j);
+        LLVMSetValueName(param, fixed_vector_arg_names[j]);
+    }
+    int drop_cnt = 0;
+    for (int i = 0; i < operands_cnt; ++i) {
+        if (is_imm[i] == 0 && operands[i].s.valid && ((operands[i].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[i])) || operands[i].s.slot_type == SUB_SLOT_XMM)) {
+            drop_cnt += 1;
+        }
+    }
+    for (j = FIXED_VECTOR_PARAM_COUNT; j < (FIXED_VECTOR_PARAM_COUNT + operands_cnt - env_cnt - drop_cnt); j++) {
+        param = LLVMGetParam(handler, j);
+        char var[16] = {0};
+        sprintf(var, "param%d", (j - FIXED_VECTOR_PARAM_COUNT));
+        LLVMSetValueName(param, var);
+    }
+    if (!fix_second_half_addr) {
+        param = LLVMGetParam(handler, j);
+        LLVMSetValueName(param, "next");
+    }
+    LLVMSetFunctionCallConv(handler, QEMUAOT_CC);
+
+    LLVMBasicBlockRef entry = LLVMAppendBasicBlock(handler, "entry");
+    LLVMPositionBuilderAtEnd(builder, entry);
+
+    // Store all fixed to ENV
+    LLVMValueRef env_raw = get_env_ptr_raw();
+    for (int i = 0; i < FIXED_PARAM_COUNT; ++i) {
+        LLVMValueRef fixed_val = LLVMGetParam(handler, i);
+        uint64_t env_xreg_offset = xreg_offsets[i];
+        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xreg_offset, 0);
+        LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("spill_fixed_addr", dummy_slot_for_debug));
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[fixed_vector_param_llvmtypes[i]], 0), get_next_var_name("spill_fixed_ptr", dummy_slot_for_debug));
+        build_store_with_alignment(builder, fixed_val, ptr, 8);
+    }
+
+    // Store all vectors to ENV
+    for (int i = FIXED_PARAM_COUNT; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
+        LLVMValueRef vec_val = LLVMGetParam(handler, i);
+        if (spill_cnt) {
+            for (int j = 0; j < spill_cnt; ++j) {
+                if (spilled_xmm_regs[j] == (XMMRegType)(i - FIXED_PARAM_COUNT)) {
+                    vec_val = reload_vector(spilled_xmm_regs[j]);
+                    break;
+                }
+                if (IS_YMM_HELPER(h) && ((spilled_xmm_regs[j] + 1) == (XMMRegType)(i - FIXED_PARAM_COUNT))) {
+                    vec_val = reload_vector(spilled_xmm_regs[j] + 1);
+                    break;
+                }
+            }
+        }
+        uint64_t xmm_offset = get_xmm_offset((i - FIXED_PARAM_COUNT)/2) + 16 * ((i - FIXED_PARAM_COUNT) % 2);
+        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
+        LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("spill_vec_addr", dummy_slot_for_debug));
+        check_scalable_vector_perform_store(vec_val, LLVMVector2xi64, addr, 16);
+    }
+
+    LLVMValueRef call_args[MAX_OPERANDS_COUNT] = {NULL};
+    call_arg_cnt = collect_arguments_and_types(h, TARGET_DEFAULT_HELPER_CONSTRUCT_VECTOR, VALUE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, handler, NULL, 0, call_args, handler_name);
+    LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
+    LLVMValueRef env_alloca = NULL;
+    env_alloca = LLVMBuildAlloca(builder, llvm_int_types[OPC_ADDR_T], "env_alloca");
+    LLVMSetAlignment(env_alloca, 8);
+    build_store_with_alignment(builder, env_raw, env_alloca, 8);
+#ifdef DEBUG
+    printf("BuildCall2:%s\n", LLVMGetValueName(helper_func)); fflush(NULL);
+#endif
+    // Get the helper call target from argument, since I would like to reuse handler for different helper targets
+    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, call_arg_cnt, with_ret ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
+    env_raw = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], env_alloca, get_next_var_name("env_ptr", dummy_slot_for_debug), 8);
+    set_env_ptr_raw(env_raw);
+
+    // Load all fixed from ENV
+    LLVMValueRef return_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
+    if (with_ret) {
+        return_args[FIXED_VECTOR_PARAM_COUNT] = call_helper_inst;
+    }
+    for (int i = 0; i < FIXED_PARAM_COUNT; ++i) {
+        uint64_t env_xreg_offset = xreg_offsets[i];
+        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xreg_offset, 0);
+        LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("reload_fixed_addr", dummy_slot_for_debug));
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[fixed_vector_param_llvmtypes[i]], 0), get_next_var_name("reload_fixed_ptr", dummy_slot_for_debug));
+        return_args[i] = build_load_with_alignment(builder, llvm_int_types[fixed_vector_param_llvmtypes[i]], ptr, get_next_var_name("reload_fixed_val", dummy_slot_for_debug), 8);
+    }
+
+    // Load all vectors from ENV
+    for (int i = FIXED_PARAM_COUNT; i < FIXED_VECTOR_PARAM_COUNT; ++i) {
+        XMMRegType src_xmm = (i - FIXED_PARAM_COUNT);
+        if (spill_cnt) {
+            for (int j = 0; j < spill_cnt; ++j) {
+                if (spilled_xmm_regs[j] == (XMMRegType)(i - FIXED_PARAM_COUNT)) {
+                    src_xmm = passenger_xmm_regs[j];
+                    break;
+                }
+                if (IS_YMM_HELPER(h) && ((spilled_xmm_regs[j] + 1) == (XMMRegType)(i - FIXED_PARAM_COUNT))) {
+                    src_xmm = passenger_xmm_regs[j] + 1;
+                    break;
+                }
+            }
+        }
+        uint64_t env_xmm_offset = get_xmm_offset(src_xmm / 2) + 16 * (src_xmm % 2);
+        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xmm_offset, 0);
+        LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("reload_vec_addr", dummy_slot_for_debug));
+        return_args[i] = check_scalable_vector_perform_load(LLVMVector2xi64, addr, 16);
+    }
+
+    LLVMTypeRef next_type = LLVMGlobalGetValueType(next_func);
+    LLVMValueRef call_next_inst;
+    if (!fix_second_half_addr) {
+        int next_addr_param_idx = (FIXED_VECTOR_PARAM_COUNT + (operands_cnt - env_cnt - drop_cnt));
+        assert(next_addr_param_idx < LLVMCountParams(handler));
+        LLVMValueRef next_addr = LLVMGetParam(handler, next_addr_param_idx);
+        LLVMValueRef the_next = LLVMBuildIntToPtr(builder, next_addr, LLVMPointerType(next_type, 0), get_next_var_name("next", dummy_slot_for_debug));
+#ifdef DEBUG
+        printf("BuildCall2:%s\n", LLVMGetValueName(next_func)); fflush(NULL);
+#endif
+        call_next_inst = LLVMBuildCall2(builder, next_type, the_next, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), "");
+    } else {
+        call_next_inst = LLVMBuildCall2(builder, next_type, next_func, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), "");
+    }
+    LLVMSetTailCall(call_next_inst, 1);
+    LLVMSetInstructionCallConv(call_next_inst, QEMUAOT_CC);
+    LLVMBuildRetVoid(builder);
+
+    assert(last_active_bb);
+    LLVMPositionBuilderAtEnd(builder, last_active_bb);
+    return handler;
 }
 
 static uint8_t do_link_helper(HelperType h, const char *build_macro, const char *bc_name, const char *c_file) {
@@ -3675,6 +3858,19 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         }
         operands_cnt += 1;
     }
+    OperandType operands_for_eh[MAX_OPERANDS_COUNT] = {0};
+    uint32_t is_imm_for_eh[MAX_OPERANDS_COUNT] = {0};
+
+    // Operands for the exception handler
+    int operands_cnt_for_eh = 0;
+    do {
+        operands_for_eh[operands_cnt_for_eh] = get_operand(ptr, (operands_cnt_for_eh + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &is_imm_for_eh[operands_cnt_for_eh]);
+        if (is_imm_for_eh[operands_cnt_for_eh] == 0 && operands_for_eh[operands_cnt_for_eh].s.valid == 0) {
+            break;
+        }
+        operands_cnt_for_eh += 1;
+    } while (1);
+    assert(operands_cnt_for_eh <= MAX_OPERANDS_COUNT);
 
     // Do vector register spill/reload if candidate helper can be inlined
     XMMRegType spilled_xmm_regs[MAX_OPERANDS_COUNT];
@@ -3877,7 +4073,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
             }
             param_cnt += 1;
         }
-        exception_path_trampoline = get_trampoline(helper_func, 1, helper_return_type[h] != LLVMInvalidType ? 1 : 0, operands, is_imm, operands_cnt, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
+        exception_path_trampoline = get_exception_handler(h, helper_func, helper_return_type[h] != LLVMInvalidType ? 1 : 0, operands_for_eh, is_imm_for_eh, operands_cnt_for_eh, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs, passenger_xmm_regs, param_cnt == MAX_ADDED_ARGS);
     }
 
     // Generate the fast path inlined helper
@@ -3981,22 +4177,22 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
 
             xmm_val = reload_vector(spilled_xmm_regs[i]);
             if (!func_xmm_alloca[spilled_xmm_regs[i]].alloca) {
-                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]]], fixed_vector_stack_names[XREG_MAX + spilled_xmm_regs[i]]);
-                LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]]));
+                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + spilled_xmm_regs[i]]], fixed_vector_stack_names[FIXED_PARAM_COUNT + spilled_xmm_regs[i]]);
+                LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + spilled_xmm_regs[i]]));
                 func_xmm_alloca[spilled_xmm_regs[i]].alloca = alloca_inst;
-                func_xmm_alloca[spilled_xmm_regs[i]].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]]);
-                func_xmm_llvmtype[spilled_xmm_regs[i]] = fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i]];
+                func_xmm_alloca[spilled_xmm_regs[i]].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + spilled_xmm_regs[i]]);
+                func_xmm_llvmtype[spilled_xmm_regs[i]] = fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + spilled_xmm_regs[i]];
             }
             build_store_with_alignment(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i]].alloca, func_xmm_alloca[spilled_xmm_regs[i]].alignment);
             fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i]] = 1;
             if (IS_YMM_HELPER(h)) {
                 xmm_val = reload_vector(spilled_xmm_regs[i] + 1);
                 if (!func_xmm_alloca[spilled_xmm_regs[i] + 1].alloca) {
-                    LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1]], fixed_vector_stack_names[XREG_MAX + spilled_xmm_regs[i] + 1]);
-                    LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1]));
+                    LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1]], fixed_vector_stack_names[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1]);
+                    LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1]));
                     func_xmm_alloca[spilled_xmm_regs[i] + 1].alloca = alloca_inst;
-                    func_xmm_alloca[spilled_xmm_regs[i] + 1].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1]);
-                    func_xmm_llvmtype[spilled_xmm_regs[i] + 1] = fixed_vector_param_llvmtypes[XREG_MAX + spilled_xmm_regs[i] + 1];
+                    func_xmm_alloca[spilled_xmm_regs[i] + 1].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1]);
+                    func_xmm_llvmtype[spilled_xmm_regs[i] + 1] = fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1];
                 }
                 build_store_with_alignment(builder, xmm_val, func_xmm_alloca[spilled_xmm_regs[i] + 1].alloca, func_xmm_alloca[spilled_xmm_regs[i] + 1].alignment);
                 fixed_vector_param_in_stack[FIXED_PARAM_COUNT + spilled_xmm_regs[i] + 1] = 1;
@@ -4414,12 +4610,12 @@ static void setup_func_stack() {
     if (xmm_valid) {
         for (int i = 0; i < (1<<REGISTER_INDEX_SHIFT); ++i) {
             if (xmm_valid & (1UL<<i)) {
-                assert((XREG_MAX + i) < FIXED_VECTOR_PARAM_COUNT);
-                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[XREG_MAX + i]], fixed_vector_stack_names[XREG_MAX + i]);
-                LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + i]));
+                assert((FIXED_PARAM_COUNT + i) < FIXED_VECTOR_PARAM_COUNT);
+                LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + i]], fixed_vector_stack_names[FIXED_PARAM_COUNT + i]);
+                LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + i]));
                 func_xmm_alloca[i].alloca = alloca_inst;
-                func_xmm_alloca[i].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[XREG_MAX + i]);
-                func_xmm_llvmtype[i] = fixed_vector_param_llvmtypes[XREG_MAX + i];
+                func_xmm_alloca[i].alignment = GET_LLVM_TYPE_ALIGNMENT(fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + i]);
+                func_xmm_llvmtype[i] = fixed_vector_param_llvmtypes[FIXED_PARAM_COUNT + i];
                 build_store_with_alignment(builder, LLVMGetParam(llvm_func, FIXED_PARAM_COUNT + i), func_xmm_alloca[i].alloca, func_xmm_alloca[i].alignment);
                 fixed_vector_param_in_stack[FIXED_PARAM_COUNT + i] = 1;
             }
