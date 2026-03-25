@@ -1496,10 +1496,10 @@ sub get_func_body
     $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[1] = $arg_entry->{'VAR_NAME'}x[1];\n";
     $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[2] = $arg_entry->{'VAR_NAME'}y[0];\n";
     $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[3] = $arg_entry->{'VAR_NAME'}y[1];\n";
-    $epilog = $epilog."$arg_entry->{'VAR_NAME'}x[0] = $arg_entry->{'VAR_NAME'}"."[0];\n";
-    $epilog = $epilog."$arg_entry->{'VAR_NAME'}x[1] = $arg_entry->{'VAR_NAME'}"."[1];\n";
-    $epilog = $epilog."$arg_entry->{'VAR_NAME'}y[0] = $arg_entry->{'VAR_NAME'}"."[2];\n";
-    $epilog = $epilog."$arg_entry->{'VAR_NAME'}y[1] = $arg_entry->{'VAR_NAME'}"."[3];\n";
+    $epilog = "$arg_entry->{'VAR_NAME'}x[0] = $arg_entry->{'VAR_NAME'}"."[0];\n".$epilog;
+    $epilog = "$arg_entry->{'VAR_NAME'}x[1] = $arg_entry->{'VAR_NAME'}"."[1];\n".$epilog;
+    $epilog = "$arg_entry->{'VAR_NAME'}y[0] = $arg_entry->{'VAR_NAME'}"."[2];\n".$epilog;
+    $epilog = "$arg_entry->{'VAR_NAME'}y[1] = $arg_entry->{'VAR_NAME'}"."[3];\n".$epilog;
   }
 
   my %events = ();
