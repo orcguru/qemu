@@ -3427,17 +3427,10 @@ static void tcg_target_init(TCGContext *s)
 /* Saving pairs: (X19, X20) .. (X27, X28), (X29(fp), X30(lr)).  */
 #define PUSH_SIZE  ((30 - 19 + 1) * 8)
 
-/*
 #define FRAME_SIZE \
     ((PUSH_SIZE \
       + TCG_STATIC_CALL_ARGS_SIZE \
       + CPU_TEMP_BUF_NLONGS * sizeof(long) \
-      + TCG_TARGET_STACK_ALIGN - 1) \
-     & ~(TCG_TARGET_STACK_ALIGN - 1))
-    */
-#define FRAME_SIZE \
-    ((PUSH_SIZE \
-      + 0xff0 \
       + TCG_TARGET_STACK_ALIGN - 1) \
      & ~(TCG_TARGET_STACK_ALIGN - 1))
 

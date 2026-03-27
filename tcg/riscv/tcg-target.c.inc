@@ -2932,12 +2932,9 @@ static const int tcg_target_callee_save_regs[] = {
 #define REG_SIZE   (TCG_TARGET_REG_BITS / 8)
 #define SAVE_SIZE  ((int)ARRAY_SIZE(tcg_target_callee_save_regs) * REG_SIZE)
 #define TEMP_SIZE  (CPU_TEMP_BUF_NLONGS * (int)sizeof(long))
-#define FRAME_SIZE 0x7f0
-/*
 #define FRAME_SIZE ((TCG_STATIC_CALL_ARGS_SIZE + TEMP_SIZE + SAVE_SIZE \
                      + TCG_TARGET_STACK_ALIGN - 1) \
                     & -TCG_TARGET_STACK_ALIGN)
-*/
 #define SAVE_OFS   (TCG_STATIC_CALL_ARGS_SIZE + TEMP_SIZE)
 
 /* We're expecting to be able to use an immediate for frame allocation.  */
