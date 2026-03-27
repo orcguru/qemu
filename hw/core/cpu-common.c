@@ -71,6 +71,17 @@ CPUState *cpu_create(const char *typename)
     cpu->neg.ssi.shadow_stack_pointer = ptr + SHADOW_STACK_SIZE - 32;
     cpu->neg.ssi.shadow_stack_pointer_upper_bound = ptr + SHADOW_STACK_SIZE - 16;
     cpu->neg.ssi.shadow_stack_pointer_lower_bound = ptr + 16 /*safety margin*/ + 4096 /*margin for shadow_call_offset*/;
+// Reserve two pages at boundaries to trap overflow accesses
+#define AOT_STACK_SIZE   ((64 + 2) * qemu_real_host_page_size())
+    ptr = (uint64_t)mmap(0, AOT_STACK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    assert(ptr != -1UL);
+    int ret = mprotect((void *)ptr, qemu_real_host_page_size(), PROT_NONE);
+    assert(ret == 0);
+    ret = mprotect((void *)(ptr + (AOT_STACK_SIZE - qemu_real_host_page_size())), qemu_real_host_page_size(), PROT_NONE);
+    assert(ret == 0);
+    cpu->neg.sr.aot_stack = (ptr + qemu_real_host_page_size());
+    cpu->neg.sr.runtime_stack = -1UL;
+    qemu_log_mask(LOG_AOT, "%s aot_stack:[%lx - %lx)\n", __FUNCTION__, cpu->neg.sr.aot_stack, (cpu->neg.sr.aot_stack + AOT_STACK_SIZE - 2*qemu_real_host_page_size()));
 #endif
     return cpu;
 }
