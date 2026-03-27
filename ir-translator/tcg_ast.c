@@ -605,7 +605,6 @@ static GHashTable *current_helper_aux_info = NULL;
 
 static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, OperandType out);
 static LLVMValueRef get_env_ptr_raw();
-static void set_env_ptr_raw(LLVMValueRef env_stack);
 static OperandType get_env_ptr(OpCodeType opc);
 static OperandType get_shadow_stack_top_bound(OpCodeType opc);
 static OperandType get_shadow_stack_bottom_bound(OpCodeType opc);
@@ -999,22 +998,6 @@ static LLVMValueRef get_env_ptr_raw() {
     const char *constraint_string = "=r";
     LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_function_type, asm_string, constraint_string, /* has_side_effects */ 1, /* is_align_stack */ 0);
     return LLVMBuildCall2(builder, asm_function_type, inline_asm, NULL, 0, get_next_var_name("env_ptr", dummy_slot_for_debug));
-}
-
-static void set_env_ptr_raw(LLVMValueRef env_stack) {
-    LLVMTypeRef asm_param_types[] = { llvm_int_types[OPC_ADDR_T] };
-    LLVMTypeRef asm_function_type = LLVMFunctionType(LLVMVoidType(), asm_param_types, 1, 0);
-    char asm_string[128];
-#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
-    sprintf(asm_string, "mov x25, $0");
-#elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
-    sprintf(asm_string, "mv x25, $0");
-#endif
-    const char *constraint_string = "r,~{x25}";
-    LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_function_type, asm_string, constraint_string, /* has_side_effects */ 1, /* is_align_stack */ 0);
-    LLVMValueRef call_args[] = { env_stack };
-    LLVMBuildCall2(builder, asm_function_type, inline_asm, call_args, 1, "");
-    return;
 }
 
 static OperandType get_env_ptr(OpCodeType opc) {
@@ -2849,12 +2832,6 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     LLVMValueRef call_args[MAX_OPERANDS_COUNT] = {NULL};
     call_arg_cnt = collect_arguments_and_types(not_a_helper, target_domain == TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_DROP_ALIAS_POINTER ? TARGET_DEFAULT_HELPER_CONSTRUCT_VECTOR : TARGET_DEFAULT_HELPER_PASSTHROUGH_VECTOR, VALUE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, trampoline, NULL, 0, call_args, trampoline_name);
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
-    LLVMValueRef env_alloca = NULL;
-    if (do_return) {
-        env_alloca = LLVMBuildAlloca(builder, llvm_int_types[OPC_ADDR_T], "env_alloca");
-        LLVMSetAlignment(env_alloca, 8);
-        build_store_with_alignment(builder, env_raw, env_alloca, 8);
-    }
 #ifdef DEBUG
     printf("BuildCall2:%s\n", LLVMGetValueName(helper_func)); fflush(NULL);
 #endif
@@ -2867,9 +2844,6 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         assert(last_active_bb);
         LLVMPositionBuilderAtEnd(builder, last_active_bb);
         return trampoline;
-    } else {
-        env_raw = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], env_alloca, get_next_var_name("env_ptr", dummy_slot_for_debug), 8);
-        set_env_ptr_raw(env_raw);
     }
 
     // Load all fixed from ENV
@@ -3036,17 +3010,11 @@ static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func
     LLVMValueRef call_args[MAX_OPERANDS_COUNT] = {NULL};
     call_arg_cnt = collect_arguments_and_types(h, TARGET_DEFAULT_HELPER_CONSTRUCT_VECTOR, VALUE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, handler, NULL, 0, call_args, handler_name);
     LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
-    LLVMValueRef env_alloca = NULL;
-    env_alloca = LLVMBuildAlloca(builder, llvm_int_types[OPC_ADDR_T], "env_alloca");
-    LLVMSetAlignment(env_alloca, 8);
-    build_store_with_alignment(builder, env_raw, env_alloca, 8);
 #ifdef DEBUG
     printf("BuildCall2:%s\n", LLVMGetValueName(helper_func)); fflush(NULL);
 #endif
     // Get the helper call target from argument, since I would like to reuse handler for different helper targets
     LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, call_arg_cnt, with_ret ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
-    env_raw = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], env_alloca, get_next_var_name("env_ptr", dummy_slot_for_debug), 8);
-    set_env_ptr_raw(env_raw);
 
     // Load all fixed from ENV
     LLVMValueRef return_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
@@ -5544,6 +5512,7 @@ int main(int argc, const char *argv[]) {
     };
     LLVMParseCommandLineOptions(3, global_isel_args, "Enable GlobalISel at O1 for AArch64");
     */
+    setenv("LLVM_ENABLE_AOT_STACK_SWITCH", "1", 1);
 #endif
 
     LLVMTargetRef target;
