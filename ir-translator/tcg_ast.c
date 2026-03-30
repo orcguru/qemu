@@ -3605,6 +3605,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         int arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, (LLVMValueRef)1, (LLVMValueRef)1, llvm_func, call_types, (FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS), NULL, helper_str[h]);
         LLVMTypeRef helper_type = LLVMFunctionType(LLVMVoidType(), call_types, arg_cnt, 0);
         helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
+        LLVMSetFunctionCallConv(helper_func, QEMUAOT_CC);
     }
     LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
 
