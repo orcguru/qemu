@@ -5482,6 +5482,21 @@ int main(int argc, const char *argv[]) {
         strcpy(func_name_prefix, argv[2]);
     }
     sprintf(output_file, "%s.o", argv[1]);
+
+    int rc = setenv("LLVM_ENABLE_AOT_STACK_SWITCH", "1", 1);
+    assert(rc == 0);
+#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+    /*
+    const char *global_isel_args[] = {
+        "program_name",
+        "-global-isel",
+        "-aarch64-enable-global-isel-at-O=1",
+        NULL
+    };
+    LLVMParseCommandLineOptions(3, global_isel_args, "Enable GlobalISel at O1 for AArch64");
+    */
+#endif
+
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
     LLVMInitializeAArch64TargetInfo();
     LLVMInitializeAArch64Target();
@@ -5501,19 +5516,6 @@ int main(int argc, const char *argv[]) {
     const char *default_triple = "aarch64-unknown-linux-gnu";
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
     const char *default_triple = "riscv64-unknown-linux-gnu";
-#endif
-
-#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
-    /*
-    const char *global_isel_args[] = {
-        "program_name",
-        "-global-isel",
-        "-aarch64-enable-global-isel-at-O=1",
-        NULL
-    };
-    LLVMParseCommandLineOptions(3, global_isel_args, "Enable GlobalISel at O1 for AArch64");
-    */
-    setenv("LLVM_ENABLE_AOT_STACK_SWITCH", "1", 1);
 #endif
 
     LLVMTargetRef target;
