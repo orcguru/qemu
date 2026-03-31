@@ -74,7 +74,7 @@ void helper_cpuid(CPUX86State *env)
         case 0x1:
             eax = 0x60fb1;
             ebx = 0x40800;
-            ecx = 0x80002001;
+            ecx = 0x80082001;
             edx = 0x178bfbfd;
             break;
         case 0x7:
