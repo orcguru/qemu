@@ -43,6 +43,7 @@
       ) \
     ) \
   )
+#define OPC_VECTOR_ELEMENT_BYTES(T)     (1 << (T - LLVMInt8))
 
 #define DECLARE_AND_INIT_TYPE_FOR_ALL   \
     uint8_t is_vec = is_vector(ptr);    \
@@ -1180,18 +1181,8 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
             int elem_idx = 0;
             LLVMType vec_type = OPC_FIXED_TO_VECTOR128(tidx);
             vtype = llvm_int_types[vec_type];
-            if (operand.s.offset % 8 == 0) {
-                elem_idx = operand.s.offset/8;
-            } else if (operand.s.offset % 4 == 0) {
-                assert(tidx <= LLVMInt32);
-                elem_idx = operand.s.offset/4;
-            } else if (operand.s.offset % 2 == 0) {
-                assert(tidx <= LLVMInt16);
-                elem_idx = operand.s.offset/2;
-            } else {
-                assert(tidx == LLVMInt8);
-                elem_idx = operand.s.offset;
-            }
+            assert(operand.s.offset % OPC_VECTOR_ELEMENT_BYTES(tidx) == 0);
+            elem_idx = operand.s.offset / OPC_VECTOR_ELEMENT_BYTES(tidx);
             LLVMValueRef vec = build_load_with_alignment(builder, vtype, get_stack_alloca(operand).alloca, get_next_var_name("source_vec", operand), get_stack_alloca(operand).alignment);
             LLVMValueRef index = LLVMConstInt(llvm_int_types[OPC_ADDR_T], elem_idx, 0);
             if (llvm_int_types[vec_type] != llvm_int_store_types[vec_type]) {
