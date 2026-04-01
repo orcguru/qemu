@@ -3846,7 +3846,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
     assert((used_xmm_regs_cnt + touched_effective_xmm_regs_cnt) <= XMM_COUNT);
     if (touched_effective_xmm_regs_cnt) {
         XMMRegType free_xmm_regs[XMM_COUNT];
-        XMMRegType tmp = xmm0;
+        XMMRegType tmp = xmm1;  // pcmpistrm writes to xmm0
         for (int i = 0; i < XMM_COUNT; ++i) {
             free_xmm_regs[i] = tmp;
             tmp += 2;
