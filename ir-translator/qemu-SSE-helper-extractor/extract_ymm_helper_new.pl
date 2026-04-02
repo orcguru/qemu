@@ -1478,6 +1478,9 @@ sub add_context_backup
       $restore_info{"backup_$v->{'VAR_NAME'}"} = $v->{'VAR_NAME'};
     }
   }
+  foreach my $si (@{$funcs{$target_func}->{'SCALAR_ARGS'}}) {
+    $backup_vars = $backup_vars."$si->{'TYPE'} backup_$si->{'VAR_NAME'} = $si->{'VAR_NAME'};\n";
+  }
   $backup_vars = $backup_vars."\n";
   $new_func_body =~ s/^\{/\{\n$backup_vars/;
   return $new_func_body;
@@ -1790,7 +1793,7 @@ sub get_exception_path
   $body =~ s/,\s+$/ /;
   $body = $body.$qemuaot_vec_invoke;
   foreach my $si (@{$func_ptr->{'SCALAR_ARGS'}}) {
-    $body = $body.", $si->{'VAR_NAME'}";
+    $body = $body.", backup_$si->{'VAR_NAME'}";
   }
   my $total_arg_cnt = $#{$func_ptr->{'SCALAR_ARGS'}} + $#{$func_ptr->{'VECTOR_ARGS'}} + 2;
   die "" if $total_arg_cnt > 6;
