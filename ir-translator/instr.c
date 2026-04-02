@@ -1064,7 +1064,7 @@ size_t create_helper_env_slot4_imm2(void *ptr, OHType h, uint16_t cflags, uint8_
     SET_SLOT(2);
     SET_SLOT(3);
     i->imm0 = i0;
-    i->imm1 = i0;
+    i->imm1 = i1;
     return sizeof(*i);
 }
 
