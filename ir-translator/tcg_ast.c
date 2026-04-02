@@ -869,6 +869,21 @@ static AllocaWithAlignment get_stack_alloca(OperandType operand) {
     return alloca_w_align;
 }
 
+static LLVMType get_stack_type(OperandType operand) {
+    if (operand.s.slot_type == SUB_SLOT_XREG) {
+        return func_xreg_llvmtype[operand.s.slot_idx];
+    } else if (operand.s.slot_type == SUB_SLOT_TMP) {
+        if (has_alias(operand) == 0) {
+            return func_tmp_llvmtype[operand.s.slot_idx];
+        } else {
+            OperandType alias = get_alias(operand);
+            assert(alias.s.valid && alias.s.slot_type == SUB_SLOT_ENV && alias.s.offset == 0);
+            return OPC_ADDR_T;
+        }
+    }
+    assert(0);
+}
+
 static OperandType get_tmp_and_do_alloc_with_init(LLVMType type, uint64_t val) {
     OperandType tmp = get_tmp_and_do_alloc(type);
     LLVMValueRef constant = LLVMConstInt(llvm_int_types[type], val, 0);
@@ -1204,7 +1219,17 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
             ret = build_load_with_alignment(builder, type, get_stack_alloca(operand).alloca, get_next_var_name("source_val", operand), get_stack_alloca(operand).alignment);
         }
     } else {
-        ret = build_load_with_alignment(builder, type, get_stack_alloca(operand).alloca, get_next_var_name("source_val", operand), get_stack_alloca(operand).alignment);
+        LLVMType load_type = get_stack_type(operand);
+        if (tidx <= LLVMInt64 && load_type <= LLVMInt64) {
+            ret = build_load_with_alignment(builder, llvm_int_types[load_type], get_stack_alloca(operand).alloca, get_next_var_name("source_val", operand), get_stack_alloca(operand).alignment);
+            if (tidx < load_type) {
+                ret = LLVMBuildTrunc(builder, ret, type, get_next_var_name(opcode_type_str[opc], operand));
+            } else if (tidx > load_type) {
+                ret = LLVMBuildZExt(builder, ret, type, get_next_var_name(opcode_type_str[opc], operand));
+            }
+        } else {
+            ret = build_load_with_alignment(builder, type, get_stack_alloca(operand).alloca, get_next_var_name("source_val", operand), get_stack_alloca(operand).alignment);
+        }
     }
     return ret;
 }
