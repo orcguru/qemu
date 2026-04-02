@@ -1084,8 +1084,8 @@ static bool tcg_out_dup_vec(TCGContext *s, TCGType type, unsigned vece,
 static bool tcg_out_dupm_vec(TCGContext *s, TCGType type, unsigned vece,
                                     TCGReg dst, TCGReg base, intptr_t offset)
 {
-    tcg_out_ld(s, TCG_TYPE_REG, TCG_REG_TMP0, base, offset);
-    return tcg_out_dup_vec(s, type, vece, dst, TCG_REG_TMP0);
+    tcg_out_ld(s, TCG_TYPE_REG, TCG_REG_TMP1, base, offset);
+    return tcg_out_dup_vec(s, type, vece, dst, TCG_REG_TMP1);
 }
 
 static void tcg_out_dupi_vec(TCGContext *s, TCGType type, unsigned vece,
@@ -1103,8 +1103,8 @@ static void tcg_out_dupi_vec(TCGContext *s, TCGType type, unsigned vece,
         tcg_out_opc_vi(s, OPC_VMV_V_I, dst, 0, arg);
         return;
     }
-    tcg_out_movi(s, TCG_TYPE_I64, TCG_REG_TMP0, arg);
-    tcg_out_dup_vec(s, type, vece, dst, TCG_REG_TMP0);
+    tcg_out_movi(s, TCG_TYPE_I64, TCG_REG_TMP1, arg);
+    tcg_out_dup_vec(s, type, vece, dst, TCG_REG_TMP1);
 }
 
 static void tcg_out_br(TCGContext *s, TCGLabel *l)
