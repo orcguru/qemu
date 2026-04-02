@@ -3251,6 +3251,7 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
 
     tcg_out_st(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -56);
     tcg_out_ld(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -64);
+    tcg_out_st(s, TCG_TYPE_I64, TCG_REG_TP, TCG_AREG0, -80);
     tcg_out_opc_imm(s, OPC_JALR, TCG_REG_ZERO, TCG_REG_RA, 0);
 
     /* Return path for goto_ptr. Set return value to 0 */
