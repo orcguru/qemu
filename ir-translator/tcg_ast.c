@@ -521,6 +521,7 @@ static char func_name_prefix[33] = {0};
 static LLVMAttributeRef target_features_attr = NULL;
 static LLVMAttributeRef NoInlineAttr = NULL;
 static LLVMAttributeRef AlwaysInlineAttr = NULL;
+static LLVMAttributeRef NoUnwindAttr = NULL;
 static LLVMTargetMachineRef target_machine = NULL;
 static LLVMContextRef context = NULL;
 static LLVMModuleRef module = NULL;
@@ -971,6 +972,7 @@ static void create_module(const char *module_name) {
     context = LLVMGetGlobalContext();
     NoInlineAttr = LLVMCreateEnumAttribute(context, LLVMNoInlineAttribute, 0);
     AlwaysInlineAttr = LLVMCreateEnumAttribute(context, LLVMAlwaysInlineAttribute, 0);
+    NoUnwindAttr = LLVMCreateEnumAttribute(context, LLVMGetEnumAttributeKindForName("nounwind", strlen("nounwind")), 0);
     const char *attr_key = "target-features";
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
     const char *attr_value = "+neon";
@@ -2795,6 +2797,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnt, 0));
     LLVMAddAttributeAtIndex(trampoline, -1, NoInlineAttr);
     LLVMAddAttributeAtIndex(trampoline, -1, target_features_attr);
+    LLVMAddAttributeAtIndex(trampoline, -1, NoUnwindAttr);
     LLVMSetLinkage(trampoline, LLVMWeakAnyLinkage);
     int j = 0;
     LLVMValueRef param = NULL;
@@ -2963,6 +2966,7 @@ static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func
         LLVMFunctionType(LLVMVoidType(), call_types, call_arg_cnt, 0));
     LLVMAddAttributeAtIndex(handler, -1, NoInlineAttr);
     LLVMAddAttributeAtIndex(handler, -1, target_features_attr);
+    LLVMAddAttributeAtIndex(handler, -1, NoUnwindAttr);
     LLVMSetLinkage(handler, LLVMWeakAnyLinkage);
     int j = 0;
     LLVMValueRef param = NULL;
@@ -3094,9 +3098,9 @@ static uint8_t do_link_helper(HelperType h, const char *build_macro, const char 
     if (!check_fp) {
         char cmd[4096] = {0};
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
-        sprintf(cmd, "clang -c %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+        sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
-        sprintf(cmd, "clang -c %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+        sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
 #endif
 #ifdef DEBUG
         printf("%s\n", cmd); fflush(NULL);
@@ -3582,6 +3586,7 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_r
         LLVMTypeRef func_type = LLVMFunctionType(with_ret ? LLVMInt64Type() : LLVMVoidType(), call_types, arg_cnt, 0);
         func = LLVMAddFunction(module, name, func_type);
         LLVMAddAttributeAtIndex(func, -1, target_features_attr);
+        LLVMAddAttributeAtIndex(func, -1, NoUnwindAttr);
         LLVMSetFunctionCallConv(func, QEMUAOT_CC);
     }
     return func;
@@ -3621,6 +3626,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         int arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, (LLVMValueRef)1, (LLVMValueRef)1, llvm_func, call_types, (FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS), NULL, helper_str[h]);
         LLVMTypeRef helper_type = LLVMFunctionType(LLVMVoidType(), call_types, arg_cnt, 0);
         helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
+        LLVMAddAttributeAtIndex(helper_func, -1, NoUnwindAttr);
         LLVMSetFunctionCallConv(helper_func, QEMUAOT_CC);
     }
     LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -3633,6 +3639,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         int call_arg_cnt = collect_arguments_and_types(helper_jit, TARGET_DEFAULT_HELPER_PASSTHROUGH_VECTOR, TYPE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, MAX_ADDED_ARGS, NULL, helper_str[helper_jit]);
         LLVMTypeRef helper_jit_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
         helper_jit_func = LLVMAddFunction(module, helper_str[helper_jit], helper_jit_type);
+        LLVMAddAttributeAtIndex(helper_jit_func, -1, NoUnwindAttr);
     }
 
     LLVMValueRef jit_trampoline = get_trampoline(helper_jit_func, 0, 0, operands, is_imm, operands_cnt, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER);
@@ -4037,6 +4044,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         second_half_func = LLVMAddFunction(module, second_half_name, func_type);
         LLVMAddAttributeAtIndex(second_half_func, -1, AlwaysInlineAttr);
         LLVMAddAttributeAtIndex(second_half_func, -1, target_features_attr);
+        LLVMAddAttributeAtIndex(second_half_func, -1, NoUnwindAttr);
         LLVMSetFunctionCallConv(second_half_func, QEMUAOT_CC);
         register_labels_for_func(second_half_func);
     } else {
@@ -4054,6 +4062,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
             int call_arg_cnt = collect_arguments_and_types(h, TARGET_DEFAULT_HELPER_CONSTRUCT_VECTOR, TYPE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, MAX_OPERANDS_COUNT, NULL, helper_str[h]);
             LLVMTypeRef helper_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
             helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
+            LLVMAddAttributeAtIndex(helper_func, -1, NoUnwindAttr);
         }
         // FIXME: verify that stack point does not need adjustment, since QEMUAOT CC does not have prolog/epilog
         // Trampoline handles register-context switch
@@ -4342,6 +4351,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         second_half_func = LLVMAddFunction(module, second_half_name, func_type);
         LLVMAddAttributeAtIndex(second_half_func, -1, AlwaysInlineAttr);
         LLVMAddAttributeAtIndex(second_half_func, -1, target_features_attr);
+        LLVMAddAttributeAtIndex(second_half_func, -1, NoUnwindAttr);
         LLVMSetFunctionCallConv(second_half_func, QEMUAOT_CC);
         register_labels_for_func(second_half_func);
     } else {
@@ -4355,6 +4365,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         int call_arg_cnt = collect_arguments_and_types(h, TARGET_DEFAULT_HELPER_PASSTHROUGH_VECTOR, TYPE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, MAX_ADDED_ARGS, NULL, helper_str[h]);
         LLVMTypeRef helper_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
         helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
+        LLVMAddAttributeAtIndex(helper_func, -1, NoUnwindAttr);
     }
     LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
 
