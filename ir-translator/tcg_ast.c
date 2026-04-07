@@ -5393,6 +5393,25 @@ void module_prolog() {
     dummy_slot_for_debug.s.valid = 0;
 }
 
+int check_always_inline_status(LLVMModuleRef module, const char *target_func) {
+    LLVMValueRef func = LLVMGetNamedFunction(module, target_func);
+    if (!func) {
+        printf("Function '%s' not found - may be completely inlined\n", target_func);
+        return 1;
+    }
+    LLVMAttributeRef attr = LLVMGetEnumAttributeAtIndex(func, -1, LLVMAlwaysInlineAttribute);
+    if (!attr) {
+        return 0;
+    }
+    LLVMUseRef use = LLVMGetFirstUse(func);
+    if (!use) {
+        printf("Function '%s' with always_inline has no calls - likely inlined\n", target_func);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 void module_epilog() {
     //LLVMDumpModule(module);
 #if 1
@@ -5449,6 +5468,11 @@ void module_epilog() {
                 deleteCandidate = currentFunction;
             }
         */
+        }
+        if (!deleteCandidate) {
+            if (check_always_inline_status(module, funcName)) {
+                deleteCandidate = currentFunction;
+            }
         }
         currentFunction = LLVMGetNextFunction(currentFunction);
         if (deleteCandidate) {
