@@ -20,6 +20,8 @@
 #include <stdbool.h>
 #include <glib.h>
 
+#define HELPER_COUNTERS             1
+#define TRAMPOLINE_CNT_OFFSET       104
 //#define DEBUG_RET                   1
 //#define BUILD_RISCV_ON_AARCH        1
 //#define VERBOSE_VAR                 1
@@ -2820,6 +2822,20 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlock(trampoline, "entry");
     LLVMPositionBuilderAtEnd(builder, entry);
 
+#ifdef HELPER_COUNTERS
+    {
+        LLVMValueRef env_raw = get_env_ptr_raw();
+        uint64_t counter_offset = TRAMPOLINE_CNT_OFFSET;
+        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], counter_offset, 0);
+        LLVMValueRef addr = LLVMBuildSub(builder, env_raw, off, get_next_var_name("trampoline_cnt_addr", dummy_slot_for_debug));
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name("trampoline_cnt_ptr", dummy_slot_for_debug));
+        LLVMValueRef val = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], ptr, get_next_var_name("trampoline_cnt_before", dummy_slot_for_debug), 8);
+        LLVMValueRef one = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 1, 0);
+        val = LLVMBuildAdd(builder, val, one, get_next_var_name("trampoline_cnt_val_updated", dummy_slot_for_debug));
+        build_store_with_alignment(builder, val, ptr, 8);
+    }
+#endif
+
     // Store all fixed to ENV
     LLVMValueRef env_raw = get_env_ptr_raw();
     for (int i = 0; i < FIXED_PARAM_COUNT; ++i) {
@@ -2995,6 +3011,20 @@ static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func
     LLVMBasicBlockRef entry = LLVMAppendBasicBlock(handler, "entry");
     LLVMPositionBuilderAtEnd(builder, entry);
 
+#ifdef HELPER_COUNTERS
+    {
+        LLVMValueRef env_raw = get_env_ptr_raw();
+        uint64_t counter_offset = TRAMPOLINE_CNT_OFFSET;
+        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], counter_offset, 0);
+        LLVMValueRef addr = LLVMBuildSub(builder, env_raw, off, get_next_var_name("trampoline_cnt_addr", dummy_slot_for_debug));
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name("trampoline_cnt_ptr", dummy_slot_for_debug));
+        LLVMValueRef val = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], ptr, get_next_var_name("trampoline_cnt_before", dummy_slot_for_debug), 8);
+        LLVMValueRef one = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 1, 0);
+        val = LLVMBuildAdd(builder, val, one, get_next_var_name("trampoline_cnt_val_updated", dummy_slot_for_debug));
+        build_store_with_alignment(builder, val, ptr, 8);
+    }
+#endif
+
     // Store all fixed to ENV
     LLVMValueRef env_raw = get_env_ptr_raw();
     for (int i = 0; i < FIXED_PARAM_COUNT; ++i) {
@@ -3098,9 +3128,17 @@ static uint8_t do_link_helper(HelperType h, const char *build_macro, const char 
     if (!check_fp) {
         char cmd[4096] = {0};
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+#ifdef HELPER_COUNTERS
+        sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c -DHELPER_COUNTERS=1 %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+#else
         sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+#endif
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
+#ifdef HELPER_COUNTERS
+        sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c -DHELPER_COUNTERS=1 %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+#else
         sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+#endif
 #endif
 #ifdef DEBUG
         printf("%s\n", cmd); fflush(NULL);

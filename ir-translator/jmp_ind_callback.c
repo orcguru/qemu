@@ -33,6 +33,20 @@ __attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, u
 __attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long rip XMM_PARAM_DECLARE_COMMON, unsigned long target_addr, CodeFragment *list_ptr, unsigned long trampoline_helper_jit)
 #endif
 {
+#ifdef HELPER_COUNTERS
+#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+    unsigned long env_val;
+    asm volatile ("mov %0, x25" : "=r" (env_val) : :);
+    unsigned long *jmp_ind_callback_cnt_ptr = (unsigned long *)(env_val - 112);
+    *jmp_ind_callback_cnt_ptr += 1;
+#elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
+    unsigned long env_val;
+    asm volatile ("mv %0, x25" : "=r" (env_val) : :);
+    unsigned long *jmp_ind_callback_cnt_ptr = (unsigned long *)(env_val - 112);
+    *jmp_ind_callback_cnt_ptr += 1;
+#endif
+#endif
+
     unsigned long host_addr = 0;
     while (list_ptr) {
         if (list_ptr->target_addr == target_addr) {
