@@ -3353,6 +3353,8 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
     info_ptr->x_addr_range_end = end_code;
     assert((strlen(image_name) + 1) <= sizeof(info_ptr->elf_name));
     strcpy(info_ptr->elf_name, image_name);
+    info_ptr->log_msg = g_hash_table_new(NULL, NULL);
+    assert(info_ptr->log_msg);
     info_ptr->next = NULL;
     if (!aot_info_list) {
         aot_info_list = info_ptr;
