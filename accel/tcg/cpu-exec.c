@@ -45,6 +45,8 @@
 #include "tb-context.h"
 #include "tb-internal.h"
 #include "internal-common.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 /* -icount align implementation. */
 
@@ -1058,6 +1060,9 @@ static void ghash_insert_jmp_dest(GHashTable *g, uintptr_t jmp_dest)
     }
 }
 
+extern char *aot_log_file;
+extern char exec_name[128];
+
 static void gen_tcg_ir(CPUState *cpu)
 {
     uint32_t flags = get_hflags_for_codegen(cpu);
@@ -1084,6 +1089,23 @@ static void gen_tcg_ir(CPUState *cpu)
     bb_split_htable = g_hash_table_new(NULL, NULL);
     assert(bb_split_htable);
     ghash_insert_jmp_dest(bb_split_htable, get_image_entry(cpu));
+
+    // Collect AOT jmp destination if available
+    if (aot_log_file) {
+        FILE *file = fopen(aot_log_file, "r");
+        assert(file != NULL);
+        char buffer[1024];
+        while (fgets(buffer, sizeof(buffer), file) != NULL) {
+            if (strstr(buffer, "QEMU TCG JIT on") != NULL && strstr(buffer, exec_name) != NULL) {
+                char *ptr = strstr(buffer, "offset:");
+                assert(ptr);
+                ptr += 7;
+                unsigned long aot_jmp_dest = (unsigned long)strtoll(ptr, NULL, 16);
+                ghash_insert_jmp_dest(bb_split_htable, (start_code + aot_jmp_dest));
+            }
+        }
+        fclose(file);
+    }
 
     uintptr_t last_branch_left = -1;
     uintptr_t last_branch_right = -1;

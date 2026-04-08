@@ -479,6 +479,12 @@ static void handle_arg_plugin(const char *arg)
 }
 #endif
 
+char *aot_log_file = NULL;
+static void handle_auxilary_jmp_dest(const char *arg)
+{
+    aot_log_file = (char *)arg;
+}
+
 struct qemu_argument {
     const char *argv;
     const char *env;
@@ -489,6 +495,8 @@ struct qemu_argument {
 };
 
 static const struct qemu_argument arg_table[] = {
+    {"a",          "",                 true, handle_auxilary_jmp_dest,
+     "",           "Provide AOT.log to add jump destination"},
     {"h",          "",                 false, handle_arg_help,
      "",           "print this help"},
     {"help",       "",                 false, handle_arg_help,
@@ -625,6 +633,8 @@ static void usage(int exitcode)
     exit(exitcode);
 }
 
+char exec_name[128] = {0};
+
 static int parse_args(int argc, char **argv)
 {
     const char *r;
@@ -691,6 +701,12 @@ static int parse_args(int argc, char **argv)
     }
 
     exec_path = argv[optind];
+    char *ptr = exec_path;
+    while (strstr(ptr, "/") != NULL) {
+        ptr = strstr(ptr, "/");
+        ptr += 1;
+    }
+    strcpy(exec_name, ptr);
 
     return optind;
 }
