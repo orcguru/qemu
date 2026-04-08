@@ -541,7 +541,7 @@ sub gen_new_func
   foreach my $e_idx (0 .. $#sorted_entries) {
     my $e = $sorted_entries[$e_idx];
     my $txt = &GetText($current_pos, ($e - 1), $ARGV[0]);
-    if ($e_idx == 0) {
+    if ($external == 1 and $e_idx == 0) {
       my $counter_def = <<~'END';
 #ifdef HELPER_COUNTERS
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
@@ -557,7 +557,7 @@ sub gen_new_func
 #endif
 #endif
 END
-      $txt =~ s/^{/{\n$counter_def/;
+      $txt =~ s/^\n?{/\n{\n$counter_def/;
     }
     $new_func = $new_func.$txt;
     if ($func->{'ENTRIES'}->{$e}->{'TYPE'} eq "CALL") {
