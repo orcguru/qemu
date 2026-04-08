@@ -601,6 +601,18 @@ void *qemu_plugin_get_current_cpu(void);
 QEMU_PLUGIN_API
 uint64_t *qemu_plugin_get_aot_cnt_ptr(void);
 
+QEMU_PLUGIN_API
+uint64_t *qemu_plugin_get_jmp_ind_callback_cnt_ptr(void);
+
+QEMU_PLUGIN_API
+uint64_t *qemu_plugin_get_trampoline_cnt_ptr(void);
+
+QEMU_PLUGIN_API
+uint64_t *qemu_plugin_get_helper1_cnt_ptr(void);
+
+QEMU_PLUGIN_API
+uint64_t *qemu_plugin_get_helper2_cnt_ptr(void);
+
 /**
  * qemu_plugin_get_hwaddr() - return handle for memory operation
  * @info: opaque memory info structure

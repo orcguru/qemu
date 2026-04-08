@@ -31,6 +31,46 @@ uint64_t *qemu_plugin_get_aot_cnt_ptr(void)
     return &cpu->neg.iec.aot_cnt;
 }
 
+QEMU_PLUGIN_EXPORT
+uint64_t *qemu_plugin_get_jmp_ind_callback_cnt_ptr(void)
+{
+    CPUState *cpu = current_cpu;
+    if (!cpu) {
+        return NULL;
+    }
+    return &cpu->neg.iec2.jmp_ind_callback_cnt;
+}
+
+QEMU_PLUGIN_EXPORT
+uint64_t *qemu_plugin_get_trampoline_cnt_ptr(void)
+{
+    CPUState *cpu = current_cpu;
+    if (!cpu) {
+        return NULL;
+    }
+    return &cpu->neg.iec2.trampoline_cnt;
+}
+
+QEMU_PLUGIN_EXPORT
+uint64_t *qemu_plugin_get_helper1_cnt_ptr(void)
+{
+    CPUState *cpu = current_cpu;
+    if (!cpu) {
+        return NULL;
+    }
+    return &cpu->neg.iec2.helper1_cnt;
+}
+
+QEMU_PLUGIN_EXPORT
+uint64_t *qemu_plugin_get_helper2_cnt_cnt_ptr(void)
+{
+    CPUState *cpu = current_cpu;
+    if (!cpu) {
+        return NULL;
+    }
+    return &cpu->neg.iec2.helper2_cnt;
+}
+
 /*
  * Virtual Memory queries - these are all NOPs for user-mode which
  * only ever has visibility of virtual addresses.

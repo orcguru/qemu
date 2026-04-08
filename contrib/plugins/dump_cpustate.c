@@ -27,6 +27,23 @@ static void dump_cpustate_stats(void *cpu_opaque)
     } else {
         printf("    aot_cnt: NULL pointer (current_cpu might be NULL)\n");
     }
+
+    uint64_t *ptr_cnt = qemu_plugin_get_jmp_ind_callback_cnt_ptr();
+    if (ptr_cnt) {
+        printf("    jmp_ind_callback_cnt: %lu\n", *ptr_cnt);
+    }
+    ptr_cnt = qemu_plugin_get_trampoline_cnt_ptr();
+    if (ptr_cnt) {
+        printf("    trampoline_cnt: %lu\n", *ptr_cnt);
+    }
+    ptr_cnt = qemu_plugin_get_helper1_cnt_ptr();
+    if (ptr_cnt) {
+        printf("    helper1_cnt: %lu\n", *ptr_cnt);
+    }
+    ptr_cnt = qemu_plugin_get_helper2_cnt_ptr();
+    if (ptr_cnt) {
+        printf("    helper2_cnt: %lu\n", *ptr_cnt);
+    }
 }
 
 static void vcpu_exit_callback(qemu_plugin_id_t id, unsigned int cpu_index)

@@ -367,6 +367,13 @@ typedef struct __attribute__((packed)) InstrExecCounters {
     uint64_t reserved;
 } InstrExecCounters;
 
+typedef struct __attribute__((packed)) InstrExecCountersGroup2 {
+    uint64_t jmp_ind_callback_cnt;
+    uint64_t trampoline_cnt;
+    uint64_t helper1_cnt;
+    uint64_t helper2_cnt;
+} InstrExecCountersGroup2;
+
 typedef struct __attribute__((packed)) PackedShadowStackInfo {
     uint64_t pad;
     uint64_t shadow_stack_pointer_upper_bound;
@@ -397,6 +404,7 @@ typedef struct CPUNegativeOffsetState {
     IcountDecr icount_decr;
     bool can_do_io;
 #ifdef AOT
+    InstrExecCountersGroup2 iec2 __attribute__((aligned(16)));
     TPBackupForRISCV64 tpbr __attribute__((aligned(16)));
     // FIXME: put sr close to the horizon maybe for better cache performance
     StackRecord sr __attribute__((aligned(16)));
