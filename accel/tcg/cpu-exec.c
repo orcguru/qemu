@@ -971,8 +971,8 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
                     info_ptr = info_ptr->next;
                 }
                 if (info_ptr) {
-                    if (!g_hash_table_contains(info_ptr->log_msg, (gconstpointer)(s.pc - info_ptr->x_addr_range_begin))) {
-                        g_hash_table_insert(info_ptr->log_msg, (gpointer)(s.pc - info_ptr->x_addr_range_begin), (gpointer)NULL);
+                    if (!g_hash_table_contains((GHashTable *)info_ptr->log_msg, (gconstpointer)(s.pc - info_ptr->x_addr_range_begin))) {
+                        g_hash_table_insert((GHashTable *)info_ptr->log_msg, (gpointer)(s.pc - info_ptr->x_addr_range_begin), (gpointer)NULL);
                         qemu_log_mask(LOG_AOT, "QEMU TCG JIT on %s offset:%lx\n", info_ptr->elf_name, (s.pc - info_ptr->x_addr_range_begin));
                     }
                     if (s.pc == qemu_legacy_log_func) {

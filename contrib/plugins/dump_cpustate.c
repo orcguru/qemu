@@ -7,6 +7,13 @@
 #include <stdint.h>
 #include <glib.h>
 #include <qemu-plugin.h>
+#include "tcg/tcg-aot.h"
+
+const char *helper_str[] = {
+    #define X(name) #name,
+    HELPER_LIST
+    #undef X
+};
 
 QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 static GMutex lock;
@@ -43,6 +50,12 @@ static void dump_cpustate_stats(void *cpu_opaque)
     ptr_cnt = qemu_plugin_get_helper2_cnt_ptr();
     if (ptr_cnt) {
         printf("    helper2_cnt: %lu\n", *ptr_cnt);
+    }
+    ptr_cnt = qemu_plugin_get_helper_counters_ptr();
+    for (int i = 0; i < HELPER_MAX_aot; ++i) {
+        if (ptr_cnt) {
+            printf("    %s: %lu\n", helper_str[i], ptr_cnt[i]);
+        }
     }
 }
 

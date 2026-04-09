@@ -55,6 +55,10 @@ bool cpu_exists(int64_t id)
     return !!cpu_by_arch_id(id);
 }
 
+#ifdef AOT
+#include "tcg/tcg-aot.h"
+#endif
+
 CPUState *cpu_create(const char *typename)
 {
     Error *err = NULL;
@@ -70,6 +74,8 @@ CPUState *cpu_create(const char *typename)
     cpu->neg.iec2.trampoline_cnt = 0;
     cpu->neg.iec2.helper1_cnt = 0;
     cpu->neg.iec2.helper2_cnt = 0;
+    cpu->neg.iec3.helper_counters = (uint64_t *)g_malloc0(8*HELPER_MAX_aot);
+    assert(cpu->neg.iec3.helper_counters);
 #define SHADOW_STACK_SIZE   (16 * 4096)
     uint64_t ptr = (uint64_t)g_malloc0(SHADOW_STACK_SIZE);
     cpu->neg.ssi.shadow_stack_pointer = ptr + SHADOW_STACK_SIZE - 32;

@@ -71,6 +71,16 @@ uint64_t *qemu_plugin_get_helper2_cnt_cnt_ptr(void)
     return &cpu->neg.iec2.helper2_cnt;
 }
 
+QEMU_PLUGIN_EXPORT
+uint64_t *qemu_plugin_get_helper_counters_ptr()
+{
+    CPUState *cpu = current_cpu;
+    if (!cpu) {
+        return NULL;
+    }
+    return cpu->neg.iec3.helper_counters;
+}
+
 /*
  * Virtual Memory queries - these are all NOPs for user-mode which
  * only ever has visibility of virtual addresses.

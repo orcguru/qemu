@@ -352,6 +352,11 @@ typedef union IcountDecr {
 } IcountDecr;
 
 #ifdef AOT
+typedef struct __attribute__((packed)) InstrExecCountersGroup3 {
+    uint64_t *helper_counters;
+    uint64_t pad;
+} InstrExecCountersGroup3;
+
 typedef struct __attribute__((packed)) TPBackupForRISCV64 {
     uint64_t tp;
     uint64_t pad;
@@ -404,6 +409,7 @@ typedef struct CPUNegativeOffsetState {
     IcountDecr icount_decr;
     bool can_do_io;
 #ifdef AOT
+    InstrExecCountersGroup3 iec3 __attribute__((aligned(16)));
     InstrExecCountersGroup2 iec2 __attribute__((aligned(16)));
     TPBackupForRISCV64 tpbr __attribute__((aligned(16)));
     // FIXME: put sr close to the horizon maybe for better cache performance
