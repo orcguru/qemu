@@ -22,6 +22,7 @@
 
 #define HELPER_COUNTERS             1
 #define TRAMPOLINE_CNT_OFFSET       104
+#define HELPER_COUNTERS_OFFSET      128
 //#define DEBUG_RET                   1
 //#define BUILD_RISCV_ON_AARCH        1
 //#define VERBOSE_VAR                 1
@@ -4304,6 +4305,26 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
 void translate_call(OpCodeType opc, void *ptr) {
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     HelperType h = get_helper(ptr);
+
+#ifdef HELPER_COUNTERS
+    {
+        LLVMValueRef env_raw = get_env_ptr_raw();
+        uint64_t counter_offset = HELPER_COUNTERS_OFFSET;
+        LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], counter_offset, 0);
+        LLVMValueRef addr = LLVMBuildSub(builder, env_raw, off, get_next_var_name("helper_counters_addr", dummy_slot_for_debug));
+        LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name("helper_counters_ptr", dummy_slot_for_debug));
+        LLVMValueRef val = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], ptr, get_next_var_name("helper_counters_val", dummy_slot_for_debug), 8);
+
+        off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], h*8, 0);
+        addr = LLVMBuildAdd(builder, val, off, get_next_var_name("helper_counter_addr", dummy_slot_for_debug));
+        ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name("helper_counter_ptr", dummy_slot_for_debug));
+        val = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], ptr, get_next_var_name("helper_counter_val_before", dummy_slot_for_debug), 8);
+        LLVMValueRef one = LLVMConstInt(llvm_int_types[OPC_ADDR_T], 1, 0);
+        val = LLVMBuildAdd(builder, val, one, get_next_var_name("helper_counter_val_after", dummy_slot_for_debug));
+        build_store_with_alignment(builder, val, ptr, 8);
+    }
+#endif
+
     if (h == helper_jmp_ind) {
         return translate_short_circuit_jmp_ind(opc, ptr);
 #if AOT_LEVEL == AOT_LEVEL_MAX
