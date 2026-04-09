@@ -1549,12 +1549,12 @@ sub get_func_body
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
     unsigned long env_val;
     asm volatile ("mov %0, x25" : "=r" (env_val) : :);
-    unsigned long *helper1_cnt_ptr = (unsigned long *)(env_val - 96);
+    unsigned long *helper1_cnt_ptr = (unsigned long *)(env_val - 88);
     *helper1_cnt_ptr += 1;
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
     unsigned long env_val;
     asm volatile ("mv %0, x25" : "=r" (env_val) : :);
-    unsigned long *helper1_cnt_ptr = (unsigned long *)(env_val - 96);
+    unsigned long *helper1_cnt_ptr = (unsigned long *)(env_val - 88);
     *helper1_cnt_ptr += 1;
 #endif
 #endif
