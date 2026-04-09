@@ -62,7 +62,7 @@ uint64_t *qemu_plugin_get_helper1_cnt_ptr(void)
 }
 
 QEMU_PLUGIN_EXPORT
-uint64_t *qemu_plugin_get_helper2_cnt_cnt_ptr(void)
+uint64_t *qemu_plugin_get_helper2_cnt_ptr(void)
 {
     CPUState *cpu = current_cpu;
     if (!cpu) {
