@@ -2300,3 +2300,6 @@ const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
     [LLVMVector32xi8] = v32uchar,
 };
 
+const int helper_do_not_sync_vector[HELPER_MAX] = {
+    [helper_comisd] = 1,
+};
