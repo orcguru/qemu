@@ -2773,6 +2773,18 @@ void translate_discard(OpCodeType opc, void *ptr) {
 
 static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain) {
     char trampoline_name[4096] = {0};
+#ifdef COLLECT_TRAMPOLINE_IR
+    sprintf(trampoline_name, "trampoline_do_not_sync_vector_param%d", operands_cnt);
+    int env_cnt = 0;
+    for (int i = 0; i < operands_cnt; ++i) {
+        if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_ENV && operands[i].s.offset == 0) {
+            char env_part[32] = {0};
+            sprintf(env_part, "_env%d", i);
+            strcat(trampoline_name, env_part);
+            env_cnt += 1;
+        }
+    }
+#else
     sprintf(trampoline_name, "%s%strampoline%s_r%d_param%d", func_name_prefix, func_name_prefix[0] ? "_" : "", do_return ? "" : "_noreturn", with_ret, operands_cnt);
     int env_cnt = 0;
     for (int i = 0; i < operands_cnt; ++i) {
@@ -2790,6 +2802,7 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
         sprintf(name_tail, "_sec_%s", LLVMGetValueName(next_func));
         strcat(trampoline_name, name_tail);
     }
+#endif
     assert(strlen(trampoline_name) < sizeof(trampoline_name));
     LLVMValueRef trampoline = LLVMGetNamedFunction(module, trampoline_name);
     if (trampoline) {

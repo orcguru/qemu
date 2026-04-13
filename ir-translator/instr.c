@@ -2302,4 +2302,13 @@ const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
 
 const int helper_do_not_sync_vector[HELPER_MAX] = {
     [helper_comisd] = 1,
+    [helper_cpuid] = 1,
+    [helper_cvtsq2sd] = 1,
+    //[helper_cvttsd2sq] = 1,
+    [helper_ucomisd] = 1,
+    [helper_mulsd] = 1,
+    [helper_divq_EAX] = 1,
+    [helper_divl_EAX] = 1,
+    [helper_idivq_EAX] = 1,
+    [helper_rdtsc] = 1,
 };
