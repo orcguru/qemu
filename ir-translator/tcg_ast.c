@@ -624,8 +624,8 @@ static uint8_t is_tail_call(HelperType h);
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr);
 static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_ret);
 static void setup_func_stack();
-static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain);
-static LLVMValueRef get_trampoline_do_not_sync_vector(LLVMValueRef helper_func, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int target_domain);
+static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain);
+static LLVMValueRef get_trampoline_do_not_sync_vector(HelperType h, LLVMValueRef helper_func, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int target_domain);
 static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, XMMRegType *passenger_xmm_regs, int fix_second_half_addr);
 static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr);
 static void translate_cc_compute_inband(OpCodeType opc, void *ptr);
@@ -2771,10 +2771,10 @@ void translate_discard(OpCodeType opc, void *ptr) {
     }
 }
 
-static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain) {
+static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain) {
     char trampoline_name[4096] = {0};
 #ifdef COLLECT_TRAMPOLINE_IR
-    sprintf(trampoline_name, "trampoline_do_not_sync_vector_param%d", operands_cnt);
+    sprintf(trampoline_name, "trampoline_do_not_sync_vector_param%d%s", operands_cnt, HELPER_DEFINES_OUTPUT(h) ? "_with_return" : "");
     int env_cnt = 0;
     for (int i = 0; i < operands_cnt; ++i) {
         if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_ENV && operands[i].s.offset == 0) {
@@ -2973,9 +2973,9 @@ static LLVMValueRef get_trampoline(LLVMValueRef helper_func, uint8_t do_return, 
     return trampoline;
 }
 
-static LLVMValueRef get_trampoline_do_not_sync_vector(LLVMValueRef helper_func, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int target_domain) {
+static LLVMValueRef get_trampoline_do_not_sync_vector(HelperType h, LLVMValueRef helper_func, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int target_domain) {
     char trampoline_name[256] = {0};
-    sprintf(trampoline_name, "trampoline_do_not_sync_vector_param%d", operands_cnt);
+    sprintf(trampoline_name, "trampoline_do_not_sync_vector_param%d%s", operands_cnt, HELPER_DEFINES_OUTPUT(h) ? "_with_return" : "");
     int env_cnt = 0;
     for (int i = 0; i < operands_cnt; ++i) {
         if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_ENV && operands[i].s.offset == 0) {
@@ -3770,7 +3770,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         LLVMAddAttributeAtIndex(helper_jit_func, -1, NoUnwindAttr);
     }
 
-    LLVMValueRef jit_trampoline = get_trampoline(helper_jit_func, 0, 0, operands, is_imm, operands_cnt, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER);
+    LLVMValueRef jit_trampoline = get_trampoline(h, helper_jit_func, 0, 0, operands, is_imm, operands_cnt, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER);
     LLVMValueRef jit_trampoline_addr = LLVMBuildPtrToInt(builder, jit_trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, second_half_addr, jit_trampoline_addr, llvm_func, NULL, 0, call_args, helper_str[h]);
@@ -4483,7 +4483,6 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
         // Do active spill since the trampoline handles FIXED registers only!
         if (helper_do_not_sync_vector[h]) {
-            assert(!HELPER_DEFINES_OUTPUT(h));
             if (is_imm[operands_cnt] == 0 && operands[operands_cnt].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[operands_cnt])) {
                 OperandType alias = get_alias(operands[operands_cnt]);
                 assert(alias.s.valid);
@@ -4563,12 +4562,12 @@ void translate_call(OpCodeType opc, void *ptr) {
     if (helper_do_not_sync_vector[h]) {
         assert(!second_half_disabled);
         assert(param_cnt < MAX_ADDED_ARGS);
-        trampoline = get_trampoline_do_not_sync_vector(helper_func, operands, is_imm, operands_cnt, second_half_func, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
+        trampoline = get_trampoline_do_not_sync_vector(h, helper_func, operands, is_imm, operands_cnt, second_half_func, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
     } else {
 #else
     {
 #endif
-        trampoline = get_trampoline(helper_func, second_half_disabled ? 0 : 1, HELPER_DEFINES_OUTPUT(h), operands, is_imm, operands_cnt, second_half_func, 0, NULL, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
+        trampoline = get_trampoline(h, helper_func, second_half_disabled ? 0 : 1, HELPER_DEFINES_OUTPUT(h), operands, is_imm, operands_cnt, second_half_func, 0, NULL, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
     }
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
