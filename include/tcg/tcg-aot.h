@@ -28,7 +28,7 @@
 #define AOT_LEVEL_0                 0
 #define AOT_LEVEL_1                 1
 #define AOT_LEVEL_MAX               3
-#define AOT_LEVEL                   AOT_LEVEL_MAX
+#define AOT_LEVEL                   AOT_LEVEL_0
 
 typedef struct CodeFragment {
     uint64_t target_addr;
