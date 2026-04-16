@@ -2920,6 +2920,8 @@ static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8
     if (with_ret) {
         return_args[FIXED_VECTOR_PARAM_COUNT] = call_helper_inst;
     }
+    // ENV must be re-initialized after the call
+    env_raw = get_env_ptr_raw();
     for (int i = 0; i < FIXED_PARAM_COUNT; ++i) {
         uint64_t env_xreg_offset = xreg_offsets[i];
         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xreg_offset, 0);
@@ -3161,6 +3163,8 @@ static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func
     if (with_ret) {
         return_args[FIXED_VECTOR_PARAM_COUNT] = call_helper_inst;
     }
+    // ENV must be re-initialized after the call
+    env_raw = get_env_ptr_raw();
     for (int i = 0; i < FIXED_PARAM_COUNT; ++i) {
         uint64_t env_xreg_offset = xreg_offsets[i];
         LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], env_xreg_offset, 0);
