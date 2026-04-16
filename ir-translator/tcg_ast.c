@@ -1,5 +1,7 @@
 #include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <assert.h>
 #include <string.h>
@@ -589,9 +591,11 @@ static uint64_t tmp_valid[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
 static uint64_t tmp_var_available[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
 static uint64_t tmp_var_available_backup[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
 static LLVMType tmp_bits_type[1<<STACK_INDEX_SHIFT] = {0};
-static char output_file[4096] = {0};
+static char output_file[PATH_MAX+2] = {0};
 static OperandType dummy_slot_for_debug;
 static int32_t tmp_shadow_offset[1<<STACK_INDEX_SHIFT] = {0};
+static char template_path[PATH_MAX] = {0};
+static char input_path[PATH_MAX] = {0};
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
 
@@ -5792,12 +5796,26 @@ int main(int argc, const char *argv[]) {
         printf("Usage: ./app <tcg-ir> <func_name_prefix>\n");
         return -1;
     }
+    // Get the path for helper_templates
+    char *p = realpath(argv[0], template_path);
+    assert(p);
+    while (strstr(p, "/") != NULL) {
+        p = strstr(p, "/");
+        if (*p == '/') {
+            p += 1;
+        }
+    }
+    assert((p - template_path) < PATH_MAX);
+    *p = '\0';
 
     if (argc >= 3) {
         assert(strlen(argv[2]) <= (sizeof(func_name_prefix)-1));
         strcpy(func_name_prefix, argv[2]);
     }
-    sprintf(output_file, "%s.o", argv[1]);
+    p = realpath(argv[1], input_path);
+    assert(p);
+    sprintf(output_file, "%s.o", input_path);
+    chdir(template_path);
 
     int rc = setenv("LLVM_ENABLE_AOT_STACK_SWITCH", "1", 1);
     assert(rc == 0);
@@ -5848,7 +5866,7 @@ int main(int argc, const char *argv[]) {
                                              LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelDefault);
 
     module_prolog();
-    parse_tcg_instructions(argv[1]);
+    parse_tcg_instructions(input_path);
     module_epilog();
     return 0;
 }
