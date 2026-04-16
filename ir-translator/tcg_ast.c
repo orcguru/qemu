@@ -4486,7 +4486,11 @@ void translate_call(OpCodeType opc, void *ptr) {
             break;
         }
         // Do active spill since the trampoline handles FIXED registers only!
+#if AOT_LEVEL == AOT_LEVEL_MAX
         if (helper_do_not_sync_vector[h]) {
+#else
+        if (0) {
+#endif
             if (is_imm[operands_cnt] == 0 && operands[operands_cnt].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[operands_cnt])) {
                 OperandType alias = get_alias(operands[operands_cnt]);
                 assert(alias.s.valid);
@@ -4562,6 +4566,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         param_cnt += 1;
     }
     LLVMValueRef trampoline = NULL;
+#if AOT_LEVEL == AOT_LEVEL_MAX
 #ifndef COLLECT_TRAMPOLINE_IR
     if (helper_do_not_sync_vector[h]) {
         assert(!second_half_disabled);
@@ -4571,13 +4576,20 @@ void translate_call(OpCodeType opc, void *ptr) {
 #else
     {
 #endif
+#else
+    {
+#endif
         trampoline = get_trampoline(h, helper_func, second_half_disabled ? 0 : 1, HELPER_DEFINES_OUTPUT(h), operands, is_imm, operands_cnt, second_half_func, 0, NULL, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
     }
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER, TYPE_AND_VALUE, operands, is_imm, operands_cnt, param_cnt == MAX_ADDED_ARGS ? NULL : second_half_addr, NULL, llvm_func, call_types, (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT), call_args, LLVMGetValueName(trampoline));
     assert(call_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
+#if AOT_LEVEL == AOT_LEVEL_MAX
     if (helper_do_not_sync_vector[h]) {
+#else
+    if (0) {
+#endif
         call_args[call_arg_cnt] = LLVMBuildPtrToInt(builder, helper_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
         call_types[call_arg_cnt] = llvm_int_types[OPC_ADDR_T];
         call_arg_cnt += 1;
@@ -4687,7 +4699,11 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
     }
 
+#if AOT_LEVEL == AOT_LEVEL_MAX
     if (helper_do_not_sync_vector[h]) {
+#else
+    if (0) {
+#endif
         for (int i = 0; i < do_not_sync_vector_alias_slot_idx_cnt; ++i) {
             int new_idx = do_not_sync_vector_alias_slot_idx[i];
             uint64_t xmm_offset = get_xmm_offset(new_idx / 2) + 16 * (new_idx % 2);
