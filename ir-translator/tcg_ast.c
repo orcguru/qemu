@@ -595,6 +595,7 @@ static char output_file[PATH_MAX+2] = {0};
 static OperandType dummy_slot_for_debug;
 static int32_t tmp_shadow_offset[1<<STACK_INDEX_SHIFT] = {0};
 static char template_path[PATH_MAX] = {0};
+static char output_path[PATH_MAX] = {0};
 static char input_path[PATH_MAX] = {0};
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
@@ -3226,7 +3227,7 @@ static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func
 static uint8_t do_link_helper(HelperType h, const char *build_macro, const char *bc_name, const char *c_file) {
     FILE *check_fp = fopen(bc_name, "r");
     if (!check_fp) {
-        char cmd[4096] = {0};
+        char cmd[2048+PATH_MAX] = {0};
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
 #ifdef HELPER_COUNTERS
         sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c -DHELPER_COUNTERS=1 %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
@@ -3752,7 +3753,9 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     char macro_def[4096] = {0};
     sprintf(macro_def, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\" ", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
     assert(strlen(macro_def) < sizeof(macro_def));
-    uint8_t ret = do_link_helper(jmp_ind_callback, macro_def, "helper_templates/jmp_ind_callback.bc", "jmp_ind_callback");
+    char bc_path[PATH_MAX+32] = {0};
+    sprintf(bc_path, "%s/jmp_ind_callback.bc", output_path);
+    uint8_t ret = do_link_helper(jmp_ind_callback, macro_def, bc_path, "jmp_ind_callback");
     assert(ret);
     LLVMValueRef second_half_func = LLVMGetNamedFunction(module, second_half_name);
     assert(second_half_func);
@@ -3852,12 +3855,12 @@ static void translate_cc_compute_inband(OpCodeType opc, void *ptr) {
     LLVMValueRef helper = LLVMGetNamedFunction(module, helper_func_name);
     if (!helper) {
         char build_macro[4096] = {0};
-        char bc_name[256] = {0};
+        char bc_name[PATH_MAX+64] = {0};
         char element[256] = {0};
         sprintf(build_macro, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\"", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
         sprintf(element, " -DHELPER_NAME=%s_inband", helper_str[h]);
         strcat(build_macro, element);
-        sprintf(bc_name, "helper_templates/%s.bc", helper_str[h]);
+        sprintf(bc_name, "%s/%s.bc", output_path, helper_str[h]);
         assert(strlen(build_macro) < sizeof(build_macro));
         uint8_t do_inline_helper = do_link_helper(h, build_macro, bc_name, helper_str[h]);
         assert(do_inline_helper);
@@ -4161,11 +4164,11 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
     sprintf(second_half_name, "%s%sfunc_%lx_call%d", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset, call_idx);
 
     char helper_func_name[1024] = {0};
-    char bc_name[1024] = {0};
+    char bc_name[PATH_MAX+64] = {0};
     char element[1024] = {0};
     sprintf(element, " -DHELPER_NAME=%s%s_outband", helper_str[h], vector_seq_name);
     strcat(build_macro, element);
-    sprintf(bc_name, "helper_templates/%s%s.bc", helper_str[h], vector_seq_name);
+    sprintf(bc_name, "%s/%s%s.bc", output_path, helper_str[h], vector_seq_name);
     sprintf(helper_func_name, "%s%s_outband", helper_str[h], vector_seq_name);
     assert(strlen(build_macro) < sizeof(build_macro));
 
@@ -5817,6 +5820,19 @@ int main(int argc, const char *argv[]) {
     p = realpath(argv[1], input_path);
     assert(p);
     sprintf(output_file, "%s.o", input_path);
+    // Get output path
+    p = realpath(argv[1], output_path);
+    assert(p);
+    while (strstr(p, "/") != NULL) {
+        p = strstr(p, "/");
+        if (*p == '/') {
+            p += 1;
+        }
+    }
+    assert((p - output_path) < PATH_MAX);
+    *p = '\0';
+
+    // Now change directory
     chdir(template_path);
 
     int rc = setenv("LLVM_ENABLE_AOT_STACK_SWITCH", "1", 1);
