@@ -987,7 +987,9 @@ static void create_module(const char *module_name) {
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
     const char *attr_value = "+neon";
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
-    const char *attr_value = "+m,+a,+f,+d,+v,+unaligned-scalar-mem,+unaligned-vector-mem";
+    // Unfortunately on Spacemit(R) X60, following instruction requires alignment: vse64.v v30,(a4)
+    //const char *attr_value = "+m,+a,+f,+d,+v,+unaligned-scalar-mem,+unaligned-vector-mem";
+    const char *attr_value = "+m,+a,+f,+d,+v";
 #endif
     size_t attr_key_len = strlen(attr_key);
     size_t attr_value_len = strlen(attr_value);
@@ -5860,7 +5862,8 @@ int main(int argc, const char *argv[]) {
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
     const char* features = "+neon";
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
-    const char* features = "+m,+a,+f,+d,+v,+unaligned-scalar-mem,+unaligned-vector-mem";
+    //const char* features = "+m,+a,+f,+d,+v,+unaligned-scalar-mem,+unaligned-vector-mem";
+    const char* features = "+m,+a,+f,+d,+v";
 #endif
     target_machine = LLVMCreateTargetMachine(target, default_triple, "generic", features,
                                              LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelDefault);
