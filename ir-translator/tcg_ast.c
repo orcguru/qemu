@@ -866,8 +866,6 @@ static AllocaWithAlignment get_stack_alloca(OperandType operand) {
         if (has_alias(operand) == 0) {
             alloca_w_align = func_tmp_alloca[operand.s.slot_idx];
         } else {
-            OperandType alias = get_alias(operand);
-            assert(alias.s.valid && alias.s.slot_type == SUB_SLOT_ENV && alias.s.offset == 0);
             unregister_alias(operand);
             LLVMValueRef env_raw = get_env_ptr_raw();
             do_store(0/*dummy*/, env_raw, OPC_ADDR_T, operand);
