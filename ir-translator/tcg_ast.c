@@ -1369,9 +1369,17 @@ void translate_andc(OpCodeType opc, void *ptr) {
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
-    GET_3_OPERANDS();
-    CREATE_NOT(tmp, operand2);
+    GET_3_OPERANDS_NOCHECK();
+    assert(!is_imm0 && !is_imm1);
+    OperandType in2;
+    if (is_imm2) {
+        in2 = get_tmp_and_do_alloc_with_init(type_out, operand2.i);
+    } else {
+        in2 = operand2;
+    }
+    CREATE_NOT(tmp, in2);
     CREATE_AND(operand0, operand1, tmp);
 }
 
