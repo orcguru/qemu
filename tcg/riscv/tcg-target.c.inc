@@ -3215,6 +3215,8 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_DST, TCG_AREG0, 18 * 8);  // cc_dst
     tcg_out_ld(s, TCG_TYPE_I32, CONTEXT_CC_OP, TCG_AREG0, 21 * 8);  // cc_op
 #endif
+
+#if AOT_LEVEL != AOT_LEVEL_0
     // Vectors
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V0, TCG_AREG0, 0x360 + 0*16);
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V1, TCG_AREG0, 0x360 + 1*16);
@@ -3248,6 +3250,7 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V29, TCG_AREG0, 0x6e0 + 1*16);
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V30, TCG_AREG0, 0x720 + 0*16);
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V31, TCG_AREG0, 0x720 + 1*16);
+#endif
 
     tcg_out_st(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -56);
     tcg_out_ld(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -64);
