@@ -2427,7 +2427,11 @@ gen_eob(DisasContext *s, int mode)
             gen_helper_jmp_ind(tcg_env, cpu_eip);
         } else if (s->base.jmp_type == TR_IS_IRET) {
             gen_helper_iret_ind(tcg_env);
-        } else if (s->base.jmp_type == TR_IS_LCALL || s->base.jmp_type == TR_IS_LJMP || s->base.jmp_type == TR_IS_LRET) {
+        } else if (s->base.jmp_type == TR_IS_LCALL || s->base.jmp_type == TR_IS_LJMP) {
+            // FIXME: not tested, just to unblock IR generation
+            assert(s->eip_next_tl_set);
+            gen_helper_jmp_ind(tcg_env, s->eip_next_tl_val);
+        } else if (s->base.jmp_type == TR_IS_LRET) {
         } else {
             assert(0);
         }
