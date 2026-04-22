@@ -584,7 +584,6 @@ size_t create_helper_slot4(void *ptr, OHType h, uint16_t cflags, uint8_t noargs,
     i->instr_type_ext = Instr1BH4_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -654,7 +653,6 @@ size_t create_helper_slot5(void *ptr, OHType h, uint16_t cflags, uint8_t noargs,
     i->instr_type_ext = Instr1BH141_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -673,7 +671,6 @@ size_t create_helper_slot4_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noa
     i->instr_type_ext = Instr1BH42_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -901,7 +898,6 @@ size_t create_helper_env_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noar
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH21_ENV0_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     return sizeof(*i);
@@ -915,7 +911,6 @@ size_t create_helper_slot_env(void *ptr, OHType h, uint16_t cflags, uint8_t noar
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH21_ENV1_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     return sizeof(*i);
@@ -964,7 +959,6 @@ size_t create_helper_slot3_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noa
     i->instr_type_ext = Instr1BH4I_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs == 0);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -982,7 +976,6 @@ size_t create_helper_slot3_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t no
     i->instr_type_ext = Instr1BH4I1_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs == 1);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1001,7 +994,6 @@ size_t create_helper_slot2_imm3(void *ptr, OHType h, uint16_t cflags, uint8_t no
     i->instr_type_ext = Instr1BH4I11_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs == 1);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1020,7 +1012,6 @@ size_t create_helper_env_slot3_imm(void *ptr, OHType h, uint16_t cflags, uint8_t
     i->instr_type_ext = Instr1BH4I_ENV0_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs == 0);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1038,7 +1029,6 @@ size_t create_helper_env_slot4_imm(void *ptr, OHType h, uint16_t cflags, uint8_t
     i->instr_type_ext = Instr1BH5I_ENV0_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs == 0);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1057,7 +1047,6 @@ size_t create_helper_env_slot4_imm2(void *ptr, OHType h, uint16_t cflags, uint8_
     i->instr_type_ext = Instr1BH5I2_ENV0_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs == 0);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1103,7 +1092,6 @@ size_t create_helper_env_imm_slot(void *ptr, OHType h, uint16_t cflags, uint8_t 
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH21S_ENV0_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     i->imm = i0;
     SET_SLOT(0);
@@ -1133,7 +1121,6 @@ size_t create_helper_slot2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs,
     i->instr_type_ext = Instr1BH4S2_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1149,7 +1136,6 @@ size_t create_helper_slot3(void *ptr, OHType h, uint16_t cflags, uint8_t noargs,
     i->instr_type_ext = Instr1BH4S3_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1166,7 +1152,6 @@ size_t create_helper_env_slot3(void *ptr, OHType h, uint16_t cflags, uint8_t noa
     i->instr_type_ext = Instr1BH4S3_ENV0_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1183,7 +1168,6 @@ size_t create_helper_env_slot4(void *ptr, OHType h, uint16_t cflags, uint8_t noa
     i->instr_type_ext = Instr1BH4S4_ENV0_ext;
     i->helper_l = (uint8_t)h.h;
     i->helper_h = h.h >> 8;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1234,7 +1218,6 @@ size_t create_helper_slot2_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t no
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH412_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1251,7 +1234,6 @@ size_t create_helper_slot2_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noa
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH41_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1267,7 +1249,6 @@ size_t create_helper_env_slot2_imm(void *ptr, OHType h, uint16_t cflags, uint8_t
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH41_ENV0_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1283,7 +1264,6 @@ size_t create_helper_env_slot2_imm_slot(void *ptr, OHType h, uint16_t cflags, ui
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH42_ENV0_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1315,7 +1295,6 @@ size_t create_helper_env_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noar
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH24_ENV0_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     i->imm0 = i0;
     i->imm1 = i1;
@@ -1330,7 +1309,6 @@ size_t create_helper_env_slot_imm(void *ptr, OHType h, uint16_t cflags, uint8_t 
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH211_ENV0_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     i->imm = i0;
@@ -1359,7 +1337,6 @@ size_t create_helper_env_slot2(void *ptr, OHType h, uint16_t cflags, uint8_t noa
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH4S_ENV0_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
@@ -1374,7 +1351,6 @@ size_t create_helper_slot_env_slot(void *ptr, OHType h, uint16_t cflags, uint8_t
     i->instr_type = SIZEXB;
     i->instr_type_ext = Instr1BH4S_ENV1_ext;
     i->helper = h.h;
-    assert(noargs < 2);
     i->noargs = noargs;
     SET_SLOT(0);
     SET_SLOT(1);
