@@ -1,0 +1,231 @@
+XMM0:$0x360
+XMM1:$0x3a0
+XMM2:$0x3e0
+XMM3:$0x420
+XMM4:$0x460
+XMM5:$0x4a0
+XMM6:$0x4e0
+XMM7:$0x520
+XMM8:$0x560
+XMM9:$0x5a0
+XMM10:$0x5e0
+XMM11:$0x620
+XMM12:$0x660
+XMM13:$0x6a0
+XMM14:$0x6e0
+XMM15:$0x720
+XMM_t0:$0xb60
+
+EXTERNAL:$0x4a723:
+ld_vec v128,e8,tmp6,env,$0x3a0
+mov_vec v128,e8,tmp7,tmp6
+st_vec v128,e8,tmp7,env,$0x5e0
+ld_vec v128,e8,tmp8,env,$0x560
+mov_vec v128,e8,tmp9,tmp8
+st_vec v128,e8,tmp9,env,$0x620
+ mov_i64 loc1,$0x2
+mov_vec v128,e8,tmp13,v128$0x0
+st_vec v128,e8,tmp13,env,$0xb60
+ add_i64 loc12,env,$0xb60
+ st_i32 $0x2,env,$0xb60
+ add_i64 loc16,env,$0x5e0
+ add_i64 loc18,env,$0x5e0
+ call pslldq_xmm,$0x0,$0,env,loc16,loc18,loc12
+ mov_i64 loc1,$0x4
+mov_vec v128,e8,tmp22,v128$0x0
+st_vec v128,e8,tmp22,env,$0xb60
+ add_i64 loc21,env,$0xb60
+ st_i32 $0x4,env,$0xb60
+ add_i64 loc23,env,$0x620
+ add_i64 loc25,env,$0x620
+ call pslldq_xmm,$0x0,$0,env,loc23,loc25,loc21
+ld_vec v128,e8,tmp26,env,$0x3a0
+ld_vec v128,e8,tmp27,env,$0x5e0
+add_vec v128,e16,tmp28,tmp26,tmp27
+st_vec v128,e8,tmp28,env,$0x3a0
+ld_vec v128,e8,tmp29,env,$0x560
+ld_vec v128,e8,tmp30,env,$0x620
+add_vec v128,e16,tmp31,tmp29,tmp30
+st_vec v128,e8,tmp31,env,$0x560
+ld_vec v128,e8,tmp32,env,$0x3a0
+mov_vec v128,e8,tmp33,tmp32
+st_vec v128,e8,tmp33,env,$0x5e0
+ld_vec v128,e8,tmp34,env,$0x560
+mov_vec v128,e8,tmp35,tmp34
+st_vec v128,e8,tmp35,env,$0x620
+ mov_i64 loc1,$0x4
+mov_vec v128,e8,tmp37,v128$0x0
+st_vec v128,e8,tmp37,env,$0xb60
+ add_i64 loc36,env,$0xb60
+ st_i32 $0x4,env,$0xb60
+ add_i64 loc38,env,$0x5e0
+ add_i64 loc39,env,$0x5e0
+ call pslldq_xmm,$0x0,$0,env,loc38,loc39,loc36
+ mov_i64 loc1,$0x8
+mov_vec v128,e8,tmp43,v128$0x0
+st_vec v128,e8,tmp43,env,$0xb60
+ add_i64 loc42,env,$0xb60
+ st_i32 $0x8,env,$0xb60
+ add_i64 loc44,env,$0x620
+ add_i64 loc45,env,$0x620
+ call pslldq_xmm,$0x0,$0,env,loc44,loc45,loc42
+ld_vec v128,e8,tmp46,env,$0x3a0
+ld_vec v128,e8,tmp47,env,$0x5e0
+add_vec v128,e16,tmp48,tmp46,tmp47
+st_vec v128,e8,tmp48,env,$0x3a0
+ld_vec v128,e8,tmp49,env,$0x560
+ld_vec v128,e8,tmp50,env,$0x620
+add_vec v128,e16,tmp51,tmp49,tmp50
+st_vec v128,e8,tmp51,env,$0x560
+ld_vec v128,e8,tmp52,env,$0x3a0
+mov_vec v128,e8,tmp53,tmp52
+st_vec v128,e8,tmp53,env,$0x5e0
+ mov_i64 loc1,$0x10
+ld_vec v128,e8,tmp55,env,$0x560
+sari_vec v128,e32,tmp56,tmp55,$0x10
+st_vec v128,e8,tmp56,env,$0x560
+ mov_i64 loc1,$0x8
+mov_vec v128,e8,tmp58,v128$0x0
+st_vec v128,e8,tmp58,env,$0xb60
+ add_i64 loc57,env,$0xb60
+ st_i32 $0x8,env,$0xb60
+ add_i64 loc59,env,$0x5e0
+ add_i64 loc60,env,$0x5e0
+ call pslldq_xmm,$0x0,$0,env,loc59,loc60,loc57
+ mov_i64 loc1,$0x3
+ add_i64 loc63,env,$0x560
+ add_i64 loc65,env,$0x560
+ call pshufd_xmm,$0x0,$0,loc63,loc65,$0x3
+ld_vec v128,e8,tmp66,env,$0x3a0
+ld_vec v128,e8,tmp67,env,$0x5e0
+add_vec v128,e16,tmp68,tmp66,tmp67
+st_vec v128,e8,tmp68,env,$0x3a0
+ld_vec v128,e8,tmp69,env,$0x5a0
+mov_vec v128,e8,tmp70,tmp69
+st_vec v128,e8,tmp70,env,$0x5e0
+ mov_i64 loc1,$0x2
+mov_vec v128,e8,tmp72,v128$0x0
+st_vec v128,e8,tmp72,env,$0xb60
+ add_i64 loc71,env,$0xb60
+ st_i32 $0x2,env,$0xb60
+ add_i64 loc73,env,$0x5a0
+ add_i64 loc75,env,$0x5a0
+ call pslldq_xmm,$0x0,$0,env,loc73,loc75,loc71
+ mov_i64 loc1,$0x10
+ld_vec v128,e8,tmp76,env,$0x5e0
+sari_vec v128,e32,tmp77,tmp76,$0x10
+st_vec v128,e8,tmp77,env,$0x5e0
+ld_vec v128,e8,tmp78,env,$0x420
+ld_vec v128,e8,tmp79,env,$0x560
+add_vec v128,e32,tmp80,tmp78,tmp79
+st_vec v128,e8,tmp80,env,$0x420
+ mov_i64 loc1,$0x10
+ld_vec v128,e8,tmp81,env,$0x5a0
+sari_vec v128,e32,tmp82,tmp81,$0x10
+st_vec v128,e8,tmp82,env,$0x5a0
+ mov_i64 loc1,$0x10
+ld_vec v128,e8,tmp83,env,$0x3a0
+sari_vec v128,e32,tmp84,tmp83,$0x10
+st_vec v128,e8,tmp84,env,$0x3a0
+ld_vec v128,e8,tmp85,env,$0x360
+mov_vec v128,e8,tmp86,tmp85
+st_vec v128,e8,tmp86,env,$0x560
+ mov_i64 loc1,$0x2
+mov_vec v128,e8,tmp88,v128$0x0
+st_vec v128,e8,tmp88,env,$0xb60
+ add_i64 loc87,env,$0xb60
+ st_i32 $0x2,env,$0xb60
+ add_i64 loc89,env,$0x360
+ add_i64 loc91,env,$0x360
+ call pslldq_xmm,$0x0,$0,env,loc89,loc91,loc87
+ mov_i64 loc1,$0x10
+ld_vec v128,e8,tmp92,env,$0x560
+sari_vec v128,e32,tmp93,tmp92,$0x10
+st_vec v128,e8,tmp93,env,$0x560
+ mov_i64 loc1,$0x3
+ add_i64 loc94,env,$0x3a0
+ add_i64 loc96,env,$0x3a0
+ call pshufd_xmm,$0x0,$0,loc94,loc96,$0x3
+ mov_i64 loc1,$0x10
+ld_vec v128,e8,tmp97,env,$0x360
+sari_vec v128,e32,tmp98,tmp97,$0x10
+st_vec v128,e8,tmp98,env,$0x360
+ add_i64 loc99,env,$0x560
+ add_i64 loc100,env,$0x560
+ add_i64 loc101,env,$0x5e0
+ call packssdw_xmm,$0x0,$0,env,loc99,loc100,loc101
+ld_vec v128,e8,tmp102,env,$0x3a0
+ld_vec v128,e8,tmp103,env,$0x520
+add_vec v128,e32,tmp104,tmp102,tmp103
+st_vec v128,e8,tmp104,env,$0x3a0
+ add_i64 loc105,env,$0x360
+ add_i64 loc106,env,$0x360
+ add_i64 loc107,env,$0x5a0
+ call packssdw_xmm,$0x0,$0,env,loc105,loc106,loc107
+ld_vec v128,e8,tmp108,env,$0x360
+ld_vec v128,e8,tmp109,env,$0x560
+ssadd_vec v128,e16,tmp110,tmp108,tmp109
+st_vec v128,e8,tmp110,env,$0x360
+ add_i64 loc111,env,$0x360
+ add_i64 loc112,env,$0x360
+ add_i64 loc113,env,$0x460
+ call pmaddwd_xmm,$0x0,$0,env,loc111,loc112,loc113
+ld_vec v128,e8,tmp115,env,$0x360
+mov_vec v128,e8,tmp116,tmp115
+st_vec v128,e8,tmp116,env,$0x560
+ mov_i64 loc1,$0x4
+mov_vec v128,e8,tmp118,v128$0x0
+st_vec v128,e8,tmp118,env,$0xb60
+ add_i64 loc117,env,$0xb60
+ st_i32 $0x4,env,$0xb60
+ add_i64 loc119,env,$0x560
+ add_i64 loc120,env,$0x560
+ call psrldq_xmm,$0x0,$0,env,loc119,loc120,loc117
+ld_vec v128,e8,tmp121,env,$0x360
+ld_vec v128,e8,tmp122,env,$0x560
+add_vec v128,e32,tmp123,tmp121,tmp122
+st_vec v128,e8,tmp123,env,$0x360
+ld_vec v128,e8,tmp124,env,$0x360
+mov_vec v128,e8,tmp125,tmp124
+st_vec v128,e8,tmp125,env,$0x560
+ mov_i64 loc1,$0x8
+mov_vec v128,e8,tmp127,v128$0x0
+st_vec v128,e8,tmp127,env,$0xb60
+ add_i64 loc126,env,$0xb60
+ st_i32 $0x8,env,$0xb60
+ add_i64 loc128,env,$0x560
+ add_i64 loc129,env,$0x560
+ call psrldq_xmm,$0x0,$0,env,loc128,loc129,loc126
+ld_vec v128,e8,tmp130,env,$0x3e0
+ld_vec v128,e8,tmp131,env,$0x560
+add_vec v128,e32,tmp132,tmp130,tmp131
+st_vec v128,e8,tmp132,env,$0x3e0
+ld_vec v128,e8,tmp133,env,$0x3a0
+ld_vec v128,e8,tmp134,env,$0x3e0
+add_vec v128,e32,tmp135,tmp133,tmp134
+st_vec v128,e8,tmp135,env,$0x3a0
+ld_vec v128,e8,tmp136,env,$0x3a0
+ld_vec v128,e8,tmp137,env,$0x360
+add_vec v128,e32,tmp138,tmp136,tmp137
+st_vec v128,e8,tmp138,env,$0x3a0
+ld_vec v128,e8,tmp139,env,$0x3a0
+mov_vec v128,e8,tmp140,tmp139
+st_vec v128,e8,tmp140,env,$0x3e0
+ mov_i64 loc0,rcx
+ mov_i64 loc1,rax
+ mov_i64 loc5,loc0
+ sub_i64 loc0,loc0,loc1
+ mov_i64 cc_dst,loc0
+ mov_i64 cc_src,loc1
+ discard cc_src2
+ discard cc_op
+ mov_i64 loc0,$0xfffffffffffffe8a
+ mov_i32 cc_op,$0x13
+ brcond_i64 cc_dst,$0x0,ne,$L0
+ add_i64 rip,rip,$0xe3
+ jmp_direct $0xe3
+ set_label $L0
+ add_i64 rip,rip,$0xffffffffffffff6d
+ jmp_direct $0xffffffffffffff6d
+
+
