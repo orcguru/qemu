@@ -28,6 +28,7 @@
 #define HELPER_COUNTERS_OFFSET      128
 //#define DEBUG_RET                   1
 #define BUILD_RISCV_ON_AARCH        1
+//#define DUMP_IR                     1
 //#define VERBOSE_VAR                 1
 //#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
@@ -5704,7 +5705,9 @@ int check_always_inline_status(LLVMModuleRef module, const char *target_func) {
 }
 
 void module_epilog() {
-    //LLVMDumpModule(module);
+#ifdef DUMP_IR
+    LLVMDumpModule(module);
+#endif
 #if 1
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
