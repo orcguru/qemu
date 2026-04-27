@@ -3742,6 +3742,22 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_r
     return func;
 }
 
+static LLVMValueRef create_static_array(LLVMModuleRef module, const char* name, size_t count) {
+    LLVMTypeRef i64_type = LLVMInt64Type();
+    LLVMTypeRef array_type = LLVMArrayType(i64_type, count);
+    LLVMValueRef zero_initializer = LLVMConstNull(array_type);
+    LLVMValueRef global_var = LLVMAddGlobal(module, array_type, name);
+    LLVMSetInitializer(global_var, zero_initializer);
+    LLVMSetAlignment(global_var, 8);
+    LLVMSetLinkage(global_var, LLVMInternalLinkage);
+    LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, 0);
+    LLVMValueRef index = LLVMConstInt(LLVMInt32Type(), 0, 0);
+    LLVMValueRef indices[] = {zero, index};
+    LLVMValueRef elem_ptr = LLVMBuildGEP2(builder, array_type, global_var,
+                                          indices, 2, "array_elem_ptr");
+    return elem_ptr;
+}
+
 // FIXME: can this be merged into common logic?
 static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
@@ -3759,6 +3775,15 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         }
         operands_cnt += 1;
     }
+
+    char shadow_array_name[64] = {0};
+    sprintf(shadow_array_name, "%s%sshadow_array_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset);
+    LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, 2);
+    OperandType shadow_array_op = get_tmp_and_do_alloc(OPC_ADDR_T);
+    do_store(opc, shadow_array, OPC_ADDR_T, shadow_array_op);
+    is_imm[operands_cnt] = 0;
+    operands[operands_cnt] = shadow_array_op;
+    operands_cnt += 1;
 
     // Get the second half - jmp_ind_callback
     char macro_def[4096] = {0};

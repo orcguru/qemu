@@ -1,17 +1,18 @@
 ; ModuleID = 'qemuaot'
 source_filename = "qemuaot"
-target triple = "riscv64-unknown-linux-gnu"
+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
+target triple = "aarch64-unknown-linux-gnu"
 
 ; Function Attrs: noinline nounwind
-define weak qemuaot void @trampoline_do_not_sync_vector_param2_with_return_env0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %xmm5, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, <vscale x 1 x i64> %xmm14, <vscale x 1 x i64> %ymm14_h, i64 %param0, i64 %next, i64 %helper) #0 {
+define weak qemuaot void @trampoline_do_not_sync_vector_param2_with_return_env0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, i64 %param0, i64 %next, i64 %helper) #0 {
 entry:
-  %env_ptr__aaaj = call i64 asm sideeffect "mv $0, x25", "=r"()
+  %env_ptr__aaaj = call i64 asm sideeffect "mov $0, x25", "=r"()
   %trampoline_cnt_addr__aaak = sub i64 %env_ptr__aaaj, 104
   %trampoline_cnt_ptr__aaal = inttoptr i64 %trampoline_cnt_addr__aaak to ptr
   %trampoline_cnt_before__aaam = load i64, ptr %trampoline_cnt_ptr__aaal, align 8
   %trampoline_cnt_val_updated__aaan = add i64 %trampoline_cnt_before__aaam, 1
   store i64 %trampoline_cnt_val_updated__aaan, ptr %trampoline_cnt_ptr__aaal, align 8
-  %env_ptr__aaao = call i64 asm sideeffect "mv $0, x25", "=r"()
+  %env_ptr__aaao = call i64 asm sideeffect "mov $0, x25", "=r"()
   %spill_fixed_addr__aaap = add i64 %env_ptr__aaao, 0
   %spill_fixed_ptr__aaaq = inttoptr i64 %spill_fixed_addr__aaap to ptr
   store i64 %rax, ptr %spill_fixed_ptr__aaaq, align 8
@@ -72,7 +73,7 @@ entry:
   %spill_fixed_addr__aacb = add i64 %env_ptr__aaao, 128
   %spill_fixed_ptr__aacc = inttoptr i64 %spill_fixed_addr__aacb to ptr
   store i64 %rip, ptr %spill_fixed_ptr__aacc, align 8
-  %env_ptr__aacd = call i64 asm sideeffect "mv $0, x25", "=r"()
+  %env_ptr__aacd = call i64 asm sideeffect "mov $0, x25", "=r"()
   %helper_func__aace = inttoptr i64 %helper to ptr
   %helper_return__aacf = call i64 %helper_func__aace(i64 %env_ptr__aacd, i64 %param0)
   %reload_fixed_addr__aacg = add i64 %env_ptr__aaao, 0
@@ -136,8 +137,8 @@ entry:
   %reload_fixed_ptr__aaem = inttoptr i64 %reload_fixed_addr__aael to ptr
   %reload_fixed_val__aaen = load i64, ptr %reload_fixed_ptr__aaem, align 8
   %next__aaeo = inttoptr i64 %next to ptr
-  tail call qemuaot void %next__aaeo(i64 %reload_fixed_val__aaci, i64 %reload_fixed_val__aacl, i64 %reload_fixed_val__aaco, i64 %reload_fixed_val__aacr, i64 %reload_fixed_val__aacu, i64 %reload_fixed_val__aacx, i64 %reload_fixed_val__aada, i64 %reload_fixed_val__aadd, i64 %reload_fixed_val__aadg, i64 %reload_fixed_val__aadj, i64 %reload_fixed_val__aadm, i64 %reload_fixed_val__aadp, i64 %reload_fixed_val__aads, i64 %reload_fixed_val__aadv, i64 %reload_fixed_val__aady, i64 %reload_fixed_val__aaeb, i64 %reload_fixed_val__aaee, i64 %reload_fixed_val__aaeh, i32 %reload_fixed_val__aaek, i64 %reload_fixed_val__aaen, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %xmm5, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, <vscale x 1 x i64> %xmm14, <vscale x 1 x i64> %ymm14_h, i64 %helper_return__aacf)
+  tail call qemuaot void %next__aaeo(i64 %reload_fixed_val__aaci, i64 %reload_fixed_val__aacl, i64 %reload_fixed_val__aaco, i64 %reload_fixed_val__aacr, i64 %reload_fixed_val__aacu, i64 %reload_fixed_val__aacx, i64 %reload_fixed_val__aada, i64 %reload_fixed_val__aadd, i64 %reload_fixed_val__aadg, i64 %reload_fixed_val__aadj, i64 %reload_fixed_val__aadm, i64 %reload_fixed_val__aadp, i64 %reload_fixed_val__aads, i64 %reload_fixed_val__aadv, i64 %reload_fixed_val__aady, i64 %reload_fixed_val__aaeb, i64 %reload_fixed_val__aaee, i64 %reload_fixed_val__aaeh, i32 %reload_fixed_val__aaek, i64 %reload_fixed_val__aaen, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, i64 %helper_return__aacf)
   ret void
 }
 
-attributes #0 = { noinline nounwind "target-features"="+m,+a,+f,+d,+v" }
+attributes #0 = { noinline nounwind "target-features"="+neon" }

@@ -1,17 +1,18 @@
 ; ModuleID = 'qemuaot'
-source_filename = "qemuaot"
-target triple = "riscv64-unknown-linux-gnu"
+source_filename = "qemuaot" 
+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
+target triple = "aarch64-unknown-linux-gnu"
 
 ; Function Attrs: noinline nounwind
 define weak qemuaot void @trampoline_do_not_sync_vector_param1_env0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, i64 %next, i64 %helper) #0 {
 entry:
-  %env_ptr__aaaj = call i64 asm sideeffect "mv $0, x25", "=r"()
+  %env_ptr__aaaj = call i64 asm sideeffect "mov $0, x25", "=r"()
   %trampoline_cnt_addr__aaak = sub i64 %env_ptr__aaaj, 104
   %trampoline_cnt_ptr__aaal = inttoptr i64 %trampoline_cnt_addr__aaak to ptr
   %trampoline_cnt_before__aaam = load i64, ptr %trampoline_cnt_ptr__aaal, align 8
   %trampoline_cnt_val_updated__aaan = add i64 %trampoline_cnt_before__aaam, 1
   store i64 %trampoline_cnt_val_updated__aaan, ptr %trampoline_cnt_ptr__aaal, align 8
-  %env_ptr__aaao = call i64 asm sideeffect "mv $0, x25", "=r"()
+  %env_ptr__aaao = call i64 asm sideeffect "mov $0, x25", "=r"()
   %spill_fixed_addr__aaap = add i64 %env_ptr__aaao, 0
   %spill_fixed_ptr__aaaq = inttoptr i64 %spill_fixed_addr__aaap to ptr
   store i64 %rax, ptr %spill_fixed_ptr__aaaq, align 8
@@ -72,7 +73,7 @@ entry:
   %spill_fixed_addr__aacb = add i64 %env_ptr__aaao, 128
   %spill_fixed_ptr__aacc = inttoptr i64 %spill_fixed_addr__aacb to ptr
   store i64 %rip, ptr %spill_fixed_ptr__aacc, align 8
-  %env_ptr__aacd = call i64 asm sideeffect "mv $0, x25", "=r"()
+  %env_ptr__aacd = call i64 asm sideeffect "mov $0, x25", "=r"()
   %helper_func__aace = inttoptr i64 %helper to ptr
   call void %helper_func__aace(i64 %env_ptr__aacd)
   %reload_fixed_addr__aacf = add i64 %env_ptr__aaao, 0
@@ -140,4 +141,4 @@ entry:
   ret void
 }
 
-attributes #0 = { noinline nounwind "target-features"="+m,+a,+f,+d,+v" }
+attributes #0 = { noinline nounwind "target-features"="+neon" }
