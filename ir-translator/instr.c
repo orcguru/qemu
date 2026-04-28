@@ -1315,6 +1315,21 @@ size_t create_helper_env_slot_imm(void *ptr, OHType h, uint16_t cflags, uint8_t 
     return sizeof(*i);
 }
 
+size_t create_helper_env_slot_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0, uint32_t i1) {
+#ifdef DEBUG
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
+#endif
+    Instr1BH212_ENV0 *i = (Instr1BH212_ENV0 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH212_ENV0_ext;
+    i->helper = h.h;
+    i->noargs = noargs;
+    SET_SLOT(0);
+    i->imm0 = i0;
+    i->imm1 = i1;
+    return sizeof(*i);
+}
+
 size_t create_scalar_imm_slot_imm(void *ptr, OHType op, uint64_t i0, OperandType s0, uint64_t i1) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);

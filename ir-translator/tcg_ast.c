@@ -3753,9 +3753,8 @@ static LLVMValueRef create_static_array(LLVMModuleRef module, const char* name, 
     LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, 0);
     LLVMValueRef index = LLVMConstInt(LLVMInt32Type(), 0, 0);
     LLVMValueRef indices[] = {zero, index};
-    LLVMValueRef elem_ptr = LLVMBuildGEP2(builder, array_type, global_var,
-                                          indices, 2, "array_elem_ptr");
-    return elem_ptr;
+    LLVMValueRef elem_ptr = LLVMBuildGEP2(builder, array_type, global_var, indices, 2, "array_elem_ptr");
+    return LLVMBuildPtrToInt(builder, elem_ptr, llvm_int_types[OPC_ADDR_T], "array_elem_ptr_val");
 }
 
 // FIXME: can this be merged into common logic?
@@ -3776,14 +3775,59 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         operands_cnt += 1;
     }
 
-    char shadow_array_name[64] = {0};
-    sprintf(shadow_array_name, "%s%sshadow_array_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset);
-    LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, 2);
-    OperandType shadow_array_op = get_tmp_and_do_alloc(OPC_ADDR_T);
-    do_store(opc, shadow_array, OPC_ADDR_T, shadow_array_op);
-    is_imm[operands_cnt] = 0;
-    operands[operands_cnt] = shadow_array_op;
-    operands_cnt += 1;
+    if (is_imm[operands_cnt-2] && is_imm[operands_cnt-1]) {
+        assert(operands[operands_cnt-2].i < operands[operands_cnt-1].i && operands[operands_cnt-2].i == 0);
+        operands_cnt -= 2;
+        char shadow_array_name[64] = {0};
+        sprintf(shadow_array_name, "%s%sshadow_array_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset);
+        LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, 2);
+        OperandType shadow_array_op = get_tmp_and_do_alloc(OPC_ADDR_T);
+        do_store(opc, shadow_array, OPC_ADDR_T, shadow_array_op);
+        is_imm[operands_cnt] = 0;
+        operands[operands_cnt] = shadow_array_op;
+        operands_cnt += 1;
+    } else {
+        assert(is_imm[operands_cnt-1]);
+        OperandType shadow_array_op = get_tmp_and_do_alloc(OPC_ADDR_T);
+        LLVMType type_in = OPC_ADDR_T;
+        LLVMType type_out = OPC_ADDR_T;
+        LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm[operands_cnt-2], operands[operands_cnt-2], type_in, 0);
+        LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm[operands_cnt-1], operands[operands_cnt-1], type_in, 0);
+
+        LLVMValueRef bool1 = LLVMBuildICmp(builder, LLVMIntULT, src1, src2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+
+        LLVMBasicBlockRef bb_inside_jt = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        LLVMBasicBlockRef bb_outof_jt = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        LLVMBasicBlockRef bb_ctz_merge = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+
+        LLVMBuildCondBr(builder, bool1, bb_inside_jt, bb_outof_jt);
+        LLVMPositionBuilderAtEnd(builder, bb_inside_jt);
+
+        char shadow_array_name[64] = {0};
+        sprintf(shadow_array_name, "%s%sshadow_array_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset);
+        LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, (2 * operands[operands_cnt-1].i));
+        LLVMValueRef offset_cnt = LLVMConstInt(LLVMInt64Type(), 4, 0);
+        LLVMValueRef offset_val = LLVMBuildShl(builder, src1, offset_cnt, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        LLVMValueRef shadow_pointer = LLVMBuildAdd(builder, shadow_array, offset_val, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        LLVMBuildBr(builder, bb_ctz_merge);
+
+        LLVMPositionBuilderAtEnd(builder, bb_outof_jt);
+        LLVMValueRef invalid_pointer = LLVMConstInt(LLVMInt64Type(), 0, 0);
+        LLVMBuildBr(builder, bb_ctz_merge);
+
+        LLVMPositionBuilderAtEnd(builder, bb_ctz_merge);
+        last_active_bb = bb_ctz_merge;
+        LLVMValueRef phi = LLVMBuildPhi(builder, llvm_int_types[type_out], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        LLVMValueRef phi_incoming_values[] = {shadow_pointer, invalid_pointer};
+        LLVMBasicBlockRef phi_incoming_blocks[] = {bb_inside_jt, bb_outof_jt};
+        LLVMAddIncoming(phi, phi_incoming_values, phi_incoming_blocks, 2);
+        do_store(opc, phi, OPC_ADDR_T, shadow_array_op);
+
+        operands_cnt -= 2;
+        is_imm[operands_cnt] = 0;
+        operands[operands_cnt] = shadow_array_op;
+        operands_cnt += 1;
+    }
 
     // Get the second half - jmp_ind_callback
     char macro_def[4096] = {0};
