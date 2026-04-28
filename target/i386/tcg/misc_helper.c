@@ -239,6 +239,7 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
 {
     if (shadow_array_entry != 0) {
         unsigned long *shadow_entry_ptr = (unsigned long *)shadow_array_entry;
+        // FIXME: atomic load
         if (shadow_entry_ptr[0] == target_addr) {
             FuncPtrType1 func_ptr = (FuncPtrType1)shadow_entry_ptr[1];
             return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);
