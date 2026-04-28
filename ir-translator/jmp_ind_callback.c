@@ -59,6 +59,7 @@ __attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, u
         FuncPtrType1 func_ptr = (FuncPtrType1)host_addr;
 #if AOT_LEVEL == AOT_LEVEL_MAX
         if (shadow_array_entry != 0) {
+            // FIXME: atomic store
             unsigned long *shadow_entry_ptr = (unsigned long *)shadow_array_entry;
             shadow_entry_ptr[0] = target_addr;
             shadow_entry_ptr[1] = host_addr;
