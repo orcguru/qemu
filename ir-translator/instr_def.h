@@ -1,13 +1,13 @@
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint64_t imm;
 } Instr1B14;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -16,7 +16,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -27,7 +27,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -38,7 +38,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -50,7 +50,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -60,7 +60,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t vs             :2;
     uint16_t es             :2;
@@ -72,7 +72,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t vs             :2;
     uint16_t es             :2;
@@ -83,7 +83,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -95,7 +95,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -109,7 +109,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -118,7 +118,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -129,7 +129,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -141,14 +141,14 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t label          :8;
 } Instr1B2;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -164,7 +164,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -181,7 +181,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t vs             :2;
     uint16_t es             :2;
@@ -193,7 +193,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t vs             :2;
     uint16_t es             :2;
@@ -207,7 +207,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t vs             :2;
     uint16_t es             :2;
@@ -223,7 +223,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t vs             :2;
     uint16_t es             :2;
@@ -242,7 +242,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -260,7 +260,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t vs             :2;
     uint16_t es             :2;
@@ -271,7 +271,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t vs             :2;
     uint16_t es             :2;
@@ -284,7 +284,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -306,7 +306,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t vs             :2;
     uint16_t es             :2;
@@ -319,7 +319,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -329,7 +329,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t vs             :2;
     uint16_t es             :2;
@@ -344,20 +344,20 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
 } Instr1BH2_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint64_t imm;
 } Instr1BH24I_ENV0;
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -365,7 +365,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -378,7 +378,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint8_t relop           :6;
     uint16_t slot0_type     :2;
@@ -394,7 +394,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint64_t imm;
     uint16_t xmm_idx        :7;
@@ -403,7 +403,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint64_t imm;
     uint16_t env_offset;
@@ -411,7 +411,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
@@ -420,7 +420,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
@@ -429,7 +429,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -444,7 +444,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -461,7 +461,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -476,7 +476,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -492,7 +492,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -507,7 +507,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -522,7 +522,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -539,7 +539,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -557,7 +557,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -569,7 +569,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -583,7 +583,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -597,7 +597,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t helper_l;
     uint8_t helper_h        :3;
     uint8_t noargs          :1;
@@ -613,7 +613,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -625,7 +625,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
@@ -637,7 +637,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
@@ -649,7 +649,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
@@ -663,7 +663,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint64_t imm            :4;
@@ -673,7 +673,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -684,7 +684,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -699,7 +699,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -713,7 +713,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
@@ -726,7 +726,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
@@ -739,7 +739,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint64_t imm0           :4;
@@ -748,7 +748,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
@@ -758,7 +758,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
@@ -769,7 +769,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
@@ -780,7 +780,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint16_t helper         :11;
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
@@ -791,7 +791,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t instr_type      :1;
-    uint8_t instr_type_ext  :6;
+    uint8_t instr_type_ext  :7;
     uint8_t opc;
     uint64_t imm0;
     uint16_t slot0_type     :2;
@@ -801,7 +801,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint32_t instr_type     :1;
-    uint32_t instr_type_ext :6;
+    uint32_t instr_type_ext :7;
     uint8_t opc;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
