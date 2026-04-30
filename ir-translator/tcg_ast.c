@@ -22,6 +22,7 @@
 #include <stdbool.h>
 #include <glib.h>
 
+//#define DISABLE_JUMP_TABLE_CACHE    1
 //#define COLLECT_TRAMPOLINE_IR       1
 #define HELPER_COUNTERS             1
 #define TRAMPOLINE_CNT_OFFSET       104
@@ -3780,7 +3781,11 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         operands_cnt -= 2;
         char shadow_array_name[64] = {0};
         sprintf(shadow_array_name, "%s%sshadow_array_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset);
+#ifndef DISABLE_JUMP_TABLE_CACHE
         LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, 2);
+#else
+        LLVMValueRef shadow_array = LLVMConstInt(LLVMInt64Type(), 0, 0);
+#endif
         OperandType shadow_array_op = get_tmp_and_do_alloc(OPC_ADDR_T);
         do_store(opc, shadow_array, OPC_ADDR_T, shadow_array_op);
         is_imm[operands_cnt] = 0;
@@ -3805,10 +3810,14 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
 
         char shadow_array_name[64] = {0};
         sprintf(shadow_array_name, "%s%sshadow_array_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset);
+#ifndef DISABLE_JUMP_TABLE_CACHE
         LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, (2 * operands[operands_cnt-1].i));
         LLVMValueRef offset_cnt = LLVMConstInt(LLVMInt64Type(), 4, 0);
         LLVMValueRef offset_val = LLVMBuildShl(builder, src1, offset_cnt, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
         LLVMValueRef shadow_pointer = LLVMBuildAdd(builder, shadow_array, offset_val, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+#else
+        LLVMValueRef shadow_pointer = LLVMConstInt(LLVMInt64Type(), 0, 0);
+#endif
         LLVMBuildBr(builder, bb_ctz_merge);
 
         LLVMPositionBuilderAtEnd(builder, bb_outof_jt);
