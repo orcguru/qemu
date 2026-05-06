@@ -237,13 +237,27 @@ typedef __attribute__((qemuaot,nothrow)) void (*FuncPtrType1)(unsigned long rax,
 
 __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, v2long xmm0, v2long ymm0_h, v2long xmm1, v2long ymm1_h, v2long xmm2, v2long ymm2_h, v2long xmm3, v2long ymm3_h, v2long xmm4, v2long ymm4_h, v2long xmm5, v2long ymm5_h, v2long xmm6, v2long ymm6_h, v2long xmm7, v2long ymm7_h, v2long xmm8, v2long ymm8_h, v2long xmm9, v2long ymm9_h, v2long xmm10, v2long ymm10_h, v2long xmm11, v2long ymm11_h, v2long xmm12, v2long ymm12_h, v2long xmm13, v2long ymm13_h, v2long xmm14, v2long ymm14_h, v2long xmm15, v2long ymm15_h, void *env, unsigned long target_addr, unsigned long shadow_array_entry, unsigned long jmp_ind_callback, unsigned long trampoline_helper_jit)
 {
+#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+    unsigned long env_val;
+    asm volatile ("mov %0, x25" : "=r" (env_val) : :);
+    unsigned long *shadow_jt_flag_ptr = (unsigned long *)(env_val - 120);
+#elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
+    unsigned long env_val;
+    asm volatile ("mv %0, x25" : "=r" (env_val) : :);
+    unsigned long *shadow_jt_flag_ptr = (unsigned long *)(env_val - 120);
+#endif
     if (shadow_array_entry != 0) {
         unsigned long *shadow_entry_ptr = (unsigned long *)shadow_array_entry;
         // FIXME: atomic load
         if (shadow_entry_ptr[0] == target_addr) {
+            *shadow_jt_flag_ptr = 1;
             FuncPtrType1 func_ptr = (FuncPtrType1)shadow_entry_ptr[1];
             return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);
+        } else {
+            *shadow_jt_flag_ptr = 2;
         }
+    } else {
+        *shadow_jt_flag_ptr = 3;
     }
     return g_hash_table_lookup_qemuaot(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h, (unsigned long)tb_ctx.aot_htable, target_addr, jmp_ind_callback, trampoline_helper_jit, shadow_array_entry);
 }
@@ -473,6 +487,12 @@ const char *x64_reg_name[16] = {"RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI",
 const char *segment_base_name[6] = {"ES_BASE", "CS_BASE", "SS_BASE", "DS_BASE", "FS_BASE", "GS_BASE"};
 unsigned long dump_cnt = 0;
 
+#define DUMP_SHADOW_JUMP_TABLE  1
+#ifdef DUMP_SHADOW_JUMP_TABLE
+unsigned long prev_rip = -1UL;
+unsigned long prev_func = -1UL;
+#endif
+
 void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
 {
     uint64_t *shadow_stack_pointer_ptr = (uint64_t *)((unsigned long)env - 8);
@@ -480,6 +500,16 @@ void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
     uint64_t shadow_stack_pointer_upper_bound = (*(uint64_t *)((unsigned long)env - 24)) + 16;  // remove margin
     assert(shadow_stack_pointer_lower_bound < shadow_stack_pointer_ptr[0]);
     assert(shadow_stack_pointer_ptr[0] <= shadow_stack_pointer_upper_bound);
+#ifdef DUMP_SHADOW_JUMP_TABLE
+    unsigned long *shadow_jt_flag_ptr = (unsigned long *)((unsigned long)env - 120);
+    if (*shadow_jt_flag_ptr != 0) {
+        qemu_log_mask(LOG_AOT, "SHADOW_JT %lx/%lx -> %lx/%lx - %ld\n", prev_rip, prev_func, env->eip, func_offset, *shadow_jt_flag_ptr);
+        *shadow_jt_flag_ptr = 0;
+    }
+    prev_rip = env->eip;
+    prev_func = func_offset;
+    return;
+#endif
 
     if (!last_env) {
         last_env = (CPUX86State **)calloc(sizeof(CPUX86State *), (MAX_PID+1));
