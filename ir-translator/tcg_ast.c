@@ -22,6 +22,7 @@
 #include <stdbool.h>
 #include <glib.h>
 
+#define SHADOW_JUMP_TABLE_BLOCK_SIZE    32
 //#define DISABLE_JUMP_TABLE_CACHE    1
 //#define COLLECT_TRAMPOLINE_IR       1
 #define HELPER_COUNTERS             1
@@ -3777,15 +3778,19 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     }
 
     if (is_imm[operands_cnt-2] && is_imm[operands_cnt-1]) {
-        assert(operands[operands_cnt-2].i < operands[operands_cnt-1].i && operands[operands_cnt-2].i == 0);
-        operands_cnt -= 2;
+        assert(operands[operands_cnt-2].i < operands[operands_cnt-1].i && operands[operands_cnt-2].i == 0 && (operands[operands_cnt-1].i == 1 || (operands[operands_cnt-1].i % SHADOW_JUMP_TABLE_BLOCK_SIZE) == 0) && operands[operands_cnt-1].i <= (7 * SHADOW_JUMP_TABLE_BLOCK_SIZE));
         char shadow_array_name[64] = {0};
         sprintf(shadow_array_name, "%s%sshadow_array_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset);
 #ifndef DISABLE_JUMP_TABLE_CACHE
-        LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, 2);
+        LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, 2*operands[operands_cnt-1].i);
+        if ((operands[operands_cnt-1].i % SHADOW_JUMP_TABLE_BLOCK_SIZE) == 0) {
+            LLVMValueRef snippet = LLVMConstInt(LLVMInt64Type(), (operands[operands_cnt-1].i / SHADOW_JUMP_TABLE_BLOCK_SIZE), 0);
+            shadow_array = LLVMBuildAdd(builder, shadow_array, snippet, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+        }
 #else
         LLVMValueRef shadow_array = LLVMConstInt(LLVMInt64Type(), 0, 0);
 #endif
+        operands_cnt -= 2;
         OperandType shadow_array_op = get_tmp_and_do_alloc(OPC_ADDR_T);
         do_store(opc, shadow_array, OPC_ADDR_T, shadow_array_op);
         is_imm[operands_cnt] = 0;

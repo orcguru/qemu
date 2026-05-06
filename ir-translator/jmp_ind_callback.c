@@ -10,6 +10,7 @@ typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;
 #define AOT_LEVEL_1                 1
 #define AOT_LEVEL_MAX               3
 #define AOT_LEVEL                   AOT_LEVEL_MAX
+#define SHADOW_JUMP_TABLE_BLOCK_SIZE    32
 
 #if AOT_LEVEL == AOT_LEVEL_MAX
 typedef __attribute__((qemuaot,nothrow)) void (*FuncPtrType1)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip XMM_PARAM_DECLARE_COMMON);
@@ -59,10 +60,16 @@ __attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, u
         FuncPtrType1 func_ptr = (FuncPtrType1)host_addr;
 #if AOT_LEVEL == AOT_LEVEL_MAX
         if (shadow_array_entry != 0) {
+            unsigned long *shadow_entry_ptr = (unsigned long *)(shadow_array_entry & 0xfffffffffffffff0UL);
+            int cnt = (shadow_array_entry & 0xf) ? ((shadow_array_entry & 0xf) * SHADOW_JUMP_TABLE_BLOCK_SIZE) : 1;
             // FIXME: atomic store
-            unsigned long *shadow_entry_ptr = (unsigned long *)shadow_array_entry;
-            shadow_entry_ptr[0] = target_addr;
-            shadow_entry_ptr[1] = host_addr;
+            for (int i = 0; i < cnt; ++i) {
+                if (shadow_entry_ptr[2*i] == 0) {
+                    shadow_entry_ptr[2*i] = target_addr;
+                    shadow_entry_ptr[2*i+1] = host_addr;
+                    break;
+                }
+            }
         }
         return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr XMM_PARAM_LIST);
 #elif AOT_LEVEL == AOT_LEVEL_1
