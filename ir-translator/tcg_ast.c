@@ -3785,7 +3785,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, 2*operands[operands_cnt-1].i);
         if ((operands[operands_cnt-1].i % SHADOW_JUMP_TABLE_BLOCK_SIZE) == 0) {
             LLVMValueRef snippet = LLVMConstInt(LLVMInt64Type(), (operands[operands_cnt-1].i / SHADOW_JUMP_TABLE_BLOCK_SIZE), 0);
-            shadow_array = LLVMBuildAdd(builder, shadow_array, snippet, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+            shadow_array = LLVMBuildOr(builder, shadow_array, snippet, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
         }
 #else
         LLVMValueRef shadow_array = LLVMConstInt(LLVMInt64Type(), 0, 0);
