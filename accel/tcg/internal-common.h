@@ -53,7 +53,8 @@ void tb_register_aot_code(CPUState *cpu,
                               vaddr target_pc, uint32_t target_size);
 uint64_t tb_aot_lookup_host_addr(uint64_t target_addr);
 void tb_aot_insert(uint64_t start, uint64_t offset, uint64_t host_addr);
-void tb_aot_log(const char *name, uint64_t host_addr);
+void tb_aot_log_funcmap(const char *name, uint64_t host_addr);
+void tb_aot_log_message(const char *msg);
 #endif
 TranslationBlock *tb_gen_code(CPUState *cpu, TCGTBCPUState s);
 void page_init(void);

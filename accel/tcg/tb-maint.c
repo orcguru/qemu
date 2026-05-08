@@ -1026,9 +1026,14 @@ void tb_aot_insert(uint64_t start, uint64_t offset, uint64_t host_addr)
     }
 }
 
-void tb_aot_log(const char *name, uint64_t host_addr)
+void tb_aot_log_funcmap(const char *name, uint64_t host_addr)
 {
     qemu_log_mask(LOG_AOT, "%s %s %016lx\n", __FUNCTION__, name, host_addr);
+}
+
+void tb_aot_log_message(const char *msg)
+{
+    qemu_log_mask(LOG_AOT, "%s", msg);
 }
 
 #endif
