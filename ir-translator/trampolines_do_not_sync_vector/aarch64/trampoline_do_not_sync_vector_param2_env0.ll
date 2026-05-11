@@ -4,7 +4,7 @@ target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i6
 target triple = "aarch64-unknown-linux-gnu"
 
 ; Function Attrs: noinline nounwind
-define weak qemuaot void @trampoline_do_not_sync_vector_param2_env0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, i64 %param0, i64 %next, i64 %helper) #0 {
+define weak qemuaot void @trampoline_do_not_sync_vector_param2_env0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, i64 %param0, i64 %next, i64 %helper) #0 ".text.trampoline" {
 entry:
   %env_ptr__aaak = call i64 asm sideeffect "mov $0, x25", "=r"()
   %trampoline_cnt_addr__aaal = sub i64 %env_ptr__aaak, 104

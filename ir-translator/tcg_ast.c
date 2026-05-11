@@ -595,6 +595,8 @@ static uint64_t tmp_var_available[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] =
 static uint64_t tmp_var_available_backup[(1<<STACK_INDEX_SHIFT)/(8*sizeof(uint64_t))] = {0};
 static LLVMType tmp_bits_type[1<<STACK_INDEX_SHIFT] = {0};
 static char output_file[PATH_MAX+2] = {0};
+static char list_file[PATH_MAX+10] = {0};
+static FILE *list_fp = NULL;
 static OperandType dummy_slot_for_debug;
 static int32_t tmp_shadow_offset[1<<STACK_INDEX_SHIFT] = {0};
 static char template_path[PATH_MAX] = {0};
@@ -743,6 +745,21 @@ static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr) {
 #endif
     }
     return 0;
+}
+
+static void init_list_file(const char *name) {
+    list_fp = fopen(name, "w");
+    assert(list_fp);
+}
+
+static void add_list_info(const char *func, const char *type) {
+    assert(list_fp);
+    fprintf(list_fp, "%s %s\n", func, type);
+}
+
+static void fini_list_file() {
+    assert(list_fp);
+    fclose(list_fp);
 }
 
 static LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val,
@@ -2013,6 +2030,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     sprintf(func_name, "%s%sfunc_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", func_hex.i);
     assert(strlen(func_name) < sizeof(func_name));
     LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, 0), llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    add_list_info(func_name, "declare");
     CREATE_ADD(ptr_val, ptr_val, -8UL);
     LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
     LLVMValueRef shadow_ptr1 = LLVMBuildIntToPtr(builder, shadow_val1, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -2773,6 +2791,7 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
     LLVMTypeRef ret_type = LLVMVoidType();
     LLVMTypeRef func_type = LLVMFunctionType(ret_type, call_types, arg_cnt, 0);
     LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, get_or_add_func_with_qemuaot_cc(func_name, 0), call_args, arg_cnt, "");
+    add_list_info(func_name, "declare");
     LLVMSetTailCall(call_inst, 1);
     LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
     LLVMBuildRetVoid(builder);
@@ -2841,7 +2860,8 @@ static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8
     LLVMAddAttributeAtIndex(trampoline, -1, NoInlineAttr);
     LLVMAddAttributeAtIndex(trampoline, -1, target_features_attr);
     LLVMAddAttributeAtIndex(trampoline, -1, NoUnwindAttr);
-    LLVMSetLinkage(trampoline, LLVMWeakAnyLinkage);
+    //LLVMSetLinkage(trampoline, LLVMWeakAnyLinkage);
+    LLVMSetSection(trampoline, ".text.trampoline");
     int j = 0;
     LLVMValueRef param = NULL;
     for (j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
@@ -3024,6 +3044,7 @@ static LLVMValueRef get_trampoline_do_not_sync_vector(HelperType h, LLVMValueRef
     LLVMAddAttributeAtIndex(trampoline, -1, NoInlineAttr);
     LLVMAddAttributeAtIndex(trampoline, -1, target_features_attr);
     LLVMAddAttributeAtIndex(trampoline, -1, NoUnwindAttr);
+    LLVMSetSection(trampoline, ".text.trampoline");
     int j = 0;
     LLVMValueRef param = NULL;
     for (j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
@@ -3095,7 +3116,8 @@ static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func
     LLVMAddAttributeAtIndex(handler, -1, NoInlineAttr);
     LLVMAddAttributeAtIndex(handler, -1, target_features_attr);
     LLVMAddAttributeAtIndex(handler, -1, NoUnwindAttr);
-    LLVMSetLinkage(handler, LLVMWeakAnyLinkage);
+    //LLVMSetLinkage(handler, LLVMWeakAnyLinkage);
+    LLVMSetSection(handler, ".text.trampoline");
     int j = 0;
     LLVMValueRef param = NULL;
     for (j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
@@ -3740,6 +3762,9 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_r
         LLVMAddAttributeAtIndex(func, -1, target_features_attr);
         LLVMAddAttributeAtIndex(func, -1, NoUnwindAttr);
         LLVMSetFunctionCallConv(func, QEMUAOT_CC);
+        char sec_name[128] = {0};
+        sprintf(sec_name, ".text.%s", name);
+        LLVMSetSection(func, sec_name);
     }
     return func;
 }
@@ -3863,6 +3888,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
         LLVMAddAttributeAtIndex(helper_func, -1, NoUnwindAttr);
         LLVMSetFunctionCallConv(helper_func, QEMUAOT_CC);
+        LLVMSetSection(helper_func, ".text.helper");
     }
     LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
 
@@ -3875,6 +3901,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
         LLVMTypeRef helper_jit_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
         helper_jit_func = LLVMAddFunction(module, helper_str[helper_jit], helper_jit_type);
         LLVMAddAttributeAtIndex(helper_jit_func, -1, NoUnwindAttr);
+        LLVMSetSection(helper_jit_func, ".text.helper");
     }
 
     LLVMValueRef jit_trampoline = get_trampoline(h, helper_jit_func, 0, 0, operands, is_imm, operands_cnt, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER);
@@ -4281,6 +4308,10 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         LLVMAddAttributeAtIndex(second_half_func, -1, target_features_attr);
         LLVMAddAttributeAtIndex(second_half_func, -1, NoUnwindAttr);
         LLVMSetFunctionCallConv(second_half_func, QEMUAOT_CC);
+        char sec_name[128] = {0};
+        sprintf(sec_name, ".text.%s", second_half_name);
+        LLVMSetSection(second_half_func, sec_name);
+        add_list_info(second_half_name, "define");
         register_labels_for_func(second_half_func);
     } else {
         second_half_already_exists = 1;
@@ -4298,6 +4329,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
             LLVMTypeRef helper_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
             helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
             LLVMAddAttributeAtIndex(helper_func, -1, NoUnwindAttr);
+            LLVMSetSection(helper_func, ".text.helper");
         }
         // FIXME: verify that stack point does not need adjustment, since QEMUAOT CC does not have prolog/epilog
         // Trampoline handles register-context switch
@@ -4643,6 +4675,10 @@ void translate_call(OpCodeType opc, void *ptr) {
         LLVMAddAttributeAtIndex(second_half_func, -1, target_features_attr);
         LLVMAddAttributeAtIndex(second_half_func, -1, NoUnwindAttr);
         LLVMSetFunctionCallConv(second_half_func, QEMUAOT_CC);
+        char sec_name[128] = {0};
+        sprintf(sec_name, ".text.%s", second_half_name);
+        LLVMSetSection(second_half_func, sec_name);
+        add_list_info(second_half_name, "define");
         register_labels_for_func(second_half_func);
     } else {
         second_half_already_exists = 1;
@@ -4656,6 +4692,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         LLVMTypeRef helper_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
         helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
         LLVMAddAttributeAtIndex(helper_func, -1, NoUnwindAttr);
+        LLVMSetSection(helper_func, ".text.helper");
     }
     LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
 
@@ -5131,6 +5168,7 @@ void handle_func(uint64_t val, int is_external) {
         LLVMSetLinkage(llvm_func, LLVMExternalLinkage);
         LLVMAddAttributeAtIndex(llvm_func, -1, NoInlineAttr);
     }
+    add_list_info(func_name, "define");
     for (int j = 0; j < FIXED_VECTOR_PARAM_COUNT; j++) {
         LLVMValueRef param = LLVMGetParam(llvm_func, j);
         LLVMSetValueName(param, fixed_vector_arg_names[j]);
@@ -5795,11 +5833,11 @@ void module_epilog() {
 #ifdef DUMP_IR
     LLVMDumpModule(module);
 #endif
-#if 1
     LLVMValueRef function = LLVMGetFirstFunction(module);
     while (function != NULL) {
         if (LLVMIsAFunction(function)) {
             if (LLVMIsDeclaration(function) && strstr(LLVMGetValueName(function), "func_")) {
+                LLVMSetSection(function, ".text.declare_only");
                 LLVMSetLinkage(function, LLVMWeakAnyLinkage);
                 LLVMAddAttributeAtIndex(function, -1, NoInlineAttr);
                 LLVMAddAttributeAtIndex(function, -1, target_features_attr);
@@ -5869,7 +5907,6 @@ void module_epilog() {
     }
     printf("Object file %s generated successfully.\n", output_file);
     fflush(NULL);
-#endif
     LLVMDisposeModule(module);
 }
 
@@ -5916,6 +5953,8 @@ int main(int argc, const char *argv[]) {
     p = realpath(argv[1], input_path);
     assert(p);
     sprintf(output_file, "%s.o", input_path);
+    sprintf(list_file, "%s.text.list", input_path);
+    init_list_file(list_file);
     // Get output path
     p = realpath(argv[1], output_path);
     assert(p);
@@ -5987,5 +6026,6 @@ int main(int argc, const char *argv[]) {
     module_prolog();
     parse_tcg_instructions(input_path);
     module_epilog();
+    fini_list_file();
     return 0;
 }
