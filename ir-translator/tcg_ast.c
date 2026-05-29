@@ -141,7 +141,7 @@
             create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
         } else {                                    \
             assert(OPC_OUTPUT_T != LLVMInvalidType);  \
-            tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? not_i32 : not_i64;      \
+            tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? and_i32 : and_i64;      \
             create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
         }                                           \
         translate_binary(tmp_opc.o, buf, LLVMBuildAnd);     \
