@@ -2773,6 +2773,30 @@ void translate_set_label(OpCodeType opc, void *ptr) {
     }
 }
 
+void translate_set_label_fix_branch(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    DECLARE_AND_INIT_TYPE_FOR_SCALAR;
+    uint8_t l = get_label(ptr);
+    char lstr[16];
+    sprintf(lstr, "bb_L%d", l);
+    LLVMBasicBlockRef label = get_bb(lstr);
+    if (!label) {
+        label = LLVMAppendBasicBlock(llvm_func, lstr);
+    }
+    assert(last_active_bb);
+    LLVMValueRef instr = LLVMGetLastInstruction(last_active_bb);
+    if (instr) {
+        LLVMOpcode opc_llvm = LLVMGetInstructionOpcode(instr);
+        if (opc_llvm != LLVMRet && opc_llvm != LLVMBr) {
+            LLVMBuildBr(builder, label);
+        }
+    } else {
+        LLVMBuildBr(builder, label);
+    }
+}
+
 void translate_jmp_direct(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
@@ -5200,6 +5224,10 @@ void handle_func(uint64_t val, int is_external) {
                 assert(ptr_tmp < ptr_max);
                 for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
                     OpCodeType opc = get_opcode(ptr_tmp);
+                    if (opc == set_label && get_label(ptr_tmp) != tgt_lbl) {
+                        translate_set_label_fix_branch(opc, ptr_tmp);
+                        break;
+                    }
                     handle_single_instr(opc, ptr_tmp);
                     memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
                     if (is_opc_end_of_control_flow(opc, ptr_tmp)) {

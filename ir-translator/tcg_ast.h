@@ -1923,6 +1923,7 @@ void translate_sextract_i64(OpCodeType opc, void *ptr);
 void translate_st(OpCodeType opc, void *ptr);
 void translate_bswap64_i64(OpCodeType opc, void *ptr);
 void translate_set_label(OpCodeType opc, void *ptr);
+void translate_set_label_fix_branch(OpCodeType opc, void *ptr);
 void translate_brcond_i64(OpCodeType opc, void *ptr);
 void translate_jmp_direct(OpCodeType opc, void *ptr);
 void translate_discard(OpCodeType opc, void *ptr);
