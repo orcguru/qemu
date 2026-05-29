@@ -1498,13 +1498,18 @@ void translate_rotr(OpCodeType opc, void *ptr) {
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType t0 = get_tmp_and_do_alloc(type_out);
     OperandType t1 = get_tmp_and_do_alloc(type_out);
+    OperandType t2 = get_tmp_and_do_alloc(type_out);
+    OperandType t3 = get_tmp_and_do_alloc(type_out);
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
 
-    CREATE_SHR_SLOT(t0, operand1, operand2);
+    OperandType mask = get_tmp_and_do_alloc_with_init(type_out, type_out == LLVMInt32 ? (32-1) : (64-1));
+    CREATE_AND(t2, operand2, mask);
+    CREATE_SHR_SLOT(t0, operand1, t2);
     OperandType constant = get_tmp_and_do_alloc_with_init(type_out, type_out == LLVMInt32 ? 32 : 64);
     CREATE_SUB(t1, constant, operand2);
-    CREATE_SHL_SLOT(t1, operand1, t1);
+    CREATE_AND(t3, t1, mask);
+    CREATE_SHL_SLOT(t1, operand1, t3);
     CREATE_OR(operand0, t0, t1);
 }
 
@@ -1515,15 +1520,20 @@ void translate_rotl(OpCodeType opc, void *ptr) {
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType t0 = get_tmp_and_do_alloc(type_out);
     OperandType t1 = get_tmp_and_do_alloc(type_out);
+    OperandType t2 = get_tmp_and_do_alloc(type_out);
+    OperandType t3 = get_tmp_and_do_alloc(type_out);
     OperandType operand0, operand1, operand2;
     uint32_t is_imm2;
     GET_2_OPERANDS();
     operand2 = get_operand(ptr, 2, &is_imm2);
 
+    OperandType mask_slot = get_tmp_and_do_alloc_with_init(type_out, type_out == LLVMInt32 ? (32-1) : (64-1));
     if (is_imm2) {
-        CREATE_SHL(t0, operand1, operand2.i);
+        uint64_t mask = (type_out == LLVMInt32 ? (32-1) : (64-1));
+        CREATE_SHL(t0, operand1, (operand2.i & mask));
     } else {
-        CREATE_SHL_SLOT(t0, operand1, operand2);
+        CREATE_AND(t2, operand2, mask_slot);
+        CREATE_SHL_SLOT(t0, operand1, t2);
     }
     if (is_imm2) {
         t1 = get_tmp_and_do_alloc_with_init(type_out, ((type_out == LLVMInt32 ? 32 : 64) - operand2.i));
@@ -1531,7 +1541,8 @@ void translate_rotl(OpCodeType opc, void *ptr) {
         OperandType constant = get_tmp_and_do_alloc_with_init(type_out, type_out == LLVMInt32 ? 32 : 64);
         CREATE_SUB(t1, constant, operand2);
     }
-    CREATE_SHR_SLOT(t1, operand1, t1);
+    CREATE_AND(t3, t1, mask_slot);
+    CREATE_SHR_SLOT(t1, operand1, t3);
     CREATE_OR(operand0, t0, t1);
 }
 
