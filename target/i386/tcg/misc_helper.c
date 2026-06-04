@@ -489,7 +489,7 @@ const char *x64_reg_name[16] = {"RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI",
 const char *segment_base_name[6] = {"ES_BASE", "CS_BASE", "SS_BASE", "DS_BASE", "FS_BASE", "GS_BASE"};
 unsigned long dump_cnt = 0;
 
-#define DUMP_SHADOW_JUMP_TABLE  1
+//#define DUMP_SHADOW_JUMP_TABLE  1
 #ifdef DUMP_SHADOW_JUMP_TABLE
 unsigned long prev_rip = -1UL;
 unsigned long prev_func = -1UL;
