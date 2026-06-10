@@ -29,7 +29,7 @@
 #define TRAMPOLINE_CNT_OFFSET       104
 #define HELPER_COUNTERS_OFFSET      128
 //#define DEBUG_RET                   1
-//#define BUILD_RISCV_ON_AARCH        1
+#define BUILD_RISCV_ON_AARCH        1
 //#define DUMP_IR                     1
 //#define VERBOSE_VAR                 1
 //#define DEBUG                       1
