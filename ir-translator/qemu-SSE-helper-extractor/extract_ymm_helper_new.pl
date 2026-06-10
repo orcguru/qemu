@@ -12,7 +12,7 @@ if ($#ARGV < 1) {
   exit 1;
 }
 
-my $arch_info = `uname -m`;
+my $arch_info = "riscv64";
 chomp($arch_info);
 my %VecCodeToCType = (
   "VecQ" => "v4ulong",
