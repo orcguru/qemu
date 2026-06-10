@@ -25,7 +25,7 @@
 #define SHADOW_JUMP_TABLE_BLOCK_SIZE    32
 //#define DISABLE_JUMP_TABLE_CACHE    1
 //#define COLLECT_TRAMPOLINE_IR       1
-#define HELPER_COUNTERS             1
+//#define HELPER_COUNTERS             1
 #define TRAMPOLINE_CNT_OFFSET       104
 #define HELPER_COUNTERS_OFFSET      128
 //#define DEBUG_RET                   1
