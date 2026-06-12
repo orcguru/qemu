@@ -25,11 +25,7 @@
 #include "tcg/helper-tcg.h"
 #include "tcg/seg_helper.h"
 
-#ifdef AOT_IR
-void helper_syscall(CPUX86State *env, int next_eip_addend, uint64_t rip)
-#else
 void helper_syscall(CPUX86State *env, int next_eip_addend)
-#endif
 {
     CPUState *cs = env_cpu(env);
 

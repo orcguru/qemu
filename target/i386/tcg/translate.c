@@ -143,9 +143,6 @@ typedef struct DisasContext {
     TCGOp *prev_insn_end;
 #ifdef AOT_IR
     target_ulong rip_at_exit;
-    bool last_rip_add;
-    bool last_rip_mov;
-    TCGv last_rip_mov_src;
     bool eip_next_tl_set;
     TCGv eip_next_tl_val;
     target_ulong eip_next_pc;
@@ -513,15 +510,8 @@ static void gen_add_A0_im(DisasContext *s, int val)
 
 static inline void gen_op_jmp_v(DisasContext *s, TCGv dest)
 {
-#ifdef AOT_IR
-    s->pc_save = -1;
-    s->last_rip_add = false;
-    s->last_rip_mov = true;
-    s->last_rip_mov_src = dest;
-#else
     tcg_gen_mov_tl(cpu_eip, dest);
     s->pc_save = -1;
-#endif
 }
 
 static inline void gen_op_add_reg(DisasContext *s, MemOp size, int reg, TCGv val)
@@ -558,13 +548,10 @@ static void gen_update_eip_next(DisasContext *s)
 {
     assert(s->pc_save != -1);
     if (tb_cflags(s->base.tb) & CF_PCREL) {
-#ifndef AOT_IR
         tcg_gen_addi_tl(cpu_eip, cpu_eip, s->pc - s->pc_save);
-#else
+#ifdef AOT_IR
         s->rip_at_exit += (s->base.pc_next - s->pc_save);
         s->base.pc_acc += (s->pc - s->pc_save);
-        s->last_rip_add = true;
-        s->last_rip_mov = false;
 #endif
     } else if (CODE64(s)) {
         tcg_gen_movi_tl(cpu_eip, s->pc);
@@ -578,13 +565,10 @@ static void gen_update_eip_cur(DisasContext *s)
 {
     assert(s->pc_save != -1);
     if (tb_cflags(s->base.tb) & CF_PCREL) {
-#ifndef AOT_IR
         tcg_gen_addi_tl(cpu_eip, cpu_eip, s->base.pc_next - s->pc_save);
-#else
+#ifdef AOT_IR
         s->rip_at_exit += (s->base.pc_next - s->pc_save);
         s->base.pc_acc += (s->base.pc_next - s->pc_save);
-        s->last_rip_add = true;
-        s->last_rip_mov = false;
 #endif
     } else if (CODE64(s)) {
         tcg_gen_movi_tl(cpu_eip, s->base.pc_next);
@@ -632,12 +616,9 @@ static TCGv eip_next_tl(DisasContext *s)
 {
     assert(s->pc_save != -1);
     if (tb_cflags(s->base.tb) & CF_PCREL) {
-#ifndef AOT_IR
         TCGv ret = tcg_temp_new();
         tcg_gen_addi_tl(ret, cpu_eip, s->pc - s->pc_save);
-#else
-        TCGv ret = tcg_temp_new();
-        tcg_gen_addi_tl(ret, cpu_eip, (((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->pc - s->pc_save)) - pc_before));
+#ifdef AOT_IR
         s->eip_next_tl_set = true;
         s->eip_next_tl_val = ret;
         s->eip_next_pc = s->pc;
@@ -655,11 +636,7 @@ static TCGv eip_cur_tl(DisasContext *s)
     assert(s->pc_save != -1);
     if (tb_cflags(s->base.tb) & CF_PCREL) {
         TCGv ret = tcg_temp_new();
-#ifdef AOT_IR
-        tcg_gen_addi_tl(ret, cpu_eip, (((s->base.pc_first - x_load_addr + s->base.pc_acc) + (s->base.pc_next - s->pc_save)) - pc_before));
-#else
         tcg_gen_addi_tl(ret, cpu_eip, s->base.pc_next - s->pc_save);
-#endif
         return ret;
     } else if (CODE64(s)) {
         return tcg_constant_tl(s->base.pc_next);
@@ -1911,11 +1888,7 @@ static TCGv gen_lea_modrm_1(DisasContext *s, AddressParts a, bool is_vsib)
     if (!ea) {
         if (tb_cflags(s->base.tb) & CF_PCREL && a.base == -2) {
             /* With cpu_eip ~= pc_save, the expression is pc-relative. */
-#ifdef AOT_IR
-            tcg_gen_addi_tl(s->A0, cpu_eip, (((s->base.pc_first - x_load_addr + s->base.pc_acc) + (a.disp - s->pc_save)) - pc_before));
-#else
             tcg_gen_addi_tl(s->A0, cpu_eip, a.disp - s->pc_save);
-#endif
         } else {
             tcg_gen_movi_tl(s->A0, a.disp);
         }
@@ -2391,12 +2364,10 @@ gen_eob(DisasContext *s, int mode)
         // FIXME: need helper_rechecking_single_step???
         assert(s->base.jmp_type != TR_IS_RET && s->base.jmp_type != INVALID_TYPE);
         if (s->base.jmp_type == TR_IS_JMP) {
-            tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
             set_tb_jmp_target(s->base.tb, s->rip_at_exit);
             tcg_gen_jmp_direct(s->rip_at_exit);
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
-            tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
             set_tb_jmp_target(s->base.tb, s->rip_at_exit);
             tcg_gen_jmp_direct(s->rip_at_exit);
@@ -2415,16 +2386,12 @@ gen_eob(DisasContext *s, int mode)
 #ifdef AOT_IR
         assert(s->base.jmp_type != INVALID_TYPE);
         if (s->base.jmp_type == TR_IS_JMP) {
-            tcg_gen_mov_i64(cpu_eip, s->last_rip_mov_src);
             gen_helper_jmp_ind(tcg_env, cpu_eip);
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
-            tcg_gen_mov_i64(cpu_eip, s->last_rip_mov_src);
             gen_helper_jmp_ind(tcg_env, cpu_eip);
         } else if (s->base.jmp_type == TR_IS_RET) {
-            assert(s->last_rip_mov);
-            tcg_gen_mov_i64(cpu_eip, s->last_rip_mov_src);
             tcg_gen_ret(cpu_eip);
             gen_helper_jmp_ind(tcg_env, cpu_eip);
         } else if (s->base.jmp_type == TR_IS_IRET) {
@@ -2444,17 +2411,13 @@ gen_eob(DisasContext *s, int mode)
 #ifdef AOT_IR
         assert(s->base.jmp_type != INVALID_TYPE);
         if (s->base.jmp_type == TR_IS_JMP) {
-            tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
             set_tb_jmp_target(s->base.tb, s->rip_at_exit);
             tcg_gen_jmp_direct(s->rip_at_exit);
         } else if (s->base.jmp_type == TR_IS_RET) {
-            assert(s->last_rip_mov);
-            tcg_gen_mov_i64(cpu_eip, s->last_rip_mov_src);
             tcg_gen_ret(cpu_eip);
             gen_helper_jmp_ind(tcg_env, cpu_eip);
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
-            tcg_gen_addi_i64(cpu_eip, cpu_eip, ((s->rip_at_exit - x_load_addr) - pc_before));
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
             set_tb_jmp_target(s->base.tb, s->rip_at_exit);
             tcg_gen_jmp_direct(s->rip_at_exit);
@@ -2501,12 +2464,9 @@ static void gen_jmp_rel(DisasContext *s, MemOp ot, int diff, int tb_num)
 #endif
 
     if (tb_cflags(s->base.tb) & CF_PCREL) {
-#ifndef AOT_IR
         tcg_gen_addi_tl(cpu_eip, cpu_eip, new_pc - s->pc_save);
-#else
+#ifdef AOT_IR
         s->rip_at_exit += (new_pc - s->pc_save);
-        s->last_rip_add = true;
-        s->last_rip_mov = false;
 #endif
         /*
          * If we can prove the branch does not leave the page and we have
@@ -2527,17 +2487,13 @@ static void gen_jmp_rel(DisasContext *s, MemOp ot, int diff, int tb_num)
         /* jump to same page: we can use a direct jump */
         tcg_gen_goto_tb(tb_num);
         if (!(tb_cflags(s->base.tb) & CF_PCREL)) {
-#ifndef AOT_IR
             tcg_gen_movi_tl(cpu_eip, new_eip);
-#endif
         }
         tcg_gen_exit_tb(s->base.tb, tb_num);
         s->base.is_jmp = DISAS_NORETURN;
     } else {
         if (!(tb_cflags(s->base.tb) & CF_PCREL)) {
-#ifndef AOT_IR
             tcg_gen_movi_tl(cpu_eip, new_eip);
-#endif
         }
         if (s->jmp_opt) {
             gen_eob(s, DISAS_JUMP);   /* jump to another page */
