@@ -1575,12 +1575,18 @@ static void gen_BZHI(DisasContext *s, X86DecodedInsn *decode)
 static void gen_CALL(DisasContext *s, X86DecodedInsn *decode)
 {
     gen_push_v(s, eip_next_tl(s));
+#ifdef AOT
+    s->base.jmp_type = TR_IS_CALL;
+#endif
     gen_JMP(s, decode);
 }
 
 static void gen_CALL_m(DisasContext *s, X86DecodedInsn *decode)
 {
     gen_push_v(s, eip_next_tl(s));
+#ifdef AOT
+    s->base.jmp_type = TR_IS_CALL;
+#endif
     gen_JMP_m(s, decode);
 }
 
@@ -2312,6 +2318,11 @@ static void gen_JCXZ(DisasContext *s, X86DecodedInsn *decode)
 static void gen_JMP(DisasContext *s, X86DecodedInsn *decode)
 {
     gen_update_cc_op(s);
+#ifdef AOT
+    if (s->base.jmp_type != TR_IS_CALL) {
+        s->base.jmp_type = TR_IS_JMP;
+    }
+#endif
     gen_jmp_rel(s, s->dflag, decode->immediate, 0);
 }
 
@@ -2320,6 +2331,11 @@ static void gen_JMP_m(DisasContext *s, X86DecodedInsn *decode)
     gen_op_jmp_v(s, s->T0);
     gen_bnd_jmp(s);
     s->base.is_jmp = DISAS_JUMP;
+#ifdef AOT
+    if (s->base.jmp_type != TR_IS_CALL) {
+        s->base.jmp_type = TR_IS_JMP;
+    }
+#endif
 }
 
 static void gen_JMPF(DisasContext *s, X86DecodedInsn *decode)
@@ -3601,6 +3617,9 @@ static void gen_RET(DisasContext *s, X86DecodedInsn *decode)
     gen_op_jmp_v(s, s->T0);
     gen_bnd_jmp(s);
     s->base.is_jmp = DISAS_JUMP;
+#ifdef AOT
+    s->base.jmp_type = TR_IS_RET;
+#endif
 }
 
 static void gen_RETF(DisasContext *s, X86DecodedInsn *decode)
@@ -4155,18 +4174,27 @@ static void gen_SYSCALL(DisasContext *s, X86DecodedInsn *decode)
      * generated after one has entered CPL0 if TF is set in FMASK.
      */
     s->base.is_jmp = DISAS_EOB_RECHECK_TF;
+#ifdef AOT
+    s->base.jmp_type = TR_IS_SYSCALL;
+#endif
 }
 
 static void gen_SYSENTER(DisasContext *s, X86DecodedInsn *decode)
 {
     gen_helper_sysenter(tcg_env);
     s->base.is_jmp = DISAS_EOB_ONLY;
+#ifdef AOT
+    s->base.jmp_type = TR_IS_JMP;
+#endif
 }
 
 static void gen_SYSEXIT(DisasContext *s, X86DecodedInsn *decode)
 {
     gen_helper_sysexit(tcg_env, tcg_constant_i32(s->dflag - 1));
     s->base.is_jmp = DISAS_EOB_ONLY;
+#ifdef AOT
+    s->base.jmp_type = TR_IS_JMP;
+#endif
 }
 
 static void gen_SYSRET(DisasContext *s, X86DecodedInsn *decode)

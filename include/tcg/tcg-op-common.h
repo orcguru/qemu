@@ -560,6 +560,12 @@ static inline void tcg_gen_trunc_ptr_i32(TCGv_i32 r, TCGv_ptr a)
 #endif
 }
 
+#ifdef AOT
+void tcg_gen_jmp_direct(unsigned long tgt);
+void tcg_gen_push_ret_addr(TCGv_i64 x64_next_eip, unsigned long tgt);
+void tcg_gen_ret(void);
+#endif
+
 #undef PTR
 #undef NAT
 

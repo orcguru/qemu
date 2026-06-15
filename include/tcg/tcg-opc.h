@@ -184,6 +184,12 @@ DEF(cmp_vec, 1, 2, 1, TCG_OPF_VECTOR)
 DEF(bitsel_vec, 1, 3, 0, TCG_OPF_VECTOR)
 DEF(cmpsel_vec, 1, 4, 1, TCG_OPF_VECTOR)
 
+#ifdef AOT
+DEF(jmp_direct, 0, 0, 1, TCG_OPF_NOT_PRESENT)
+DEF(push_ret_addr, 0, 1, 1, TCG_OPF_NOT_PRESENT)
+DEF(ret, 0, 0, 1, TCG_OPF_NOT_PRESENT)
+#endif
+
 DEF(last_generic, 0, 0, 0, TCG_OPF_NOT_PRESENT)
 
 #include "tcg-target-opc.h.inc"

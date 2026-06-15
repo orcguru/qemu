@@ -3274,3 +3274,30 @@ void tcg_gen_lookup_and_goto_ptr(void)
     tcg_gen_op1i(INDEX_op_goto_ptr, TCG_TYPE_PTR, tcgv_ptr_arg(ptr));
     tcg_temp_free_ptr(ptr);
 }
+
+#ifdef AOT
+static void DNI tcg_gen_op2i_i64(TCGOpcode opc, TCGv_i64 a1, TCGArg a2)
+{
+    tcg_gen_op2(opc, TCG_TYPE_I64, tcgv_i64_arg(a1), a2);
+}
+
+#include "tcg/tcg-aot.h"
+extern int collect_jit_ir;
+extern jit_ir_dump_info_t jid;
+
+void tcg_gen_jmp_direct(unsigned long tgt)
+{
+    tcg_gen_op1i(INDEX_op_jmp_direct, TCG_TYPE_PTR, (tgt - jid.x_load_addr) - jid.pc_before);
+}
+
+void tcg_gen_push_ret_addr(TCGv_i64 x64_next_eip, unsigned long tgt)
+{
+    tcg_gen_op2i_i64(INDEX_op_push_ret_addr, x64_next_eip, (tgt - jid.x_load_addr));
+}
+
+// WORKAROUND: "ret rip" can trigger error in temp_save
+void tcg_gen_ret(void)
+{
+    tcg_gen_op1i(INDEX_op_ret, TCG_TYPE_PTR, 0);
+}
+#endif

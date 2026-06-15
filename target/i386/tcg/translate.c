@@ -141,6 +141,12 @@ typedef struct DisasContext {
     sigjmp_buf jmpbuf;
     TCGOp *prev_insn_start;
     TCGOp *prev_insn_end;
+#ifdef AOT
+    target_ulong rip_at_exit;
+    bool eip_next_tl_set;
+    TCGv eip_next_tl_val;
+    target_ulong eip_next_pc;
+#endif
 } DisasContext;
 
 /*
@@ -287,6 +293,12 @@ enum {
     USES_CC_SRC2 = 4,
     USES_CC_SRCT = 8,
 };
+
+#ifdef AOT
+#include "tcg/tcg-aot.h"
+extern int collect_jit_ir;
+extern jit_ir_dump_info_t jid;
+#endif
 
 /* Bit set if the global variable is live after setting CC_OP to X.  */
 static const uint8_t cc_op_live_[] = {
@@ -538,6 +550,9 @@ static void gen_update_eip_next(DisasContext *s)
     assert(s->pc_save != -1);
     if (tb_cflags(s->base.tb) & CF_PCREL) {
         tcg_gen_addi_tl(cpu_eip, cpu_eip, s->pc - s->pc_save);
+#ifdef AOT
+        s->rip_at_exit += (s->base.pc_next - s->pc_save);
+#endif
     } else if (CODE64(s)) {
         tcg_gen_movi_tl(cpu_eip, s->pc);
     } else {
@@ -551,6 +566,9 @@ static void gen_update_eip_cur(DisasContext *s)
     assert(s->pc_save != -1);
     if (tb_cflags(s->base.tb) & CF_PCREL) {
         tcg_gen_addi_tl(cpu_eip, cpu_eip, s->base.pc_next - s->pc_save);
+#ifdef AOT
+        s->rip_at_exit += (s->base.pc_next - s->pc_save);
+#endif
     } else if (CODE64(s)) {
         tcg_gen_movi_tl(cpu_eip, s->base.pc_next);
     } else {
@@ -599,6 +617,11 @@ static TCGv eip_next_tl(DisasContext *s)
     if (tb_cflags(s->base.tb) & CF_PCREL) {
         TCGv ret = tcg_temp_new();
         tcg_gen_addi_tl(ret, cpu_eip, s->pc - s->pc_save);
+#ifdef AOT
+        s->eip_next_tl_set = true;
+        s->eip_next_tl_val = ret;
+        s->eip_next_pc = s->pc;
+#endif
         return ret;
     } else if (CODE64(s)) {
         return tcg_constant_tl(s->pc);
@@ -1445,6 +1468,10 @@ static void do_gen_rep(DisasContext *s, MemOp ot, TCGv dshift,
     }
 
     /* Go to the main loop but reenter the same instruction.  */
+#ifdef AOT
+    // FIXME: do verify!
+    s->base.jmp_type = TR_IS_JMP;
+#endif
     gen_jmp_rel_csize(s, -cur_insn_len(s), 0);
 
     if (can_loop) {
@@ -1465,6 +1492,9 @@ static void do_gen_rep(DisasContext *s, MemOp ot, TCGv dshift,
     if (had_rf) {
         gen_reset_eflags(s, RF_MASK);
     }
+#ifdef AOT
+    s->base.jmp_type = TR_IS_JMP;
+#endif
     gen_jmp_rel_csize(s, 0, 1);
 }
 
@@ -1997,6 +2027,9 @@ static void gen_conditional_jump_labels(DisasContext *s, target_long diff,
     if (not_taken) {
         gen_set_label(not_taken);
     }
+#ifdef AOT
+    s->base.jmp_type = TR_IS_JMP;
+#endif
     gen_jmp_rel_csize(s, 0, 1);
 
     gen_set_label(taken);
@@ -2306,6 +2339,20 @@ gen_eob(DisasContext *s, int mode)
         gen_reset_eflags(s, RF_MASK);
     }
     if (mode == DISAS_EOB_RECHECK_TF) {
+#ifdef AOT
+        // FIXME: need helper_rechecking_single_step???
+        assert(s->base.jmp_type != TR_IS_RET && s->base.jmp_type != INVALID_TYPE);
+        if (s->base.jmp_type == TR_IS_JMP) {
+            tcg_gen_jmp_direct(s->rip_at_exit);
+        } else if (s->base.jmp_type == TR_IS_CALL) {
+            assert(s->eip_next_tl_set);
+            tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
+            tcg_gen_jmp_direct(s->rip_at_exit);
+        } else if (s->base.jmp_type == TR_IS_SYSCALL) {
+        } else {
+            assert(0);
+        }
+#endif
         gen_helper_rechecking_single_step(tcg_env);
         tcg_gen_exit_tb(NULL, 0);
     } else if (s->flags & HF_TF_MASK) {
@@ -2313,8 +2360,34 @@ gen_eob(DisasContext *s, int mode)
     } else if (mode == DISAS_JUMP &&
                /* give irqs a chance to happen */
                !inhibit_reset) {
+#ifdef AOT
+        assert(s->base.jmp_type != INVALID_TYPE);
+        if (s->base.jmp_type == TR_IS_JMP) {
+        } else if (s->base.jmp_type == TR_IS_CALL) {
+            assert(s->eip_next_tl_set);
+            tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
+        } else if (s->base.jmp_type == TR_IS_RET) {
+            tcg_gen_ret();
+        } else {
+            assert(0);
+        }
+#endif
         tcg_gen_lookup_and_goto_ptr();
     } else {
+#ifdef AOT
+        assert(s->base.jmp_type != INVALID_TYPE);
+        if (s->base.jmp_type == TR_IS_JMP) {
+            tcg_gen_jmp_direct(s->rip_at_exit);
+        } else if (s->base.jmp_type == TR_IS_RET) {
+            tcg_gen_ret();
+        } else if (s->base.jmp_type == TR_IS_CALL) {
+            assert(s->eip_next_tl_set);
+            tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
+            tcg_gen_jmp_direct(s->rip_at_exit);
+        } else {
+            assert(0);
+        }
+#endif
         tcg_gen_exit_tb(NULL, 0);
     }
 
@@ -2343,16 +2416,24 @@ static void gen_jmp_rel(DisasContext *s, MemOp ot, int diff, int tb_num)
         }
     }
     new_eip &= mask;
+#ifdef AOT
+    target_ulong rip_at_exit_backup = s->rip_at_exit;
+#endif
 
     if (tb_cflags(s->base.tb) & CF_PCREL) {
         tcg_gen_addi_tl(cpu_eip, cpu_eip, new_pc - s->pc_save);
+#ifdef AOT
+        s->rip_at_exit += (new_pc - s->pc_save);
+#endif
         /*
          * If we can prove the branch does not leave the page and we have
          * no extra masking to apply (data16 branch in code32, see above),
          * then we have also proven that the addition does not wrap.
          */
         if (!use_goto_tb || !translator_is_same_page(&s->base, new_pc)) {
+#ifndef AOT
             tcg_gen_andi_tl(cpu_eip, cpu_eip, mask);
+#endif
             use_goto_tb = false;
         }
     } else if (!CODE64(s)) {
@@ -2377,6 +2458,9 @@ static void gen_jmp_rel(DisasContext *s, MemOp ot, int diff, int tb_num)
             gen_eob(s, DISAS_EOB_ONLY);  /* exit to main loop */
         }
     }
+#ifdef AOT
+    s->rip_at_exit = rip_at_exit_backup;
+#endif
 }
 
 /* Jump to eip+diff, truncating to the current code size. */
@@ -3910,6 +3994,9 @@ static void i386_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
         break;
     case DISAS_TOO_MANY:
         gen_update_cc_op(dc);
+#ifdef AOT
+        dc->base.jmp_type = TR_IS_JMP;
+#endif
         gen_jmp_rel_csize(dc, 0, 0);
         break;
     case DISAS_EOB_NEXT:
@@ -3945,6 +4032,11 @@ void x86_translate_code(CPUState *cpu, TranslationBlock *tb,
                         int *max_insns, vaddr pc, void *host_pc)
 {
     DisasContext dc;
+
+#ifdef AOT
+    memset(&dc, 0, sizeof(dc));
+    dc.rip_at_exit = pc;
+#endif
 
 #ifdef AOT
     if (unlikely(collect_jit_ir)) {

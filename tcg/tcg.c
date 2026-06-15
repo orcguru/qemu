@@ -6974,6 +6974,12 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
         TCGOpcode opc = op->opc;
 
         switch (opc) {
+#ifdef AOT
+        case INDEX_op_jmp_direct:
+        case INDEX_op_push_ret_addr:
+        case INDEX_op_ret:
+            break;
+#endif
         case INDEX_op_extrl_i64_i32:
             assert(TCG_TARGET_REG_BITS == 64);
             /*
