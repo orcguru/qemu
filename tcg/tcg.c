@@ -7350,16 +7350,3 @@ void tcg_expand_vec_op(TCGOpcode o, TCGType t, unsigned e, TCGArg a0, ...)
     g_assert_not_reached();
 }
 #endif
-
-#ifdef AOT_IR
-#include "exec/translator.h"
-control_transfer_type_t get_jmp(void)
-{
-    return TR_IS_JMP;
-}
-
-control_transfer_type_t get_call(void)
-{
-    return TR_IS_CALL;
-}
-#endif
