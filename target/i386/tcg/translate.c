@@ -551,7 +551,6 @@ static void gen_update_eip_next(DisasContext *s)
         tcg_gen_addi_tl(cpu_eip, cpu_eip, s->pc - s->pc_save);
 #ifdef AOT_IR
         s->rip_at_exit += (s->base.pc_next - s->pc_save);
-        s->base.pc_acc += (s->pc - s->pc_save);
 #endif
     } else if (CODE64(s)) {
         tcg_gen_movi_tl(cpu_eip, s->pc);
@@ -568,7 +567,6 @@ static void gen_update_eip_cur(DisasContext *s)
         tcg_gen_addi_tl(cpu_eip, cpu_eip, s->base.pc_next - s->pc_save);
 #ifdef AOT_IR
         s->rip_at_exit += (s->base.pc_next - s->pc_save);
-        s->base.pc_acc += (s->base.pc_next - s->pc_save);
 #endif
     } else if (CODE64(s)) {
         tcg_gen_movi_tl(cpu_eip, s->base.pc_next);
@@ -2371,6 +2369,7 @@ gen_eob(DisasContext *s, int mode)
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
             set_tb_jmp_target(s->base.tb, s->rip_at_exit);
             tcg_gen_jmp_direct(s->rip_at_exit);
+        } else if (s->base.jmp_type == TR_IS_SYSCALL) {
         } else {
             assert(0);
         }
