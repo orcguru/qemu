@@ -1470,7 +1470,7 @@ static void do_gen_rep(DisasContext *s, MemOp ot, TCGv dshift,
 
     /* Go to the main loop but reenter the same instruction.  */
 #ifdef AOT_IR
-    s->base.jmp_type = get_jmp();
+    s->base.jmp_type = TR_IS_JMP;
 #endif
     gen_jmp_rel_csize(s, -cur_insn_len(s), 0);
 
@@ -1493,7 +1493,7 @@ static void do_gen_rep(DisasContext *s, MemOp ot, TCGv dshift,
         gen_reset_eflags(s, RF_MASK);
     }
 #ifdef AOT_IR
-    s->base.jmp_type = get_jmp();
+    s->base.jmp_type = TR_IS_JMP;
 #endif
     gen_jmp_rel_csize(s, 0, 1);
 }
@@ -2030,7 +2030,7 @@ static void gen_conditional_jump_labels(DisasContext *s, target_long diff,
         gen_set_label(not_taken);
     }
 #ifdef AOT_IR
-    s->base.jmp_type = get_jmp();
+    s->base.jmp_type = TR_IS_JMP;
 #endif
     gen_jmp_rel_csize(s, 0, 1);
 
@@ -4030,7 +4030,7 @@ static void i386_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
     case DISAS_TOO_MANY:
         gen_update_cc_op(dc);
 #ifdef AOT_IR
-        dc->base.jmp_type = get_jmp();
+        dc->base.jmp_type = TR_IS_JMP;
 #endif
         gen_jmp_rel_csize(dc, 0, 0);
         break;
@@ -4039,7 +4039,7 @@ static void i386_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
     case DISAS_EOB_INHIBIT_IRQ:
         assert(dc->base.pc_next == dc->pc);
         gen_update_eip_cur(dc);
-        dc->base.jmp_type = get_jmp();
+        dc->base.jmp_type = TR_IS_JMP;
         gen_eob(dc, dc->base.is_jmp);
         break;
     case DISAS_EOB_ONLY:
@@ -4054,7 +4054,7 @@ static void i386_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
     case DISAS_NEXT:
         gen_update_cc_op(dc);
         gen_update_eip_cur(dc);
-        dc->base.jmp_type = get_jmp();
+        dc->base.jmp_type = TR_IS_JMP;
         gen_eob(dc, dc->base.is_jmp);
         break;
 #else

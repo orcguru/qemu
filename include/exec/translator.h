@@ -59,10 +59,6 @@ typedef enum control_transfer_type {
     TR_IS_LJMP,
     TR_IS_LRET,
 } control_transfer_type_t;
-
-// For debug
-control_transfer_type_t get_jmp(void);
-control_transfer_type_t get_call(void);
 #endif
 
 /**
