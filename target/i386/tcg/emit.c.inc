@@ -4170,9 +4170,6 @@ static void gen_SYSCALL(DisasContext *s, X86DecodedInsn *decode)
 {
     gen_update_cc_op(s);
     gen_update_eip_cur(s);
-#ifdef AOT_IR
-    pc_before = (s->base.pc_first - x_load_addr + s->base.pc_acc);
-#endif
     gen_helper_syscall(tcg_env, cur_insn_len_i32(s));
     if (LMA(s)) {
         assume_cc_op(s, CC_OP_EFLAGS);
@@ -4185,8 +4182,7 @@ static void gen_SYSCALL(DisasContext *s, X86DecodedInsn *decode)
      */
     s->base.is_jmp = DISAS_EOB_RECHECK_TF;
 #ifdef AOT_IR
-    s->base.jmp_type = TR_IS_JMP;
-    s->rip_at_exit += (s->pc - s->pc_save);
+    s->base.jmp_type = TR_IS_SYSCALL;
 #endif
 }
 
