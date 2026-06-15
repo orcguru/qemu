@@ -214,10 +214,14 @@ void translator_loop(CPUState *cpu, TranslationBlock *tb, int *max_insns,
     } else {
         tcg_debug_assert(first_insn_start != db->insn_start);
         tcg_ctx->emit_before_op = first_insn_start;
+#ifndef AOT
         set_can_do_io(db, false);
+#endif
     }
     tcg_ctx->emit_before_op = db->insn_start;
+#ifndef AOT
     set_can_do_io(db, true);
+#endif
     tcg_ctx->emit_before_op = NULL;
 
     /* May be used by disas_log or plugin callbacks. */

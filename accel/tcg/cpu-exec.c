@@ -924,6 +924,9 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
 extern aot_range_info_t *aot_info_list;
 extern unsigned long qemu_aot_target;
 extern unsigned long qemu_aot_target_exec_cnt;
+
+int collect_jit_ir = 0;
+jit_ir_dump_info_t jid;
 #endif
 
 static int __attribute__((noinline))
@@ -959,6 +962,7 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
             }
 
 #ifdef AOT
+            collect_jit_ir = 0;
             uint64_t entry = tb_aot_lookup_host_addr(s.pc);
             if (entry) {
                 tcg_qemu_aot_exec(cpu_env(cpu), (void *)entry, (void *)s.pc);
@@ -971,9 +975,48 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
                     info_ptr = info_ptr->next;
                 }
                 if (info_ptr) {
-                    if (!g_hash_table_contains((GHashTable *)info_ptr->log_msg, (gconstpointer)(s.pc - info_ptr->x_addr_range_begin))) {
-                        g_hash_table_insert((GHashTable *)info_ptr->log_msg, (gpointer)(s.pc - info_ptr->x_addr_range_begin), (gpointer)NULL);
+                    if (!g_hash_table_contains((GHashTable *)info_ptr->jit_hash, (gconstpointer)s.pc)) {
+                        JitRecord *jr = g_malloc(sizeof(JitRecord));
+                        assert(jr);
+                        jr->jit_pc = 0;
+                        jr->next = NULL;
+                        g_hash_table_insert((GHashTable *)info_ptr->jit_hash, (gpointer)s.pc, (gpointer)jr);
+                    }
+                    JitRecord *jr = g_hash_table_lookup((GHashTable *)info_ptr->jit_hash, (gconstpointer)s.pc);
+                    assert(jr);
+                    int found = 0;
+
+                    JitRecord *jr_loop_ptr = jr;
+                    while (jr_loop_ptr) {
+                        if (jr_loop_ptr->jit_pc == s.pc) {
+                            found = 1;
+                            break;
+                        }
+                        jr_loop_ptr = jr_loop_ptr->next;
+                    }
+
+                    if (!found) {
                         qemu_log_mask(LOG_AOT, "QEMU TCG JIT on %s offset:%lx\n", info_ptr->elf_name, (s.pc - info_ptr->x_addr_range_begin));
+                        JitRecord *jr_entry = g_malloc(sizeof(JitRecord));
+                        assert(jr_entry);
+                        jr_entry->jit_pc = s.pc;
+                        jr_entry->next = NULL;
+                        while (jr->next != NULL) {
+                            jr = jr->next;
+                        }
+                        jr->next = jr_entry;
+
+                        jid.x_load_addr = info_ptr->x_addr_range_begin;
+                        jid.pc_before = s.pc - jid.x_load_addr;
+                        if (!info_ptr->jit_ir_fd) {
+                            char jit_ir_name[512];
+                            sprintf(jit_ir_name, "%s.jit_ir", info_ptr->elf_name);
+                            info_ptr->jit_ir_fd = fopen(jit_ir_name, "w");
+                            assert(info_ptr->jit_ir_fd);
+                            jid.xmm_info_done = 0;
+                        }
+                        jid.jit_ir_fd = info_ptr->jit_ir_fd;
+                        collect_jit_ir = 1;
                     }
                     if (s.pc == qemu_legacy_log_func) {
                         if (qemu_aot_target_exec_cnt != 0) {

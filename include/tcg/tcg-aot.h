@@ -37,6 +37,11 @@ typedef struct CodeFragment {
     struct CodeFragment *next;
 } CodeFragment;
 
+typedef struct JitRecord {
+    uint64_t jit_pc;
+    struct JitRecord *next;
+} JitRecord;
+
 typedef struct helper_func {
   const char *name;
   uint64_t addr;
@@ -48,9 +53,17 @@ typedef struct aot_range_info {
     uint64_t x_addr_range_begin;
     uint64_t x_addr_range_end;
     char elf_name[256];
-    void *log_msg;
+    void *jit_hash;
+    FILE *jit_ir_fd;
     struct aot_range_info *next;
 } aot_range_info_t;
+
+typedef struct jit_ir_dump_info {
+    uintptr_t pc_before;
+    uintptr_t x_load_addr;
+    FILE *jit_ir_fd;
+    int xmm_info_done;
+} jit_ir_dump_info_t;
 
 // FIXME: definition should sync with <BRANCH:qemu-aot-ir-master-NEXT>/ir-translator/tcg_ast.h
 #define HELPER_LIST \

@@ -2940,8 +2940,13 @@ static inline TCGReg tcg_regset_first(TCGRegSet d)
 }
 
 /* Return only the number of characters output -- no error return. */
+#ifdef AOT
+#define ne_fprintf(...) \
+    ({ int ret_ = fprintf(__VA_ARGS__); fflush(f); ret_ >= 0 ? ret_ : 0; })
+#else
 #define ne_fprintf(...) \
     ({ int ret_ = fprintf(__VA_ARGS__); ret_ >= 0 ? ret_ : 0; })
+#endif
 
 void tcg_dump_ops(TCGContext *s, FILE *f, bool have_prefs)
 {
@@ -2959,12 +2964,15 @@ void tcg_dump_ops(TCGContext *s, FILE *f, bool have_prefs)
 
         if (c == INDEX_op_insn_start) {
             nb_oargs = 0;
+            /*
             col += ne_fprintf(f, "\n ----");
 
             for (i = 0, k = INSN_START_WORDS; i < k; ++i) {
                 col += ne_fprintf(f, " %016" PRIx64,
                                   tcg_get_insn_start_param(op, i));
             }
+            */
+            col += ne_fprintf(f, " $0x%lx:icount:%d:", tcg_get_insn_start_param(op, 0), s->gen_tb->icount);
         } else if (c == INDEX_op_call) {
             const TCGHelperInfo *info = tcg_call_info(op);
             void *func = tcg_call_func(op);
@@ -6851,6 +6859,11 @@ static void tcg_out_st_helper_args(TCGContext *s, const TCGLabelQemuLdst *ldst,
     tcg_out_helper_load_common_args(s, ldst, parm, info, next_arg);
 }
 
+#ifdef AOT
+extern int collect_jit_ir;
+extern jit_ir_dump_info_t jid;
+#endif
+
 int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
 {
     int i, num_insns;
@@ -6866,6 +6879,13 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
             qemu_log_unlock(logfile);
         }
     }
+
+#ifdef AOT
+    if (unlikely(collect_jit_ir)) {
+        tcg_dump_ops(s, jid.jit_ir_fd, false);
+        fprintf(jid.jit_ir_fd, "\n");
+    }
+#endif
 
 #ifdef CONFIG_DEBUG_TCG
     /* Ensure all labels referenced have been emitted.  */

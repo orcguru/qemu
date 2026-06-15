@@ -3804,6 +3804,12 @@ static void i386_tr_tb_start(DisasContextBase *db, CPUState *cpu)
 {
 }
 
+#ifdef AOT
+#include "tcg/tcg-aot.h"
+extern int collect_jit_ir;
+extern jit_ir_dump_info_t jid;
+#endif
+
 static void i386_tr_insn_start(DisasContextBase *dcbase, CPUState *cpu)
 {
     DisasContext *dc = container_of(dcbase, DisasContext, base);
@@ -3811,9 +3817,15 @@ static void i386_tr_insn_start(DisasContextBase *dcbase, CPUState *cpu)
 
     dc->prev_insn_start = dc->base.insn_start;
     dc->prev_insn_end = tcg_last_op();
+#ifndef AOT
     if (tb_cflags(dcbase->tb) & CF_PCREL) {
         pc_arg &= ~TARGET_PAGE_MASK;
     }
+#else
+    if (collect_jit_ir) {
+        pc_arg -= jid.x_load_addr;
+    }
+#endif
     tcg_gen_insn_start(pc_arg, dc->cc_op);
 }
 
@@ -3923,10 +3935,29 @@ static const TranslatorOps i386_tr_ops = {
     .tb_stop            = i386_tr_tb_stop,
 };
 
+#ifdef AOT
+#include "tcg/tcg-aot.h"
+extern int collect_jit_ir;
+extern jit_ir_dump_info_t jid;
+#endif
+
 void x86_translate_code(CPUState *cpu, TranslationBlock *tb,
                         int *max_insns, vaddr pc, void *host_pc)
 {
     DisasContext dc;
+
+#ifdef AOT
+    if (unlikely(collect_jit_ir)) {
+        if (!jid.xmm_info_done) {
+            for (int i = 0; i < 16; ++i) {
+                fprintf(jid.jit_ir_fd, "XMM%d:$0x%x\n", i, (int)offsetof(CPUX86State, xmm_regs[i]));
+            }
+            fprintf(jid.jit_ir_fd, "XMM_t0:$0x%x\n\n", (int)offsetof(CPUX86State, xmm_t0));
+            fflush(jid.jit_ir_fd);
+            jid.xmm_info_done = 1;
+        }
+    }
+#endif
 
     translator_loop(cpu, tb, max_insns, pc, host_pc, &i386_tr_ops, &dc.base);
 }
