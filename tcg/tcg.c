@@ -6976,8 +6976,10 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
         switch (opc) {
 #ifdef AOT
         case INDEX_op_jmp_direct:
-        case INDEX_op_push_ret_addr:
         case INDEX_op_ret:
+            break;
+        case INDEX_op_push_ret_addr:
+            temp_dead(s, arg_temp(op->args[0]));
             break;
 #endif
         case INDEX_op_extrl_i64_i32:
