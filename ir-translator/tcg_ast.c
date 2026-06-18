@@ -30,8 +30,8 @@
 #define HELPER_COUNTERS_OFFSET      128
 //#define DEBUG_RET                   1
 //#define BUILD_RISCV_ON_AARCH        1
-//#define DUMP_IR                     1
-//#define VERBOSE_VAR                 1
+#define DUMP_IR                     1
+#define VERBOSE_VAR                 1
 //#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
@@ -2819,7 +2819,7 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
     assert(is_imm);
 
     char func_name[64] = {0};
-    sprintf(func_name, "%s%sfunc_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", (current_func_offset + delta.i));
+    sprintf(func_name, "%s%sfunc_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", delta.i);
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT] = {NULL};
     int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_AND_VALUE, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, FIXED_VECTOR_PARAM_COUNT, call_args, func_name);

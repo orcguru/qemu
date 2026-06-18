@@ -3439,18 +3439,12 @@ static void DNI tcg_gen_op2i_i64(TCGOpcode opc, TCGv_i64 a1, TCGArg a2)
     tcg_gen_op2(opc, TCG_TYPE_I64, tcgv_i64_arg(a1), a2);
 }
 
-static void DNI tcg_gen_op3i_i64_2(TCGOpcode opc, TCGv_i64 a1, TCGArg a2, TCGArg a3)
-{
-    tcg_gen_op3(opc, TCG_TYPE_I64, tcgv_i64_arg(a1), a2, a3);
-}
-
 uintptr_t x_load_addr = 0;
-extern uintptr_t pc_before;
 extern uintptr_t branch_left;
 extern uintptr_t branch_right;
 void tcg_gen_jmp_direct(unsigned long tgt)
 {
-    tcg_gen_op1i(INDEX_op_jmp_direct, TCG_TYPE_PTR, (tgt - x_load_addr) - pc_before);
+    tcg_gen_op1i(INDEX_op_jmp_direct, TCG_TYPE_PTR, (tgt - x_load_addr));
     // FIXME
     if (branch_left == -1) {
         branch_left = (tgt - x_load_addr);
