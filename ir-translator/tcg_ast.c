@@ -30,8 +30,8 @@
 #define HELPER_COUNTERS_OFFSET      128
 //#define DEBUG_RET                   1
 //#define BUILD_RISCV_ON_AARCH        1
-#define DUMP_IR                     1
-#define VERBOSE_VAR                 1
+//#define DUMP_IR                     1
+//#define VERBOSE_VAR                 1
 //#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
