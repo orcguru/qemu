@@ -296,7 +296,6 @@ enum {
 
 #ifdef AOT_IR
 extern uintptr_t x_load_addr;
-extern uintptr_t pc_before;
 #endif
 
 /* Bit set if the global variable is live after setting CC_OP to X.  */

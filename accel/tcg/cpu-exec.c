@@ -1000,7 +1000,6 @@ typedef struct hole_desc {
 
 uintptr_t branch_left = -1UL;
 uintptr_t branch_right = -1UL;
-uintptr_t pc_before = -1;
 GHashTable *bb_split_htable = NULL;
 extern uintptr_t x_load_addr;
 extern unsigned long get_image_start_code(CPUState *cpu);
@@ -1110,6 +1109,7 @@ static void gen_tcg_ir(CPUState *cpu)
     uintptr_t last_branch_left = -1;
     uintptr_t last_branch_right = -1;
     uintptr_t pc_after = -1;
+    uintptr_t pc_before = -1;
     branch_left = -1;
     branch_right = -1;
 
