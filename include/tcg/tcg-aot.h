@@ -59,7 +59,6 @@ typedef struct aot_range_info {
 } aot_range_info_t;
 
 typedef struct jit_ir_dump_info {
-    uintptr_t pc_before;
     uintptr_t x_load_addr;
     FILE *jit_ir_fd;
     int xmm_info_done;

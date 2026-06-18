@@ -3287,7 +3287,7 @@ extern jit_ir_dump_info_t jid;
 
 void tcg_gen_jmp_direct(unsigned long tgt)
 {
-    tcg_gen_op1i(INDEX_op_jmp_direct, TCG_TYPE_PTR, (tgt - jid.x_load_addr) - jid.pc_before);
+    tcg_gen_op1i(INDEX_op_jmp_direct, TCG_TYPE_PTR, (tgt - jid.x_load_addr));
 }
 
 void tcg_gen_push_ret_addr(TCGv_i64 x64_next_eip, unsigned long tgt)

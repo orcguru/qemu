@@ -1007,7 +1007,6 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
                         jr->next = jr_entry;
 
                         jid.x_load_addr = info_ptr->x_addr_range_begin;
-                        jid.pc_before = s.pc - jid.x_load_addr;
                         if (!info_ptr->jit_ir_fd) {
                             char jit_ir_name[512];
                             sprintf(jit_ir_name, "%s.jit_ir", info_ptr->elf_name);
