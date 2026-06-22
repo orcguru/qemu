@@ -70,6 +70,8 @@ CPUState *cpu_create(const char *typename)
     }
 #ifdef AOT
     cpu->neg.iec.aot_cnt = 0;
+    cpu->neg.iec.aot_visit_ptr = (uint64_t *)g_malloc0(8*ELF_ADDRESS_RANGE);
+    assert(cpu->neg.iec.aot_visit_ptr);
     cpu->neg.iec2.jmp_ind_callback_cnt = 0;
     cpu->neg.iec2.trampoline_cnt = 0;
     cpu->neg.iec2.helper1_cnt = 0;

@@ -31,6 +31,9 @@
 #define AOT_LEVEL                   AOT_LEVEL_MAX
 #define SHADOW_JUMP_TABLE_BLOCK_SIZE    32
 
+// FIXME: sync below magic with split_tcg_ir.pl for performance evaluation
+#define ELF_ADDRESS_RANGE   0x200000
+
 typedef struct CodeFragment {
     uint64_t target_addr;
     uint64_t host_addr;

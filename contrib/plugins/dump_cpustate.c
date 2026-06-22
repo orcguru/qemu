@@ -57,6 +57,13 @@ static void dump_cpustate_stats(void *cpu_opaque)
             printf("    %s: %lu\n", helper_str[i], ptr_cnt[i]);
         }
     }
+    printf("---ELF range counters\n");
+    ptr_cnt = qemu_plugin_get_elf_range_counters_ptr();
+    for (int i = 0; i < ELF_ADDRESS_RANGE; ++i) {
+        if (ptr_cnt && ptr_cnt[i]) {
+            printf("  elf 0x%x: %lu\n", i, ptr_cnt[i]);
+        }
+    }
 }
 
 static void vcpu_exit_callback(qemu_plugin_id_t id, unsigned int cpu_index)

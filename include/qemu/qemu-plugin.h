@@ -616,6 +616,9 @@ uint64_t *qemu_plugin_get_helper2_cnt_ptr(void);
 QEMU_PLUGIN_API
 uint64_t *qemu_plugin_get_helper_counters_ptr();
 
+QEMU_PLUGIN_API
+uint64_t *qemu_plugin_get_elf_range_counters_ptr();
+
 /**
  * qemu_plugin_get_hwaddr() - return handle for memory operation
  * @info: opaque memory info structure
