@@ -774,6 +774,17 @@ typedef struct __attribute__((packed)) {
     uint16_t noargs         :1;
     uint16_t slot0_type     :2;
     uint16_t slot0_idx      :10;
+    uint64_t imm0;
+    uint64_t imm1;
+} Instr1BH212;
+
+typedef struct __attribute__((packed)) {
+    uint8_t instr_type      :1;
+    uint8_t instr_type_ext  :7;
+    uint16_t helper         :11;
+    uint16_t noargs         :1;
+    uint16_t slot0_type     :2;
+    uint16_t slot0_idx      :10;
     uint16_t slot1_type     :2;
     uint16_t slot1_idx      :10;
 } Instr1BH4S_ENV0;

@@ -144,7 +144,7 @@ target_ulong HELPER(rdpid)(CPUX86State *env)
 }
 
 #ifdef AOT_IR
-void helper_jmp_ind(CPUX86State *env, target_ulong t0) {}
+void helper_jmp_ind(target_ulong t0) {}
 void helper_iret_ind(CPUX86State *env) {}
 void helper_dump_load(CPUX86State *env, target_ulong t0, target_ulong t1) {}
 void helper_dump_store(CPUX86State *env, target_ulong t0, target_ulong t1) {}

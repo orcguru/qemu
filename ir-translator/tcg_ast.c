@@ -22,16 +22,14 @@
 #include <stdbool.h>
 #include <glib.h>
 
-#define SHADOW_JUMP_TABLE_BLOCK_SIZE    32
-//#define DISABLE_JUMP_TABLE_CACHE    1
 //#define COLLECT_TRAMPOLINE_IR       1
 //#define HELPER_COUNTERS             1
 #define TRAMPOLINE_CNT_OFFSET       104
 #define HELPER_COUNTERS_OFFSET      128
 //#define DEBUG_RET                   1
 //#define BUILD_RISCV_ON_AARCH        1
-//#define DUMP_IR                     1
-//#define VERBOSE_VAR                 1
+#define DUMP_IR                     1
+#define VERBOSE_VAR                 1
 //#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
@@ -521,7 +519,6 @@ extern const char *helper_str[];
 extern const char *xmmreg_str[];
 extern const uint64_t xreg_offsets[XREG_MAX];
 extern const CVectorType cvector_type_for_llvm_type[LLVMMAXType];
-extern const int helper_qemuaot_with_env[HELPER_MAX];
 extern const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS];
 extern const LLVMType helper_return_type[HELPER_MAX];
 extern const int helper_require_exception_path[HELPER_MAX];
@@ -726,23 +723,12 @@ static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr) {
     if (opc == jmp_direct) {
         return 1;
     } else if (opc == call) {
-#if AOT_LEVEL == AOT_LEVEL_MAX
         HelperType h = get_helper(ptr);
         if (h == helper_cc_compute_all || h == helper_cc_compute_c) {
             return 0;
         } else {
             return 1;
         }
-#elif AOT_LEVEL == AOT_LEVEL_1
-        HelperType h = get_helper(ptr);
-        if (h == helper_cc_compute_all || h == helper_cc_compute_c) {
-            return 0;
-        } else {
-            return 1;
-        }
-#elif AOT_LEVEL == AOT_LEVEL_0
-        return 1;
-#endif
     }
     return 0;
 }
@@ -1008,11 +994,7 @@ static void create_module(const char *module_name) {
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
     // Unfortunately on Spacemit(R) X60, following instruction requires alignment: vse64.v v30,(a4)
     //const char *attr_value = "+m,+a,+f,+d,+v,+unaligned-scalar-mem,+unaligned-vector-mem";
-#if AOT_LEVEL == AOT_LEVEL_0
-    const char *attr_value = "+m,+a,+f,+d";
-#else
     const char *attr_value = "+m,+a,+f,+d,+v";
-#endif
 #endif
     size_t attr_key_len = strlen(attr_key);
     size_t attr_value_len = strlen(attr_value);
@@ -1203,11 +1185,6 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
         CREATE_ADD64(tmp, env, env_var_offset[operand.s.slot_idx]);
         LLVMValueRef tmp_src = get_source_node_imm_or_stack(opc, 0, tmp, OPC_ADDR_T, 0);
         LLVMTypeRef val_type = type;
-#if AOT_LEVEL == AOT_LEVEL_0 || AOT_LEVEL == AOT_LEVEL_1
-        if (operand.s.slot_idx == cc_op) {
-            val_type = llvm_int_types[LLVMInt32];
-        }
-#endif
         LLVMValueRef ptr = LLVMBuildIntToPtr(builder, tmp_src, LLVMPointerType(val_type, 0), get_next_var_name("source_env_ptr_offset", operand));
         ret = build_load_with_alignment(builder, val_type, ptr, get_next_var_name("source_val", operand), 8);
         if (val_type != type) {
@@ -3655,10 +3632,7 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
                         if (operands[op_idx].s.slot_type == SUB_SLOT_XMM) {
                             continue;
                         } else if (operands[op_idx].s.slot_type == SUB_SLOT_ENV) {
-                            if (!helper_qemuaot_with_env[h]) {
-                                continue;
-                            }
-                            define_type(out_typeref, idx, LLVMInt64, out_typeref_limit);
+                            continue;
                         } else if (operands[op_idx].s.slot_type == SUB_SLOT_TMP) {
                             if (has_alias_xmm(operands[op_idx])) {
                                 continue;
@@ -3725,10 +3699,7 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
                     if (operands[op_idx].s.slot_type == SUB_SLOT_XMM) {
                         continue;
                     } else if (operands[op_idx].s.slot_type == SUB_SLOT_ENV) {
-                        if (!helper_qemuaot_with_env[h]) {
-                            continue;
-                        }
-                        out_valref[idx] = get_env_ptr_raw();
+                        continue;
                     } else if (operands[op_idx].s.slot_type == SUB_SLOT_TMP) {
                         if (has_alias_xmm(operands[op_idx])) {
                             continue;
@@ -3844,15 +3815,23 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
        add_i64 loc2,loc2,rsi
        qemu_ld_i64 loc0,loc2,noat+al+lesl,2
        ...
-       call jmp_ind,$0x1,$0,env,rip,loc643,$0x15
+       call jmp_ind,$0x1,$0,rip,loc643,$0x15
 
      * In above example, "loc643" is the index of current jump-table entry, and 0x15 is the jump-table size
        identified by script identify_jump_table_by_AI.pl
-    */
+
+     * Structure of .bss data block (8B each):
+       visit_cnt
+       hit_cache_cnt
+       mode
+       local_hash_ptr
+       2 * jt_size entries
+     */
     int jt_entry_idx = operands_cnt-2;
     int jt_size_idx = operands_cnt-1;
     assert(is_imm[jt_size_idx]);
     OperandType shadow_array_op = get_tmp_and_do_alloc(OPC_ADDR_T);
+    OperandType shadow_data_op = get_tmp_and_do_alloc(OPC_ADDR_T);
     LLVMType type_in = OPC_ADDR_T;
     LLVMType type_out = OPC_ADDR_T;
     LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm[jt_entry_idx], operands[jt_entry_idx], type_in, 0);
@@ -3869,14 +3848,12 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
 
     char shadow_array_name[64] = {0};
     sprintf(shadow_array_name, "%s%sshadow_array_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset);
-#ifndef DISABLE_JUMP_TABLE_CACHE
-    LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, (2 * operands[jt_size_idx].i));
+    LLVMValueRef shadow_data = create_static_array(module, shadow_array_name, (4 + 2 * operands[jt_size_idx].i));
+    LLVMValueRef array_off = LLVMConstInt(LLVMInt64Type(), 4 * 8, 0);
+    LLVMValueRef shadow_array = LLVMBuildAdd(builder, shadow_data, array_off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef offset_cnt = LLVMConstInt(LLVMInt64Type(), 4, 0);
     LLVMValueRef offset_val = LLVMBuildShl(builder, src1, offset_cnt, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef shadow_pointer = LLVMBuildAdd(builder, shadow_array, offset_val, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-#else
-    LLVMValueRef shadow_pointer = LLVMConstInt(LLVMInt64Type(), 0, 0);
-#endif
     LLVMBuildBr(builder, bb_ctz_merge);
 
     LLVMPositionBuilderAtEnd(builder, bb_outof_jt);
@@ -3890,10 +3867,14 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     LLVMBasicBlockRef phi_incoming_blocks[] = {bb_inside_jt, bb_outof_jt};
     LLVMAddIncoming(phi, phi_incoming_values, phi_incoming_blocks, 2);
     do_store(opc, phi, OPC_ADDR_T, shadow_array_op);
+    do_store(opc, shadow_data, OPC_ADDR_T, shadow_data_op);
 
     operands_cnt -= 2;
     is_imm[operands_cnt] = 0;
     operands[operands_cnt] = shadow_array_op;
+    operands_cnt += 1;
+    is_imm[operands_cnt] = 0;
+    operands[operands_cnt] = shadow_data_op;
     operands_cnt += 1;
 
     // Get the second half - jmp_ind_callback
@@ -3922,17 +3903,25 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
 
     // Inside the second_half - jmp_ind_callback logic may decide to invoke
     // runtime translation in case entry not found in AOT
+    OperandType operands_for_jit[MAX_OPERANDS_COUNT] = {0};
+    uint32_t is_imm_for_jit[MAX_OPERANDS_COUNT] = {0};
+    LLVMValueRef env_raw = get_env_ptr_raw();
+    operands_for_jit[0] = get_tmp_and_do_alloc(OPC_ADDR_T);
+    do_store(opc, env_raw, OPC_ADDR_T, operands_for_jit[0]);
+    operands_for_jit[1] = operands[0];
+    is_imm_for_jit[0] = 0;
+    is_imm_for_jit[1] = 0;
     LLVMValueRef helper_jit_func = LLVMGetNamedFunction(module, helper_str[helper_jit]);
     if (!helper_jit_func) {
         LLVMTypeRef call_types[MAX_ADDED_ARGS] = {NULL};
-        int call_arg_cnt = collect_arguments_and_types(helper_jit, TARGET_DEFAULT_HELPER_PASSTHROUGH_VECTOR, TYPE_ONLY, operands, is_imm, operands_cnt, NULL, NULL, llvm_func, call_types, MAX_ADDED_ARGS, NULL, helper_str[helper_jit]);
+        int call_arg_cnt = collect_arguments_and_types(helper_jit, TARGET_DEFAULT_HELPER_PASSTHROUGH_VECTOR, TYPE_ONLY, operands_for_jit, is_imm_for_jit, 2, NULL, NULL, llvm_func, call_types, MAX_ADDED_ARGS, NULL, helper_str[helper_jit]);
         LLVMTypeRef helper_jit_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
         helper_jit_func = LLVMAddFunction(module, helper_str[helper_jit], helper_jit_type);
         LLVMAddAttributeAtIndex(helper_jit_func, -1, NoUnwindAttr);
         LLVMSetSection(helper_jit_func, ".text.helper");
     }
 
-    LLVMValueRef jit_trampoline = get_trampoline(h, helper_jit_func, 0, 0, operands, is_imm, operands_cnt, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER);
+    LLVMValueRef jit_trampoline = get_trampoline(h, helper_jit_func, 0, 0, operands_for_jit, is_imm_for_jit, 2, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER);
     LLVMValueRef jit_trampoline_addr = LLVMBuildPtrToInt(builder, jit_trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, second_half_addr, jit_trampoline_addr, llvm_func, NULL, 0, call_args, helper_str[h]);
@@ -4583,7 +4572,6 @@ void translate_call(OpCodeType opc, void *ptr) {
 
     if (h == helper_jmp_ind) {
         return translate_short_circuit_jmp_ind(opc, ptr);
-#if AOT_LEVEL == AOT_LEVEL_MAX
     } else if (h == helper_cc_compute_all || h == helper_cc_compute_c || h == helper_cc_compute_nz) {
         if (helper_require_exception_path[h]) {
             return translate_helper_outband(opc, ptr);
@@ -4592,16 +4580,6 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
     } else if (INLINE_HELPER_ENABLED(h)) {
         return translate_helper_outband(opc, ptr);
-#elif AOT_LEVEL == AOT_LEVEL_1
-    } else if (h == helper_cc_compute_all || h == helper_cc_compute_c || h == helper_cc_compute_nz) {
-        if (helper_require_exception_path[h]) {
-            return translate_helper_outband(opc, ptr);
-        } else {
-            return translate_cc_compute_inband(opc, ptr);
-        }
-    } else if (INLINE_HELPER_ENABLED(h)) {
-        return translate_helper_outband(opc, ptr);
-#endif
     }
     // We cannot inline below helpers currently, so their invocations incur context backup penalty.
 #ifdef DEBUG
@@ -4649,11 +4627,7 @@ void translate_call(OpCodeType opc, void *ptr) {
             break;
         }
         // Do active spill since the trampoline handles FIXED registers only!
-#if AOT_LEVEL == AOT_LEVEL_MAX
         if (helper_do_not_sync_vector[h]) {
-#else
-        if (0) {
-#endif
             if (is_imm[operands_cnt] == 0 && operands[operands_cnt].s.slot_type == SUB_SLOT_TMP && has_alias_xmm(operands[operands_cnt])) {
                 OperandType alias = get_alias(operands[operands_cnt]);
                 assert(alias.s.valid);
@@ -4734,7 +4708,6 @@ void translate_call(OpCodeType opc, void *ptr) {
         param_cnt += 1;
     }
     LLVMValueRef trampoline = NULL;
-#if AOT_LEVEL == AOT_LEVEL_MAX
 #ifndef COLLECT_TRAMPOLINE_IR
     if (helper_do_not_sync_vector[h]) {
         assert(!second_half_disabled);
@@ -4744,20 +4717,13 @@ void translate_call(OpCodeType opc, void *ptr) {
 #else
     {
 #endif
-#else
-    {
-#endif
         trampoline = get_trampoline(h, helper_func, second_half_disabled ? 0 : 1, HELPER_DEFINES_OUTPUT(h), operands, is_imm, operands_cnt, second_half_func, 0, NULL, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
     }
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER, TYPE_AND_VALUE, operands, is_imm, operands_cnt, param_cnt == MAX_ADDED_ARGS ? NULL : second_half_addr, NULL, llvm_func, call_types, (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT), call_args, LLVMGetValueName(trampoline));
     assert(call_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
-#if AOT_LEVEL == AOT_LEVEL_MAX
     if (helper_do_not_sync_vector[h]) {
-#else
-    if (0) {
-#endif
         call_args[call_arg_cnt] = LLVMBuildPtrToInt(builder, helper_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
         call_types[call_arg_cnt] = llvm_int_types[OPC_ADDR_T];
         call_arg_cnt += 1;
@@ -4867,11 +4833,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
     }
 
-#if AOT_LEVEL == AOT_LEVEL_MAX
     if (helper_do_not_sync_vector[h]) {
-#else
-    if (0) {
-#endif
         for (int i = 0; i < do_not_sync_vector_alias_slot_idx_cnt; ++i) {
             int new_idx = do_not_sync_vector_alias_slot_idx[i];
             uint64_t xmm_offset = get_xmm_offset(new_idx / 2) + 16 * (new_idx % 2);
@@ -5637,27 +5599,8 @@ void module_prolog() {
         "rsp", "rbp", "rsi", "rdi",
         "r8", "r9", "r10", "r11",
         "r12", "r13", "r14", "r15",
-#if AOT_LEVEL == AOT_LEVEL_0
-        "rip"
-#elif AOT_LEVEL == AOT_LEVEL_1
-        "rip"
-#elif AOT_LEVEL == AOT_LEVEL_MAX
         "cc_src", "cc_dst", "cc_op", "rip"
-#endif
     };
-#if AOT_LEVEL == AOT_LEVEL_0
-    for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
-        fixed_llvmtyperef[i] = LLVMInt64Type();
-        fixed_vector_param_llvmtypes[i] = LLVMInt64;
-        fixed_vector_arg_names[i] = base_names[i];
-    }
-#elif AOT_LEVEL == AOT_LEVEL_1
-    for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
-        fixed_llvmtyperef[i] = LLVMInt64Type();
-        fixed_vector_param_llvmtypes[i] = LLVMInt64;
-        fixed_vector_arg_names[i] = base_names[i];
-    }
-#elif AOT_LEVEL == AOT_LEVEL_MAX
     for (int i = 0; i < FIXED_PARAM_COUNT; i++) {
         if (i < 16) {
             fixed_llvmtyperef[i] = LLVMInt64Type();
@@ -5671,7 +5614,6 @@ void module_prolog() {
         }
         fixed_vector_arg_names[i] = base_names[i];
     }
-#endif
     static char extra_name_buf[32][16];
     static char stack_name_buf[FIXED_VECTOR_PARAM_COUNT][16];
     static char tmp_name_buf[1<<STACK_INDEX_SHIFT][16];
@@ -5805,15 +5747,6 @@ void module_prolog() {
     llvm_vector_elem_bit_counts[LLVMVector4xi64*2+1] = 64;
 #endif
 
-#if AOT_LEVEL == AOT_LEVEL_0
-    env_var_offset[cc_src] = ENV_OFFSET_cc_src;
-    env_var_offset[cc_dst] = ENV_OFFSET_cc_dst;
-    env_var_offset[cc_op] = ENV_OFFSET_cc_op;
-#elif AOT_LEVEL == AOT_LEVEL_1
-    env_var_offset[cc_src] = ENV_OFFSET_cc_src;
-    env_var_offset[cc_dst] = ENV_OFFSET_cc_dst;
-    env_var_offset[cc_op] = ENV_OFFSET_cc_op;
-#endif
     env_var_offset[cc_src2] = ENV_OFFSET_cc_src2;
     env_var_offset[es_base] = ENV_OFFSET_es_base;
     env_var_offset[cs_base] = ENV_OFFSET_cs_base;
@@ -6046,11 +5979,7 @@ int main(int argc, const char *argv[]) {
     const char* features = "+neon";
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
     //const char* features = "+m,+a,+f,+d,+v,+unaligned-scalar-mem,+unaligned-vector-mem";
-#if AOT_LEVEL == AOT_LEVEL_0
-    const char* features = "+m,+a,+f,+d";
-#else
     const char* features = "+m,+a,+f,+d,+v";
-#endif
 #endif
     target_machine = LLVMCreateTargetMachine(target, default_triple, "generic", features,
                                              LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelDefault);

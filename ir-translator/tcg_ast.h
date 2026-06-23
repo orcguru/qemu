@@ -5,17 +5,9 @@
 #include <llvm-c/Types.h>
 
 #define LLVMMAXType                 LLVMInt128
-#define AOT_LEVEL_0                 0
-#define AOT_LEVEL_1                 1
-#define AOT_LEVEL_MAX               3
-#define AOT_LEVEL                   AOT_LEVEL_MAX
 #define XMM_COUNT                   15
 
-#if AOT_LEVEL == AOT_LEVEL_MAX
 #define MAX_ADDED_ARGS              6
-#elif AOT_LEVEL == AOT_LEVEL_0 || AOT_LEVEL == AOT_LEVEL_1
-#define MAX_ADDED_ARGS              7
-#endif
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -37,7 +29,6 @@ typedef enum {
     OP_ATTR,
 } TcgOpType;
 
-#if AOT_LEVEL == AOT_LEVEL_MAX
 #define ENVVAR_TYPE_LIST \
     X(cc_src2) \
     X(es_base) \
@@ -47,33 +38,6 @@ typedef enum {
     X(fs_base) \
     X(gs_base) \
     X(ENVVarMAX)
-#elif AOT_LEVEL == AOT_LEVEL_1
-#define ENVVAR_TYPE_LIST \
-    X(cc_src) \
-    X(cc_dst) \
-    X(cc_op) \
-    X(cc_src2) \
-    X(es_base) \
-    X(cs_base) \
-    X(ss_base) \
-    X(ds_base) \
-    X(fs_base) \
-    X(gs_base) \
-    X(ENVVarMAX)
-#elif AOT_LEVEL == AOT_LEVEL_0
-#define ENVVAR_TYPE_LIST \
-    X(cc_src) \
-    X(cc_dst) \
-    X(cc_op) \
-    X(cc_src2) \
-    X(es_base) \
-    X(cs_base) \
-    X(ss_base) \
-    X(ds_base) \
-    X(fs_base) \
-    X(gs_base) \
-    X(ENVVarMAX)
-#endif
 
 typedef enum {
     #define X(name) name,
@@ -81,7 +45,6 @@ typedef enum {
     #undef X
 } EnvVarType;
 
-#if AOT_LEVEL == AOT_LEVEL_MAX
 #define XREG_TYPE_LIST \
     X(rax) \
     X(rcx) \
@@ -104,47 +67,6 @@ typedef enum {
     X(cc_op) \
     X(rip) \
     X(XREG_MAX)
-#elif AOT_LEVEL == AOT_LEVEL_1
-#define XREG_TYPE_LIST \
-    X(rax) \
-    X(rcx) \
-    X(rdx) \
-    X(rbx) \
-    X(rsp) \
-    X(rbp) \
-    X(rsi) \
-    X(rdi) \
-    X(r8) \
-    X(r9) \
-    X(r10) \
-    X(r11) \
-    X(r12) \
-    X(r13) \
-    X(r14) \
-    X(r15) \
-    X(rip) \
-    X(XREG_MAX)
-#elif AOT_LEVEL == AOT_LEVEL_0
-#define XREG_TYPE_LIST \
-    X(rax) \
-    X(rcx) \
-    X(rdx) \
-    X(rbx) \
-    X(rsp) \
-    X(rbp) \
-    X(rsi) \
-    X(rdi) \
-    X(r8) \
-    X(r9) \
-    X(r10) \
-    X(r11) \
-    X(r12) \
-    X(r13) \
-    X(r14) \
-    X(r15) \
-    X(rip) \
-    X(XREG_MAX)
-#endif
 
 typedef enum {
     #define X(name) name,
@@ -1714,6 +1636,7 @@ typedef enum {
     X(Instr1BH24_ENV0_ext) \
     X(Instr1BH211_ENV0_ext) \
     X(Instr1BH212_ENV0_ext) \
+    X(Instr1BH212_ext) \
     X(Instr1B1111_ext) \
     X(Instr1BH4S_ENV0_ext) \
     X(Instr1BH4S_ENV1_ext) \
@@ -1875,6 +1798,7 @@ size_t create_helper_env_slot2(void *ptr, OHType h, uint16_t cflags, uint8_t noa
 size_t create_helper_slot_env_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1);
 size_t create_helper_env_slot_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0);
 size_t create_helper_env_slot_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0, uint32_t i1);
+size_t create_helper_slot_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0, uint32_t i1);
 size_t create_helper_env_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, uint32_t i0);
 size_t create_helper_env_imm_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, uint32_t i0, OperandType s0);
 
