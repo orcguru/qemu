@@ -1330,6 +1330,21 @@ size_t create_helper_env_slot_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t
     return sizeof(*i);
 }
 
+size_t create_helper_slot_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0, uint32_t i1) {
+#ifdef DEBUG
+    printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
+#endif
+    Instr1BH212 *i = (Instr1BH212 *)ptr;
+    i->instr_type = SIZEXB;
+    i->instr_type_ext = Instr1BH212_ext;
+    i->helper = h.h;
+    i->noargs = noargs;
+    SET_SLOT(0);
+    i->imm0 = i0;
+    i->imm1 = i1;
+    return sizeof(*i);
+}
+
 size_t create_scalar_imm_slot_imm(void *ptr, OHType op, uint64_t i0, OperandType s0, uint64_t i1) {
 #ifdef DEBUG
     printf("%s %s ", __FUNCTION__, opcode_type_str[op.o]); fflush(NULL);
@@ -1979,13 +1994,6 @@ const int helper_require_exception_path[HELPER_MAX] = {
     [helper_vpgatherqq_ymm] = 1,
     [helper_vpmaskmovd_st_ymm] = 1,
     [helper_vpmaskmovq_st_ymm] = 1,
-};
-
-// Dirty hack to keep the same interface between helper_jmp_ind and helper_jit:
-// For XMM helpers, the ENV is omitted from the parameter list; however, for
-// helper_jmp_ind, I would like to keep it to align with helper_jit.
-const int helper_qemuaot_with_env[HELPER_MAX] = {
-    [helper_jmp_ind] = 1,
 };
 
 // Make sure argument type matches, otherwise inline could not happen!

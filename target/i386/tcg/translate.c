@@ -2384,20 +2384,20 @@ gen_eob(DisasContext *s, int mode)
 #ifdef AOT_IR
         assert(s->base.jmp_type != INVALID_TYPE);
         if (s->base.jmp_type == TR_IS_JMP) {
-            gen_helper_jmp_ind(tcg_env, cpu_eip);
+            gen_helper_jmp_ind(cpu_eip);
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
-            gen_helper_jmp_ind(tcg_env, cpu_eip);
+            gen_helper_jmp_ind(cpu_eip);
         } else if (s->base.jmp_type == TR_IS_RET) {
             tcg_gen_ret(cpu_eip);
-            gen_helper_jmp_ind(tcg_env, cpu_eip);
+            gen_helper_jmp_ind(cpu_eip);
         } else if (s->base.jmp_type == TR_IS_IRET) {
             gen_helper_iret_ind(tcg_env);
         } else if (s->base.jmp_type == TR_IS_LCALL || s->base.jmp_type == TR_IS_LJMP) {
             // FIXME: not tested, just to unblock IR generation
             assert(s->eip_next_tl_set);
-            gen_helper_jmp_ind(tcg_env, s->eip_next_tl_val);
+            gen_helper_jmp_ind(s->eip_next_tl_val);
         } else if (s->base.jmp_type == TR_IS_LRET) {
         } else {
             assert(0);
@@ -2413,7 +2413,7 @@ gen_eob(DisasContext *s, int mode)
             tcg_gen_jmp_direct(s->rip_at_exit);
         } else if (s->base.jmp_type == TR_IS_RET) {
             tcg_gen_ret(cpu_eip);
-            gen_helper_jmp_ind(tcg_env, cpu_eip);
+            gen_helper_jmp_ind(cpu_eip);
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);
