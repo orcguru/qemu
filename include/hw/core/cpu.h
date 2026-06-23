@@ -354,7 +354,7 @@ typedef union IcountDecr {
 #ifdef AOT
 typedef struct __attribute__((packed)) InstrExecCountersGroup3 {
     uint64_t *helper_counters;
-    uint64_t shadow_jt_flag;
+    uint64_t reserved;
 } InstrExecCountersGroup3;
 
 typedef struct __attribute__((packed)) TPBackupForRISCV64 {

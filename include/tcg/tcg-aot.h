@@ -25,12 +25,6 @@
 #ifndef TCG_AOT_H
 #define TCG_AOT_H
 
-#define AOT_LEVEL_0                 0
-#define AOT_LEVEL_1                 1
-#define AOT_LEVEL_MAX               3
-#define AOT_LEVEL                   AOT_LEVEL_MAX
-#define SHADOW_JUMP_TABLE_BLOCK_SIZE    32
-
 // FIXME: sync below magic with split_tcg_ir.pl for performance evaluation
 #define ELF_ADDRESS_RANGE   0x200000
 

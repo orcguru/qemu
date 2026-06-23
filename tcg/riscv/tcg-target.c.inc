@@ -3160,16 +3160,10 @@ void tcg_register_jit(const void *buf, size_t buf_size)
 #define CONTEXT_R13       TCG_REG_T5
 #define CONTEXT_R14       TCG_REG_T6
 #define CONTEXT_R15       TCG_REG_GP
-#if AOT_LEVEL == AOT_LEVEL_MAX
 #define CONTEXT_CC_SRC    TCG_REG_A5
 #define CONTEXT_CC_DST    TCG_REG_T0
 #define CONTEXT_CC_OP     TCG_REG_T1
 #define CONTEXT_RIP       TCG_REG_A0
-#elif AOT_LEVEL == AOT_LEVEL_1
-#define CONTEXT_RIP       TCG_REG_A5
-#elif AOT_LEVEL == AOT_LEVEL_0
-#define CONTEXT_RIP       TCG_REG_A5
-#endif
 
 static void tcg_target_qemu_aot_prologue(TCGContext *s)
 {
@@ -3210,13 +3204,10 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R13, TCG_AREG0, 13 * 8);  // r13
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R14, TCG_AREG0, 14 * 8);  // r14
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_R15, TCG_AREG0, 15 * 8);  // r15
-#if AOT_LEVEL == AOT_LEVEL_MAX
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_SRC, TCG_AREG0, 19 * 8);  // cc_src
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_CC_DST, TCG_AREG0, 18 * 8);  // cc_dst
     tcg_out_ld(s, TCG_TYPE_I32, CONTEXT_CC_OP, TCG_AREG0, 21 * 8);  // cc_op
-#endif
 
-#if AOT_LEVEL != AOT_LEVEL_0
     // Vectors
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V0, TCG_AREG0, 0x360 + 0*16);
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V1, TCG_AREG0, 0x360 + 1*16);
@@ -3250,7 +3241,6 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V29, TCG_AREG0, 0x6e0 + 1*16);
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V30, TCG_AREG0, 0x720 + 0*16);
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V31, TCG_AREG0, 0x720 + 1*16);
-#endif
 
     tcg_out_st(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -56);
     tcg_out_ld(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -64);
