@@ -239,7 +239,7 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
     // Update visit_cnt
     *shadow_data_ptr += 1;
     if (shadow_array_entry != 0) {
-        unsigned long *shadow_entry_ptr = (unsigned long *)(shadow_array_entry & 0xfffffffffffffff0UL);
+        unsigned long *shadow_entry_ptr = (unsigned long *)shadow_array_entry;
         const int cnt = 1;
         // FIXME: atomic load
         for (int i = 0; i < cnt; ++i) {
