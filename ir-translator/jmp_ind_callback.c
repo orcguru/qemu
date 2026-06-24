@@ -34,7 +34,7 @@ __attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, u
     if (host_addr) {
         FuncPtrType1 func_ptr = (FuncPtrType1)host_addr;
         if (shadow_array_entry != 0) {
-            unsigned long *shadow_entry_ptr = (unsigned long *)(shadow_array_entry & 0xfffffffffffffff0UL);
+            unsigned long *shadow_entry_ptr = (unsigned long *)shadow_array_entry;
             const int cnt = 1;
             // FIXME: atomic store
             for (int i = 0; i < cnt; ++i) {
