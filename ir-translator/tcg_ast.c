@@ -28,8 +28,8 @@
 #define HELPER_COUNTERS_OFFSET      128
 //#define DEBUG_RET                   1
 //#define BUILD_RISCV_ON_AARCH        1
-//#define DUMP_IR                     1
-//#define VERBOSE_VAR                 1
+#define DUMP_IR                     1
+#define VERBOSE_VAR                 1
 //#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
@@ -599,6 +599,8 @@ static int32_t tmp_shadow_offset[1<<STACK_INDEX_SHIFT] = {0};
 static char template_path[PATH_MAX] = {0};
 static char output_path[PATH_MAX] = {0};
 static char input_path[PATH_MAX] = {0};
+static uint64_t x64_exec_end = 0;
+static int tcg_ir_head = 0;
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
 
@@ -3790,6 +3792,26 @@ static LLVMValueRef create_static_array(LLVMModuleRef module, const char* name, 
     return LLVMBuildPtrToInt(builder, elem_ptr, llvm_int_types[OPC_ADDR_T], "array_elem_ptr_val");
 }
 
+static LLVMValueRef create_reference_to_external_array(LLVMModuleRef module, const char* name, size_t count) {
+    LLVMTypeRef i64_type = LLVMInt64Type();
+    LLVMTypeRef array_type = LLVMArrayType(i64_type, count);
+    LLVMValueRef global_var = LLVMGetNamedGlobal(module, name);
+    if (!global_var) {
+        global_var = LLVMAddGlobal(module, array_type, name);
+        if (tcg_ir_head) {
+            LLVMValueRef zero_initializer = LLVMConstNull(array_type);
+            LLVMSetInitializer(global_var, zero_initializer);
+            LLVMSetAlignment(global_var, 8);
+        }
+        LLVMSetLinkage(global_var, LLVMExternalLinkage);
+    }
+    LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, 0);
+    LLVMValueRef index = LLVMConstInt(LLVMInt32Type(), 0, 0);
+    LLVMValueRef indices[] = {zero, index};
+    LLVMValueRef elem_ptr = LLVMBuildGEP2(builder, array_type, global_var, indices, 2, "array_elem_ptr");
+    return LLVMBuildPtrToInt(builder, elem_ptr, llvm_int_types[OPC_ADDR_T], "array_elem_ptr_val");
+}
+
 // FIXME: can this be merged into common logic?
 static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
@@ -3869,12 +3891,21 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     do_store(opc, phi, OPC_ADDR_T, shadow_array_op);
     do_store(opc, shadow_data, OPC_ADDR_T, shadow_data_op);
 
+    OperandType shadow_map_op = get_tmp_and_do_alloc(OPC_ADDR_T);
+    char shadow_map_name[64] = {0};
+    sprintf(shadow_map_name, "%s%sshadow_map", func_name_prefix, func_name_prefix[0] ? "_" : "");
+    LLVMValueRef shadow_map = create_reference_to_external_array(module, shadow_map_name, 0x100000);
+    do_store(opc, shadow_map, OPC_ADDR_T, shadow_map_op);
+
     operands_cnt -= 2;
     is_imm[operands_cnt] = 0;
     operands[operands_cnt] = shadow_array_op;
     operands_cnt += 1;
     is_imm[operands_cnt] = 0;
     operands[operands_cnt] = shadow_data_op;
+    operands_cnt += 1;
+    is_imm[operands_cnt] = 0;
+    operands[operands_cnt] = shadow_map_op;
     operands_cnt += 1;
 
     // Get the second half - jmp_ind_callback
@@ -5773,6 +5804,48 @@ void module_prolog() {
 
     helper_str[helper_memset] = "memset";
     dummy_slot_for_debug.s.valid = 0;
+
+    /*
+     * The purpose of shadow_map is to speedup indirect branch lookup.
+     * We will create a large array to cover the x64 ELF text section space, those
+     * mapping info will be inserted into this array, and there will be an auxiliary bit
+     * array to verify the sanity of those information. The auxiliary bit array will
+     * be created by runtime.
+     *
+     * Structure of shadow_map:
+     * x64 ELF exec address start
+     * x64 ELF exec address end
+     * Host AOT exec start
+     * Pointer to the auxiliary bit array
+     * Counter for jmp_ind_callback - total
+     * Counter for jmp_ind_callback - out-of-range
+     * Counter for jmp_ind_callback - invalid_aot1
+     * Counter for jmp_ind_callback - invalid_aot2
+     * Counter for jmp_ind_callback - collide
+     * Counter for jmp_ind_callback - duplicated
+     * Counter for jmp_ind_callback - hit
+     * Counter for jmp_ind_callback - sample1
+     * Counter for jmp_ind_callback - sample2
+     * Counter for helper_jmp_ind - total
+     * Counter for helper_jmp_ind - out-of-range
+     * Counter for helper_jmp_ind - empty
+     * Counter for helper_jmp_ind - invalid_aot
+     * Counter for helper_jmp_ind - hit
+     * Byte array (size: (<x64 ELF exec address end> - <x64 ELF exec address start> + 4) padded to align with 8B)
+     */
+    if (tcg_ir_head) {
+        char shadow_map_name[64] = {0};
+        sprintf(shadow_map_name, "%s%sshadow_map", func_name_prefix, func_name_prefix[0] ? "_" : "");
+        size_t sz = 8 * (4 + 14) + (((x64_exec_end + 4) % 8) ? ((((x64_exec_end + 4) >> 3) + 1) << 3) : (x64_exec_end + 4));
+        create_reference_to_external_array(module, shadow_map_name, sz);
+
+        // FIXME: initialize x64_exec_end info properly!
+        LLVMValueRef ro_var = LLVMAddGlobal(module, LLVMInt64Type(), "x64_exec_end");
+        LLVMSetGlobalConstant(ro_var, 1);
+        LLVMSetSection(ro_var, ".rodata");
+        LLVMValueRef init = LLVMConstInt(LLVMInt64Type(), x64_exec_end, 0);
+        LLVMSetInitializer(ro_var, init);
+    }
 }
 
 int check_always_inline_status(LLVMModuleRef module, const char *target_func) {
@@ -5895,8 +5968,8 @@ void parse_tcg_instructions(const char *filename) {
 }
 
 int main(int argc, const char *argv[]) {
-    if (argc < 2) {
-        printf("Usage: ./app <tcg-ir> <func_name_prefix>\n");
+    if (argc < 3) {
+        printf("Usage: ./app <tcg-ir> <x64 exec END in hex> <func_name_prefix>\n");
         return -1;
     }
     // Get the path for helper_templates
@@ -5911,9 +5984,13 @@ int main(int argc, const char *argv[]) {
     assert((p - template_path) < PATH_MAX);
     *p = '\0';
 
-    if (argc >= 3) {
-        assert(strlen(argv[2]) <= (sizeof(func_name_prefix)-1));
-        strcpy(func_name_prefix, argv[2]);
+    if (argc >= 4) {
+        assert(strlen(argv[3]) <= (sizeof(func_name_prefix)-1));
+        strcpy(func_name_prefix, argv[3]);
+    }
+    if (strstr(argv[1], "0.tcg.ir") == argv[1] ||
+        strstr(argv[1], "/0.tcg.ir")) {
+        tcg_ir_head = 1;
     }
     p = realpath(argv[1], input_path);
     assert(p);
@@ -5931,6 +6008,7 @@ int main(int argc, const char *argv[]) {
     }
     assert((p - output_path) < PATH_MAX);
     *p = '\0';
+    x64_exec_end = strtoll(argv[2], NULL, 16);
 
     // Now change directory
     chdir(template_path);
