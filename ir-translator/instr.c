@@ -1998,7 +1998,7 @@ const int helper_require_exception_path[HELPER_MAX] = {
 
 // Make sure argument type matches, otherwise inline could not happen!
 const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
-    [helper_jmp_ind] = {LLVMInt64, LLVMInt64, LLVMInt64},
+    [helper_jmp_ind] = {LLVMInt64, LLVMInt64, LLVMInt64, LLVMInt64},
     [helper_cc_compute_all] = {LLVMInt64, LLVMInt64, LLVMInt64, LLVMInt32},
     [helper_cc_compute_c] = {LLVMInt64, LLVMInt64, LLVMInt64, LLVMInt32},
     [helper_cc_compute_nz] = {LLVMInt64, LLVMInt64, LLVMInt32},
