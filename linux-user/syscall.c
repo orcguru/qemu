@@ -9214,6 +9214,32 @@ _syscall5(int, sys_move_mount, int, __from_dfd, const char *, __from_pathname,
            int, __to_dfd, const char *, __to_pathname, unsigned int, flag)
 #endif
 
+
+extern GHashTable *pc_htable;
+
+struct pc_rec {
+    uint64_t pc;
+    uint64_t cnt;
+    struct pc_rec *next;
+};
+
+static void dump_entry(gpointer key, gpointer value, gpointer user_data) {
+    struct pc_rec *rec = (struct pc_rec *)value;
+
+    FILE *logfile = qemu_log_trylock();
+    while (rec) {
+        if (rec->pc) {
+            if (logfile) {
+                fprintf(logfile, "PC:0x%lx CNT:%ld\n", rec->pc, rec->cnt);
+            }
+        }
+        rec = rec->next;
+    }
+    if (logfile) {
+        qemu_log_unlock(logfile);
+    }
+}
+
 /* This is an internal helper for do_syscall so that it is easier
  * to have a single return point, so that actions, such as logging
  * of syscall results, can be performed.
@@ -11197,6 +11223,7 @@ static abi_long do_syscall1(CPUArchState *cpu_env, int num, abi_long arg1,
         /* new thread calls */
     case TARGET_NR_exit_group:
         preexit_cleanup(cpu_env, arg1);
+        g_hash_table_foreach(pc_htable, dump_entry, NULL);
         return get_errno(exit_group(arg1));
 #endif
     case TARGET_NR_setdomainname:

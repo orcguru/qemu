@@ -516,6 +516,14 @@ char *riscv_cpu_get_name(RISCVCPU *cpu)
     return cpu_model_from_type(typename);
 }
 
+GHashTable *pc_htable = NULL;
+
+struct pc_rec {
+    uint64_t pc;
+    uint64_t cnt;
+    struct pc_rec *next;
+};
+
 static void riscv_cpu_dump_state(CPUState *cs, FILE *f, int flags)
 {
     RISCVCPU *cpu = RISCV_CPU(cs);
@@ -528,7 +536,44 @@ static void riscv_cpu_dump_state(CPUState *cs, FILE *f, int flags)
         qemu_fprintf(f, " %s %d\n", "V      =  ", env->virt_enabled);
     }
 #endif
-    qemu_fprintf(f, " %s " TARGET_FMT_lx "\n", "pc      ", env->pc);
+    //qemu_fprintf(f, "%s" TARGET_FMT_lx "\n", "", env->pc);
+    if (!pc_htable) {
+        pc_htable = g_hash_table_new(NULL, NULL);
+    }
+    if (!g_hash_table_contains(pc_htable, (gconstpointer)env->pc)) {
+        struct pc_rec *rec = g_malloc(sizeof(struct pc_rec));
+        assert(rec);
+        rec->pc = 0;
+        rec->cnt = 0;
+        rec->next = NULL;
+        g_hash_table_insert(pc_htable, (gpointer)env->pc, (gpointer)rec);
+    }
+    struct pc_rec *rec = g_hash_table_lookup(pc_htable, (gconstpointer)env->pc);
+    assert(rec);
+
+    struct pc_rec *rec_ptr = rec;
+    int found = 0;
+    while (rec_ptr) {
+        if (rec_ptr->pc == env->pc) {
+            found = 1;
+            break;
+        }
+        rec_ptr = rec_ptr->next;
+    }
+    if (found) {
+        rec_ptr->cnt += 1;
+    } else {
+        struct pc_rec *rec_entry = g_malloc(sizeof(struct pc_rec));
+        assert(rec_entry);
+        rec_entry->pc = env->pc;
+        rec_entry->cnt = 1;
+        rec_entry->next = NULL;
+        while (rec->next != NULL) {
+            rec = rec->next;
+        }
+        rec->next = rec_entry;
+    }
+    return;
 #ifndef CONFIG_USER_ONLY
     {
         static const int dump_csrs[] = {
