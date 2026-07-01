@@ -271,14 +271,14 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
                                   ((unsigned long)map_ptr[x64_delta+1] << 8) |
                                   (unsigned long)map_ptr[x64_delta+0];
         */
-        unsigned long *map_ptr = (unsigned long *)(shadow_map + 8 * (4 + CTR_COUNT));
-        unsigned long x64_delta_long_idx = (x64_delta >> 3);
-        unsigned long x64_delta_long_shift = ((x64_delta & 0x7) << 3);
-        unsigned long host_delta;
-        unsigned long high = map_ptr[x64_delta_long_idx + 1];
-        unsigned long low = map_ptr[x64_delta_long_idx];
-        host_delta = ((low >> x64_delta_long_shift) | (high >> (64 - x64_delta_long_shift))) & 0xffffffff;
-
+        unsigned int *map_ptr = (unsigned int *)(shadow_map + 8 * (4 + CTR_COUNT));
+        size_t x64_delta_idx = (x64_delta >> 2);
+        size_t x64_delta_shift = ((x64_delta & 0x3) << 3);
+        unsigned int host_delta;
+        unsigned int high = map_ptr[x64_delta_idx + 1];
+        unsigned int low = map_ptr[x64_delta_idx];
+        unsigned long combined = ((unsigned long)high << 32) | low;
+        host_delta = (combined >> x64_delta_shift) & 0xffffffff;
         if (host_delta != 0) {
             ptr = (unsigned long *)aux_array;
             unsigned char *bit_array_ptr = (unsigned char *)(aux_array+8);
