@@ -777,6 +777,7 @@ typedef enum {
     X(helper_xsaveopt) \
     X(helper_xsetbv) \
     X(helper_jmp_ind) \
+    X(helper_jumptable) \
     X(helper_iret_ind) \
     X(helper_dump_load) \
     X(helper_dump_store) \
@@ -1611,6 +1612,7 @@ typedef enum {
     X(Instr1B411_ext) \
     X(Instr1B142_ext) \
     X(Instr1B142E_ext) \
+    X(Instr1BH21_ext) \
     X(Instr1BH21_ENV0_ext) \
     X(Instr1BH21_ENV1_ext) \
     X(Instr1B4111_ext) \
@@ -1795,10 +1797,10 @@ size_t create_helper_env(void *ptr, OHType h, uint16_t cflags, uint8_t noargs);
 size_t create_helper_env_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0);
 size_t create_helper_slot_env(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0);
 size_t create_helper_env_slot2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1);
+size_t create_helper_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0);
 size_t create_helper_slot_env_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, OperandType s1);
 size_t create_helper_env_slot_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0);
 size_t create_helper_env_slot_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0, uint32_t i1);
-size_t create_helper_slot_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0, uint32_t i1);
 size_t create_helper_env_imm(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, uint32_t i0);
 size_t create_helper_env_imm_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, uint32_t i0, OperandType s0);
 

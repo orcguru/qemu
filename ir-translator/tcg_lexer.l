@@ -908,6 +908,7 @@ iret_protected                  iret_protected
 iret_real                       iret_real
 jmp_direct                      jmp_direct
 jmp_ind                         jmp_ind
+jumptable                       jumptable
 lar                             lar
 lcall_protected                 lcall_protected
 lcall_real                      lcall_real
@@ -2709,6 +2710,7 @@ xsetbv                          xsetbv
 {xsaveopt}                      { HANDLE_COLUMN; yylval->oh.h = helper_xsaveopt; return SYMBOL; }
 {xsetbv}                        { HANDLE_COLUMN; yylval->oh.h = helper_xsetbv; return SYMBOL; }
 {jmp_ind}                       { HANDLE_COLUMN; yylval->oh.h = helper_jmp_ind; return SYMBOL; }
+{jumptable}                     { HANDLE_COLUMN; yylval->oh.h = helper_jumptable; return SYMBOL; }
 {iret_ind}                      { HANDLE_COLUMN; yylval->oh.h = helper_iret_ind; return SYMBOL; }
 {dump_registers}                { HANDLE_COLUMN; yylval->oh.h = helper_dump_registers; return SYMBOL; }
 {dump_load}                     { HANDLE_COLUMN; yylval->oh.h = helper_dump_load; return SYMBOL; }
