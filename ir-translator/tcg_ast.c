@@ -636,7 +636,8 @@ static void setup_func_stack();
 static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain);
 static LLVMValueRef get_trampoline_do_not_sync_vector(HelperType h, LLVMValueRef helper_func, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int target_domain);
 static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, XMMRegType *passenger_xmm_regs, int fix_second_half_addr);
-static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr);
+static void translate_jmp_ind(OpCodeType opc, void *ptr);
+static void translate_jumptable(OpCodeType opc, void *ptr);
 static void translate_cc_compute_inband(OpCodeType opc, void *ptr);
 static void translate_helper_outband(OpCodeType opc, void *ptr);
 static void register_labels_for_func(LLVMValueRef func);
@@ -1025,7 +1026,6 @@ static LLVMValueRef get_env_ptr_raw() {
     LLVMTypeRef asm_return_type = llvm_int_types[OPC_ADDR_T];
     LLVMTypeRef asm_param_types[] = {};
     LLVMTypeRef asm_function_type = LLVMFunctionType(asm_return_type, asm_param_types, 0, 0);
-    //FIXME: handle AArch64 as well
     char asm_string[128];
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
     sprintf(asm_string, "mov $0, x25");
@@ -3324,7 +3324,7 @@ static uint8_t do_link_helper(HelperType h, const char *build_macro, const char 
 
 static uint8_t is_tail_call(HelperType h) {
     if (h == helper_syscall || h == helper_icebp || h == helper_raise_interrupt ||
-        h == helper_iret_ind || h == helper_jmp_ind || h == helper_ljmp_protected ||
+        h == helper_iret_ind || h == helper_jmp_ind || h == helper_jumptable || h == helper_ljmp_protected ||
         h == helper_lret_protected || h == helper_pause || h == helper_raise_exception) {
         return 1;
     }
@@ -3813,7 +3813,131 @@ static LLVMValueRef create_reference_to_external_array(LLVMModuleRef module, con
 }
 
 // FIXME: can this be merged into common logic?
-static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
+static void translate_jmp_ind(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    HelperType h = get_helper(ptr);
+    char *second_half_name = "jmp_ind_callback";
+    OperandType operands[MAX_OPERANDS_COUNT] = {0};
+    uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
+    int operands_cnt = 0;
+    for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
+        operands[i] = get_operand(ptr, (i + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &(is_imm[i]));
+        if (is_imm[i] == 0 && operands[i].s.valid == 0) {
+            break;
+        }
+        operands_cnt += 1;
+    }
+
+    OperandType shadow_map_op = get_tmp_and_do_alloc(OPC_ADDR_T);
+    char shadow_map_name[64] = {0};
+    sprintf(shadow_map_name, "%s%sshadow_map", func_name_prefix, func_name_prefix[0] ? "_" : "");
+    LLVMValueRef shadow_map = create_reference_to_external_array(module, shadow_map_name, 0/*doesn't matter*/);
+    do_store(opc, shadow_map, OPC_ADDR_T, shadow_map_op);
+
+    is_imm[operands_cnt] = 1;
+    OperandType invalid_array_entry;
+    invalid_array_entry.i = 0;
+    operands[operands_cnt] = invalid_array_entry;
+    operands_cnt += 1;
+    is_imm[operands_cnt] = 0;
+    operands[operands_cnt] = shadow_map_op;
+    operands_cnt += 1;
+
+    // Get the second half - jmp_ind_callback
+    char macro_def[4096] = {0};
+    sprintf(macro_def, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\" ", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
+    assert(strlen(macro_def) < sizeof(macro_def));
+    char bc_path[PATH_MAX+32] = {0};
+    sprintf(bc_path, "%s/jmp_ind_callback.bc", output_path);
+    uint8_t ret = do_link_helper(jmp_ind_callback, macro_def, bc_path, "jmp_ind_callback");
+    assert(ret);
+    LLVMValueRef second_half_func = LLVMGetNamedFunction(module, second_half_name);
+    assert(second_half_func);
+
+    // Get the helper
+    LLVMValueRef helper_func = LLVMGetNamedFunction(module, helper_str[h]);
+    if (!helper_func) {
+        LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS] = {NULL};
+        int arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, TYPE_ONLY, operands, is_imm, operands_cnt, (LLVMValueRef)1, (LLVMValueRef)1, llvm_func, call_types, (FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS), NULL, helper_str[h]);
+        LLVMTypeRef helper_type = LLVMFunctionType(LLVMVoidType(), call_types, arg_cnt, 0);
+        helper_func = LLVMAddFunction(module, helper_str[h], helper_type);
+        LLVMAddAttributeAtIndex(helper_func, -1, NoUnwindAttr);
+        LLVMSetFunctionCallConv(helper_func, QEMUAOT_CC);
+        LLVMSetSection(helper_func, ".text.helper");
+    }
+    LLVMValueRef second_half_addr = LLVMBuildPtrToInt(builder, second_half_func, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+
+    // Inside the second_half - jmp_ind_callback logic may decide to invoke
+    // runtime translation in case entry not found in AOT
+    OperandType operands_for_jit[MAX_OPERANDS_COUNT] = {0};
+    uint32_t is_imm_for_jit[MAX_OPERANDS_COUNT] = {0};
+    LLVMValueRef env_raw = get_env_ptr_raw();
+    operands_for_jit[0] = get_tmp_and_do_alloc(OPC_ADDR_T);
+    do_store(opc, env_raw, OPC_ADDR_T, operands_for_jit[0]);
+    operands_for_jit[1] = operands[0];
+    is_imm_for_jit[0] = 0;
+    is_imm_for_jit[1] = 0;
+    LLVMValueRef helper_jit_func = LLVMGetNamedFunction(module, helper_str[helper_jit]);
+    if (!helper_jit_func) {
+        LLVMTypeRef call_types[MAX_ADDED_ARGS] = {NULL};
+        int call_arg_cnt = collect_arguments_and_types(helper_jit, TARGET_DEFAULT_HELPER_PASSTHROUGH_VECTOR, TYPE_ONLY, operands_for_jit, is_imm_for_jit, 2, NULL, NULL, llvm_func, call_types, MAX_ADDED_ARGS, NULL, helper_str[helper_jit]);
+        LLVMTypeRef helper_jit_type = LLVMFunctionType(llvm_int_types[helper_return_type[h]], call_types, call_arg_cnt, 0);
+        helper_jit_func = LLVMAddFunction(module, helper_str[helper_jit], helper_jit_type);
+        LLVMAddAttributeAtIndex(helper_jit_func, -1, NoUnwindAttr);
+        LLVMSetSection(helper_jit_func, ".text.helper");
+    }
+
+    LLVMValueRef jit_trampoline = get_trampoline(h, helper_jit_func, 0, 0, operands_for_jit, is_imm_for_jit, 2, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER);
+    LLVMValueRef jit_trampoline_addr = LLVMBuildPtrToInt(builder, jit_trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
+    int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, second_half_addr, jit_trampoline_addr, llvm_func, NULL, 0, call_args, helper_str[h]);
+    assert(call_arg_cnt <= (FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT));
+    LLVMTypeRef helper_type = LLVMGlobalGetValueType(helper_func);
+#ifdef DEBUG
+    printf("BuildCall2:%s\n", LLVMGetValueName(helper_func)); fflush(NULL);
+#endif
+    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, call_arg_cnt, "");
+    LLVMSetTailCall(call_helper_inst, 1);
+    LLVMSetInstructionCallConv(call_helper_inst, QEMUAOT_CC);
+    LLVMBuildRetVoid(builder);
+
+    LLVMValueRef llvm_func_backup = llvm_func;
+    void *ptr_init = get_instr_buffer();
+    void *ptr_max = ptr_init + get_instr_buffer_size();
+    // Check if we got remaining BBs
+    do {
+        llvm_func = llvm_func_backup;
+        uint8_t current_active_label_cnt = get_current_active_label_cnt(llvm_func);
+        if (!current_active_label_cnt) {
+            break;
+        }
+        uint8_t *current_active_labels = get_current_active_labels(llvm_func);
+        uint8_t tgt_lbl = current_active_labels[0];
+        void *ptr_tmp = NULL;
+        for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+            OpCodeType opc = get_opcode(ptr_tmp);
+            if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+                break;
+            }
+        }
+        assert(ptr_tmp < ptr_max);
+        for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+            OpCodeType opc = get_opcode(ptr_tmp);
+            handle_single_instr(opc, ptr_tmp);
+            memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
+            if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
+                break;
+            }
+        }
+    } while (1);
+#ifdef DEBUG
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+}
+
+static void translate_jumptable(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
@@ -3841,14 +3965,8 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
 
      * In above example, "loc643" is the index of current jump-table entry, and 0x15 is the jump-table size
        identified by script identify_jump_table_by_AI.pl
-
-     * Structure of .bss data block (8B each):
-       visit_cnt
-       hit_cache_cnt
-       mode
-       local_hash_ptr
-       2 * jt_size entries
      */
+    int tgt_idx = 0;
     int jt_entry_idx = operands_cnt-2;
     int jt_size_idx = operands_cnt-1;
     assert(is_imm[jt_size_idx]);
@@ -3870,12 +3988,38 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
 
     char shadow_array_name[64] = {0};
     sprintf(shadow_array_name, "%s%sshadow_array_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset);
-    LLVMValueRef shadow_data = create_static_array(module, shadow_array_name, (4 + 2 * operands[jt_size_idx].i));
-    LLVMValueRef array_off = LLVMConstInt(LLVMInt64Type(), 4 * 8, 0);
-    LLVMValueRef shadow_array = LLVMBuildAdd(builder, shadow_data, array_off, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef shadow_array = create_static_array(module, shadow_array_name, 2 * operands[jt_size_idx].i);
     LLVMValueRef offset_cnt = LLVMConstInt(LLVMInt64Type(), 4, 0);
     LLVMValueRef offset_val = LLVMBuildShl(builder, src1, offset_cnt, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef shadow_pointer = LLVMBuildAdd(builder, shadow_array, offset_val, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+
+    LLVMValueRef target_pointer = LLVMBuildIntToPtr(builder, shadow_pointer, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef target_validate_val = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], target_pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug), 8);
+
+    LLVMValueRef tgt = get_source_node_imm_or_stack(opc, is_imm[tgt_idx], operands[tgt_idx], type_in, 0);
+    LLVMValueRef bool2 = LLVMBuildICmp(builder, LLVMIntEQ, tgt, target_validate_val, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+
+    LLVMBasicBlockRef bb_hit_shadow_array = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMBasicBlockRef bb_miss_shadow_array = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMBuildCondBr(builder, bool2, bb_hit_shadow_array, bb_miss_shadow_array);
+    LLVMPositionBuilderAtEnd(builder, bb_hit_shadow_array);
+
+    LLVMValueRef shadow_dest_offset = LLVMConstInt(LLVMInt64Type(), 8, 0);
+    LLVMValueRef shadow_dest = LLVMBuildAdd(builder, shadow_pointer, shadow_dest_offset, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef shadow_dest_pointer = LLVMBuildIntToPtr(builder, shadow_dest, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef dest_val = build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], shadow_dest_pointer, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug), 8);
+    LLVMTypeRef call_types_for_jt[FIXED_VECTOR_PARAM_COUNT] = {NULL};
+    LLVMValueRef call_args_for_jt[FIXED_VECTOR_PARAM_COUNT] = {NULL};
+    int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_AND_VALUE, NULL, NULL, 0, NULL, NULL, llvm_func, call_types_for_jt, FIXED_VECTOR_PARAM_COUNT, call_args_for_jt, "jumptable_target");
+    LLVMTypeRef ret_type = LLVMVoidType();
+    LLVMTypeRef func_type = LLVMFunctionType(ret_type, call_types_for_jt, arg_cnt, 0);
+    LLVMValueRef the_dest = LLVMBuildIntToPtr(builder, dest_val, LLVMPointerType(func_type, 0), get_next_var_name("helper_func", dummy_slot_for_debug));
+    LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, the_dest, call_args_for_jt, arg_cnt, "");
+    LLVMSetTailCall(call_inst, 1);
+    LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
+    LLVMBuildRetVoid(builder);
+
+    LLVMPositionBuilderAtEnd(builder, bb_miss_shadow_array);
     LLVMBuildBr(builder, bb_ctz_merge);
 
     LLVMPositionBuilderAtEnd(builder, bb_outof_jt);
@@ -3885,24 +4029,20 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     LLVMPositionBuilderAtEnd(builder, bb_ctz_merge);
     last_active_bb = bb_ctz_merge;
     LLVMValueRef phi = LLVMBuildPhi(builder, llvm_int_types[type_out], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMValueRef phi_incoming_values[] = {shadow_pointer, invalid_pointer};
-    LLVMBasicBlockRef phi_incoming_blocks[] = {bb_inside_jt, bb_outof_jt};
-    LLVMAddIncoming(phi, phi_incoming_values, phi_incoming_blocks, 2);
+    LLVMValueRef phi_incoming_values[] = {shadow_pointer, invalid_pointer, shadow_pointer};
+    LLVMBasicBlockRef phi_incoming_blocks[] = {bb_inside_jt, bb_outof_jt, bb_miss_shadow_array};
+    LLVMAddIncoming(phi, phi_incoming_values, phi_incoming_blocks, 3);
     do_store(opc, phi, OPC_ADDR_T, shadow_array_op);
-    do_store(opc, shadow_data, OPC_ADDR_T, shadow_data_op);
 
     OperandType shadow_map_op = get_tmp_and_do_alloc(OPC_ADDR_T);
     char shadow_map_name[64] = {0};
     sprintf(shadow_map_name, "%s%sshadow_map", func_name_prefix, func_name_prefix[0] ? "_" : "");
-    LLVMValueRef shadow_map = create_reference_to_external_array(module, shadow_map_name, 0x100000);
+    LLVMValueRef shadow_map = create_reference_to_external_array(module, shadow_map_name, 0/*doesn't matter*/);
     do_store(opc, shadow_map, OPC_ADDR_T, shadow_map_op);
 
     operands_cnt -= 2;
     is_imm[operands_cnt] = 0;
     operands[operands_cnt] = shadow_array_op;
-    operands_cnt += 1;
-    is_imm[operands_cnt] = 0;
-    operands[operands_cnt] = shadow_data_op;
     operands_cnt += 1;
     is_imm[operands_cnt] = 0;
     operands[operands_cnt] = shadow_map_op;
@@ -3920,6 +4060,7 @@ static void translate_short_circuit_jmp_ind(OpCodeType opc, void *ptr) {
     assert(second_half_func);
 
     // Get the helper
+    h = helper_jmp_ind;
     LLVMValueRef helper_func = LLVMGetNamedFunction(module, helper_str[h]);
     if (!helper_func) {
         LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_ADDED_ARGS] = {NULL};
@@ -4602,7 +4743,9 @@ void translate_call(OpCodeType opc, void *ptr) {
 #endif
 
     if (h == helper_jmp_ind) {
-        return translate_short_circuit_jmp_ind(opc, ptr);
+        return translate_jmp_ind(opc, ptr);
+    } else if (h == helper_jumptable) {
+        return translate_jumptable(opc, ptr);
     } else if (h == helper_cc_compute_all || h == helper_cc_compute_c || h == helper_cc_compute_nz) {
         if (helper_require_exception_path[h]) {
             return translate_helper_outband(opc, ptr);

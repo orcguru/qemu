@@ -48,7 +48,6 @@ __attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, u
         list_ptr = list_ptr->next;
     }
     if (host_addr) {
-        int cache_set = 0;
         FuncPtrType1 func_ptr = (FuncPtrType1)host_addr;
         if (shadow_array_entry != 0) {
             unsigned long *shadow_entry_ptr = (unsigned long *)shadow_array_entry;
@@ -56,10 +55,9 @@ __attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, u
             if (shadow_entry_ptr[0] == 0) {
                 shadow_entry_ptr[0] = target_addr;
                 shadow_entry_ptr[1] = host_addr;
-                cache_set = 1;
             }
         }
-        if (!cache_set && shadow_map) {
+        if (shadow_map) {
             unsigned long *ptr = (unsigned long *)shadow_map;
             unsigned long x64_elf_exec_start = ptr[0];
             unsigned long x64_elf_exec_end = ptr[1];

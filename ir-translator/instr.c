@@ -1330,18 +1330,16 @@ size_t create_helper_env_slot_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t
     return sizeof(*i);
 }
 
-size_t create_helper_slot_imm2(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0, uint32_t i0, uint32_t i1) {
+size_t create_helper_slot(void *ptr, OHType h, uint16_t cflags, uint8_t noargs, OperandType s0) {
 #ifdef DEBUG
     printf("%s %s %s ", __FUNCTION__, opcode_type_str[call], helper_str[h.h]); fflush(NULL);
 #endif
-    Instr1BH212 *i = (Instr1BH212 *)ptr;
+    Instr1BH21 *i = (Instr1BH21 *)ptr;
     i->instr_type = SIZEXB;
-    i->instr_type_ext = Instr1BH212_ext;
+    i->instr_type_ext = Instr1BH21_ext;
     i->helper = h.h;
     i->noargs = noargs;
     SET_SLOT(0);
-    i->imm0 = i0;
-    i->imm1 = i1;
     return sizeof(*i);
 }
 
@@ -1998,7 +1996,7 @@ const int helper_require_exception_path[HELPER_MAX] = {
 
 // Make sure argument type matches, otherwise inline could not happen!
 const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
-    [helper_jmp_ind] = {LLVMInt64, LLVMInt64, LLVMInt64, LLVMInt64},
+    [helper_jmp_ind] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [helper_cc_compute_all] = {LLVMInt64, LLVMInt64, LLVMInt64, LLVMInt32},
     [helper_cc_compute_c] = {LLVMInt64, LLVMInt64, LLVMInt64, LLVMInt32},
     [helper_cc_compute_nz] = {LLVMInt64, LLVMInt64, LLVMInt32},
