@@ -231,6 +231,7 @@ target_ulong HELPER(rdpid)(CPUX86State *env)
 #ifdef AOT
 #include "tcg/tcg-aot.h"
 
+//#define DUMP_CTR_COUNTER        1
 #define CTR_CALLBACK_TOTAL      0
 #define CTR_CALLBACK_OOR        1
 #define CTR_CALLBACK_INVAOT1    2
@@ -249,59 +250,66 @@ target_ulong HELPER(rdpid)(CPUX86State *env)
 
 typedef __attribute__((qemuaot,nothrow)) void (*FuncPtrType1)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, v2long xmm0, v2long ymm0_h, v2long xmm1, v2long ymm1_h, v2long xmm2, v2long ymm2_h, v2long xmm3, v2long ymm3_h, v2long xmm4, v2long ymm4_h, v2long xmm5, v2long ymm5_h, v2long xmm6, v2long ymm6_h, v2long xmm7, v2long ymm7_h, v2long xmm8, v2long ymm8_h, v2long xmm9, v2long ymm9_h, v2long xmm10, v2long ymm10_h, v2long xmm11, v2long ymm11_h, v2long xmm12, v2long ymm12_h, v2long xmm13, v2long ymm13_h, v2long xmm14, v2long ymm14_h, v2long xmm15, v2long ymm15_h);
 
-__attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, v2long xmm0, v2long ymm0_h, v2long xmm1, v2long ymm1_h, v2long xmm2, v2long ymm2_h, v2long xmm3, v2long ymm3_h, v2long xmm4, v2long ymm4_h, v2long xmm5, v2long ymm5_h, v2long xmm6, v2long ymm6_h, v2long xmm7, v2long ymm7_h, v2long xmm8, v2long ymm8_h, v2long xmm9, v2long ymm9_h, v2long xmm10, v2long ymm10_h, v2long xmm11, v2long ymm11_h, v2long xmm12, v2long ymm12_h, v2long xmm13, v2long ymm13_h, v2long xmm14, v2long ymm14_h, v2long xmm15, v2long ymm15_h, unsigned long target_addr, unsigned long shadow_array_entry, unsigned long shadow_data, unsigned long shadow_map, unsigned long jmp_ind_callback, unsigned long trampoline_helper_jit)
+__attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, v2long xmm0, v2long ymm0_h, v2long xmm1, v2long ymm1_h, v2long xmm2, v2long ymm2_h, v2long xmm3, v2long ymm3_h, v2long xmm4, v2long ymm4_h, v2long xmm5, v2long ymm5_h, v2long xmm6, v2long ymm6_h, v2long xmm7, v2long ymm7_h, v2long xmm8, v2long ymm8_h, v2long xmm9, v2long ymm9_h, v2long xmm10, v2long ymm10_h, v2long xmm11, v2long ymm11_h, v2long xmm12, v2long ymm12_h, v2long xmm13, v2long ymm13_h, v2long xmm14, v2long ymm14_h, v2long xmm15, v2long ymm15_h, unsigned long target_addr, unsigned long shadow_array_entry, unsigned long shadow_map, unsigned long jmp_ind_callback, unsigned long trampoline_helper_jit)
 {
-    volatile unsigned long *shadow_data_ptr = (volatile unsigned long *)shadow_data;
-    // Update visit_cnt
-    *shadow_data_ptr += 1;
-    if (shadow_array_entry != 0) {
-        unsigned long *shadow_entry_ptr = (unsigned long *)shadow_array_entry;
-        // FIXME: atomic load
-        if (shadow_entry_ptr[0] == target_addr) {
-            FuncPtrType1 func_ptr = (FuncPtrType1)shadow_entry_ptr[1];
-            shadow_data_ptr = (volatile unsigned long *)(shadow_data + 8);
-            // Update hit_cache_cnt
-            *shadow_data_ptr += 1;
-            return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);
-        }
-    }
-    if (shadow_map) {
-        unsigned long *ptr = (unsigned long *)shadow_map;
-        unsigned long x64_elf_exec_start = ptr[0];
-        unsigned long x64_elf_exec_end = ptr[1];
-        unsigned long host_exec_start = ptr[2];
-        unsigned long aux_array = ptr[3];
-        unsigned long *counters = (unsigned long *)(shadow_map+32);
-        counters[CTR_HELPER_TOTAL] += 1;
-        if (target_addr >= x64_elf_exec_start && target_addr < x64_elf_exec_end) {
-            unsigned long x64_delta = target_addr - x64_elf_exec_start;
-            unsigned char *map_ptr = (unsigned char *)(shadow_map + 8 * (4 + CTR_COUNT));
-            unsigned long host_delta = ((unsigned long)map_ptr[x64_delta+3] << 24) |
-                                      ((unsigned long)map_ptr[x64_delta+2] << 16) |
-                                      ((unsigned long)map_ptr[x64_delta+1] << 8) |
-                                      (unsigned long)map_ptr[x64_delta+0];
-            if (host_delta != 0) {
-                ptr = (unsigned long *)aux_array;
-                unsigned char *bit_array_ptr = (unsigned char *)(aux_array+8);
-                if ((host_delta >> 3) < ptr[0]) {
-                    unsigned long idx = host_delta >> 3;
-                    unsigned char shift = host_delta % 8;
-                    if (bit_array_ptr[idx] & (1 << shift)) {
-                        counters[CTR_HELPER_HIT] += 1;
-                        FuncPtrType1 func_ptr = (FuncPtrType1)(host_exec_start + host_delta);
-                        return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);
-                    } else {
-                        counters[CTR_HELPER_INVAOT] += 1;
-                    }
+    unsigned long *ptr = (unsigned long *)shadow_map;
+    unsigned long x64_elf_exec_start = ptr[0];
+    unsigned long x64_elf_exec_end = ptr[1];
+    unsigned long host_exec_start = ptr[2];
+    unsigned long aux_array = ptr[3];
+#ifdef DUMP_CTR_COUNTER
+    unsigned long *counters = (unsigned long *)(shadow_map+32);
+    counters[CTR_HELPER_TOTAL] += 1;
+#endif
+    if (target_addr >= x64_elf_exec_start && target_addr < x64_elf_exec_end) {
+        unsigned long x64_delta = target_addr - x64_elf_exec_start;
+        // FIXME: tune instruction cnt/perf
+        /*
+        unsigned char *map_ptr = (unsigned char *)(shadow_map + 8 * (4 + CTR_COUNT));
+        unsigned long host_delta = ((unsigned long)map_ptr[x64_delta+3] << 24) |
+                                  ((unsigned long)map_ptr[x64_delta+2] << 16) |
+                                  ((unsigned long)map_ptr[x64_delta+1] << 8) |
+                                  (unsigned long)map_ptr[x64_delta+0];
+        */
+        unsigned long *map_ptr = (unsigned long *)(shadow_map + 8 * (4 + CTR_COUNT));
+        unsigned long x64_delta_long_idx = (x64_delta >> 3);
+        unsigned long x64_delta_long_shift = ((x64_delta & 0x7) << 3);
+        unsigned long host_delta;
+        unsigned long high = map_ptr[x64_delta_long_idx + 1];
+        unsigned long low = map_ptr[x64_delta_long_idx];
+        host_delta = ((low >> x64_delta_long_shift) | (high >> (64 - x64_delta_long_shift))) & 0xffffffff;
+
+        if (host_delta != 0) {
+            ptr = (unsigned long *)aux_array;
+            unsigned char *bit_array_ptr = (unsigned char *)(aux_array+8);
+            if ((host_delta >> 3) < ptr[0]) {
+                unsigned long idx = host_delta >> 3;
+                unsigned char shift = host_delta % 8;
+                if (bit_array_ptr[idx] & (1 << shift)) {
+#ifdef DUMP_CTR_COUNTER
+                    counters[CTR_HELPER_HIT] += 1;
+#endif
+                    FuncPtrType1 func_ptr = (FuncPtrType1)(host_exec_start + host_delta);
+                    return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);
                 } else {
+#ifdef DUMP_CTR_COUNTER
                     counters[CTR_HELPER_INVAOT] += 1;
+#endif
                 }
             } else {
-                counters[CTR_HELPER_EMP] += 1;
+#ifdef DUMP_CTR_COUNTER
+                counters[CTR_HELPER_INVAOT] += 1;
+#endif
             }
         } else {
-            counters[CTR_HELPER_OOR] += 1;
+#ifdef DUMP_CTR_COUNTER
+            counters[CTR_HELPER_EMP] += 1;
+#endif
         }
+    } else {
+#ifdef DUMP_CTR_COUNTER
+        counters[CTR_HELPER_OOR] += 1;
+#endif
     }
     return g_hash_table_lookup_qemuaot(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h, (unsigned long)tb_ctx.aot_htable, target_addr, jmp_ind_callback, trampoline_helper_jit, shadow_array_entry, shadow_map);
 }
