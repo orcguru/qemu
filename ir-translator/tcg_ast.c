@@ -23,7 +23,6 @@
 #include <glib.h>
 
 #define SHADOW_STACK_ALIGNMENT      (16 * 4096)
-#define SHADOW_STACK_HIGH_MASK      (~(SHADOW_STACK_ALIGNMENT - 1))
 #define SHADOW_STACK_LOW_MASK       (SHADOW_STACK_ALIGNMENT - 1)
 //#define COLLECT_TRAMPOLINE_IR       1
 //#define HELPER_COUNTERS             1
@@ -624,8 +623,9 @@ static GHashTable *current_helper_aux_info = NULL;
 static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, OperandType out);
 static LLVMValueRef get_env_ptr_raw();
 static OperandType get_env_ptr(OpCodeType opc);
-static OperandType get_shadow_stack_pointer(OpCodeType opc);
-static void set_shadow_stack_pointer(OpCodeType opc, OperandType val);
+static OperandType get_shadow_stack_pointer_base(OpCodeType opc);
+static OperandType get_shadow_stack_pointer_index(OpCodeType opc);
+static void set_shadow_stack_pointer_index(OpCodeType opc, OperandType val);
 static LLVMBasicBlockRef get_bb(const char *name);
 static void handle_single_instr(OpCodeType opc, void *ptr);
 static uint8_t do_link_helper(HelperType h, const char *build_macro, const char *bc_name, const char *c_file);
@@ -932,7 +932,7 @@ static const char *get_next_var_name(const char *tag, OperandType slot_name_for_
 #endif
 }
 
-static OperandType get_shadow_stack_pointer(OpCodeType opc) {
+static OperandType get_shadow_stack_pointer_base(OpCodeType opc) {
     OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
     OperandType env = get_env_ptr(opc);
     CREATE_ADD64(ptr_addr, env, -8UL);
@@ -941,10 +941,19 @@ static OperandType get_shadow_stack_pointer(OpCodeType opc) {
     return ptr_val;
 }
 
-static void set_shadow_stack_pointer(OpCodeType opc, OperandType val) {
+static OperandType get_shadow_stack_pointer_index(OpCodeType opc) {
     OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
     OperandType env = get_env_ptr(opc);
-    CREATE_ADD64(ptr_addr, env, -8UL);
+    CREATE_ADD64(ptr_addr, env, -16UL);
+    OperandType ptr_val = get_tmp_and_do_alloc(OPC_ADDR_T);
+    CREATE_LD(ptr_val, ptr_addr);
+    return ptr_val;
+}
+
+static void set_shadow_stack_pointer_index(OpCodeType opc, OperandType val) {
+    OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
+    OperandType env = get_env_ptr(opc);
+    CREATE_ADD64(ptr_addr, env, -16UL);
     CREATE_ST(val, ptr_addr);
 }
 
@@ -1980,25 +1989,20 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     assert(is_imm1);
 
     LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(opc, is_imm0, operand0, type_in, 0);
-    OperandType ptr_val = get_shadow_stack_pointer(opc);
+    OperandType ss_base = get_shadow_stack_pointer_base(opc);
+    OperandType ss_index = get_shadow_stack_pointer_index(opc);
 
-    LLVMValueRef ss_high_mask = LLVMConstInt(llvm_int_types[OPC_ADDR_T], SHADOW_STACK_HIGH_MASK, 0);
     LLVMValueRef ss_low_mask = LLVMConstInt(llvm_int_types[OPC_ADDR_T], SHADOW_STACK_LOW_MASK, 0);
-    OperandType high_mask_op = get_tmp_and_do_alloc(type_out);
-    do_store(opc, ss_high_mask, type_out, high_mask_op);
     OperandType low_mask_op = get_tmp_and_do_alloc(type_out);
     do_store(opc, ss_low_mask, type_out, low_mask_op);
-    OperandType ptr_high_val = get_tmp_and_do_alloc(type_out);
-    OperandType ptr_low_val = get_tmp_and_do_alloc(type_out);
+    OperandType ss = get_tmp_and_do_alloc(type_out);
 
-    // Calculate ptr_val - 8
-    CREATE_AND(ptr_high_val, ptr_val, high_mask_op);
-    CREATE_AND(ptr_low_val, ptr_val, low_mask_op);
-    CREATE_ADD(ptr_low_val, ptr_low_val, -8UL);
-    CREATE_AND(ptr_low_val, ptr_low_val, low_mask_op);
-    CREATE_OR(ptr_val, ptr_high_val, ptr_low_val);
+    // Calculate shadow stack - 8
+    CREATE_ADD(ss_index, ss_index, -8UL);
+    CREATE_AND(ss_index, ss_index, low_mask_op);
+    CREATE_OR(ss, ss_base, ss_index);
 
-    LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
+    LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(opc, 0, ss, OPC_ADDR_T, 0);
     LLVMValueRef shadow_ptr0 = LLVMBuildIntToPtr(builder, shadow_val0, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     build_store_with_alignment(builder, x64_ret_addr, shadow_ptr0, 8);
 
@@ -2008,18 +2012,16 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, 0), llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     add_list_info(func_name, "declare");
 
-    // Calculate ptr_val - 8
-    CREATE_AND(ptr_high_val, ptr_val, high_mask_op);
-    CREATE_AND(ptr_low_val, ptr_val, low_mask_op);
-    CREATE_ADD(ptr_low_val, ptr_low_val, -8UL);
-    CREATE_AND(ptr_low_val, ptr_low_val, low_mask_op);
-    CREATE_OR(ptr_val, ptr_high_val, ptr_low_val);
+    // Calculate shadow stack - 8
+    CREATE_ADD(ss_index, ss_index, -8UL);
+    CREATE_AND(ss_index, ss_index, low_mask_op);
+    CREATE_OR(ss, ss_base, ss_index);
 
-    LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
+    LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ss, OPC_ADDR_T, 0);
     LLVMValueRef shadow_ptr1 = LLVMBuildIntToPtr(builder, shadow_val1, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     build_store_with_alignment(builder, func_addr, shadow_ptr1, 8);
 
-    set_shadow_stack_pointer(opc, ptr_val);
+    set_shadow_stack_pointer_index(opc, ss);
 }
 
 void translate_ret(OpCodeType opc, void *ptr) {
@@ -2033,7 +2035,8 @@ void translate_ret(OpCodeType opc, void *ptr) {
     operand0 = get_operand(ptr, 0, &is_imm);
     assert(!is_imm && operand0.s.valid);
 
-    OperandType shadow_stack = get_shadow_stack_pointer(opc);
+    OperandType ss_base = get_shadow_stack_pointer_base(opc);
+    OperandType ss_index = get_shadow_stack_pointer_index(opc);
 
     char false_bb_name[16] = {0};
     sprintf(false_bb_name, "bb_false%d", br_cnt);
@@ -2043,39 +2046,31 @@ void translate_ret(OpCodeType opc, void *ptr) {
     assert(!get_bb(true_bb_name));
     LLVMBasicBlockRef bb_true = LLVMAppendBasicBlock(llvm_func, true_bb_name);
 
-    LLVMValueRef ss_high_mask = LLVMConstInt(llvm_int_types[OPC_ADDR_T], SHADOW_STACK_HIGH_MASK, 0);
     LLVMValueRef ss_low_mask = LLVMConstInt(llvm_int_types[OPC_ADDR_T], SHADOW_STACK_LOW_MASK, 0);
-    OperandType high_mask_op = get_tmp_and_do_alloc(type_out);
-    do_store(opc, ss_high_mask, type_out, high_mask_op);
     OperandType low_mask_op = get_tmp_and_do_alloc(type_out);
     do_store(opc, ss_low_mask, type_out, low_mask_op);
-    OperandType ptr_high_val = get_tmp_and_do_alloc(type_out);
-    OperandType ptr_low_val = get_tmp_and_do_alloc(type_out);
     OperandType shadow_stack_guest = get_tmp_and_do_alloc(type_out);
     OperandType shadow_stack_host = get_tmp_and_do_alloc(type_out);
     OperandType delta = get_tmp_and_do_alloc(type_out);
+    OperandType ss = get_tmp_and_do_alloc(type_out);
+    CREATE_OR(ss, ss_base, ss_index);
 
-    CREATE_LD(shadow_stack_host, shadow_stack);
+    CREATE_LD(shadow_stack_host, ss);
 
     // Calculate shadow_stack + 8
-    CREATE_AND(ptr_high_val, shadow_stack, high_mask_op);
-    CREATE_AND(ptr_low_val, shadow_stack, low_mask_op);
-    CREATE_ADD(ptr_low_val, ptr_low_val, 8UL);
-    CREATE_AND(ptr_low_val, ptr_low_val, low_mask_op);
-    CREATE_OR(shadow_stack, ptr_high_val, ptr_low_val);
+    CREATE_ADD(ss_index, ss_index, 8UL);
+    CREATE_AND(ss_index, ss_index, low_mask_op);
+    CREATE_OR(ss, ss_base, ss_index);
 
-    CREATE_LD(shadow_stack_guest, shadow_stack);
+    CREATE_LD(shadow_stack_guest, ss);
 
     CREATE_SUB(delta, operand0, shadow_stack_guest);
 
     // Calculate shadow_stack + 8
-    CREATE_AND(ptr_high_val, shadow_stack, high_mask_op);
-    CREATE_AND(ptr_low_val, shadow_stack, low_mask_op);
-    CREATE_ADD(ptr_low_val, ptr_low_val, 8UL);
-    CREATE_AND(ptr_low_val, ptr_low_val, low_mask_op);
-    CREATE_OR(shadow_stack, ptr_high_val, ptr_low_val);
+    CREATE_ADD(ss_index, ss_index, 8UL);
+    CREATE_AND(ss_index, ss_index, low_mask_op);
 
-    set_shadow_stack_pointer(opc, shadow_stack);
+    set_shadow_stack_pointer_index(opc, ss_index);
 
     OperandType op_imm;
     op_imm.i = 0;
