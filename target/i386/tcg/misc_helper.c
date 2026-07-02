@@ -537,6 +537,10 @@ unsigned long prev_func = -1UL;
 void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
 {
     uint64_t *shadow_stack_pointer_ptr = (uint64_t *)((unsigned long)env - 8);
+    uint64_t shadow_stack_pointer_lower_bound = (*(uint64_t *)((unsigned long)env - 16)) - 16 - 4096;  // remove margin
+    uint64_t shadow_stack_pointer_upper_bound = (*(uint64_t *)((unsigned long)env - 24)) + 16;  // remove margin
+    assert(shadow_stack_pointer_lower_bound < shadow_stack_pointer_ptr[0]);
+    assert(shadow_stack_pointer_ptr[0] <= shadow_stack_pointer_upper_bound);
 #ifdef DUMP_SHADOW_JUMP_TABLE
     unsigned long *shadow_jt_flag_ptr = (unsigned long *)((unsigned long)env - 120);
     if (*shadow_jt_flag_ptr != 0) {

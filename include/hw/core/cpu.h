@@ -381,9 +381,9 @@ typedef struct __attribute__((packed)) InstrExecCountersGroup2 {
 
 typedef struct __attribute__((packed)) PackedShadowStackInfo {
     uint64_t pad;
-    uint64_t pad1;
-    uint64_t shadow_stack_pointer_index;
-    uint64_t shadow_stack_pointer_base;
+    uint64_t shadow_stack_pointer_upper_bound;
+    uint64_t shadow_stack_pointer_lower_bound;
+    uint64_t shadow_stack_pointer;
 } PackedShadowStackInfo;
 #endif
 
