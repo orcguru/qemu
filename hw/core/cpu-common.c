@@ -81,7 +81,8 @@ CPUState *cpu_create(const char *typename)
 #define SHADOW_STACK_SIZE   (16 * 4096)
     uint64_t ptr = (uint64_t)g_malloc0(2 * SHADOW_STACK_SIZE);
     uint64_t aligned = (ptr + SHADOW_STACK_SIZE - 1) & ~(SHADOW_STACK_SIZE - 1);
-    cpu->neg.ssi.shadow_stack_pointer = aligned + SHADOW_STACK_SIZE - 16;
+    cpu->neg.ssi.shadow_stack_pointer_base = aligned;
+    cpu->neg.ssi.shadow_stack_pointer_index = SHADOW_STACK_SIZE - 16;
 // Reserve two pages at boundaries to trap overflow accesses
 #define AOT_STACK_SIZE   ((64 + 2) * qemu_real_host_page_size())
     ptr = (uint64_t)mmap(0, AOT_STACK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
