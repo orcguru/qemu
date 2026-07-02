@@ -5612,7 +5612,7 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
         translate_binary(opc, ptr, LLVMBuildOr);
         break;
     case push_ret_addr:
-        translate_push_ret_addr(opc, ptr);
+        //translate_push_ret_addr(opc, ptr);
         break;
     case ld8u_i32:
     case ld8u_i64:
@@ -5662,7 +5662,7 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
         translate_st_vec(opc, ptr);
         break;
     case ret:
-        translate_ret(opc, ptr);
+        //translate_ret(opc, ptr);
         break;
     case rotr_i32:
     case rotr_i64:
