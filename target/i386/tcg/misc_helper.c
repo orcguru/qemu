@@ -263,13 +263,6 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
 #endif
     if (target_addr >= x64_elf_exec_start && target_addr < x64_elf_exec_end) {
         unsigned long x64_delta = target_addr - x64_elf_exec_start;
-        // FIXME: tune instruction cnt/perf
-        unsigned char *map_ptr = (unsigned char *)(shadow_map + 8 * (4 + CTR_COUNT));
-        unsigned int host_delta = ((unsigned int)map_ptr[x64_delta+3] << 24) |
-                                  ((unsigned int)map_ptr[x64_delta+2] << 16) |
-                                  ((unsigned int)map_ptr[x64_delta+1] << 8) |
-                                  (unsigned int)map_ptr[x64_delta+0];
-        /*
         unsigned int *map_ptr = (unsigned int *)(shadow_map + 8 * (4 + CTR_COUNT));
         size_t x64_delta_idx = (x64_delta >> 2);
         size_t x64_delta_shift = ((x64_delta & 0x3) << 3);
@@ -278,7 +271,6 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
         unsigned int low = map_ptr[x64_delta_idx];
         unsigned long combined = ((unsigned long)high << 32) | low;
         host_delta = (combined >> x64_delta_shift) & 0xffffffff;
-        */
         if (host_delta != 0) {
             ptr = (unsigned long *)aux_array;
             unsigned char *bit_array_ptr = (unsigned char *)(aux_array+8);
