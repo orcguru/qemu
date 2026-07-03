@@ -10,6 +10,7 @@ typedef __attribute__((qemuaot,nothrow)) void (*FuncPtrType1)(unsigned long rax,
 
 typedef __attribute__((qemuaot,nothrow)) void (*FuncPtrType2)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip XMM_PARAM_DECLARE_COMMON, unsigned long env, unsigned long target);
 
+//#define DUMP_CTR_COUNTER        1
 #define CTR_CALLBACK_TOTAL      0
 #define CTR_CALLBACK_OOR        1
 #define CTR_CALLBACK_INVAOT1    2
@@ -63,8 +64,10 @@ __attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, u
             unsigned long x64_elf_exec_end = ptr[1];
             unsigned long host_exec_start = ptr[2];
             unsigned long aux_array = ptr[3];
+#ifdef DUMP_CTR_COUNTER
             unsigned long *counters = (unsigned long *)(shadow_map+32);
             counters[CTR_CALLBACK_TOTAL] += 1;
+#endif
             if (target_addr >= x64_elf_exec_start && target_addr < x64_elf_exec_end) {
                 unsigned long host_delta = host_addr - host_exec_start;
                 ptr = (unsigned long *)aux_array;
@@ -80,13 +83,15 @@ __attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, u
                                                   ((unsigned long)map_ptr[x64_delta+1] << 8) |
                                                   (unsigned long)map_ptr[x64_delta+0];
                         if (map_delta == 0) {
-
                             map_ptr[x64_delta] = host_delta & 0xff;
                             map_ptr[x64_delta+1] = (host_delta >> 8) & 0xff;
                             map_ptr[x64_delta+2] = (host_delta >> 16) & 0xff;
                             map_ptr[x64_delta+3] = (host_delta >> 24) & 0xff;
+#ifdef DUMP_CTR_COUNTER
                             counters[CTR_CALLBACK_HIT] += 1;
+#endif
                         } else {
+#ifdef DUMP_CTR_COUNTER
                             if (map_delta == host_delta) {
                                 counters[CTR_CALLBACK_DUP] += 1;
                             } else {
@@ -94,18 +99,25 @@ __attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, u
                                 counters[CTR_CALLBACK_SAMPLE1] = x64_delta;
                                 counters[CTR_CALLBACK_SAMPLE2] = map_delta << 4 | host_delta;
                             }
+#endif
                         }
                     } else {
+#ifdef DUMP_CTR_COUNTER
                         counters[CTR_CALLBACK_INVAOT2] += 1;
                         unsigned long x64_delta = target_addr - x64_elf_exec_start;
                         counters[CTR_CALLBACK_SAMPLE1] = x64_delta;
                         counters[CTR_CALLBACK_SAMPLE2] = host_addr;
+#endif
                     }
                 } else {
+#ifdef DUMP_CTR_COUNTER
                     counters[CTR_CALLBACK_INVAOT1] += 1;
+#endif
                 }
             } else {
+#ifdef DUMP_CTR_COUNTER
                 counters[CTR_CALLBACK_OOR] += 1;
+#endif
             }
         }
         return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr XMM_PARAM_LIST);
