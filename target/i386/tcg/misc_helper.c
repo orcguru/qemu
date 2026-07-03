@@ -263,14 +263,6 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
 #endif
     if (target_addr >= x64_elf_exec_start && target_addr < x64_elf_exec_end) {
         unsigned long x64_delta = target_addr - x64_elf_exec_start;
-        // FIXME: tune instruction cnt/perf
-        /*
-        unsigned char *map_ptr = (unsigned char *)(shadow_map + 8 * (4 + CTR_COUNT));
-        unsigned long host_delta = ((unsigned long)map_ptr[x64_delta+3] << 24) |
-                                  ((unsigned long)map_ptr[x64_delta+2] << 16) |
-                                  ((unsigned long)map_ptr[x64_delta+1] << 8) |
-                                  (unsigned long)map_ptr[x64_delta+0];
-        */
         unsigned int *map_ptr = (unsigned int *)(shadow_map + 8 * (4 + CTR_COUNT));
         size_t x64_delta_idx = (x64_delta >> 2);
         size_t x64_delta_shift = ((x64_delta & 0x3) << 3);
@@ -279,23 +271,17 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
         unsigned int low = map_ptr[x64_delta_idx];
         unsigned long combined = ((unsigned long)high << 32) | low;
         host_delta = (combined >> x64_delta_shift) & 0xffffffff;
-        if (host_delta != 0) {
-            ptr = (unsigned long *)aux_array;
-            unsigned char *bit_array_ptr = (unsigned char *)(aux_array+8);
-            if ((host_delta >> 3) < ptr[0]) {
-                unsigned long idx = host_delta >> 3;
-                unsigned char shift = host_delta % 8;
-                if (bit_array_ptr[idx] & (1 << shift)) {
+        ptr = (unsigned long *)aux_array;
+        unsigned char *bit_array_ptr = (unsigned char *)(aux_array+8);
+        if ((host_delta >> 3) < ptr[0]) {
+            unsigned long idx = host_delta >> 3;
+            unsigned char shift = host_delta % 8;
+            if (bit_array_ptr[idx] & (1 << shift)) {
 #ifdef DUMP_CTR_COUNTER
-                    counters[CTR_HELPER_HIT] += 1;
+                counters[CTR_HELPER_HIT] += 1;
 #endif
-                    FuncPtrType1 func_ptr = (FuncPtrType1)(host_exec_start + host_delta);
-                    return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);
-                } else {
-#ifdef DUMP_CTR_COUNTER
-                    counters[CTR_HELPER_INVAOT] += 1;
-#endif
-                }
+                FuncPtrType1 func_ptr = (FuncPtrType1)(host_exec_start + host_delta);
+                return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);
             } else {
 #ifdef DUMP_CTR_COUNTER
                 counters[CTR_HELPER_INVAOT] += 1;
@@ -303,7 +289,7 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
             }
         } else {
 #ifdef DUMP_CTR_COUNTER
-            counters[CTR_HELPER_EMP] += 1;
+            counters[CTR_HELPER_INVAOT] += 1;
 #endif
         }
     } else {
