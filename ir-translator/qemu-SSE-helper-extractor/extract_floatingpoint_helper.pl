@@ -17,13 +17,13 @@ my %VecCodeToCType = (
   "VecQ" => "v2ulong",
   "VecL" => "v4uint",
   "VecW" => "v8ushort",
-  "VecB" => "v16uchar"
+  "VecB" => "v16uchar",
 );
 my %VecSymbolToCType = (
   "_q_ZMMReg" => "v2ulong",
   "_l_ZMMReg" => "v4uint",
   "_w_ZMMReg" => "v8ushort",
-  "_b_ZMMReg" => "v16uchar"
+  "_b_ZMMReg" => "v16uchar",
 );
 my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
 my %qemuaot_gp_params_map = (
@@ -88,7 +88,7 @@ my %env_xmmregs_idx_map = (
   "15" => "xmm15"
 );
 
-my $path = "$ARGV[0].helper_xmm";
+my $path = "$ARGV[0].helper_floatingpoint";
 my $file_size = -s $ARGV[0];
 open FDIN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
 my $bytes;
@@ -237,8 +237,9 @@ while (<FD>) {
       next;
     }
     $info{'CALL_TARGET'} = &GetText($info{'NAME_START'}, $info{'NAME_STOP'});
-    if (&FuncNameIsForeign($info{'CALL_TARGET'})) {
-      $info{'IS_FOREIGN'} = 1;
+    # NEW: skip _Generic – it's not a function call
+    if ($info{'CALL_TARGET'} eq '_Generic') {
+        next;
     }
     my $str = &GetText($info{'PAREN_START'} + 1, $info{'PAREN_STOP'} - 1);
     my ($args, $ranges) = &ExtractCallArguments($str, $info{'PAREN_START'} + 1, $info{'PAREN_STOP'} - 1);
@@ -246,19 +247,28 @@ while (<FD>) {
     $info{'CALL_ARGUMENT_RANGES'} = $ranges;
     my ($func_idx, $ptr) = &lookup($info{'NAME_START'}, \%func_lookup);
     if ($func_idx != -1) {
-      #print "$ptr->{'NAME'} calls $info{'CALL_TARGET'}\n";
-      #foreach my $a (@{$info{'CALL_ARGUMENTS'}}) {
-      #  print "$a\n";
-      #}
       $info{'PARENT'} = $ptr->{'NAME'};
-      if (exists $info{'IS_FOREIGN'}) {
-        $funcs{$ptr->{'NAME'}}->{'IS_FOREIGN'} = 1;
-        foreach my $a (@{$args}) {
-          if ($a =~ /^\s*env\s*$/) {
-            $ptr->{'DO_DEFINE_ENV'} = 1;
+
+      # FIX: Check if callee is a function pointer parameter of the parent
+      if (&FuncNameIsForeign($info{'CALL_TARGET'})) {
+        my $is_param = 0;
+        foreach my $arg (@{$ptr->{'SCALAR_ARGS'}}) {
+          if ($arg->{'VAR_NAME'} eq $info{'CALL_TARGET'}) {
+            $is_param = 1;
+            last;
+          }
+        }
+        if (!$is_param) {
+          $info{'IS_FOREIGN'} = 1;
+          $funcs{$ptr->{'NAME'}}->{'IS_FOREIGN'} = 1;
+          foreach my $a (@{$args}) {
+            if ($a =~ /^\s*env\s*$/) {
+              $ptr->{'DO_DEFINE_ENV'} = 1;
+            }
           }
         }
       }
+
       $funcs{$ptr->{'NAME'}}->{'CALLS'}->{$info{'NAME_START'}} = \%info;
       $callsite_lookup{'MAP'}->{$info{'LOOKUP_START'}} = \%info;
     }
@@ -362,8 +372,19 @@ foreach my $f (keys %covered_funcs) {
     $funcs{$f}->{'HEAD'} =~ s/$funcs{$f}->{'FUNC_TYPE'}\s+/void /;
   }
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
-    if (&FuncNameIsForeign($funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'})) {
-      $foreign_funcs{$funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'}} = 1;
+    my $ct = $funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'};
+    if (&FuncNameIsForeign($ct)) {
+      # Skip if the call target is a function pointer parameter of this function
+      my $is_param = 0;
+      foreach my $arg (@{$funcs{$f}->{'SCALAR_ARGS'}}) {
+        if ($arg->{'VAR_NAME'} eq $ct) {
+          $is_param = 1;
+          last;
+        }
+      }
+      if (!$is_param) {
+        $foreign_funcs{$ct} = 1;
+      }
     }
   }
 }
@@ -854,7 +875,17 @@ foreach my $f (keys %funcs) {
         }
       }
     } elsif (&FuncNameIsForeign($call_target)) {
-      $foreign_calls{$call_target} = $func_type_input{$call_target};
+      # Skip if the call target is a function pointer parameter of the current function
+      my $is_param = 0;
+      foreach my $arg (@{$funcs{$f}->{'SCALAR_ARGS'}}) {
+        if ($arg->{'VAR_NAME'} eq $call_target) {
+          $is_param = 1;
+          last;
+        }
+      }
+      if (!$is_param) {
+        $foreign_calls{$call_target} = $func_type_input{$call_target};
+      }
     }
   }
   while (@sub_call_stack > 0) {
@@ -890,7 +921,19 @@ foreach my $f (keys %funcs) {
             }
           }
         } elsif (&FuncNameIsForeign($call_target)) {
-          $foreign_calls{$call_target} = $func_type_input{$call_target};
+          # Skip if the call target is a function pointer parameter of the caller ($c)
+          my $is_param = 0;
+          if (exists $funcs{$c}) {
+            foreach my $arg (@{$funcs{$c}->{'SCALAR_ARGS'}}) {
+              if ($arg->{'VAR_NAME'} eq $call_target) {
+                $is_param = 1;
+                last;
+              }
+            }
+          }
+          if (!$is_param) {
+            $foreign_calls{$call_target} = $func_type_input{$call_target};
+          }
         }
       }
     }
@@ -1650,15 +1693,32 @@ END
       my $call_target = $func_ptr->{'CALLS'}->{$e}->{'CALL_TARGET'};
       if (not exists $funcs{$call_target}) {
         if (&FuncNameIsForeign($call_target)) {
-          die "" if not exists $fc->{$call_target};
-          my $type_name = $fc->{$call_target};
-          $type_name =~ s/\s+/_/g;
-          if ($func_ptr->{'HELPER_INTERFACE'}) {
-            $body = $body."($type_name)(trigger_exception = 1)";
-          } else {
-            $body = $body."($type_name)(*trigger_exception_ptr = 1)";
+          # Skip if the call target is a function pointer parameter of the current function
+          my $is_param = 0;
+          foreach my $arg (@{$func_ptr->{'SCALAR_ARGS'}}) {
+            if ($arg->{'VAR_NAME'} eq $call_target) {
+              $is_param = 1;
+              last;
+            }
           }
-          $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
+          if ($is_param) {
+            # Emit the original call text unchanged
+            $body = $body . &GetText(
+                $func_ptr->{'CALLS'}->{$e}->{'NAME_START'},
+                $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'}
+            );
+            $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
+          } else {
+            die "$call_target" if not exists $fc->{$call_target};
+            my $type_name = $fc->{$call_target};
+            $type_name =~ s/\s+/_/g;
+            if ($func_ptr->{'HELPER_INTERFACE'}) {
+              $body = $body."($type_name)(trigger_exception = 1)";
+            } else {
+              $body = $body."($type_name)(*trigger_exception_ptr = 1)";
+            }
+            $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
+          }
         } else {
           $current_pos = $e;
         }
@@ -1736,11 +1796,24 @@ END
             my $sub_str = &GetText($sub_head, ($sub_current-1));
             $body = $body.$sub_str;
             my $foreign_call = $func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'};
-            die "" if not exists $fc->{$foreign_call};
-            if ($func_ptr->{'HELPER_INTERFACE'}) {
-              $body = $body."($fc->{$foreign_call})(trigger_exception = 1)";
+            # Skip if the call target is a function pointer parameter of the current function
+            my $is_param = 0;
+            foreach my $arg (@{$func_ptr->{'SCALAR_ARGS'}}) {
+                if ($arg->{'VAR_NAME'} eq $foreign_call) {
+                    $is_param = 1;
+                    last;
+                }
+            }
+            if ($is_param) {
+                # Emit the original call text unchanged
+                $body = $body.&GetText($func_ptr->{'CALLS'}->{$sub_current}->{'NAME_START'}, $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'});
             } else {
-              $body = $body."($fc->{$foreign_call})(*trigger_exception_ptr = 1)";
+                die "" if not exists $fc->{$foreign_call};
+                if ($func_ptr->{'HELPER_INTERFACE'}) {
+                    $body = $body."($fc->{$foreign_call})(trigger_exception = 1)";
+                } else {
+                    $body = $body."($fc->{$foreign_call})(*trigger_exception_ptr = 1)";
+                }
             }
             $sub_head = $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'} + 1;
             $sub_current = $sub_head;
@@ -1917,14 +1990,27 @@ sub update_func_call
         my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info, $fc);
         $call_list = $call_list.", ".$sub_call_txt;
       } elsif (&FuncNameIsForeign($sub_call_info->{'CALL_TARGET'})) {
-        die "" if not exists $fc->{$sub_call_info->{'CALL_TARGET'}};
-        my $sub_call_txt = "";
-        if ($caller_ptr->{'HELPER_INTERFACE'}) {
-          $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(trigger_exception = 1)";
-        } else {
-          $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(*trigger_exception_ptr = 1)";
+        # Skip if the call target is a function pointer parameter of the caller
+        my $is_param = 0;
+        foreach my $arg (@{$caller_ptr->{'SCALAR_ARGS'}}) {
+            if ($arg->{'VAR_NAME'} eq $sub_call_info->{'CALL_TARGET'}) {
+                $is_param = 1;
+                last;
+            }
         }
-        $call_list = $call_list.", ".$sub_call_txt;
+        if ($is_param) {
+            # Keep the original call text unchanged
+            $call_list = $call_list.", ".&GetText($sub_call_info->{'NAME_START'}, $sub_call_info->{'PAREN_STOP'});
+        } else {
+            die "" if not exists $fc->{$sub_call_info->{'CALL_TARGET'}};
+            my $sub_call_txt = "";
+            if ($caller_ptr->{'HELPER_INTERFACE'}) {
+                $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(trigger_exception = 1)";
+            } else {
+                $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(*trigger_exception_ptr = 1)";
+            }
+            $call_list = $call_list.", ".$sub_call_txt;
+        }
       } else {
         my $param = &update_vector_inside_single_param($caller_ptr, $call_info, $idx, $arg);
         $call_list = $call_list.", ".$param;
@@ -2204,6 +2290,8 @@ sub FuncNameIsForeign
 {
   my ($func_name) = @_;
   if (exists $funcs{$func_name}) {
+    return 0;
+  } elsif ($func_name eq '_Generic') {
     return 0;
   } elsif ($func_name =~ /^__builtin_/ or $func_name =~ /^__atomic/) {
     return 0;
