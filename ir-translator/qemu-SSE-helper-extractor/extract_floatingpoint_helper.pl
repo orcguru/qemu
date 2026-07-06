@@ -1232,6 +1232,7 @@ sub parse_func_head
     $head_copy = "__attribute__((weak)) ".$head_copy;
   }
   $head_copy =~ s/__attribute__\(\(target\(\"\+crypto\"\)\)\)//g;
+  $head_copy =~ s/__attribute__\s*\(\s*\(\s*noinline\s*\)\s*\)//g;
   if (not ($func->{'NAME'} =~ /^helper_/ and $func->{'NAME'} =~ /_xmm$/)) {
     if ($head_copy =~ /static\s+/) {
       $head_copy =~ s/static\s+//;
