@@ -1544,7 +1544,8 @@ sub get_func_body
     }
   } else {
     $body = "{\n";
-    my $counter_def = <<~'END';
+    if ($func_ptr->{'HELPER_INTERFACE'}) {
+      my $counter_def = <<~'END';
 #ifdef HELPER_COUNTERS
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
     unsigned long env_val;
@@ -1559,7 +1560,8 @@ sub get_func_body
 #endif
 #endif
 END
-    $body = $body.$counter_def;
+      $body = $body.$counter_def;
+    }
   }
   $current_pos = $func_ptr->{'BODY_START'} + 1;
   foreach my $e (@sorted_events) {
