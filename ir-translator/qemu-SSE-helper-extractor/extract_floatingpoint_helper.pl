@@ -357,6 +357,8 @@ while (keys %workset > 0) {
   }
   %workset = %tmpset;
 }
+# Remove forward declarations of functions that will be defined later
+$blank_info = &filter_blank_info($blank_info, \%covered_funcs);
 my %foreign_funcs = ();
 foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'TOUCHED'} = 1;
@@ -2401,4 +2403,31 @@ sub populate_additional_arguments_on_execution_path
       }
     }
   }
+}
+
+sub filter_blank_info {
+  my ($blank_info, $covered_ref) = @_;
+  my $cleaned = "";
+  my @blank_lines = split(/\n/, $blank_info);
+  foreach my $line (@blank_lines) {
+    if ($line =~ /^#/) {
+      $cleaned .= $line . "\n";
+      next;
+    }
+    if ($line =~ /;$/ and $line =~ /\(/) {
+      my @fields = split(/\(/, $line);
+      my $check = $fields[0];
+      $check =~ s/\s+$//;
+      if ($check =~ /\s/) {
+        my @sub_fields = split(/\s+/, $check);
+        my $ff_name = $sub_fields[$#sub_fields];
+        if (exists $covered_ref->{$ff_name}) {
+          print "Removed $line\n";
+          next;
+        }
+      }
+    }
+    $cleaned .= $line . "\n";
+  }
+  return $cleaned;
 }
