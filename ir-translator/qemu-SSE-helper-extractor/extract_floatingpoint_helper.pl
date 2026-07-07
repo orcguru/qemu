@@ -2503,9 +2503,16 @@ sub filter_blank_info {
   my ($blank_info, $covered_ref) = @_;
   my $cleaned = "";
   my @blank_lines = split(/\n/, $blank_info);
+  my $remove_next = 0;
   foreach my $line (@blank_lines) {
     if ($line =~ /^#/) {
       $cleaned .= $line . "\n";
+      next;
+    }
+    if ($remove_next) {
+      if ($line =~ /;$/) {
+        $remove_next = 0;
+      }
       next;
     }
     if ($line =~ /;$/ and $line =~ /\(/) {
@@ -2517,6 +2524,19 @@ sub filter_blank_info {
         my $ff_name = $sub_fields[$#sub_fields];
         if (exists $covered_ref->{$ff_name}) {
           #print "Removed $line\n";
+          next;
+        }
+      }
+    } elsif ($line =~ /,$/ and $line =~ /\(/) {
+      my @fields = split(/\(/, $line);
+      my $check = $fields[0];
+      $check =~ s/\s+$//;
+      if ($check =~ /\s/) {
+        my @sub_fields = split(/\s+/, $check);
+        my $ff_name = $sub_fields[$#sub_fields];
+        if (exists $covered_ref->{$ff_name}) {
+          #print "Removed $line\n";
+          $remove_next = 1;
           next;
         }
       }
