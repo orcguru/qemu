@@ -2081,7 +2081,7 @@ sub update_func_call
   my $sub_call_idx = 0;
   foreach my $idx (0 .. $#{$call_info->{'SCALAR_CALL_ARGS'}}) {
     my $arg = $call_info->{'SCALAR_CALL_ARGS'}->[$idx];
-    if ($arg =~ /\(/ and (not $arg =~ /^\(/)) {
+    if ($arg =~ /\(/ and (not $arg =~ /^\-?\(/)) {
       die "" if not $arg =~ /\)/;
       die "$caller_ptr->{'NAME'} $callee_ptr->{'NAME'}" if not exists $sorted_sub_calls[$sub_call_idx];
       my $sub_call_info = $caller_ptr->{'CALLS'}->{$sorted_sub_calls[$sub_call_idx]};
