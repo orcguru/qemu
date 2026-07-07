@@ -11,6 +11,10 @@ if ($#ARGV < 1) {
   exit 1;
 }
 
+my %fp_helpers = (
+  "helper_comisd" => 1,
+);
+
 my $arch_info = `uname -m`;
 chomp($arch_info);
 my %VecCodeToCType = (
@@ -170,7 +174,7 @@ while (<FD>) {
     $func_name = &extract_func_name($func_name);
     $info{'NAME'} = $func_name;
     $info{'HELPER_INTERFACE'} = 0;
-    if ($info{'NAME'} =~ /^helper_/ and $info{'NAME'} =~ /_xmm$/) {
+    if (exists $fp_helpers{$info{'NAME'}}) {
       $info{'HELPER_INTERFACE'} = 1;
     }
     $info{'FUNC_FULL'} = &GetText($bodyStart, $bodyStop);
@@ -428,11 +432,11 @@ foreach my $line (@blank_lines) {
   }
 }
 
-# Mark functions by *_xmm
+# Mark functions by fp_helpers
 my %covered_funcs = ();
 my %workset = ();
 foreach my $f (keys %funcs) {
-  if ($f =~ /_xmm$/) {
+  if (exists $fp_helpers{$f}) {
     $workset{$f} = 1;
     $covered_funcs{$f} = 1;
   }
@@ -464,7 +468,7 @@ foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'ENV_TYPE'} = $env_type;
   $funcs{$f}->{'128'} = $ret128_info;
   $funcs{$f}->{'FUNC_TYPE'} = $func_type;
-  if ($funcs{$f}->{'NAME'} =~ /^helper_/ and $funcs{$f}->{'NAME'} =~ /_xmm$/ and $funcs{$f}->{'FUNC_TYPE'} ne "void") {
+  if (exists $fp_helpers{$funcs{$f}->{'NAME'}} and $funcs{$f}->{'FUNC_TYPE'} ne "void") {
     $funcs{$f}->{'HEAD'} =~ s/$funcs{$f}->{'FUNC_TYPE'}\s+/void /;
   }
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
@@ -505,6 +509,9 @@ while (<FD>) {
     my ($func_idx, $func_ptr) = &lookup($start, \%func_lookup);
     if ($func_idx != -1) {
       my %info = ();
+      if ($func_ptr->{'NAME'} =~ /^helper_/ and $func_ptr->{'NAME'} =~ /_xmm$/) {
+        next;
+      }
       $info{'START'} = $start;
       my $current_pos = $stop + 1;
       while (&IsValidSymbolStart($file_content[$current_pos]) == 0) {
@@ -529,6 +536,7 @@ while (<FD>) {
       }
       ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $current_pos, 0);
       my $vec_arg_idx = &get_vec_arg_idx($func_ptr, $sym);
+      print "$func_ptr->{'NAME'}\n";
       die "" if $vec_arg_idx == -1;
       die "" if $file_content[$sym_stop+1] ne ";";
       $info{'VEC_ARG_IDX'} = $vec_arg_idx;
@@ -924,7 +932,7 @@ while (<FD>) {
 close FD;
 
 foreach my $f (keys %funcs) {
-  if (not ($f =~ /^helper_/ and $f =~ /_xmm$/)) {
+  if (not exists $fp_helpers{$f}) {
     next;
   }
   my $has_foreign_call = 0;
@@ -1314,7 +1322,7 @@ sub parse_func_head
   $func_type_info = &remove_attribute($func_type_info);
   $func_type_info =~ s/^\s*//;
   my $func_type = "NA";
-  if ($func->{'NAME'} =~ /^helper_/ and $func->{'NAME'} =~ /_xmm$/) {
+  if (exists $fp_helpers{$func->{'NAME'}}) {
     my @type_fields = split(/\s+/, $func_type_info);
     my @sub_type_fields = @type_fields[0..($#type_fields-1)];
     $func_type = join(" ", @sub_type_fields);
@@ -1329,7 +1337,7 @@ sub parse_func_head
   }
   $head_copy =~ s/__attribute__\(\(target\(\"\+crypto\"\)\)\)//g;
   $head_copy =~ s/__attribute__\s*\(\s*\(\s*noinline\s*\)\s*\)//g;
-  if (not ($func->{'NAME'} =~ /^helper_/ and $func->{'NAME'} =~ /_xmm$/)) {
+  if (not exists $fp_helpers{$func->{'NAME'}}) {
     if ($head_copy =~ /static\s+/) {
       $head_copy =~ s/static\s+//;
     }
