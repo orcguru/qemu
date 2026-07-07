@@ -214,6 +214,7 @@ $blank_info = $blank_info."\n".$txt;
 my %callsite_lookup = ();
 my %callsite_lookup_map = ();
 $callsite_lookup{'MAP'} = \%callsite_lookup_map;
+my $prev_generic_func = "";
 open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
 while (<FD>) {
   my $line = $_;
@@ -237,9 +238,102 @@ while (<FD>) {
       next;
     }
     $info{'CALL_TARGET'} = &GetText($info{'NAME_START'}, $info{'NAME_STOP'});
-    # NEW: skip _Generic – it's not a function call
     if ($info{'CALL_TARGET'} eq '_Generic') {
-        next;
+        my $generic_call = &GetText($info{'PAREN_START'}, $info{'PAREN_STOP'});
+        if ($generic_call =~ /:/) {
+          $generic_call =~ s/^\(//;
+          $generic_call =~ s/\)$//;
+          my @fields = split(/,/, $generic_call);
+          my $generic_var = $fields[0];
+          $generic_var =~ s/^\s+//;
+          $generic_var =~ s/\s+$//;
+          $generic_var =~ s/^\(//;
+          $generic_var =~ s/\)$//;
+          my $got_addr = 0;
+          if ($generic_var =~ /^\&/) {
+            $generic_var =~ s/^\&//;
+            $got_addr = 1;
+          }
+          my $generic_var_type = "";
+          my ($func_idx, $ptr) = &lookup($info{'NAME_START'}, \%func_lookup);
+          if ($func_idx != -1) {
+            $info{'PARENT'} = $ptr->{'NAME'};
+            if (not exists $ptr->{'GENERIC_EARLY_INIT'}) {
+              my ($head, $scalar_args, $vector_args, $pure_arg_info, $ret128_info, $env_type, $func_type) = &parse_func_head($ptr);
+              $ptr->{'HEAD'} = $head;
+              $ptr->{'PURE_ARG_INFO'} = $pure_arg_info;
+              $ptr->{'SCALAR_ARGS'} = $scalar_args;
+              $ptr->{'VECTOR_ARGS'} = $vector_args;
+              $ptr->{'ENV_TYPE'} = $env_type;
+              $ptr->{'128'} = $ret128_info;
+              $ptr->{'FUNC_TYPE'} = $func_type;
+              $ptr->{'GENERIC_EARLY_INIT'} = 1;
+            }
+            foreach my $arg (@{$ptr->{'SCALAR_ARGS'}}) {
+              if ($arg->{'VAR_NAME'} eq $generic_var) {
+                $generic_var_type = $arg->{'TYPE'};
+              }
+            }
+            if ($generic_var_type eq "") {
+              my @func_lines = split(/\n/, $ptr->{'FUNC_FULL'});
+              foreach my $fl (@func_lines) {
+                if ($fl =~ /([a-zA-Z_0-9]+)(\s|\*)+$generic_var/) {
+                  $generic_var_type = $1;
+                  if ($fl =~ /\*\s*$generic_var/) {
+                    $generic_var_type = $generic_var_type." *";
+                  }
+                  last;
+                }
+              }
+              if ($generic_var_type eq "") {
+                foreach my $fl (@func_lines) {
+                  if ($fl =~ /(\s|\*)+$generic_var/) {
+                    $fl =~ s/^\s+//;
+                    my @sub_fields = split(/\s+/, $fl);
+                    $generic_var_type = $sub_fields[0];
+                    if ($fl =~ /\*\s*$generic_var/) {
+                      $generic_var_type = $generic_var_type." *";
+                    }
+                    last;
+                  }
+                }
+              }
+            }
+            if ($got_addr and $generic_var_type ne "") {
+              $generic_var_type = $generic_var_type." *";
+            }
+            foreach my $f (@fields) {
+              if ($f =~ /:/) {
+                my @sub_fields = split(/:/, $f);
+                $sub_fields[0] =~ s/^\s+//;
+                $sub_fields[0] =~ s/\s+$//;
+                if ($generic_var_type eq $sub_fields[0]) {
+                  $prev_generic_func = $sub_fields[1];
+                  $prev_generic_func =~ s/^\s+//;
+                  $prev_generic_func =~ s/\s+$//;
+                }
+              }
+            }
+            die "" if $prev_generic_func eq "";
+          } else {
+            $prev_generic_func = "";
+            next;
+          }
+          foreach my $f (@fields) {
+            if ($f =~ /:/) {
+              my @sub_fields = split(/:/, $f);
+              my $generic_func = $sub_fields[1];
+              $generic_func =~ s/^\s+//;
+              $generic_func =~ s/\s+$//;
+              #print "$generic_func\n";
+            }
+          }
+        } else {
+          if ($prev_generic_func eq "") {
+            next;
+          }
+          $info{'CALL_TARGET'} = $prev_generic_func;
+        }
     }
     my $str = &GetText($info{'PAREN_START'} + 1, $info{'PAREN_STOP'} - 1);
     my ($args, $ranges) = &ExtractCallArguments($str, $info{'PAREN_START'} + 1, $info{'PAREN_STOP'} - 1);
@@ -2422,7 +2516,7 @@ sub filter_blank_info {
         my @sub_fields = split(/\s+/, $check);
         my $ff_name = $sub_fields[$#sub_fields];
         if (exists $covered_ref->{$ff_name}) {
-          print "Removed $line\n";
+          #print "Removed $line\n";
           next;
         }
       }
