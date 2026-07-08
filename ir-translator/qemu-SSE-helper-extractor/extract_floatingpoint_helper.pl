@@ -13,6 +13,7 @@ if ($#ARGV < 1) {
 
 my %fp_helpers = (
   "helper_comisd" => 1,
+  "helper_ucomisd" => 1,
 );
 
 my $arch_info = "riscv64";

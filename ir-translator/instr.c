@@ -1993,6 +1993,7 @@ const int helper_require_exception_path[HELPER_MAX] = {
     [helper_vpmaskmovd_st_ymm] = 1,
     [helper_vpmaskmovq_st_ymm] = 1,
     [helper_comisd] = 1,
+    [helper_ucomisd] = 1,
 };
 
 // Make sure argument type matches, otherwise inline could not happen!
@@ -2302,7 +2303,6 @@ const int helper_do_not_sync_vector[HELPER_MAX] = {
     [helper_cpuid] = 1,
     [helper_cvtsq2sd] = 1,
     [helper_cvttsd2sq] = 1,
-    [helper_ucomisd] = 1,
     [helper_mulsd] = 1,
     [helper_divq_EAX] = 1,
     [helper_divl_EAX] = 1,
