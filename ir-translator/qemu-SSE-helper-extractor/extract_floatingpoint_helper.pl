@@ -15,7 +15,7 @@ my %fp_helpers = (
   "helper_comisd" => 1,
 );
 
-my $arch_info = `riscv64`;
+my $arch_info = "riscv64";
 chomp($arch_info);
 my %VecCodeToCType = (
   "VecQ" => "v2ulong",
