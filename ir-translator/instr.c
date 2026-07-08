@@ -1992,6 +1992,7 @@ const int helper_require_exception_path[HELPER_MAX] = {
     [helper_vpgatherqq_ymm] = 1,
     [helper_vpmaskmovd_st_ymm] = 1,
     [helper_vpmaskmovq_st_ymm] = 1,
+    [helper_comisd] = 1,
 };
 
 // Make sure argument type matches, otherwise inline could not happen!
@@ -2298,7 +2299,6 @@ const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
 };
 
 const int helper_do_not_sync_vector[HELPER_MAX] = {
-    [helper_comisd] = 1,
     [helper_cpuid] = 1,
     [helper_cvtsq2sd] = 1,
     [helper_cvttsd2sq] = 1,
