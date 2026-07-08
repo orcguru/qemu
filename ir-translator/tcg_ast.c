@@ -93,7 +93,8 @@
 #include "xymm_def.h"
 #define IS_YMM_HELPER(h)            (h > ymm_helper_begin && h < HELPER_MAX)
 #define IS_XMM_HELPER(h)            (h > xmm_helper_begin && h < ymm_helper_begin)
-#define INLINE_HELPER_ENABLED(h)    (IS_XMM_HELPER(h) || IS_YMM_HELPER(h))
+#define IS_FLOATINGPOINT_INLINED_HELPER(h)            (h > floatingpoint_inlined_helper_begin && h < floatingpoint_inlined_helper_end)
+#define INLINE_HELPER_ENABLED(h)    (IS_XMM_HELPER(h) || IS_YMM_HELPER(h) || IS_FLOATINGPOINT_INLINED_HELPER(h))
 
 #define DEBUG_VALUE_TYPE(v)                                     \
     do {                                                        \
@@ -3971,7 +3972,6 @@ static void translate_jumptable(OpCodeType opc, void *ptr) {
     int jt_size_idx = operands_cnt-1;
     assert(is_imm[jt_size_idx]);
     OperandType shadow_array_op = get_tmp_and_do_alloc(OPC_ADDR_T);
-    OperandType shadow_data_op = get_tmp_and_do_alloc(OPC_ADDR_T);
     LLVMType type_in = OPC_ADDR_T;
     LLVMType type_out = OPC_ADDR_T;
     LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm[jt_entry_idx], operands[jt_entry_idx], type_in, 0);
@@ -4459,7 +4459,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         }
         char element1[64];
         char element2[32];
-        if (IS_XMM_HELPER(h)) {
+        if (IS_XMM_HELPER(h) || IS_FLOATINGPOINT_INLINED_HELPER(h)) {
             sprintf(element1, " -DVEC%d=%s", i, xmmreg_str[xmm_idx]);
         } else if (IS_YMM_HELPER(h)) {
             sprintf(element1, " -DVEC%dX=%s -DVEC%dY=%s", i, xmmreg_str[xmm_idx], i, xmmreg_str[xmm_idx + 1]);

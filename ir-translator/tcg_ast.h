@@ -339,7 +339,9 @@ typedef enum {
     X(helper_cmpunordss) \
     X(helper_cmpunordssd) \
     X(helper_cmpunordsss) \
+    X(floatingpoint_inlined_helper_begin) \
     X(helper_comisd) \
+    X(floatingpoint_inlined_helper_end) \
     X(helper_comiss) \
     X(helper_cpuid) \
     X(helper_cr4_testbit) \
