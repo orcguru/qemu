@@ -341,6 +341,7 @@ typedef enum {
     X(helper_cmpunordsss) \
     X(floatingpoint_inlined_helper_begin) \
     X(helper_comisd) \
+    X(helper_ucomisd) \
     X(floatingpoint_inlined_helper_end) \
     X(helper_comiss) \
     X(helper_cpuid) \
@@ -766,7 +767,6 @@ typedef enum {
     X(helper_sysenter) \
     X(helper_sysexit) \
     X(helper_sysret) \
-    X(helper_ucomisd) \
     X(helper_ucomiss) \
     X(helper_update_mxcsr) \
     X(helper_verr) \
