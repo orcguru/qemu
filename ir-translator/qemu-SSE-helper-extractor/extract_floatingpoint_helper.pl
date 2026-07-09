@@ -2616,6 +2616,7 @@ sub filter_blank_info {
       if ($check =~ /\s/) {
         my @sub_fields = split(/\s+/, $check);
         my $ff_name = $sub_fields[$#sub_fields];
+        $ff_name =~ s/^\*//;
         if (exists $covered_ref->{$ff_name}) {
           #print "Removed $line\n";
           next;
@@ -2628,6 +2629,7 @@ sub filter_blank_info {
       if ($check =~ /\s/) {
         my @sub_fields = split(/\s+/, $check);
         my $ff_name = $sub_fields[$#sub_fields];
+        $ff_name =~ s/^\*//;
         if (exists $covered_ref->{$ff_name}) {
           #print "Removed $line\n";
           $remove_next = 1;
