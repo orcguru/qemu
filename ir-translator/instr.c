@@ -1994,6 +1994,9 @@ const int helper_require_exception_path[HELPER_MAX] = {
     [helper_vpmaskmovq_st_ymm] = 1,
     [helper_comisd] = 1,
     [helper_ucomisd] = 1,
+    [helper_cvtsq2sd] = 1,
+    [helper_cvttsd2sq] = 1,
+    [helper_mulsd] = 1,
 };
 
 // Make sure argument type matches, otherwise inline could not happen!
@@ -2063,6 +2066,7 @@ const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_vpgatherdq_ymm] = {LLVMInt64, LLVMInt32},
     [helper_vpermilpd_imm_ymm] = {LLVMInt32},
     [helper_vpermdq_ymm] = {LLVMInt32},
+    [helper_cvtsq2sd] = {LLVMInt64},
 };
 
 // Collected by qemu-runtime
@@ -2261,6 +2265,7 @@ const LLVMType helper_return_type[HELPER_MAX] = {
     [helper_movmskps_ymm] = LLVMInt32,
     [helper_movmskpd_ymm] = LLVMInt32,
     [helper_rdrand] = LLVMInt64,
+    [helper_cvttsd2sq] = LLVMInt64,
 };
 
 const uint64_t xreg_offsets[XREG_MAX] = {
@@ -2301,9 +2306,6 @@ const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
 
 const int helper_do_not_sync_vector[HELPER_MAX] = {
     [helper_cpuid] = 1,
-    [helper_cvtsq2sd] = 1,
-    [helper_cvttsd2sq] = 1,
-    [helper_mulsd] = 1,
     [helper_divq_EAX] = 1,
     [helper_divl_EAX] = 1,
     [helper_idivq_EAX] = 1,

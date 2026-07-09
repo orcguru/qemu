@@ -342,6 +342,9 @@ typedef enum {
     X(floatingpoint_inlined_helper_begin) \
     X(helper_comisd) \
     X(helper_ucomisd) \
+    X(helper_cvtsq2sd) \
+    X(helper_cvttsd2sq) \
+    X(helper_mulsd) \
     X(floatingpoint_inlined_helper_end) \
     X(helper_comiss) \
     X(helper_cpuid) \
@@ -360,7 +363,6 @@ typedef enum {
     X(helper_cvtsd2ss) \
     X(helper_cvtsi2sd) \
     X(helper_cvtsi2ss) \
-    X(helper_cvtsq2sd) \
     X(helper_cvtsq2ss) \
     X(helper_cvtss2sd) \
     X(helper_cvtss2si) \
@@ -368,7 +370,6 @@ typedef enum {
     X(helper_cvttpd2pi) \
     X(helper_cvttps2pi) \
     X(helper_cvttsd2si) \
-    X(helper_cvttsd2sq) \
     X(helper_cvttss2si) \
     X(helper_cvttss2sq) \
     X(helper_daa) \
@@ -663,7 +664,6 @@ typedef enum {
     X(helper_memset) \
     X(helper_minsd) \
     X(helper_minss) \
-    X(helper_mulsd) \
     X(helper_mulsh_i64) \
     X(helper_mulss) \
     X(helper_muluh_i64) \

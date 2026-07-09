@@ -14,6 +14,9 @@ if ($#ARGV < 1) {
 my %fp_helpers = (
   "helper_comisd" => 1,
   "helper_ucomisd" => 1,
+  "helper_cvtsq2sd" => 1,
+  "helper_cvttsd2sq" => 1,
+  "helper_mulsd" => 1,
 );
 
 my $arch_info = "riscv64";
@@ -171,10 +174,20 @@ while (<FD>) {
     $info{'FULL_STOP'} = $fullStop;
     $info{'LOOKUP_START'} = $info{'BODY_START'};
     $info{'LOOKUP_STOP'} = $info{'BODY_STOP'};
+    my $func_return_type = &GetText($fullStart, ($nameStart-1));
+    chomp($func_return_type);
+    $func_return_type =~ s/static\s+//g;
+    $func_return_type =~ s/__inline\s+//g;
+    $func_return_type =~ s/__extension__\s+//g;
+    $func_return_type =~ s/extern\s+//g;
+    $func_return_type =~ s/inline\s+//g;
+    # FIXME: tail attribute
+    $func_return_type = &remove_attribute($func_return_type);
     my $func_name = &GetText($nameStart, $nameStop);
     $func_name = &extract_func_name($func_name);
     $info{'NAME'} = $func_name;
     $info{'HELPER_INTERFACE'} = 0;
+    $info{'RETURN_TYPE'} = $func_return_type;
     if (exists $fp_helpers{$info{'NAME'}}) {
       $info{'HELPER_INTERFACE'} = 1;
     }
@@ -537,7 +550,6 @@ while (<FD>) {
       }
       ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $current_pos, 0);
       my $vec_arg_idx = &get_vec_arg_idx($func_ptr, $sym);
-      print "$func_ptr->{'NAME'}\n";
       die "" if $vec_arg_idx == -1;
       die "" if $file_content[$sym_stop+1] ne ";";
       $info{'VEC_ARG_IDX'} = $vec_arg_idx;
@@ -1957,6 +1969,30 @@ END
       } elsif ($func_ptr->{'HELPER_INTERFACE'}) {
         if (exists $func_ptr->{'IS_FOREIGN'}) {
           $body = $body."{\n";
+          my $standalone_expr_for_ret = 0;
+          if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_EXPR") {
+            # Check if there is any IS_FOREIGN call
+            my $got_is_foreign_call = 0;
+            my $call_target_name = "";
+            foreach my $c (keys %{$func_ptr->{'CALLS'}}) {
+              if ($func_ptr->{'CALLS'}->{$c}->{'NAME_START'} >= $func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'} and $func_ptr->{'CALLS'}->{$c}->{'NAME_START'} < $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'}) {
+                if (exists $funcs{$func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'}} and $call_target_name eq "") {
+                  $call_target_name = $func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'};
+                }
+                if (exists $funcs{$func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'}}->{'IS_FOREIGN'}) {
+                  $got_is_foreign_call = 1;
+                  last;
+                }
+              }
+            }
+            if ($got_is_foreign_call) {
+              $body = $body."$func_ptr->{'RETURN_TYPE'} RET = ";
+              my %empty = ();
+              my $func_call_str = &update_func_call($func_ptr, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $funcs{$call_target_name}, "", \%empty);
+              $body = $body.$func_call_str.";\n";
+              $standalone_expr_for_ret = 1;
+            }
+          }
           my $exp = &get_exception_path($func_ptr, $exception_exit);
           $body = $body.$exp;
           if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_VOID") {
@@ -1968,7 +2004,12 @@ END
             $body = $body.$qemuaot_vec_invoke.");\n}\n";
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
           } else {
-            my $expr = &GetText($func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
+            my $expr;
+            if ($standalone_expr_for_ret) {
+              $expr = "RET";
+            } else {
+              $expr = &GetText($func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
+            }
             $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
             foreach my $p (@qemuaot_gp_params) {
               $body = $body."$p, ";
