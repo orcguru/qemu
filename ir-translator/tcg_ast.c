@@ -3280,15 +3280,15 @@ static uint8_t do_link_helper(HelperType h, const char *build_macro, const char 
         char cmd[2048+PATH_MAX] = {0};
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
 #ifdef HELPER_COUNTERS
-        sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c -DHELPER_COUNTERS=1 %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+        sprintf(cmd, "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c -DHELPER_COUNTERS=1 %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
 #else
-        sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+        sprintf(cmd, "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c %s --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
 #endif
 #elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
 #ifdef HELPER_COUNTERS
-        sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c -DHELPER_COUNTERS=1 %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+        sprintf(cmd, "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c -DHELPER_COUNTERS=1 %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
 #else
-        sprintf(cmd, "clang -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
+        sprintf(cmd, "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c %s --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O1 -emit-llvm helper_templates/%s.c -o %s", build_macro, c_file, bc_name);
 #endif
 #endif
 #ifdef DEBUG
