@@ -200,10 +200,20 @@ while (<FD>) {
     $info{'FULL_STOP'} = $fullStop;
     $info{'LOOKUP_START'} = $info{'BODY_START'};
     $info{'LOOKUP_STOP'} = $info{'BODY_STOP'};
+    my $func_return_type = &GetText($fullStart, ($nameStart-1));
+    chomp($func_return_type);
+    $func_return_type =~ s/static\s+//g;
+    $func_return_type =~ s/__inline\s+//g;
+    $func_return_type =~ s/__extension__\s+//g;
+    $func_return_type =~ s/extern\s+//g;
+    $func_return_type =~ s/inline\s+//g;
+    # FIXME: tail attribute
+    $func_return_type = &remove_attribute($func_return_type);
     my $func_name = &GetText($nameStart, $nameStop);
     $func_name = &extract_func_name($func_name);
     $info{'NAME'} = $func_name;
     $info{'HELPER_INTERFACE'} = 0;
+    $info{'RETURN_TYPE'} = $func_return_type;
     if ($info{'NAME'} =~ /^helper_/ and $info{'NAME'} =~ /_xmm$/) {
       $info{'HELPER_INTERFACE'} = 1;
     }
@@ -1817,6 +1827,30 @@ END
       } elsif ($func_ptr->{'HELPER_INTERFACE'}) {
         if (exists $func_ptr->{'IS_FOREIGN'}) {
           $body = $body."{\n";
+          my $standalone_expr_for_ret = 0;
+          if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_EXPR") {
+            # Check if there is any IS_FOREIGN call
+            my $got_is_foreign_call = 0;
+            my $call_target_name = "";
+            foreach my $c (keys %{$func_ptr->{'CALLS'}}) {
+              if ($func_ptr->{'CALLS'}->{$c}->{'NAME_START'} >= $func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'} and $func_ptr->{'CALLS'}->{$c}->{'NAME_START'} < $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'}) {
+                if (exists $funcs{$func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'}} and $call_target_name eq "") {
+                  $call_target_name = $func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'};
+                }
+                if (exists $funcs{$func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'}}->{'IS_FOREIGN'}) {
+                  $got_is_foreign_call = 1;
+                  last;
+                }
+              }
+            }
+            if ($got_is_foreign_call) {
+              $body = $body."$func_ptr->{'RETURN_TYPE'} RET = ";
+              my %empty = ();
+              my $func_call_str = &update_func_call($func_ptr, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $funcs{$call_target_name}, "", \%empty);
+              $body = $body.$func_call_str.";\n";
+              $standalone_expr_for_ret = 1;
+            }
+          }
           my $exp = &get_exception_path($func_ptr, $exception_exit);
           $body = $body.$exp;
           if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_VOID") {
@@ -1828,7 +1862,12 @@ END
             $body = $body.$qemuaot_vec_invoke.");\n}\n";
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
           } else {
-            my $expr = &GetText($func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
+            my $expr;
+            if ($standalone_expr_for_ret) {
+              $expr = "RET";
+            } else {
+              $expr = &GetText($func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
+            }
             $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
             foreach my $p (@qemuaot_gp_params) {
               $body = $body."$p, ";
@@ -1950,7 +1989,7 @@ sub update_func_call
   my $sub_call_idx = 0;
   foreach my $idx (0 .. $#{$call_info->{'SCALAR_CALL_ARGS'}}) {
     my $arg = $call_info->{'SCALAR_CALL_ARGS'}->[$idx];
-    if ($arg =~ /\(/ and (not $arg =~ /^\(/)) {
+    if ($arg =~ /\(/ and (not $arg =~ /^(\-|sizeof)?\(/)) {
       die "" if not $arg =~ /\)/;
       die "$caller_ptr->{'NAME'} $callee_ptr->{'NAME'}" if not exists $sorted_sub_calls[$sub_call_idx];
       my $sub_call_info = $caller_ptr->{'CALLS'}->{$sorted_sub_calls[$sub_call_idx]};
