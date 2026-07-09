@@ -465,6 +465,12 @@ while (keys %workset > 0) {
           $covered_funcs{$funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'}} = 1;
         }
       }
+      foreach my $a (@{$funcs{$f}->{'CALLS'}->{$e}->{'CALL_ARGUMENTS'}}) {
+        if (exists $funcs{$a}) {
+          $tmpset{$a} = 1;
+          $covered_funcs{$a} = 1;
+        }
+      }
     }
   }
   %workset = %tmpset;
@@ -1041,9 +1047,39 @@ foreach my $f (keys %funcs) {
           # Skip if the call target is a function pointer parameter of the caller ($c)
           my $is_param = 0;
           if (exists $funcs{$c}) {
-            foreach my $arg (@{$funcs{$c}->{'SCALAR_ARGS'}}) {
+            foreach my $idx (0 .. $#{$funcs{$c}->{'SCALAR_ARGS'}}) {
+              my $arg = $funcs{$c}->{'SCALAR_ARGS'}->[$idx];
               if ($arg->{'VAR_NAME'} eq $call_target) {
                 $is_param = 1;
+                foreach my $pi (keys %{$defined_func{$c}}) {
+                  my $parent_func = $defined_func{$c}->{$pi}->[$#{$defined_func{$c}->{$pi}}]->{'FUNC'};
+                  my $parent_call_loc = $defined_func{$c}->{$pi}->[$#{$defined_func{$c}->{$pi}}]->{'LOC'};
+                  my $real_target = $funcs{$parent_func}->{'CALLS'}->{$parent_call_loc}->{'CALL_ARGUMENTS'}->[$idx];
+                  if (not exists $defined_func{$real_target}) {
+                    push @new_call_stack, $real_target;
+                    my %p_info = ();
+                    $defined_func{$real_target} = \%p_info;
+                    if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
+                      $has_foreign_call = 1;
+                    }
+                  }
+                  my $current_pi = $pi."_".$c."_loc$e";
+                  my @label_info = ();
+                  foreach my $elem (@{$defined_func{$c}->{$pi}}) {
+                    push @label_info, $elem;
+                  }
+                  my %entry_info = ();
+                  $entry_info{'FUNC'} = $c;
+                  $entry_info{'LOC'} = $e;
+                  push @label_info, \%entry_info;
+                  $defined_func{$real_target}->{$current_pi} = \@label_info;
+                  # FIXME: simplify duplicated mark actions
+                  if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
+                    foreach my $i (@label_info) {
+                      $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+                    }
+                  }
+                }
                 last;
               }
             }
@@ -1164,7 +1200,7 @@ sub lookup
   my ($loc, $lookup_info) = @_;
   my $low_idx = 0;
   my $high_idx = $#{$lookup_info->{'SORTED_ADDR'}};
-  if ($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_START'} <= $loc) {
+  if ($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_START'} <= $loc and $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_STOP'} > $loc) {
     return ($high_idx, $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]});
   }
   while (($high_idx - $low_idx) > 1) {
@@ -2308,6 +2344,8 @@ sub ExtractCallArguments
     if ($idx > $#chars) {
       my @elems = @chars[$start_idx..$#chars];
       my $elem = join("", @elems);
+      $elem =~ s/^\s+//;
+      $elem =~ s/\s+$//;
       push @output, $elem;
       my %r_info = ();
       $r_info{'START'} = $range_start;
@@ -2320,6 +2358,8 @@ sub ExtractCallArguments
     if ($idx > $#chars) {
       my @elems = @chars[$start_idx..$#chars];
       my $elem = join("", @elems);
+      $elem =~ s/^\s+//;
+      $elem =~ s/\s+$//;
       push @output, $elem;
       my %r_info = ();
       $r_info{'START'} = $range_start;
@@ -2337,6 +2377,8 @@ sub ExtractCallArguments
       if ($idx > $#chars) {
         my @elems = @chars[$start_idx..$#chars];
         my $elem = join("", @elems);
+        $elem =~ s/^\s+//;
+        $elem =~ s/\s+$//;
         push @output, $elem;
         my %r_info = ();
         $r_info{'START'} = $range_start;
@@ -2373,6 +2415,8 @@ sub ExtractCallArguments
       } elsif ($chars[$idx] eq ",") {
         my @elems = @chars[$start_idx..($idx-1)];
         my $elem = join("", @elems);
+        $elem =~ s/^\s+//;
+        $elem =~ s/\s+$//;
         push @output, $elem;
         my %r_info = ();
         $r_info{'START'} = $range_start;
