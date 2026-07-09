@@ -2484,6 +2484,8 @@ sub FuncNameIsForeign
   my ($func_name) = @_;
   if (exists $funcs{$func_name}) {
     return 0;
+  } elsif ($func_name eq 'fabs') {
+    return 0;
   } elsif ($func_name eq '_Generic') {
     return 0;
   } elsif ($func_name =~ /^__builtin_/ or $func_name =~ /^__atomic/) {
