@@ -17,6 +17,9 @@ my %fp_helpers = (
   "helper_cvtsq2sd" => 1,
   "helper_cvttsd2sq" => 1,
   "helper_mulsd" => 1,
+  "helper_divq_EAX" => 1,
+  "helper_divl_EAX" => 1,
+  "helper_idivq_EAX" => 1,
 );
 
 my $arch_info = "riscv64";
