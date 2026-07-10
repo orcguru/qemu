@@ -345,6 +345,9 @@ typedef enum {
     X(helper_cvtsq2sd) \
     X(helper_cvttsd2sq) \
     X(helper_mulsd) \
+    X(helper_divq_EAX) \
+    X(helper_divl_EAX) \
+    X(helper_idivq_EAX) \
     X(floatingpoint_inlined_helper_end) \
     X(helper_comiss) \
     X(helper_cpuid) \
@@ -377,8 +380,6 @@ typedef enum {
     X(helper_divb_AL) \
     X(helper_div_i32) \
     X(helper_div_i64) \
-    X(helper_divl_EAX) \
-    X(helper_divq_EAX) \
     X(helper_divsd) \
     X(helper_divss) \
     X(helper_divu_i32) \
@@ -639,7 +640,6 @@ typedef enum {
     X(helper_icebp) \
     X(helper_idivb_AL) \
     X(helper_idivl_EAX) \
-    X(helper_idivq_EAX) \
     X(helper_idivw_AX) \
     X(helper_insertq_i) \
     X(helper_insertq_r) \

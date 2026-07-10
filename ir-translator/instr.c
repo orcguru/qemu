@@ -2067,6 +2067,9 @@ const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_vpermilpd_imm_ymm] = {LLVMInt32},
     [helper_vpermdq_ymm] = {LLVMInt32},
     [helper_cvtsq2sd] = {LLVMInt64},
+    [helper_divq_EAX] = {LLVMInt64},
+    [helper_divl_EAX] = {LLVMInt64},
+    [helper_idivq_EAX] = {LLVMInt64},
 };
 
 // Collected by qemu-runtime
@@ -2306,8 +2309,5 @@ const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
 
 const int helper_do_not_sync_vector[HELPER_MAX] = {
     [helper_cpuid] = 1,
-    [helper_divq_EAX] = 1,
-    [helper_divl_EAX] = 1,
-    [helper_idivq_EAX] = 1,
     [helper_rdtsc] = 1,
 };
