@@ -22,11 +22,11 @@
 #include <stdbool.h>
 #include <glib.h>
 
+//#define CHECK_SHADOW_STACK_BOUNDARY   1
 //#define COLLECT_TRAMPOLINE_IR       1
 //#define HELPER_COUNTERS             1
 #define TRAMPOLINE_CNT_OFFSET       104
 #define HELPER_COUNTERS_OFFSET      128
-//#define DEBUG_RET                   1
 //#define BUILD_RISCV_ON_AARCH        1
 //#define DUMP_IR                     1
 //#define VERBOSE_VAR                 1
@@ -623,8 +623,10 @@ static GHashTable *current_helper_aux_info = NULL;
 static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, OperandType out);
 static LLVMValueRef get_env_ptr_raw();
 static OperandType get_env_ptr(OpCodeType opc);
+#ifdef CHECK_SHADOW_STACK_BOUNDARY
 static OperandType get_shadow_stack_top_bound(OpCodeType opc);
 static OperandType get_shadow_stack_bottom_bound(OpCodeType opc);
+#endif
 static OperandType get_shadow_stack_pointer(OpCodeType opc);
 static void set_shadow_stack_pointer(OpCodeType opc, OperandType val);
 static LLVMBasicBlockRef get_bb(const char *name);
@@ -933,6 +935,7 @@ static const char *get_next_var_name(const char *tag, OperandType slot_name_for_
 #endif
 }
 
+#ifdef CHECK_SHADOW_STACK_BOUNDARY
 static OperandType get_shadow_stack_top_bound(OpCodeType opc) {
     OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
     OperandType env = get_env_ptr(opc);
@@ -950,6 +953,7 @@ static OperandType get_shadow_stack_bottom_bound(OpCodeType opc) {
     CREATE_LD(ptr_val, ptr_addr);
     return ptr_val;
 }
+#endif
 
 static OperandType get_shadow_stack_pointer(OpCodeType opc) {
     OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
@@ -1998,6 +2002,7 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
     func_hex = get_operand(ptr, 1, &is_imm1);
     assert(is_imm1);
 
+#ifdef CHECK_SHADOW_STACK_BOUNDARY
     LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(opc, is_imm0, operand0, type_in, 0);
     OperandType ptr_val = get_shadow_stack_pointer(opc);
     LLVMValueRef shadow_ptr_val = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
@@ -2035,25 +2040,46 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
 
     LLVMPositionBuilderAtEnd(builder, bb_ss_merge);
     last_active_bb = bb_ss_merge;
+#else
+    LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(opc, is_imm0, operand0, type_in, 0);
+    OperandType ss = get_shadow_stack_pointer(opc);
+    CREATE_ADD(ss, ss, -8UL);
+    LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(opc, 0, ss, OPC_ADDR_T, 0);
+    LLVMValueRef shadow_ptr0 = LLVMBuildIntToPtr(builder, shadow_val0, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    build_store_with_alignment(builder, x64_ret_addr, shadow_ptr0, 8);
+
+    char func_name[64] = {0};
+    sprintf(func_name, "%s%sfunc_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", func_hex.i);
+    assert(strlen(func_name) < sizeof(func_name));
+    LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, 0), llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    add_list_info(func_name, "declare");
+    CREATE_ADD(ss, ss, -8UL);
+
+    LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ss, OPC_ADDR_T, 0);
+    LLVMValueRef shadow_ptr1 = LLVMBuildIntToPtr(builder, shadow_val1, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    build_store_with_alignment(builder, func_addr, shadow_ptr1, 8);
+
+    set_shadow_stack_pointer(opc, ss);
+#endif
 }
 
 void translate_ret(OpCodeType opc, void *ptr) {
 #ifdef DEBUG
     printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
-#ifndef DEBUG_RET
     uint8_t new_label = 42;
-#endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm;
     OperandType operand0;
     operand0 = get_operand(ptr, 0, &is_imm);
     assert(!is_imm && operand0.s.valid);
+
+    OperandType delta = get_tmp_and_do_alloc(type_out);
+    OperandType shadow_stack_host = get_tmp_and_do_alloc(type_out);
+#ifdef CHECK_SHADOW_STACK_BOUNDARY
     OperandType loc606 = get_tmp_and_do_alloc(type_out);
     OperandType loc607 = get_tmp_and_do_alloc(type_out);
-    OperandType loc608 = get_tmp_and_do_alloc(type_out);
     OperandType loc609 = get_tmp_and_do_alloc(type_out);
-    OperandType loc610 = get_tmp_and_do_alloc(type_out);
     OperandType loc611 = get_tmp_and_do_alloc(type_out);
 
     OperandType shadow_stack = get_shadow_stack_pointer(opc);
@@ -2066,7 +2092,6 @@ void translate_ret(OpCodeType opc, void *ptr) {
     LLVMBasicBlockRef bb_ss_valid = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMBasicBlockRef bb_ss_underflow = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMBasicBlockRef bb_ss_merge = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-#ifndef DEBUG_RET
     char false_bb_name[16] = {0};
     sprintf(false_bb_name, "bb_false%d", br_cnt);
     LLVMBasicBlockRef bb_false = LLVMAppendBasicBlock(llvm_func, false_bb_name);
@@ -2074,21 +2099,40 @@ void translate_ret(OpCodeType opc, void *ptr) {
     sprintf(true_bb_name, "bb_L%d", new_label);
     assert(!get_bb(true_bb_name));
     LLVMBasicBlockRef bb_true = LLVMAppendBasicBlock(llvm_func, true_bb_name);
-#endif
     LLVMBuildCondBr(builder, bool1, bb_ss_valid, bb_ss_underflow);
     LLVMPositionBuilderAtEnd(builder, bb_ss_valid);
 
     CREATE_MOV(loc606, shadow_stack);
     CREATE_ADD(loc607, loc606, 8);
-    CREATE_LD(loc608, loc606);
+    CREATE_LD(shadow_stack_host, loc606);
     CREATE_LD(loc609, loc607);
-    CREATE_SUB(loc610, operand0, loc609);
+    CREATE_SUB(delta, operand0, loc609);
     CREATE_ADD(loc611, loc606, 0x10);
     set_shadow_stack_pointer(opc, loc611);
-#ifndef DEBUG_RET
+#else
+    OperandType ss = get_shadow_stack_pointer(opc);
+
+    char false_bb_name[16] = {0};
+    sprintf(false_bb_name, "bb_false%d", br_cnt);
+    LLVMBasicBlockRef bb_false = LLVMAppendBasicBlock(llvm_func, false_bb_name);
+    char true_bb_name[16] = {0};
+    sprintf(true_bb_name, "bb_L%d", new_label);
+    assert(!get_bb(true_bb_name));
+    LLVMBasicBlockRef bb_true = LLVMAppendBasicBlock(llvm_func, true_bb_name);
+
+    OperandType shadow_stack_guest = get_tmp_and_do_alloc(type_out);
+
+    CREATE_LD(shadow_stack_host, ss);
+    CREATE_ADD(ss, ss, 8UL);
+    CREATE_LD(shadow_stack_guest, ss);
+    CREATE_SUB(delta, operand0, shadow_stack_guest);
+    CREATE_ADD(ss, ss, 8UL);
+    set_shadow_stack_pointer(opc, ss);
+#endif
+
     OperandType op_imm;
     op_imm.i = 0;
-    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, 0, loc610, type_in, 0);
+    LLVMValueRef c1 = get_source_node_imm_or_stack(opc, 0, delta, type_in, 0);
     LLVMValueRef c2 = get_source_node_imm_or_stack(opc, 1, op_imm, type_in, 0);
     LLVMValueRef bool_val = LLVMBuildICmp(builder, llvm_predicate[ne], c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMBuildCondBr(builder, bool_val, bb_true, bb_false);
@@ -2100,24 +2144,24 @@ void translate_ret(OpCodeType opc, void *ptr) {
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT] = {NULL};
     int arg_cnt = collect_arguments_and_types(not_a_helper, TARGET_QEMUAOT_FASTPATH, TYPE_AND_VALUE, NULL, NULL, 0, NULL, NULL, llvm_func, call_types, FIXED_VECTOR_PARAM_COUNT, call_args, "FASTPATH_RET");
     LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidType(), call_types, arg_cnt, 0);
-    LLVMValueRef ret_target = get_source_node_imm_or_stack(opc, 0, loc608, OPC_ADDR_T, 0);
+    LLVMValueRef ret_target = get_source_node_imm_or_stack(opc, 0, shadow_stack_host, OPC_ADDR_T, 0);
     LLVMValueRef ret_target_ptr = LLVMBuildIntToPtr(builder, ret_target, LLVMPointerType(func_type, 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef call_inst = LLVMBuildCall2(builder, func_type, ret_target_ptr, call_args, arg_cnt, "");
     LLVMSetTailCall(call_inst, 1);
     LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
     LLVMBuildRetVoid(builder);
-#else
-    LLVMBuildBr(builder, bb_ss_merge);
-#endif
+
+#ifdef CHECK_SHADOW_STACK_BOUNDARY
     LLVMPositionBuilderAtEnd(builder, bb_ss_underflow);
     LLVMBuildBr(builder, bb_ss_merge);
 
     LLVMPositionBuilderAtEnd(builder, bb_ss_merge);
     last_active_bb = bb_ss_merge;
-
-#ifndef DEBUG_RET
-    CREATE_LABEL(new_label);
+#else
+    last_active_bb = bb_false;
 #endif
+
+    CREATE_LABEL(new_label);
 }
 
 void translate_ld_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
