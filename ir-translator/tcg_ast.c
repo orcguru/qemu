@@ -22,6 +22,7 @@
 #include <stdbool.h>
 #include <glib.h>
 
+#define LARGE_SHADOW_MAP              1
 //#define CHECK_SHADOW_STACK_BOUNDARY   1
 //#define COLLECT_TRAMPOLINE_IR       1
 //#define HELPER_COUNTERS             1
@@ -6023,7 +6024,11 @@ void module_prolog() {
     if (tcg_ir_head) {
         char shadow_map_name[64] = {0};
         sprintf(shadow_map_name, "%s%sshadow_map", func_name_prefix, func_name_prefix[0] ? "_" : "");
+#ifdef LARGE_SHADOW_MAP
+        size_t sz = 8 * (4 + 14) + (x64_exec_end * 8);
+#else
         size_t sz = 8 * (4 + 14) + (((x64_exec_end + 4) % 8) ? ((((x64_exec_end + 4) >> 3) + 1) << 3) : (x64_exec_end + 4));
+#endif
         create_reference_to_external_array(module, shadow_map_name, sz);
 
         // FIXME: initialize x64_exec_end info properly!
