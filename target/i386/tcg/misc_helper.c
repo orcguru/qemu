@@ -231,6 +231,7 @@ target_ulong HELPER(rdpid)(CPUX86State *env)
 #ifdef AOT
 #include "tcg/tcg-aot.h"
 
+#define LARGE_SHADOW_MAP        1
 //#define DUMP_CTR_COUNTER        1
 #define CTR_CALLBACK_TOTAL      0
 #define CTR_CALLBACK_OOR        1
@@ -254,14 +255,35 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
 {
     unsigned long *ptr = (unsigned long *)shadow_map;
     unsigned long x64_elf_exec_start = ptr[0];
-    unsigned long x64_elf_exec_end = ptr[1];
-    unsigned long host_exec_start = ptr[2];
-    unsigned long aux_array = ptr[3];
+    unsigned long x64_delta_end = ptr[1];
 #ifdef DUMP_CTR_COUNTER
     unsigned long *counters = (unsigned long *)(shadow_map+32);
     counters[CTR_HELPER_TOTAL] += 1;
 #endif
-    if (target_addr >= x64_elf_exec_start && target_addr < x64_elf_exec_end) {
+    unsigned long x64_delta = target_addr - x64_elf_exec_start;
+#ifdef LARGE_SHADOW_MAP
+    if (x64_delta < x64_delta_end) {
+        unsigned long *map_ptr = (unsigned long *)(shadow_map + 8 * (4 + CTR_COUNT));
+        if (map_ptr[x64_delta]) {
+#ifdef DUMP_CTR_COUNTER
+            counters[CTR_HELPER_HIT] += 1;
+#endif
+            FuncPtrType1 func_ptr = (FuncPtrType1)map_ptr[x64_delta];
+            return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);
+        } else {
+#ifdef DUMP_CTR_COUNTER
+            counters[CTR_HELPER_EMP] += 1;
+#endif
+        }
+    } else {
+#ifdef DUMP_CTR_COUNTER
+        counters[CTR_HELPER_OOR] += 1;
+#endif
+    }
+#else
+    unsigned long host_exec_start = ptr[2];
+    unsigned long aux_array = ptr[3];
+    if (x64_delta < x64_delta_end) {
         unsigned long x64_delta = target_addr - x64_elf_exec_start;
         unsigned int *map_ptr = (unsigned int *)(shadow_map + 8 * (4 + CTR_COUNT));
         size_t x64_delta_idx = (x64_delta >> 2);
@@ -303,6 +325,7 @@ __attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rc
         counters[CTR_HELPER_OOR] += 1;
 #endif
     }
+#endif
     return g_hash_table_lookup_qemuaot(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h, (unsigned long)tb_ctx.aot_htable, target_addr, jmp_ind_callback, trampoline_helper_jit, shadow_array_entry, shadow_map);
 }
 
