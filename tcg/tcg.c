@@ -6970,16 +6970,26 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
 
     num_insns = -1;
     s->carry_live = false;
+    TCGReg tmp = TCG_REG_TMP0;
     QTAILQ_FOREACH(op, &s->ops, link) {
         TCGOpcode opc = op->opc;
 
         switch (opc) {
 #ifdef AOT
         case INDEX_op_jmp_direct:
+            break;
         case INDEX_op_ret:
+            // Force update shadow stack
+            tcg_out_ld(s, TCG_TYPE_PTR, tmp, TCG_AREG0, -8);
+            tcg_out_addi_ptr(s, tmp, tmp, 16);
+            tcg_out_st(s, TCG_TYPE_PTR, tmp, TCG_AREG0, -8);
             break;
         case INDEX_op_push_ret_addr:
             temp_dead(s, arg_temp(op->args[0]));
+            // Force update shadow stack
+            tcg_out_ld(s, TCG_TYPE_PTR, tmp, TCG_AREG0, -8);
+            tcg_out_addi_ptr(s, tmp, tmp, -16);
+            tcg_out_st(s, TCG_TYPE_PTR, tmp, TCG_AREG0, -8);
             break;
 #endif
         case INDEX_op_extrl_i64_i32:

@@ -88,6 +88,7 @@ CPUState *cpu_create(const char *typename)
     cpu->neg.ssi.shadow_stack_pointer = (ptr + (SHADOW_STACK_SIZE - qemu_real_host_page_size()) - 32);
     cpu->neg.ssi.shadow_stack_pointer_upper_bound = ptr + (SHADOW_STACK_SIZE - qemu_real_host_page_size()) - 16;
     cpu->neg.ssi.shadow_stack_pointer_lower_bound = ptr + qemu_real_host_page_size() + 16 /*safety margin*/ + 4096 /*margin for shadow_call_offset*/;
+    qemu_log_mask(LOG_AOT, "%s shadow_stack:%lx SS[%lx]:%lx %lx\n", __FUNCTION__, cpu->neg.ssi.shadow_stack_pointer_lower_bound, (unsigned long)&(cpu->neg.ssi.shadow_stack_pointer), cpu->neg.ssi.shadow_stack_pointer, cpu->neg.ssi.shadow_stack_pointer_upper_bound);
 // Reserve two pages at boundaries to trap overflow accesses
 #define AOT_STACK_SIZE   ((64 + 2) * qemu_real_host_page_size())
     ptr = (uint64_t)mmap(0, AOT_STACK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
