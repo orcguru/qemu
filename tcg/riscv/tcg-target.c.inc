@@ -855,7 +855,8 @@ static void tcg_out_addi_ptr(TCGContext *s, TCGReg rd, TCGReg rs,
                              tcg_target_long imm)
 {
     /* This function is only used for passing structs by reference. */
-    g_assert_not_reached();
+    //g_assert_not_reached();
+    tcg_out_opc_imm(s, OPC_ADDI, rd, rs, imm);
 }
 
 static void tcg_out_ext8u(TCGContext *s, TCGReg ret, TCGReg arg)
