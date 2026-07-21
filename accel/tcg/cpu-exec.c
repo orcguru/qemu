@@ -927,6 +927,7 @@ extern unsigned long qemu_aot_target_exec_cnt;
 
 int collect_jit_ir = 0;
 jit_ir_dump_info_t jid;
+extern uint64_t lookup_function(const FuncMapSection* funcmap, uint64_t guest_pc);
 #endif
 
 static int __attribute__((noinline))
@@ -975,6 +976,12 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
                     info_ptr = info_ptr->next;
                 }
                 if (info_ptr) {
+                    uint64_t aot_delta = lookup_function(info_ptr->funcmap_rbtree_root, (s.pc - info_ptr->x_addr_range_begin));
+                    if (aot_delta) {
+                        tb_aot_insert(info_ptr->x_addr_range_begin, (s.pc - info_ptr->x_addr_range_begin), (info_ptr->aot_code_base + aot_delta));
+                        tcg_qemu_aot_exec(cpu_env(cpu), (void *)(info_ptr->aot_code_base + aot_delta), (void *)s.pc);
+                    }
+
                     if (!g_hash_table_contains((GHashTable *)info_ptr->jit_hash, (gconstpointer)s.pc)) {
                         JitRecord *jr = g_malloc(sizeof(JitRecord));
                         assert(jr);

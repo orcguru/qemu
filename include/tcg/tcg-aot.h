@@ -46,12 +46,30 @@ typedef struct helper_func {
 
 typedef unsigned long __attribute__((__vector_size__(16))) v2long;
 
+typedef struct {
+    uint32_t left;
+    uint32_t right;
+    uint8_t  color;
+    uint8_t  _pad[3];
+    uint64_t key;
+    uint64_t value;
+    uint32_t _pad2;
+} __attribute__((packed, aligned(8))) AOTRBNode;
+
+typedef struct {
+    uint32_t root_index;
+    uint32_t node_count;
+    AOTRBNode nodes[];
+} FuncMapSection;
+
 typedef struct aot_range_info {
     uint64_t x_addr_range_begin;
     uint64_t x_addr_range_end;
     char elf_name[256];
     void *jit_hash;
     FILE *jit_ir_fd;
+    uint64_t aot_code_base;
+    FuncMapSection *funcmap_rbtree_root;
     struct aot_range_info *next;
 } aot_range_info_t;
 

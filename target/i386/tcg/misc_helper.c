@@ -487,6 +487,27 @@ void find_and_load_missing_aot(uintptr_t x_addr)
     load_aot_image(elf_fn, start_code, end_code, entry);
 }
 
+uint64_t lookup_function(const FuncMapSection* funcmap, uint64_t guest_pc) {
+    if (!funcmap || funcmap->root_index == 0xFFFFFFFF) {
+        return 0;
+    }
+    uint32_t current = funcmap->root_index;
+    while (current != 0xFFFFFFFF) {
+        const AOTRBNode* node = &funcmap->nodes[current];
+        if (guest_pc == node->key) {
+            return node->value;
+        } else if (guest_pc < node->key) {
+            current = node->left;
+        } else {
+            current = node->right;
+        }
+    }
+
+    return 0;
+}
+
+extern void tb_aot_insert(uint64_t start, uint64_t offset, uint64_t host_addr);
+
 // Triggers AOT file load
 void helper_jit(CPUX86State *env, unsigned long target)
 {
@@ -501,6 +522,11 @@ void helper_jit(CPUX86State *env, unsigned long target)
     }
     if (!info_ptr) {
         find_and_load_missing_aot(target);
+    } else {
+        uint64_t aot_delta = lookup_function(info_ptr->funcmap_rbtree_root, (target - info_ptr->x_addr_range_begin));
+        if (aot_delta) {
+            tb_aot_insert(info_ptr->x_addr_range_begin, (target - info_ptr->x_addr_range_begin), (info_ptr->aot_code_base + aot_delta));
+        }
     }
     pthread_mutex_unlock(&aot_range_info_mutex);
 
