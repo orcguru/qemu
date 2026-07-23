@@ -3852,11 +3852,23 @@ static LLVMValueRef create_reference_to_external_array(LLVMModuleRef module, con
         }
         LLVMSetLinkage(global_var, LLVMExternalLinkage);
     }
-    LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, 0);
-    LLVMValueRef index = LLVMConstInt(LLVMInt32Type(), 0, 0);
-    LLVMValueRef indices[] = {zero, index};
-    LLVMValueRef elem_ptr = LLVMBuildGEP2(builder, array_type, global_var, indices, 2, "array_elem_ptr");
-    return LLVMBuildPtrToInt(builder, elem_ptr, llvm_int_types[OPC_ADDR_T], "array_elem_ptr_val");
+    if (!count) {
+        char ptr_name[128] = {0};
+        sprintf(ptr_name, "%s_ptr", name);
+        LLVMValueRef map_ptr_var = LLVMGetNamedGlobal(module, ptr_name);
+        if (!map_ptr_var) {
+            map_ptr_var = LLVMAddGlobal(module, LLVMInt64Type(), ptr_name);
+            LLVMSetSection(map_ptr_var, ".data");
+            LLVMSetAlignment(map_ptr_var, 8);
+            LLVMValueRef init = LLVMConstInt(LLVMInt64Type(), 0, 0);
+            LLVMSetInitializer(map_ptr_var, init);
+            LLVMSetLinkage(map_ptr_var, LLVMExternalLinkage);
+        }
+        LLVMValueRef map_pointer = LLVMBuildIntToPtr(builder, map_ptr_var, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name("shadow_map_pointer", dummy_slot_for_debug));
+        return build_load_with_alignment(builder, llvm_int_types[OPC_ADDR_T], map_pointer, get_next_var_name("shadow_map_ptr", dummy_slot_for_debug), 8);
+    } else {
+        return NULL;
+    }
 }
 
 // FIXME: can this be merged into common logic?
