@@ -3829,6 +3829,7 @@ static LLVMValueRef create_static_array(LLVMModuleRef module, const char* name, 
     LLVMValueRef zero_initializer = LLVMConstNull(array_type);
     LLVMValueRef global_var = LLVMAddGlobal(module, array_type, name);
     LLVMSetInitializer(global_var, zero_initializer);
+    LLVMSetSection(global_var, ".data");
     LLVMSetAlignment(global_var, 8);
     LLVMSetLinkage(global_var, LLVMInternalLinkage);
     LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, 0);
