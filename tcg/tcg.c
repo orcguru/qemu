@@ -7392,31 +7392,26 @@ void tcg_expand_vec_op(TCGOpcode o, TCGType t, unsigned e, TCGArg a0, ...)
 
 #ifdef AOT
 #include "tcg/tcg-aot.h"
-helper_func_t helper_funcs[2000];
-size_t helper_funcs_count = 0;
+#include "tcg/helper_hash.h"
+
+helper_func_t helper_funcs[HELPER_HASH_N] = {0};
+size_t helper_funcs_count = HELPER_HASH_N;
 void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type)
 {
-    int found = 0;
-    for (int i = 0; i < helper_funcs_count; ++i) {
-        if (strcmp(name, helper_funcs[i].name) == 0) {
-            found = 1;
-            break;
-        }
+    uint32_t hidx = helper_name_hash(name);
+    if (helper_funcs[hidx].name && strcmp(name, helper_funcs[hidx].name) != 0) {
+        fprintf(stderr, "%s found hash collision: %s vs %s\n", __FUNCTION__, name, helper_funcs[hidx].name);
     }
-    if (!found) {
-        assert(helper_funcs_count < 2000);
-        helper_funcs[helper_funcs_count].name = name;
-        helper_funcs[helper_funcs_count].addr = addr;
-        int ret_bit_cnt = 0;
-        if (strcmp(ret_type, "tl") == 0 || strstr(ret_type, "ptr") != NULL) {
-            ret_bit_cnt = 64;
-        } else if (strcmp(ret_type, "void") != 0) {
-            ret_bit_cnt = atoi(ret_type+1);
-        }
-        (void)ret_bit_cnt;
-        // Collect helper return type for ir-translator
-        //printf("%s %d\n", name, ret_bit_cnt);
-        helper_funcs_count += 1;
+    helper_funcs[hidx].name = name;
+    helper_funcs[hidx].addr = addr;
+    int ret_bit_cnt = 0;
+    if (strcmp(ret_type, "tl") == 0 || strstr(ret_type, "ptr") != NULL) {
+        ret_bit_cnt = 64;
+    } else if (strcmp(ret_type, "void") != 0) {
+        ret_bit_cnt = atoi(ret_type+1);
     }
+    (void)ret_bit_cnt;
+    // Collect helper return type for ir-translator
+    //printf("%s %d\n", name, ret_bit_cnt);
 }
 #endif
