@@ -125,7 +125,6 @@ my %fp_helpers = (
   "helper_subsd" => 1,
   "helper_subss" => 1,
   "helper_ucomiss" => 1,
-  "helper_cr4_testbit" => 1,
   "helper_divw_AX" => 1,
   "helper_idivb_AL" => 1,
   "helper_idivl_EAX" => 1,
@@ -877,7 +876,7 @@ while (<FD>) {
             }
           }
           if (not ($sym_info[0]->{'SYM'} eq "cc_src" or $sym_info[0]->{'SYM'} eq "cc_dst" or $sym_info[0]->{'SYM'} eq "cc_op" or $sym_info[0]->{'SYM'} eq "regs" or $sym_info[0]->{'SYM'} eq "xmm_regs")) {
-            die "" if $sym_info[0]->{'IS_ARRAY'} == 1;
+            die "$sym_info[0]->{'SYM'}" if $sym_info[0]->{'IS_ARRAY'} == 1;
             die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
             $func_ptr->{'DO_DEFINE_ENV'} = 1;
             $func_ptr->{'ENVVAR_AND_VECTORS'}->{"env->$sym_info[0]->{'SYM'}"} = 1;
