@@ -269,6 +269,7 @@ typedef enum {
     X(helper_cc_compute_c) \
     X(helper_cc_compute_nz) \
     X(helper_clts) \
+    X(helper_cr4_testbit) \
     X(floatingpoint_inlined_helper_begin) \
     X(helper_addsd) \
     X(helper_addss) \
@@ -375,7 +376,6 @@ typedef enum {
     X(helper_subsd) \
     X(helper_subss) \
     X(helper_ucomiss) \
-    X(helper_cr4_testbit) \
     X(helper_divw_AX) \
     X(helper_idivb_AL) \
     X(helper_idivl_EAX) \
