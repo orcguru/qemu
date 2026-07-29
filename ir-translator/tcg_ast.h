@@ -129,8 +129,6 @@ typedef enum {
     X(helper_aad) \
     X(helper_aam) \
     X(helper_aas) \
-    X(helper_addsd) \
-    X(helper_addss) \
     X(helper_atomic_add_fetchb) \
     X(helper_atomic_add_fetchl_be) \
     X(helper_atomic_add_fetchl_le) \
@@ -270,11 +268,10 @@ typedef enum {
     X(helper_cc_compute_all) \
     X(helper_cc_compute_c) \
     X(helper_cc_compute_nz) \
-    X(helper_clrsb_i32) \
-    X(helper_clrsb_i64) \
     X(helper_clts) \
-    X(helper_clz_i32) \
-    X(helper_clz_i64) \
+    X(floatingpoint_inlined_helper_begin) \
+    X(helper_addsd) \
+    X(helper_addss) \
     X(helper_cmpeqsd) \
     X(helper_cmpeqss) \
     X(helper_cmpeqssd) \
@@ -339,28 +336,7 @@ typedef enum {
     X(helper_cmpunordss) \
     X(helper_cmpunordssd) \
     X(helper_cmpunordsss) \
-    X(floatingpoint_inlined_helper_begin) \
-    X(helper_comisd) \
-    X(helper_ucomisd) \
-    X(helper_cvtsq2sd) \
-    X(helper_cvttsd2sq) \
-    X(helper_mulsd) \
-    X(helper_divq_EAX) \
-    X(helper_divl_EAX) \
-    X(helper_idivq_EAX) \
-    X(floatingpoint_inlined_helper_end) \
     X(helper_comiss) \
-    X(helper_cpuid) \
-    X(helper_cr4_testbit) \
-    X(helper_crc32) \
-    X(helper_ctpop_i32) \
-    X(helper_ctpop_i64) \
-    X(helper_ctz_i32) \
-    X(helper_ctz_i64) \
-    X(helper_cvtpd2pi) \
-    X(helper_cvtpi2pd) \
-    X(helper_cvtpi2ps) \
-    X(helper_cvtps2pi) \
     X(helper_cvtsd2si) \
     X(helper_cvtsd2sq) \
     X(helper_cvtsd2ss) \
@@ -370,21 +346,83 @@ typedef enum {
     X(helper_cvtss2sd) \
     X(helper_cvtss2si) \
     X(helper_cvtss2sq) \
-    X(helper_cvttpd2pi) \
-    X(helper_cvttps2pi) \
     X(helper_cvttsd2si) \
     X(helper_cvttss2si) \
     X(helper_cvttss2sq) \
+    X(helper_divsd) \
+    X(helper_divss) \
+    X(helper_fma4sd) \
+    X(helper_fma4ss) \
+    X(helper_maxsd) \
+    X(helper_maxss) \
+    X(helper_minsd) \
+    X(helper_minss) \
+    X(helper_mulss) \
+    X(helper_rcpss) \
+    X(helper_rsqrtss) \
+    X(helper_sha1msg1) \
+    X(helper_sha1msg2) \
+    X(helper_sha1nexte) \
+    X(helper_sha1rnds4_f0) \
+    X(helper_sha1rnds4_f1) \
+    X(helper_sha1rnds4_f2) \
+    X(helper_sha1rnds4_f3) \
+    X(helper_sha256msg1) \
+    X(helper_sha256msg2) \
+    X(helper_sha256rnds2) \
+    X(helper_sqrtsd) \
+    X(helper_sqrtss) \
+    X(helper_subsd) \
+    X(helper_subss) \
+    X(helper_ucomiss) \
+    X(helper_cr4_testbit) \
+    X(helper_divw_AX) \
+    X(helper_idivb_AL) \
+    X(helper_idivl_EAX) \
+    X(helper_idivw_AX) \
+    X(helper_pdep) \
+    X(helper_pext) \
+    X(helper_clrsb_i32) \
+    X(helper_clrsb_i64) \
+    X(helper_clz_i32) \
+    X(helper_clz_i64) \
+    X(helper_ctpop_i32) \
+    X(helper_ctpop_i64) \
+    X(helper_ctz_i32) \
+    X(helper_ctz_i64) \
+    X(helper_div_i32) \
+    X(helper_div_i64) \
+    X(helper_divu_i32) \
+    X(helper_divu_i64) \
+    X(helper_mulsh_i64) \
+    X(helper_muluh_i64) \
+    X(helper_rem_i32) \
+    X(helper_rem_i64) \
+    X(helper_remu_i32) \
+    X(helper_remu_i64) \
+    X(helper_sar_i64) \
+    X(helper_shl_i64) \
+    X(helper_shr_i64) \
+    X(helper_comisd) \
+    X(helper_ucomisd) \
+    X(helper_cvtsq2sd) \
+    X(helper_cvttsd2sq) \
+    X(helper_mulsd) \
+    X(helper_divq_EAX) \
+    X(helper_divl_EAX) \
+    X(helper_idivq_EAX) \
+    X(floatingpoint_inlined_helper_end) \
+    X(helper_cpuid) \
+    X(helper_crc32) \
+    X(helper_cvtpd2pi) \
+    X(helper_cvtpi2pd) \
+    X(helper_cvtpi2ps) \
+    X(helper_cvtps2pi) \
+    X(helper_cvttpd2pi) \
+    X(helper_cvttps2pi) \
     X(helper_daa) \
     X(helper_das) \
     X(helper_divb_AL) \
-    X(helper_div_i32) \
-    X(helper_div_i64) \
-    X(helper_divsd) \
-    X(helper_divss) \
-    X(helper_divu_i32) \
-    X(helper_divu_i64) \
-    X(helper_divw_AX) \
     X(helper_emms) \
     X(helper_enter_mmx) \
     X(helper_exit_atomic) \
@@ -432,8 +470,6 @@ typedef enum {
     X(helper_fldt_ST0) \
     X(helper_fldz_FT0) \
     X(helper_fldz_ST0) \
-    X(helper_fma4sd) \
-    X(helper_fma4ss) \
     X(helper_fmov_FT0_STN) \
     X(helper_fmov_ST0_FT0) \
     X(helper_fmov_ST0_STN) \
@@ -638,9 +674,6 @@ typedef enum {
     X(helper_gvec_xor) \
     X(helper_gvec_xors) \
     X(helper_icebp) \
-    X(helper_idivb_AL) \
-    X(helper_idivl_EAX) \
-    X(helper_idivw_AX) \
     X(helper_insertq_i) \
     X(helper_insertq_r) \
     X(helper_into) \
@@ -659,14 +692,7 @@ typedef enum {
     X(helper_lsl) \
     X(helper_ltr) \
     X(helper_maskmov_mmx) \
-    X(helper_maxsd) \
-    X(helper_maxss) \
     X(helper_memset) \
-    X(helper_minsd) \
-    X(helper_minss) \
-    X(helper_mulsh_i64) \
-    X(helper_mulss) \
-    X(helper_muluh_i64) \
     X(helper_nonatomic_cmpxchgo) \
     X(helper_packssdw_mmx) \
     X(helper_packsswb_mmx) \
@@ -675,8 +701,6 @@ typedef enum {
     X(helper_pause) \
     X(helper_pavgb_mmx) \
     X(helper_pavgw_mmx) \
-    X(helper_pdep) \
-    X(helper_pext) \
     X(helper_pf2id) \
     X(helper_pf2iw) \
     X(helper_pfacc) \
@@ -731,7 +755,6 @@ typedef enum {
     X(helper_punpcklwd_mmx) \
     X(helper_raise_exception) \
     X(helper_raise_interrupt) \
-    X(helper_rcpss) \
     X(helper_rdpid) \
     X(helper_rdpkru) \
     X(helper_rdpmc) \
@@ -739,35 +762,12 @@ typedef enum {
     X(helper_rdtsc) \
     X(helper_read_eflags) \
     X(helper_rechecking_single_step) \
-    X(helper_rem_i32) \
-    X(helper_rem_i64) \
-    X(helper_remu_i32) \
-    X(helper_remu_i64) \
-    X(helper_rsqrtss) \
-    X(helper_sar_i64) \
-    X(helper_sha1msg1) \
-    X(helper_sha1msg2) \
-    X(helper_sha1nexte) \
-    X(helper_sha1rnds4_f0) \
-    X(helper_sha1rnds4_f1) \
-    X(helper_sha1rnds4_f2) \
-    X(helper_sha1rnds4_f3) \
-    X(helper_sha256msg1) \
-    X(helper_sha256msg2) \
-    X(helper_sha256rnds2) \
-    X(helper_shl_i64) \
-    X(helper_shr_i64) \
     X(helper_single_step) \
-    X(helper_sqrtsd) \
-    X(helper_sqrtss) \
     X(helper_st_i128) \
-    X(helper_subsd) \
-    X(helper_subss) \
     X(helper_syscall) \
     X(helper_sysenter) \
     X(helper_sysexit) \
     X(helper_sysret) \
-    X(helper_ucomiss) \
     X(helper_update_mxcsr) \
     X(helper_verr) \
     X(helper_verw) \

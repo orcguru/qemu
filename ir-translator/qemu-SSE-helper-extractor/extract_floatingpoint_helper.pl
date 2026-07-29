@@ -20,6 +20,139 @@ my %fp_helpers = (
   "helper_divq_EAX" => 1,
   "helper_divl_EAX" => 1,
   "helper_idivq_EAX" => 1,
+  "helper_addsd" => 1,
+  "helper_addss" => 1,
+  "helper_cmpeqsd" => 1,
+  "helper_cmpeqss" => 1,
+  "helper_cmpeqssd" => 1,
+  "helper_cmpeqsss" => 1,
+  "helper_cmpequsd" => 1,
+  "helper_cmpequss" => 1,
+  "helper_cmpequssd" => 1,
+  "helper_cmpequsss" => 1,
+  "helper_cmpfalsesd" => 1,
+  "helper_cmpfalsess" => 1,
+  "helper_cmpfalsessd" => 1,
+  "helper_cmpfalsesss" => 1,
+  "helper_cmpgeqsd" => 1,
+  "helper_cmpgeqss" => 1,
+  "helper_cmpgesd" => 1,
+  "helper_cmpgess" => 1,
+  "helper_cmpgtqsd" => 1,
+  "helper_cmpgtqss" => 1,
+  "helper_cmpgtsd" => 1,
+  "helper_cmpgtss" => 1,
+  "helper_cmpleqsd" => 1,
+  "helper_cmpleqss" => 1,
+  "helper_cmplesd" => 1,
+  "helper_cmpless" => 1,
+  "helper_cmpltqsd" => 1,
+  "helper_cmpltqss" => 1,
+  "helper_cmpltsd" => 1,
+  "helper_cmpltss" => 1,
+  "helper_cmpneqqsd" => 1,
+  "helper_cmpneqqss" => 1,
+  "helper_cmpneqsd" => 1,
+  "helper_cmpneqss" => 1,
+  "helper_cmpnequsd" => 1,
+  "helper_cmpnequss" => 1,
+  "helper_cmpnequssd" => 1,
+  "helper_cmpnequsss" => 1,
+  "helper_cmpngeqsd" => 1,
+  "helper_cmpngeqss" => 1,
+  "helper_cmpngesd" => 1,
+  "helper_cmpngess" => 1,
+  "helper_cmpngtqsd" => 1,
+  "helper_cmpngtqss" => 1,
+  "helper_cmpngtsd" => 1,
+  "helper_cmpngtss" => 1,
+  "helper_cmpnleqsd" => 1,
+  "helper_cmpnleqss" => 1,
+  "helper_cmpnlesd" => 1,
+  "helper_cmpnless" => 1,
+  "helper_cmpnltqsd" => 1,
+  "helper_cmpnltqss" => 1,
+  "helper_cmpnltsd" => 1,
+  "helper_cmpnltss" => 1,
+  "helper_cmpordsd" => 1,
+  "helper_cmpordss" => 1,
+  "helper_cmpordssd" => 1,
+  "helper_cmpordsss" => 1,
+  "helper_cmptruesd" => 1,
+  "helper_cmptruess" => 1,
+  "helper_cmptruessd" => 1,
+  "helper_cmptruesss" => 1,
+  "helper_cmpunordsd" => 1,
+  "helper_cmpunordss" => 1,
+  "helper_cmpunordssd" => 1,
+  "helper_cmpunordsss" => 1,
+  "helper_comiss" => 1,
+  "helper_cvtsd2si" => 1,
+  "helper_cvtsd2sq" => 1,
+  "helper_cvtsd2ss" => 1,
+  "helper_cvtsi2sd" => 1,
+  "helper_cvtsi2ss" => 1,
+  "helper_cvtsq2ss" => 1,
+  "helper_cvtss2sd" => 1,
+  "helper_cvtss2si" => 1,
+  "helper_cvtss2sq" => 1,
+  "helper_cvttsd2si" => 1,
+  "helper_cvttss2si" => 1,
+  "helper_cvttss2sq" => 1,
+  "helper_divsd" => 1,
+  "helper_divss" => 1,
+  "helper_fma4sd" => 1,
+  "helper_fma4ss" => 1,
+  "helper_maxsd" => 1,
+  "helper_maxss" => 1,
+  "helper_minsd" => 1,
+  "helper_minss" => 1,
+  "helper_mulss" => 1,
+  "helper_rcpss" => 1,
+  "helper_rsqrtss" => 1,
+  "helper_sha1msg1" => 1,
+  "helper_sha1msg2" => 1,
+  "helper_sha1nexte" => 1,
+  "helper_sha1rnds4_f0" => 1,
+  "helper_sha1rnds4_f1" => 1,
+  "helper_sha1rnds4_f2" => 1,
+  "helper_sha1rnds4_f3" => 1,
+  "helper_sha256msg1" => 1,
+  "helper_sha256msg2" => 1,
+  "helper_sha256rnds2" => 1,
+  "helper_sqrtsd" => 1,
+  "helper_sqrtss" => 1,
+  "helper_subsd" => 1,
+  "helper_subss" => 1,
+  "helper_ucomiss" => 1,
+  "helper_cr4_testbit" => 1,
+  "helper_divw_AX" => 1,
+  "helper_idivb_AL" => 1,
+  "helper_idivl_EAX" => 1,
+  "helper_idivw_AX" => 1,
+  "helper_pdep" => 1,
+  "helper_pext" => 1,
+  "helper_clrsb_i32" => 1,
+  "helper_clrsb_i64" => 1,
+  "helper_clz_i32" => 1,
+  "helper_clz_i64" => 1,
+  "helper_ctpop_i32" => 1,
+  "helper_ctpop_i64" => 1,
+  "helper_ctz_i32" => 1,
+  "helper_ctz_i64" => 1,
+  "helper_div_i32" => 1,
+  "helper_div_i64" => 1,
+  "helper_divu_i32" => 1,
+  "helper_divu_i64" => 1,
+  "helper_mulsh_i64" => 1,
+  "helper_muluh_i64" => 1,
+  "helper_rem_i32" => 1,
+  "helper_rem_i64" => 1,
+  "helper_remu_i32" => 1,
+  "helper_remu_i64" => 1,
+  "helper_sar_i64" => 1,
+  "helper_shl_i64" => 1,
+  "helper_shr_i64" => 1,
 );
 
 my $arch_info = "riscv64";
@@ -971,9 +1104,18 @@ foreach my $f (keys %funcs) {
   $path_info{'ROOT'} = \@label_info;
   $defined_func{$f} = \%path_info;
   my %func_call_path = ();
+  my %trace_parent_call_loc = ();
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     my $call_target = $funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'};
     if (exists $funcs{$call_target}) {
+      if (not exists $trace_parent_call_loc{$call_target}) {
+        my @arr = ();
+        $trace_parent_call_loc{$call_target} = \@arr;
+      }
+      my %tr_info = ();
+      $tr_info{'PARENT'} = $f;
+      $tr_info{'LOC'} = $e;
+      push @{$trace_parent_call_loc{$call_target}}, \%tr_info;
       if (not exists $defined_func{$call_target}) {
         push @sub_call_stack, $call_target;
         my %p_info = ();
@@ -1019,6 +1161,14 @@ foreach my $f (keys %funcs) {
     foreach my $c (@sub_call_stack) {
       foreach my $e (keys %{$funcs{$c}->{'CALLS'}}) {
         my $call_target = $funcs{$c}->{'CALLS'}->{$e}->{'CALL_TARGET'};
+        if (not exists $trace_parent_call_loc{$call_target}) {
+          my @arr = ();
+          $trace_parent_call_loc{$call_target} = \@arr;
+        }
+        my %tr_info = ();
+        $tr_info{'PARENT'} = $c;
+        $tr_info{'LOC'} = $e;
+        push @{$trace_parent_call_loc{$call_target}}, \%tr_info;
         if (exists $funcs{$call_target}) {
           if (not exists $defined_func{$call_target}) {
             push @new_call_stack, $call_target;
@@ -1058,28 +1208,84 @@ foreach my $f (keys %funcs) {
                   my $parent_func = $defined_func{$c}->{$pi}->[$#{$defined_func{$c}->{$pi}}]->{'FUNC'};
                   my $parent_call_loc = $defined_func{$c}->{$pi}->[$#{$defined_func{$c}->{$pi}}]->{'LOC'};
                   my $real_target = $funcs{$parent_func}->{'CALLS'}->{$parent_call_loc}->{'CALL_ARGUMENTS'}->[$idx];
-                  if (not exists $defined_func{$real_target}) {
-                    push @new_call_stack, $real_target;
-                    my %p_info = ();
-                    $defined_func{$real_target} = \%p_info;
-                    if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
-                      $has_foreign_call = 1;
+                  if (not exists $funcs{$real_target}) {
+                    my @trace_real_target = ();
+                    my %info = ();
+                    $info{'P'} = $parent_func;
+                    $info{'PCL'} = $parent_call_loc;
+                    $info{'RT'} = $real_target;
+                    push @trace_real_target, \%info;
+                    while (@trace_real_target > 0) {
+                      my $entry = pop @trace_real_target;
+                      die "" if (not exists $trace_parent_call_loc{$entry->{'P'}});
+                      foreach my $tr_info (@{$trace_parent_call_loc{$entry->{'P'}}}) {
+                        die "" if (not exists $funcs{$tr_info->{'PARENT'}}->{'CALLS'}->{$tr_info->{'LOC'}});
+                        my $scan_func = $funcs{$tr_info->{'PARENT'}}->{'CALLS'}->{$tr_info->{'LOC'}}->{'CALL_TARGET'};
+                        die "" if (not exists $funcs{$scan_func});
+                        foreach my $idx2 (0 .. $#{$funcs{$scan_func}->{'SCALAR_ARGS'}}) {
+                          my $arg = $funcs{$scan_func}->{'SCALAR_ARGS'}->[$idx2];
+                          if ($arg->{'VAR_NAME'} eq $entry->{'RT'}) {
+                            $real_target = $funcs{$tr_info->{'PARENT'}}->{'CALLS'}->{$tr_info->{'LOC'}}->{'CALL_ARGUMENTS'}->[$idx2];
+                            if (not exists $funcs{$real_target}) {
+                              my %info = ();
+                              $info{'P'} = $tr_info->{'PARENT'};
+                              $info{'PCL'} = $tr_info->{'LOC'};
+                              $info{'RT'} = $real_target;
+                              push @trace_real_target, \%info;
+                            } else {
+                              if (not exists $defined_func{$real_target}) {
+                                push @new_call_stack, $real_target;
+                                my %p_info = ();
+                                $defined_func{$real_target} = \%p_info;
+                                if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
+                                  $has_foreign_call = 1;
+                                }
+                              }
+                              my $current_pi = $pi."_".$c."_loc$e";
+                              my @label_info = ();
+                              foreach my $elem (@{$defined_func{$c}->{$pi}}) {
+                                push @label_info, $elem;
+                              }
+                              my %entry_info = ();
+                              $entry_info{'FUNC'} = $c;
+                              $entry_info{'LOC'} = $e;
+                              push @label_info, \%entry_info;
+                              $defined_func{$real_target}->{$current_pi} = \@label_info;
+                              # FIXME: simplify duplicated mark actions
+                              if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
+                                foreach my $i (@label_info) {
+                                  $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
                     }
-                  }
-                  my $current_pi = $pi."_".$c."_loc$e";
-                  my @label_info = ();
-                  foreach my $elem (@{$defined_func{$c}->{$pi}}) {
-                    push @label_info, $elem;
-                  }
-                  my %entry_info = ();
-                  $entry_info{'FUNC'} = $c;
-                  $entry_info{'LOC'} = $e;
-                  push @label_info, \%entry_info;
-                  $defined_func{$real_target}->{$current_pi} = \@label_info;
-                  # FIXME: simplify duplicated mark actions
-                  if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
-                    foreach my $i (@label_info) {
-                      $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+                  } else {
+                    if (not exists $defined_func{$real_target}) {
+                      push @new_call_stack, $real_target;
+                      my %p_info = ();
+                      $defined_func{$real_target} = \%p_info;
+                      if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
+                        $has_foreign_call = 1;
+                      }
+                    }
+                    my $current_pi = $pi."_".$c."_loc$e";
+                    my @label_info = ();
+                    foreach my $elem (@{$defined_func{$c}->{$pi}}) {
+                      push @label_info, $elem;
+                    }
+                    my %entry_info = ();
+                    $entry_info{'FUNC'} = $c;
+                    $entry_info{'LOC'} = $e;
+                    push @label_info, \%entry_info;
+                    $defined_func{$real_target}->{$current_pi} = \@label_info;
+                    # FIXME: simplify duplicated mark actions
+                    if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
+                      foreach my $i (@label_info) {
+                        $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+                      }
                     }
                   }
                 }
@@ -1167,6 +1373,7 @@ EOF
   }
   my %order_to_func = ();
   foreach my $sf (keys %defined_func) {
+    die "$sf $f" if not exists $funcs{$sf}->{'FUNC_IDX'};
     $order_to_func{$funcs{$sf}->{'FUNC_IDX'}} = $sf;
   }
   my @sorted_funcs = sort {$a <=> $b} keys %order_to_func;
