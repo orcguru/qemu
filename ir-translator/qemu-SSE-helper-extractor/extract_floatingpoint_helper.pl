@@ -1376,9 +1376,21 @@ EOF
     $order_to_func{$funcs{$sf}->{'FUNC_IDX'}} = $sf;
   }
   my @sorted_funcs = sort {$a <=> $b} keys %order_to_func;
+  my @collected_funcs = ();
+  my $func_declarations = "";
   foreach my $s (@sorted_funcs) {
     my $func_name = $order_to_func{$s};
     my $new_func = &gen_replicated_func($func_name, \%defined_func, $f, \%foreign_calls, \%order_to_func);
+    if (not $funcs{$func_name}->{'HEAD'} =~ /HELPER_NAME/) {
+      my $args = &collect_func_args($funcs{$func_name});
+      $func_declarations = $func_declarations."$funcs{$func_name}->{'HEAD'}($args);\n";
+    }
+    push @collected_funcs, $new_func;
+  }
+
+  print OUT $func_declarations;
+
+  foreach my $new_func (@collected_funcs) {
     print OUT "$new_func";
   }
 
