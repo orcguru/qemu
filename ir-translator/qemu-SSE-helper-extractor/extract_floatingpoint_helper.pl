@@ -20,6 +20,16 @@ my %fp_helpers = (
   "helper_divq_EAX" => 1,
   "helper_divl_EAX" => 1,
   "helper_idivq_EAX" => 1,
+  "helper_divw_AX" => 1,
+  "helper_idivb_AL" => 1,
+  "helper_idivl_EAX" => 1,
+  "helper_idivw_AX" => 1,
+  "helper_divsd" => 1,
+  "helper_divss" => 1,
+  "helper_div_i32" => 1,
+  "helper_div_i64" => 1,
+  "helper_divu_i32" => 1,
+  "helper_divu_i64" => 1,
   "helper_addsd" => 1,
   "helper_addss" => 1,
   "helper_cmpeqsd" => 1,
@@ -99,8 +109,6 @@ my %fp_helpers = (
   "helper_cvttsd2si" => 1,
   "helper_cvttss2si" => 1,
   "helper_cvttss2sq" => 1,
-  "helper_divsd" => 1,
-  "helper_divss" => 1,
   "helper_fma4sd" => 1,
   "helper_fma4ss" => 1,
   "helper_maxsd" => 1,
@@ -125,10 +133,6 @@ my %fp_helpers = (
   "helper_subsd" => 1,
   "helper_subss" => 1,
   "helper_ucomiss" => 1,
-  "helper_divw_AX" => 1,
-  "helper_idivb_AL" => 1,
-  "helper_idivl_EAX" => 1,
-  "helper_idivw_AX" => 1,
   "helper_pdep" => 1,
   "helper_pext" => 1,
   "helper_clrsb_i32" => 1,
@@ -139,10 +143,6 @@ my %fp_helpers = (
   "helper_ctpop_i64" => 1,
   "helper_ctz_i32" => 1,
   "helper_ctz_i64" => 1,
-  "helper_div_i32" => 1,
-  "helper_div_i64" => 1,
-  "helper_divu_i32" => 1,
-  "helper_divu_i64" => 1,
   "helper_mulsh_i64" => 1,
   "helper_muluh_i64" => 1,
   "helper_rem_i32" => 1,
@@ -1599,7 +1599,11 @@ sub parse_func_head
   }
   my $head_copy = $head;
   if (not $head_copy =~ /__attribute__\(\(always_inline\)\)/) {
-    $head_copy = "__attribute__((always_inline,weak)) ".$head_copy;
+    if ($func->{'NAME'} =~ /^helper_/ and $func->{'NAME'} =~ /div/) {
+      $head_copy = "__attribute__((noinline,weak)) ".$head_copy;
+    } else {
+      $head_copy = "__attribute__((always_inline,weak)) ".$head_copy;
+    }
     # disable inline for debug
     #$head_copy = "__attribute__((noinline,weak)) ".$head_copy;
   } elsif (not $head_copy =~ /__attribute__\(\(weak\)\)/) {
@@ -2822,6 +2826,9 @@ sub filter_blank_info {
   my @blank_lines = split(/\n/, $blank_info);
   my $remove_next = 0;
   foreach my $line (@blank_lines) {
+    if ($line =~ /^TCGHelperInfo helper_info_/) {
+      next;
+    }
     if ($line =~ /^#/) {
       $cleaned .= $line . "\n";
       next;
