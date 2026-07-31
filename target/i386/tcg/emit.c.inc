@@ -1633,6 +1633,9 @@ static void gen_CLTS(DisasContext *s, X86DecodedInsn *decode)
     gen_helper_clts(tcg_env);
     /* abort block because static cpu state changed */
     s->base.is_jmp = DISAS_EOB_NEXT;
+#ifdef AOT
+    s->base.jmp_type = TR_IS_JMP;
+#endif
 }
 
 static void gen_CMC(DisasContext *s, X86DecodedInsn *decode)
@@ -3103,6 +3106,9 @@ static void gen_POPF(DisasContext *s, X86DecodedInsn *decode)
     set_cc_op(s, CC_OP_EFLAGS);
     /* abort translation because TF/AC flag may change */
     s->base.is_jmp = DISAS_EOB_NEXT;
+#ifdef AOT
+    s->base.jmp_type = TR_IS_JMP;
+#endif
 }
 
 static void gen_PSHUFW(DisasContext *s, X86DecodedInsn *decode)
