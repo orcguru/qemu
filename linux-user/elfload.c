@@ -3604,7 +3604,9 @@ static void load_elf_image(const char *image_name, const ImageSource *src,
     }
 
 #ifdef AOT_IR
-    fill_section_gap_with_nop_and_update_end_code(info, ehdr, src);
+    if (strcmp(image_name, "<internal-vdso>") != 0) {
+        fill_section_gap_with_nop_and_update_end_code(info, ehdr, src);
+    }
 #endif
 
     debuginfo_report_elf(image_name, src->fd, load_bias);
