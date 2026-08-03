@@ -5303,8 +5303,17 @@ static int process_op_type(uint32_t slot_idx, void *ptr, OpCodeType opc, LLVMTyp
                     }
                 }
             }
-            if ((opc == call && slot_idx < noargs) || (opc != call && slot_idx < opcoc[opc])) {
+            if (opc != call && slot_idx < opcoc[opc]) {
                 tmp_has_known_def[operand.s.slot_idx] = 1;
+            } else if (opc == call && slot_idx < noargs) {
+#ifdef DEBUG
+                OperandType orig_slot = get_original_slot_for_debug(operand);
+                printf("  unregister cross_call tmp:%d orig:%s%d\n", operand.s.slot_idx, orig_slot.s.valid ? (orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp") : "NA", orig_slot.s.valid ? orig_slot.s.slot_idx : 0); fflush(NULL);
+#endif
+                tmp_has_known_def[operand.s.slot_idx] = 1;
+                if (tmp_shadow_offset[operand.s.slot_idx] != 0) {
+                    tmp_shadow_offset[operand.s.slot_idx] = 0;
+                }
             }
         }
     }
