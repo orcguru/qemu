@@ -3546,11 +3546,13 @@ static void load_elf_image(const char *image_name, const ImageSource *src,
                     goto exit_mmap;
                 }
 #ifdef AOT_IR
-                if (eppnt->p_flags & PF_X) {
+                if (eppnt->p_flags & PF_X && info->code_mmap_start == 0) {
                     info->code_mmap_start = vaddr_ps;
                     info->code_mmap_len = eppnt->p_filesz + vaddr_po;
                     info->code_mmap_prot = elf_prot;
                     info->code_mmap_start_vaddr = eppnt->p_vaddr;
+                } else if (eppnt->p_flags & PF_X && info->code_mmap_start != 0) {
+                    printf("WARNING: more than one executable load segment not supported! SELF-MODIFYING-CODE?\n");
                 }
 #endif
             }
@@ -3882,7 +3884,8 @@ void fill_section_gap_with_nop_and_update_end_code(struct image_info *info, stru
         exit(-1);
     }
     bswap_shdr(shdr, shnum);
-    abi_long load_begin = (1UL << 63)-1;
+#define BEGIN_INIT     ((1UL << 63)-1)
+    abi_long load_begin = BEGIN_INIT;
     struct elfhdr ehdr;
     if (!imgsrc_read(&ehdr, 0, sizeof(ehdr), src, NULL)) {
         assert(0);
@@ -3920,13 +3923,13 @@ void fill_section_gap_with_nop_and_update_end_code(struct image_info *info, stru
 
             vaddr = eppnt->p_vaddr;
             if (elf_prot & PROT_EXEC) {
-                if (vaddr < load_begin) {
+                if (vaddr < load_begin && load_begin == BEGIN_INIT) {
                     load_begin = vaddr;
                 }
             }
         }
     }
-    abi_long exec_begin = (1UL << 63)-1;
+    abi_long exec_begin = BEGIN_INIT;
     abi_long exec_end = 0;
     for (i = 0; i < shnum; ++i) {
         if (shdr[i].sh_type == SHT_PROGBITS && ((i + 1) < shnum) && shdr[i + 1].sh_type == SHT_PROGBITS) {
@@ -3940,10 +3943,11 @@ void fill_section_gap_with_nop_and_update_end_code(struct image_info *info, stru
             }
         }
         if (shdr[i].sh_flags &= SHF_EXECINSTR) {
-            if (shdr[i].sh_addr < exec_begin) {
+            if (shdr[i].sh_addr < exec_begin && exec_begin == BEGIN_INIT) {
                 exec_begin = shdr[i].sh_addr;
             }
-            if ((shdr[i].sh_addr + shdr[i].sh_size) > exec_end) {
+            if (((shdr[i].sh_addr + shdr[i].sh_size) > exec_end) &&
+                ((shdr[i].sh_addr + shdr[i].sh_size) <= (info->code_mmap_start + info->code_mmap_len))) {
                 exec_end = (shdr[i].sh_addr + shdr[i].sh_size);
             }
         }
