@@ -4001,8 +4001,10 @@ static void i386_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
              * chance to happen.
              */
             dc->base.is_jmp = DISAS_EOB_NEXT;
+#ifndef AOT_IR
         } else if (!translator_is_same_page(&dc->base, dc->base.pc_next)) {
             dc->base.is_jmp = DISAS_TOO_MANY;
+#endif
         }
     }
 }
