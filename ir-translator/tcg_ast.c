@@ -556,6 +556,12 @@ static LLVMBasicBlockRef last_active_bb = NULL;
 #define VALUE_ONLY              2
 
 #define HELPER_DEFINES_OUTPUT(h)        (helper_return_type[h] != LLVMInvalidType)
+#define REQUIRES_CARRY_BIT(opc)         (opc == addci_i32 || opc == addci_i64 ||    \
+                                         opc == addcio_i32 || opc == addcio_i64 ||  \
+                                         opc == addco_i32 || opc == addco_i64)
+#define REQUIRES_BORROW_BIT(opc)        (opc == subbi_i32 || opc == subbi_i64 || \
+                                         opc == subbio_i32 || opc == subbio_i64 || \
+                                         opc == subbo_i32 || opc == subbo_i64)
 
 typedef struct AllocaWithAlignment {
     LLVMValueRef alloca;
@@ -603,6 +609,10 @@ static char output_path[PATH_MAX] = {0};
 static char input_path[PATH_MAX] = {0};
 static uint64_t x64_exec_end = 0;
 static int tcg_ir_head = 0;
+static int carrybit_on = 0;
+static int borrowbit_on = 0;
+static LLVMValueRef carrybit_alloca = NULL;
+static LLVMValueRef borrowbit_alloca = NULL;
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
 
@@ -2450,6 +2460,200 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
         assert(0);
     }
     check_scalable_vector_perform_store(val, type_mem, addr, align);
+}
+
+void translate_addci(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    DECLARE_AND_INIT_TYPE_FOR_ALL;
+    uint32_t is_imm0, is_imm1, is_imm2;
+    OperandType operand0, operand1, operand2;
+    uint32_t idx = opcoc[opc];
+    operand0 = get_operand(ptr, 0, &is_imm0);
+    assert(!is_imm0 && operand0.s.valid);
+    operand1 = get_operand(ptr, idx, &is_imm1);
+    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
+    LLVMValueRef sum_val = LLVMBuildAdd(builder, src1, src2, "sumval");
+    LLVMValueRef carry = build_load_with_alignment(builder, LLVMInt1Type(), carrybit_alloca, "carrybit", 8);
+    LLVMValueRef extended_carry = LLVMBuildZExt(builder, carry, llvm_int_types[type_out], "carrybit_extended");
+    LLVMValueRef out_val = LLVMBuildAdd(builder, sum_val, extended_carry, get_next_var_name(opcode_type_str[opc], operand0));
+    do_store(opc, out_val, type_out, operand0);
+}
+
+void translate_addcio(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    DECLARE_AND_INIT_TYPE_FOR_ALL;
+    uint32_t is_imm0, is_imm1, is_imm2;
+    OperandType operand0, operand1, operand2;
+    uint32_t idx = opcoc[opc];
+    operand0 = get_operand(ptr, 0, &is_imm0);
+    assert(!is_imm0 && operand0.s.valid);
+    operand1 = get_operand(ptr, idx, &is_imm1);
+    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+
+    LLVMTypeRef intrinsic_types[] = {llvm_int_types[type_in], llvm_int_types[type_in]};
+    char intrinsic_func_name[128] = {0};
+    sprintf(intrinsic_func_name, "llvm.uadd.with.overflow.i%d", llvm_vector_elem_bit_counts[type_in*2+1]);
+    unsigned id = LLVMLookupIntrinsicID(intrinsic_func_name, strlen(intrinsic_func_name));
+    assert(id != 0);
+    LLVMValueRef fn = LLVMGetIntrinsicDeclaration(module, id, intrinsic_types, 2);
+    LLVMTypeRef ret_args[] = {llvm_int_types[type_in], LLVMInt1Type()};
+    LLVMTypeRef ret_type = LLVMStructType(ret_args, 2, false);
+    LLVMTypeRef fn_type  = LLVMFunctionType(ret_type, intrinsic_types, 2, false);
+
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
+    LLVMValueRef intrinsic_call1_args[] = {src1, src2};
+    LLVMValueRef call1 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call1_args, 2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef sum1 = LLVMBuildExtractValue(builder, call1, 0, "sum");
+    LLVMValueRef carry1 = LLVMBuildExtractValue(builder, call1, 1, "carry");
+
+    LLVMValueRef carry_in = build_load_with_alignment(builder, LLVMInt1Type(), carrybit_alloca, "carrybit", 8);
+    LLVMValueRef carry_in_ext = LLVMBuildZExt(builder, carry_in, llvm_int_types[type_out], "carrybit_extended");
+    LLVMValueRef intrinsic_call2_args[] = {sum1, carry_in_ext};
+    LLVMValueRef call2 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call2_args, 2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef sum2 = LLVMBuildExtractValue(builder, call2, 0, "sum");
+    LLVMValueRef carry2 = LLVMBuildExtractValue(builder, call2, 1, "carry");
+    do_store(opc, sum2, type_out, operand0);
+
+    LLVMValueRef carry_out = LLVMBuildOr(builder, carry1, carry2, "carryout");
+    build_store_with_alignment(builder, carry_out, carrybit_alloca, 8);
+}
+
+void translate_addco(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    DECLARE_AND_INIT_TYPE_FOR_ALL;
+    uint32_t is_imm0, is_imm1, is_imm2;
+    OperandType operand0, operand1, operand2;
+    uint32_t idx = opcoc[opc];
+    operand0 = get_operand(ptr, 0, &is_imm0);
+    assert(!is_imm0 && operand0.s.valid);
+    operand1 = get_operand(ptr, idx, &is_imm1);
+    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+
+    LLVMTypeRef intrinsic_types[] = {llvm_int_types[type_in], llvm_int_types[type_in]};
+    char intrinsic_func_name[128] = {0};
+    sprintf(intrinsic_func_name, "llvm.uadd.with.overflow.i%d", llvm_vector_elem_bit_counts[type_in*2+1]);
+    unsigned id = LLVMLookupIntrinsicID(intrinsic_func_name, strlen(intrinsic_func_name));
+    assert(id != 0);
+    LLVMValueRef fn = LLVMGetIntrinsicDeclaration(module, id, intrinsic_types, 2);
+    LLVMTypeRef ret_args[] = {llvm_int_types[type_in], LLVMInt1Type()};
+    LLVMTypeRef ret_type = LLVMStructType(ret_args, 2, false);
+    LLVMTypeRef fn_type  = LLVMFunctionType(ret_type, intrinsic_types, 2, false);
+
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
+    LLVMValueRef intrinsic_call1_args[] = {src1, src2};
+    LLVMValueRef call1 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call1_args, 2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef sum1 = LLVMBuildExtractValue(builder, call1, 0, "sum");
+    LLVMValueRef carry1 = LLVMBuildExtractValue(builder, call1, 1, "carry");
+    do_store(opc, sum1, type_out, operand0);
+    build_store_with_alignment(builder, carry1, carrybit_alloca, 8);
+}
+
+void translate_subbi(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    DECLARE_AND_INIT_TYPE_FOR_ALL;
+    uint32_t is_imm0, is_imm1, is_imm2;
+    OperandType operand0, operand1, operand2;
+    uint32_t idx = opcoc[opc];
+    operand0 = get_operand(ptr, 0, &is_imm0);
+    assert(!is_imm0 && operand0.s.valid);
+    operand1 = get_operand(ptr, idx, &is_imm1);
+    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
+    LLVMValueRef diff_val = LLVMBuildSub(builder, src1, src2, "diffval");
+    LLVMValueRef borrow = build_load_with_alignment(builder, LLVMInt1Type(), borrowbit_alloca, "borrowbit", 8);
+    LLVMValueRef extended_borrow = LLVMBuildZExt(builder, borrow, llvm_int_types[type_out], "borrowbit_extended");
+    LLVMValueRef out_val = LLVMBuildSub(builder, diff_val, extended_borrow, get_next_var_name(opcode_type_str[opc], operand0));
+    do_store(opc, out_val, type_out, operand0);
+}
+
+void translate_subbio(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    DECLARE_AND_INIT_TYPE_FOR_ALL;
+    uint32_t is_imm0, is_imm1, is_imm2;
+    OperandType operand0, operand1, operand2;
+    uint32_t idx = opcoc[opc];
+    operand0 = get_operand(ptr, 0, &is_imm0);
+    assert(!is_imm0 && operand0.s.valid);
+    operand1 = get_operand(ptr, idx, &is_imm1);
+    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+
+    LLVMTypeRef intrinsic_types[] = {llvm_int_types[type_in], llvm_int_types[type_in]};
+    char intrinsic_func_name[128] = {0};
+    sprintf(intrinsic_func_name, "llvm.usub.with.overflow.i%d", llvm_vector_elem_bit_counts[type_in*2+1]);
+    unsigned id = LLVMLookupIntrinsicID(intrinsic_func_name, strlen(intrinsic_func_name));
+    assert(id != 0);
+    LLVMValueRef fn = LLVMGetIntrinsicDeclaration(module, id, intrinsic_types, 2);
+    LLVMTypeRef ret_args[] = {llvm_int_types[type_in], LLVMInt1Type()};
+    LLVMTypeRef ret_type = LLVMStructType(ret_args, 2, false);
+    LLVMTypeRef fn_type  = LLVMFunctionType(ret_type, intrinsic_types, 2, false);
+
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
+    LLVMValueRef intrinsic_call1_args[] = {src1, src2};
+    LLVMValueRef call1 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call1_args, 2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef diff1 = LLVMBuildExtractValue(builder, call1, 0, "diff");
+    LLVMValueRef borrow1 = LLVMBuildExtractValue(builder, call1, 1, "borrow");
+
+    LLVMValueRef borrow_in = build_load_with_alignment(builder, LLVMInt1Type(), borrowbit_alloca, "borrowbit", 8);
+    LLVMValueRef borrow_in_ext = LLVMBuildZExt(builder, borrow_in, llvm_int_types[type_out], "borrowbit_extended");
+    LLVMValueRef intrinsic_call2_args[] = {diff1, borrow_in_ext};
+    LLVMValueRef call2 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call2_args, 2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef diff2 = LLVMBuildExtractValue(builder, call2, 0, "diff");
+    LLVMValueRef borrow2 = LLVMBuildExtractValue(builder, call2, 1, "borrow");
+    do_store(opc, diff2, type_out, operand0);
+
+    LLVMValueRef borrow_out = LLVMBuildOr(builder, borrow1, borrow2, "borrowout");
+    build_store_with_alignment(builder, borrow_out, borrowbit_alloca, 8);
+}
+
+void translate_subbo(OpCodeType opc, void *ptr) {
+#ifdef DEBUG
+    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+#endif
+    DECLARE_AND_INIT_TYPE_FOR_ALL;
+    uint32_t is_imm0, is_imm1, is_imm2;
+    OperandType operand0, operand1, operand2;
+    uint32_t idx = opcoc[opc];
+    operand0 = get_operand(ptr, 0, &is_imm0);
+    assert(!is_imm0 && operand0.s.valid);
+    operand1 = get_operand(ptr, idx, &is_imm1);
+    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+
+    LLVMTypeRef intrinsic_types[] = {llvm_int_types[type_in], llvm_int_types[type_in]};
+    char intrinsic_func_name[128] = {0};
+    sprintf(intrinsic_func_name, "llvm.usub.with.overflow.i%d", llvm_vector_elem_bit_counts[type_in*2+1]);
+    unsigned id = LLVMLookupIntrinsicID(intrinsic_func_name, strlen(intrinsic_func_name));
+    assert(id != 0);
+    LLVMValueRef fn = LLVMGetIntrinsicDeclaration(module, id, intrinsic_types, 2);
+    LLVMTypeRef ret_args[] = {llvm_int_types[type_in], LLVMInt1Type()};
+    LLVMTypeRef ret_type = LLVMStructType(ret_args, 2, false);
+    LLVMTypeRef fn_type  = LLVMFunctionType(ret_type, intrinsic_types, 2, false);
+
+    LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
+    LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
+    LLVMValueRef intrinsic_call1_args[] = {src1, src2};
+    LLVMValueRef call1 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call1_args, 2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
+    LLVMValueRef diff1 = LLVMBuildExtractValue(builder, call1, 0, "diff");
+    LLVMValueRef borrow1 = LLVMBuildExtractValue(builder, call1, 1, "borrow");
+    do_store(opc, diff1, type_out, operand0);
+    build_store_with_alignment(builder, borrow1, borrowbit_alloca, 8);
 }
 
 // Vector
@@ -5153,6 +5357,8 @@ static void cleanup_func_resource() {
     xreg_valid = 0;
     xmm_valid = 0;
     tmp_valid_non_zero = 0;
+    carrybit_on = 0;
+    borrowbit_on = 0;
     memset(tmp_valid, 0, sizeof(tmp_valid));;
     memset(tmp_var_available, 0, sizeof(tmp_var_available));
     memset(tmp_var_available_backup, 0, sizeof(tmp_var_available_backup));
@@ -5238,6 +5444,12 @@ static void setup_func_stack() {
                 fixed_vector_param_in_stack[FIXED_PARAM_COUNT + i] = 1;
             }
         }
+    }
+    if (carrybit_on) {
+        carrybit_alloca = LLVMBuildAlloca(builder, LLVMInt1Type(), "carrybit");
+    }
+    if (borrowbit_on) {
+        borrowbit_alloca = LLVMBuildAlloca(builder, LLVMInt1Type(), "borrowbit");
     }
 }
 
@@ -5373,6 +5585,12 @@ void handle_func(uint64_t val, int is_external) {
             current_call_idx += 1;
             assert(current_call_idx < BB_MAX_CNT);
         }
+        if (REQUIRES_CARRY_BIT(opc)) {
+            carrybit_on = 1;
+        }
+        if (REQUIRES_BORROW_BIT(opc)) {
+            borrowbit_on = 1;
+        }
     }
     memcpy(tmp_var_available_backup, tmp_var_available, sizeof(tmp_var_available_backup));
 
@@ -5451,20 +5669,8 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
     switch (opc) {
     case addc1o_i32:
     case addc1o_i64:
-    case addci_i32:
-    case addci_i64:
-    case addcio_i32:
-    case addcio_i64:
-    case addco_i32:
-    case addco_i64:
     case subb1o_i32:
     case subb1o_i64:
-    case subbi_i32:
-    case subbi_i64:
-    case subbio_i32:
-    case subbio_i64:
-    case subbo_i32:
-    case subbo_i64:
     case brcond_i32:
     case divs2_i32:
     case divs2_i64:
@@ -5474,6 +5680,30 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
         assert(0);
         break;
 
+    case addci_i32:
+    case addci_i64:
+        translate_addci(opc, ptr);
+        break;
+    case addcio_i32:
+    case addcio_i64:
+        translate_addcio(opc, ptr);
+        break;
+    case addco_i32:
+    case addco_i64:
+        translate_addco(opc, ptr);
+        break;
+    case subbi_i32:
+    case subbi_i64:
+        translate_subbi(opc, ptr);
+        break;
+    case subbio_i32:
+    case subbio_i64:
+        translate_subbio(opc, ptr);
+        break;
+    case subbo_i32:
+    case subbo_i64:
+        translate_subbo(opc, ptr);
+        break;
     case abs_vec:
         translate_abs_vec(opc, ptr);
         break;

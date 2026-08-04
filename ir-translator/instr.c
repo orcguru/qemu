@@ -1391,21 +1391,8 @@ const LLVMType opciosz[OPCODE_MAX][2] = {
     // Not supported OPC
     [addc1o_i32] = SAME(LLVMInvalidType),
     [addc1o_i64] = SAME(LLVMInvalidType),
-    [addci_i32] = SAME(LLVMInvalidType),
-    [addci_i64] = SAME(LLVMInvalidType),
-    [addcio_i32] = SAME(LLVMInvalidType),
-    [addcio_i64] = SAME(LLVMInvalidType),
-    [addco_i32] = SAME(LLVMInvalidType),
-    [addco_i64] = SAME(LLVMInvalidType),
     [subb1o_i32] = SAME(LLVMInvalidType),
     [subb1o_i64] = SAME(LLVMInvalidType),
-    [subbi_i32] = SAME(LLVMInvalidType),
-    [subbi_i64] = SAME(LLVMInvalidType),
-    [subbio_i32] = SAME(LLVMInvalidType),
-    [subbio_i64] = SAME(LLVMInvalidType),
-    [subbo_i32] = SAME(LLVMInvalidType),
-    [subbo_i64] = SAME(LLVMInvalidType),
-    [abs_vec] = SAME(LLVMInvalidType),
     [brcond_i32] = SAME(LLVMInvalidType),
     [divs2_i32] = SAME(LLVMInvalidType),
     [divs2_i64] = SAME(LLVMInvalidType),
@@ -1413,6 +1400,18 @@ const LLVMType opciosz[OPCODE_MAX][2] = {
     [divu2_i64] = SAME(LLVMInvalidType),
     [dup_vec] = SAME(LLVMInvalidType),
     // Define supported OPC:
+    [addci_i32] = SAME(LLVMInt32),
+    [addci_i64] = SAME(LLVMInt64),
+    [addcio_i32] = SAME(LLVMInt32),
+    [addcio_i64] = SAME(LLVMInt64),
+    [addco_i32] = SAME(LLVMInt32),
+    [addco_i64] = SAME(LLVMInt64),
+    [subbi_i32] = SAME(LLVMInt32),
+    [subbi_i64] = SAME(LLVMInt64),
+    [subbio_i32] = SAME(LLVMInt32),
+    [subbio_i64] = SAME(LLVMInt64),
+    [subbo_i32] = SAME(LLVMInt32),
+    [subbo_i64] = SAME(LLVMInt64),
     // Pure vector types are all invalid since those depend on element size.
     // Arithmetic
     [add_i32] = SAME(LLVMInt32),
@@ -1540,6 +1539,7 @@ const LLVMType opciosz[OPCODE_MAX][2] = {
     [qemu_st_i32] = {LLVMInvalidType, LLVMInt32},
     [qemu_st_i64] = {LLVMInvalidType, LLVMInt64},
     // Vector
+    [abs_vec] = SAME(LLVMInvalidType),
     [dupm_vec] = SAME(LLVMInvalidType),
     [add_vec] = SAME(LLVMInvalidType),
     [andc_vec] = SAME(LLVMInvalidType),
@@ -1583,6 +1583,18 @@ const LLVMType opciosz[OPCODE_MAX][2] = {
 };
 
 const uint8_t opcoc[OPCODE_MAX] = {
+    [addci_i32] = 1,
+    [addci_i64] = 1,
+    [addcio_i32] = 1,
+    [addcio_i64] = 1,
+    [addco_i32] = 1,
+    [addco_i64] = 1,
+    [subbi_i32] = 1,
+    [subbi_i64] = 1,
+    [subbio_i32] = 1,
+    [subbio_i64] = 1,
+    [subbo_i32] = 1,
+    [subbo_i64] = 1,
     [abs_vec] = 1,
     [add_i32] = 1,
     [add_i64] = 1,
@@ -2340,6 +2352,7 @@ const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
     [LLVMVector32xi8] = v32uchar,
 };
 
+// FIXME: sanity check and cover more helpers
 const int helper_do_not_sync_vector[HELPER_MAX] = {
     [helper_cpuid] = 1,
     [helper_rdtsc] = 1,
