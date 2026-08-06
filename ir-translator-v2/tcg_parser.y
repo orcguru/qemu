@@ -7,6 +7,7 @@
 
 #include "operand.h"
 #include "unified_instr.h"
+#include "tcg_ast.h"
 
 /* External functions */
 extern void register_xmm(uint64_t idx, uint64_t offset);
@@ -49,29 +50,34 @@ static void op_list_free(OpList *l) {
 
 %union {
     uint64_t    ival;
-    char       *sval;
+    OpCodeType  opc;
+    HelperType  hlp;
     Operand     opnd;
     OpList      oplist;
-    uint8_t     u8;
-    uint16_t    u16;
+    RelopType   r;
+    SlotInfo    si;
+    AttrSrcInfo attr_info;
     struct { uint8_t vs; uint8_t es; } vecspec;
 }
 
 /* Tokens */
-%token <ival>   IMM IMMD IMMX LABEL RELOP ATTR SLOT
-%token <sval>   SYMBOL
-%token <vecspec> VS_TOKEN ES_TOKEN
-%token          COMMA LPAREN RPAREN COLON
-%token <ival>   OPCODE CALL BRCOND SETLABL JMPDIR CALLDIR BR
+%token          COMMA LPAREN RPAREN COLON PLUS ENV INTERNAL EXTERNAL
+%token <ival>   IMM IMMD IMMX LABEL
+%token <opc>    OPCODE CALL
+%token <hlp>    SYMBOL
+%token <r>      RELOP
+%token <si>     SLOT
 %token <ival>   XMMVAR XMMTMP
-%token          ENV                /* literal "env" keyword */
+%token <attr_info> MEMATTR SWAPATTR
+%token <vecspec> VS_TOKEN ES_TOKEN
 
 /* Non‑terminal types */
-%type <opnd>    slot_op imm_op immd_op label_op relop_op attr_op symbol_op
+%type <opnd>    slot_op imm_op label_op relop_op attr_op symbol_op
 %type <opnd>    env_or_xmm_op
 %type <opnd>    operand
 %type <oplist>  arg_list
-%type <ival>    scalar_instr vector_instr call_instr branch_instr
+%type <ival>    scalar_instr vector_instr call_instr
+%type <attr_info> attrs attr
 
 %start program
 
@@ -106,7 +112,6 @@ instr:
     scalar_instr
   | vector_instr
   | call_instr
-  | branch_instr
   ;
 
 /* -------- Scalar instructions -------- */
@@ -131,7 +136,7 @@ vector_instr:
 
 /* -------- Call instructions -------- */
 call_instr:
-    CALL SYMBOL IMMX IMMD arg_list
+    CALL SYMBOL imm_op imm_op arg_list
     {
         OpList pre;
         op_list_init(&pre);
@@ -139,7 +144,7 @@ call_instr:
         op_list_add(&pre, sym_op);
         Operand immx_op = { .kind = OP_IMM, .imm = $3 };
         op_list_add(&pre, immx_op);
-        Operand immd_op = { .kind = OP_IMMD, .imm = $4 };
+        Operand immd_op = { .kind = OP_IMM, .imm = $4 };
         op_list_add(&pre, immd_op);
 
         int total = pre.len + $5.len;
@@ -148,61 +153,9 @@ call_instr:
         memcpy(merged + pre.len, $5.data, $5.len * sizeof(Operand));
         free(pre.data);
 
-        UnifiedInstr *u = emit_instr(0, true, 0, 0, merged, total);
+        UnifiedInstr *u = emit_instr($1, true, 0, 0, merged, total);
         free(merged);
         op_list_free(&$5);
-        $$ = 0;
-    }
-  ;
-
-/* -------- Branch / label instructions -------- */
-branch_instr:
-    BRCOND slot_op COMMA slot_op COMMA relop_op COMMA label_op
-    {
-        OpList l;
-        op_list_init(&l);
-        op_list_add(&l, $2);
-        op_list_add(&l, $4);
-        op_list_add(&l, $6);
-        op_list_add(&l, $8);
-        UnifiedInstr *u = emit_instr(BRCOND, false, 0, 0, l.data, l.len);
-        op_list_free(&l);
-        $$ = 0;
-    }
-  | SETLABL label_op
-    {
-        OpList l;
-        op_list_init(&l);
-        op_list_add(&l, $2);
-        UnifiedInstr *u = emit_instr(SETLABL, false, 0, 0, l.data, l.len);
-        op_list_free(&l);
-        $$ = 0;
-    }
-  | JMPDIR label_op
-    {
-        OpList l;
-        op_list_init(&l);
-        op_list_add(&l, $2);
-        UnifiedInstr *u = emit_instr(JMPDIR, false, 0, 0, l.data, l.len);
-        op_list_free(&l);
-        $$ = 0;
-    }
-  | CALLDIR label_op
-    {
-        OpList l;
-        op_list_init(&l);
-        op_list_add(&l, $2);
-        UnifiedInstr *u = emit_instr(CALLDIR, false, 0, 0, l.data, l.len);
-        op_list_free(&l);
-        $$ = 0;
-    }
-  | BR label_op
-    {
-        OpList l;
-        op_list_init(&l);
-        op_list_add(&l, $2);
-        UnifiedInstr *u = emit_instr(BR, false, 0, 0, l.data, l.len);
-        op_list_free(&l);
         $$ = 0;
     }
   ;
@@ -212,8 +165,8 @@ slot_op:
     SLOT
     {
         $$.kind = OP_SLOT;
-        $$.slot.type = ($1 >> 10) & 0x3;
-        $$.slot.idx  = $1 & 0x3FF;
+        $$.slot.type = $1.type;
+        $$.slot.idx  = $1.idx;
     }
   ;
 
@@ -223,12 +176,14 @@ imm_op:
         $$.kind = OP_IMM;
         $$.imm = $1;
     }
-  ;
-
-immd_op:
-    IMMD
+  | IMMD
     {
-        $$.kind = OP_IMMD;
+        $$.kind = OP_IMM;
+        $$.imm = $1;
+    }
+  | IMMX
+    {
+        $$.kind = OP_IMM;
         $$.imm = $1;
     }
   ;
@@ -250,10 +205,33 @@ relop_op:
   ;
 
 attr_op:
-    ATTR
+    attrs
     {
         $$.kind = OP_ATTR;
-        $$.attr = (uint8_t)$1;
+        merge_attr(&$$, $1);
+    }
+  ;
+
+attrs:
+    attr
+    {
+        $$ = $1;
+    }
+  | attrs PLUS attr
+    {
+        $$ = $1;
+        merge_attr(&$$, $3);
+    }
+  ;
+
+attr:
+    SWAPATTR
+    {
+        $$ = $1;
+    }
+  | MEMATTR
+    {
+        $$ = $1;
     }
   ;
 
@@ -290,8 +268,7 @@ arg_list:
   | operand
     {
         op_list_init(&$$);
-        op_list_add(&$$
-, $1);
+        op_list_add(&$$, $1);
     }
   | arg_list COMMA operand
     {
@@ -303,7 +280,6 @@ arg_list:
 operand:
     slot_op         { $$ = $1; }
   | imm_op          { $$ = $1; }
-  | immd_op         { $$ = $1; }
   | label_op        { $$ = $1; }
   | relop_op        { $$ = $1; }
   | attr_op         { $$ = $1; }
@@ -313,7 +289,19 @@ operand:
 
 %%
 
-/* ---- emit_instr implementation ---- */
+static void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo *src) {
+    if (src->subt == SUB_ATTR_STORAGE) {
+        if (src->p.storage.atomic)     dest->p.storage.atomic = src->p.storage.atomic;
+        if (src->p.storage.alignment)  dest->p.storage.alignment = src->p.storage.alignment;
+        if (src->p.storage.ext)        dest->p.storage.ext = src->p.storage.ext;
+        if (src->p.storage.size)       dest->p.storage.size = src->p.storage.size;
+        dest->subt = SUB_ATTR_STORAGE;
+    } else if (src->subt == SUB_ATTR_SWAP) {
+        dest->p.swap |= src->p.swap;
+        dest->subt = SUB_ATTR_SWAP;
+    }
+}
+
 static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
                                 uint8_t vs, uint8_t es,
                                 Operand *ops, int nops)

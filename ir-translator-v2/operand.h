@@ -3,11 +3,11 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "tcg_ast.h"
 
 typedef enum {
     OP_SLOT,
     OP_IMM,
-    OP_IMMD,
     OP_LABEL,
     OP_RELOP,
     OP_ATTR,
@@ -17,8 +17,8 @@ typedef enum {
 } OperandKind;
 
 typedef struct {
-    uint8_t type;   /* 2 bits */
-    uint16_t idx;   /* 10 bits */
+    SlotType type;
+    uint16_t idx;
 } SlotInfo;
 
 typedef struct {
@@ -32,9 +32,9 @@ typedef struct {
         SlotInfo   slot;
         uint64_t   imm;
         uint16_t   label;
-        uint8_t    relop;
-        uint8_t    attr;
-        char      *symbol;
+        RelopType  relop;
+        AttrSrcInfo attr_info;
+        HelperType symbol;
         XmmInfo    xmm;
         uint16_t   env_offset;
     };
