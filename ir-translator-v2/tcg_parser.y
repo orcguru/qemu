@@ -8,6 +8,11 @@
 #include "operand.h"
 #include "unified_instr.h"
 
+/* External functions */
+extern void register_xmm(uint64_t idx, uint64_t offset);
+extern void register_xmm_tmp(uint64_t offset);
+extern XMMReg lookup_xmm(uint64_t offset);
+
 static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
                                 uint8_t vs, uint8_t es,
                                 Operand *ops, int nops);
@@ -53,27 +58,48 @@ static void op_list_free(OpList *l) {
 }
 
 /* Tokens */
-%token <ival>   IMM IMMD IMMX LABEL RELOP ATTR SLOT ENV
-%token <ival>   XMM
+%token <ival>   IMM IMMD IMMX LABEL RELOP ATTR SLOT
 %token <sval>   SYMBOL
 %token <vecspec> VS_TOKEN ES_TOKEN
-%token          COMMA LPAREN RPAREN
+%token          COMMA LPAREN RPAREN COLON
 %token <ival>   OPCODE CALL BRCOND SETLABL JMPDIR CALLDIR BR
+%token <ival>   XMMVAR XMMTMP
+%token          ENV                /* literal "env" keyword */
 
 /* Non‑terminal types */
 %type <opnd>    slot_op imm_op immd_op label_op relop_op attr_op symbol_op
-%type <opnd>    xmm_op env_op
+%type <opnd>    env_or_xmm_op
 %type <opnd>    operand
 %type <oplist>  arg_list
-%type <ival>    instr scalar_instr vector_instr call_instr branch_instr
+%type <ival>    scalar_instr vector_instr call_instr branch_instr
 
 %start program
 
 %%
 
 program:
+    xmm_def_list instr_list
+  ;
+
+xmm_def_list:
     /* empty */
-  | program instr
+  | xmm_def_list xmm_def
+  ;
+
+xmm_def:
+    XMMVAR COLON IMMX
+    {
+        register_xmm($1, $3);
+    }
+  | XMMTMP COLON IMMX
+    {
+        register_xmm_tmp($3);
+    }
+  ;
+
+instr_list:
+    /* empty */
+  | instr_list instr
   ;
 
 instr:
@@ -239,20 +265,19 @@ symbol_op:
     }
   ;
 
-xmm_op:
-    XMM
+/* Combined env + immediate -> either env or xmm */
+env_or_xmm_op:
+    ENV imm_op
     {
-        $$.kind = OP_XMM;
-        $$.xmm.xmm_idx = ($1 >> 4) & 0x7F;
-        $$.xmm.xmm_offset = $1 & 0xF;
-    }
-  ;
-
-env_op:
-    ENV
-    {
-        $$.kind = OP_ENV;
-        $$.env_offset = (uint16_t)$1;
+        XMMReg x = lookup_xmm($2.imm);
+        if (x.xmm_idx != NON_XMM) {
+            $$.kind = OP_XMM;
+            $$.xmm.xmm_idx = x.xmm_idx;
+            $$.xmm.xmm_offset = x.xmm_offset;
+        } else {
+            $$.kind = OP_ENV;
+            $$.env_offset = (uint16_t)$2.imm;
+        }
     }
   ;
 
@@ -265,7 +290,8 @@ arg_list:
   | operand
     {
         op_list_init(&$$);
-        op_list_add(&$$, $1);
+        op_list_add(&$$
+, $1);
     }
   | arg_list COMMA operand
     {
@@ -275,15 +301,14 @@ arg_list:
   ;
 
 operand:
-    slot_op     { $$ = $1; }
-  | imm_op      { $$ = $1; }
-  | immd_op     { $$ = $1; }
-  | label_op    { $$ = $1; }
-  | relop_op    { $$ = $1; }
-  | attr_op     { $$ = $1; }
-  | symbol_op   { $$ = $1; }
-  | xmm_op      { $$ = $1; }
-  | env_op      { $$ = $1; }
+    slot_op         { $$ = $1; }
+  | imm_op          { $$ = $1; }
+  | immd_op         { $$ = $1; }
+  | label_op        { $$ = $1; }
+  | relop_op        { $$ = $1; }
+  | attr_op         { $$ = $1; }
+  | symbol_op       { $$ = $1; }
+  | env_or_xmm_op   { $$ = $1; }
   ;
 
 %%
