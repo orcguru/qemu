@@ -1,3 +1,16 @@
+
+%union {
+    uint64_t    ival;
+    OpCodeType  opc;
+    HelperType  hlp;
+    Operand     opnd;
+    OpList      oplist;
+    RelopType   r;
+    SlotInfo    si;
+    AttrSrcInfo attr_info;
+    struct { uint8_t vs; uint8_t es; } vecspec;
+}
+
 %{
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,22 +21,18 @@
 #include "operand.h"
 #include "unified_instr.h"
 #include "tcg_ast.h"
+#include "operand.h"
 
 /* External functions */
 extern void register_xmm(uint64_t idx, uint64_t offset);
 extern void register_xmm_tmp(uint64_t offset);
 extern XMMReg lookup_xmm(uint64_t offset);
+extern void handle_func(uint64_t val, int is_external);
 
 static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
                                 uint8_t vs, uint8_t es,
                                 Operand *ops, int nops);
-
-/* Dynamic operand list builder */
-typedef struct {
-    Operand *data;
-    int      len;
-    int      cap;
-} OpList;
+static void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src);
 
 static void op_list_init(OpList *l) {
     l->data = NULL;
@@ -45,20 +54,38 @@ static void op_list_free(OpList *l) {
     l->len = l->cap = 0;
 }
 
-#define YYSTYPE YYSTYPE
+#ifndef YYSTYPE
+#define YYSTYPE union YYSTYPE
+#include "tcg_lexer.yy.h"
+#endif
 %}
 
-%union {
-    uint64_t    ival;
-    OpCodeType  opc;
-    HelperType  hlp;
-    Operand     opnd;
-    OpList      oplist;
-    RelopType   r;
-    SlotInfo    si;
-    AttrSrcInfo attr_info;
-    struct { uint8_t vs; uint8_t es; } vecspec;
+%code requires {
+  typedef struct TcgContext TcgContext;
+  typedef void* yyscan_t;
+#include "tcg_ast.h"
+#include "operand.h"
 }
+
+%code {
+  extern int yylex(YYSTYPE *, yyscan_t);
+}
+
+%define parse.error verbose
+%define api.pure full
+%parse-param { yyscan_t scanner }
+%parse-param { TcgContext *ctx }
+%lex-param { yyscan_t scanner }
+
+%{
+#include "tcg_context.h"
+#include <stdio.h>
+void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s);
+extern int column;
+extern char *lineptr;
+extern uint8_t instr_buf[64];
+#define YYERROR_VERBOSE 1
+%}
 
 /* Tokens */
 %token          COMMA LPAREN RPAREN COLON PLUS ENV INTERNAL EXTERNAL
@@ -84,7 +111,7 @@ static void op_list_free(OpList *l) {
 %%
 
 program:
-    xmm_def_list instr_list
+    xmm_def_list func_list
   ;
 
 xmm_def_list:
@@ -100,6 +127,21 @@ xmm_def:
   | XMMTMP COLON IMMX
     {
         register_xmm_tmp($3);
+    }
+  ;
+
+program: ;
+
+func_list: func
+| func_list func;
+
+func: INTERNAL COLON IMMX COLON instr_list
+    {
+        handle_func($3, 0);
+    }
+  | EXTERNAL COLON IMMX COLON instr_list
+    {
+        handle_func($3, 1);
     }
   ;
 
@@ -136,26 +178,26 @@ vector_instr:
 
 /* -------- Call instructions -------- */
 call_instr:
-    CALL SYMBOL imm_op imm_op arg_list
+    CALL SYMBOL COMMA IMMX COMMA IMMD COMMA arg_list
     {
         OpList pre;
         op_list_init(&pre);
-        Operand sym_op = { .kind = OP_SYMBOL, .symbol = strdup($2) };
+        Operand sym_op = { .kind = OP_SYMBOL, .symbol = $2 };
         op_list_add(&pre, sym_op);
-        Operand immx_op = { .kind = OP_IMM, .imm = $3 };
+        Operand immx_op = { .kind = OP_IMM, .imm = $4 };
         op_list_add(&pre, immx_op);
-        Operand immd_op = { .kind = OP_IMM, .imm = $4 };
+        Operand immd_op = { .kind = OP_IMM, .imm = $6 };
         op_list_add(&pre, immd_op);
 
-        int total = pre.len + $5.len;
+        int total = pre.len + $8.len;
         Operand *merged = malloc(total * sizeof(Operand));
         memcpy(merged, pre.data, pre.len * sizeof(Operand));
-        memcpy(merged + pre.len, $5.data, $5.len * sizeof(Operand));
+        memcpy(merged + pre.len, $8.data, $8.len * sizeof(Operand));
         free(pre.data);
 
         UnifiedInstr *u = emit_instr($1, true, 0, 0, merged, total);
         free(merged);
-        op_list_free(&$5);
+        op_list_free(&$8);
         $$ = 0;
     }
   ;
@@ -208,7 +250,7 @@ attr_op:
     attrs
     {
         $$.kind = OP_ATTR;
-        merge_attr(&$$, $1);
+        merge_attr(&$$.attr_info, $1);
     }
   ;
 
@@ -239,13 +281,19 @@ symbol_op:
     SYMBOL
     {
         $$.kind = OP_SYMBOL;
-        $$.symbol = strdup($1);
+        $$.symbol = $1;
     }
   ;
 
 /* Combined env + immediate -> either env or xmm */
+/* Also handle standalone ENV (last argument in CALL) -> OP_ENV with offset 0 */
 env_or_xmm_op:
-    ENV imm_op
+    ENV
+    {
+        $$.kind = OP_ENV;
+        $$.env_offset = 0;
+    }
+  | ENV imm_op
     {
         XMMReg x = lookup_xmm($2.imm);
         if (x.xmm_idx != NON_XMM) {
@@ -289,15 +337,15 @@ operand:
 
 %%
 
-static void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo *src) {
-    if (src->subt == SUB_ATTR_STORAGE) {
-        if (src->p.storage.atomic)     dest->p.storage.atomic = src->p.storage.atomic;
-        if (src->p.storage.alignment)  dest->p.storage.alignment = src->p.storage.alignment;
-        if (src->p.storage.ext)        dest->p.storage.ext = src->p.storage.ext;
-        if (src->p.storage.size)       dest->p.storage.size = src->p.storage.size;
+static void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src) {
+    if (src.subt == SUB_ATTR_STORAGE) {
+        if (src.p.storage.atomic)     dest->p.storage.atomic = src.p.storage.atomic;
+        if (src.p.storage.alignment)  dest->p.storage.alignment = src.p.storage.alignment;
+        if (src.p.storage.ext)        dest->p.storage.ext = src.p.storage.ext;
+        if (src.p.storage.size)       dest->p.storage.size = src.p.storage.size;
         dest->subt = SUB_ATTR_STORAGE;
-    } else if (src->subt == SUB_ATTR_SWAP) {
-        dest->p.swap |= src->p.swap;
+    } else if (src.subt == SUB_ATTR_SWAP) {
+        dest->p.swap |= src.p.swap;
         dest->subt = SUB_ATTR_SWAP;
     }
 }
@@ -321,11 +369,14 @@ static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
     return u;
 }
 
-void yyerror(const char *s) {
-    fprintf(stderr, "Parse error: %s\n", s);
-}
-
-int main(void) {
-    yyparse();
-    return 0;
+void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s) {
+    int line = yyget_lineno(scanner);
+    fprintf(stderr, "error: %s in line %d, column %d\n", s, line, column);
+    if (lineptr) {
+        fprintf(stderr, "%s\n", lineptr);
+    }
+    for(int i = 0; i < column - 1; i++) {
+        fprintf(stderr, "_");
+    }
+    fprintf(stderr, "^\n");
 }

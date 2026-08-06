@@ -1387,8 +1387,8 @@ xsetbv                          xsetbv
 {NUM}             { HANDLE_COLUMN; yylval->ival = atoi(yytext); return IMM; }
 {LABEL}           { HANDLE_COLUMN; yylval->ival = atoi(yytext + 2); return LABEL; }
 {noat}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ATOMIC; yylval->attr_info.p.storage.atomic = NONATOMIC; return MEMATTR; }
-{un}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = UNALIGN; return MEMATTR; }
-{unal}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = UNALIGN; return MEMATTR; }
+{un}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = INVALID_ALIGNMENT; return MEMATTR; }
+{unal}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = INVALID_ALIGNMENT; return MEMATTR; }
 {al}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = ALIGN_MEM_SIZE; return MEMATTR; }
 {al2}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = ALIGN_2; return MEMATTR; }
 {al4}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = ALIGN_4; return MEMATTR; }
@@ -1468,8 +1468,8 @@ xsetbv                          xsetbv
 {brcond_i32}    { HANDLE_COLUMN; yylval->opc = brcond_i32; return OPCODE; }
 {add_i32}       { HANDLE_COLUMN; yylval->opc = add_i32; return OPCODE; }
 {andc_i32}      { HANDLE_COLUMN; yylval->opc = andc_i32; return OPCODE; }
-{bswap16_i32}   { HANDLE_COLUMN; yylval->opc = bswap16_i32; return BSWAP; }
-{bswap32_i32}   { HANDLE_COLUMN; yylval->opc = bswap32_i32; return BSWAP; }
+{bswap16_i32}   { HANDLE_COLUMN; yylval->opc = bswap16_i32; return OPCODE; }
+{bswap32_i32}   { HANDLE_COLUMN; yylval->opc = bswap32_i32; return OPCODE; }
 {clz_i32}       { HANDLE_COLUMN; yylval->opc = clz_i32; yylval->hlp = helper_clz_i32; return OPCODE; }
 {ctpop_i32}     { HANDLE_COLUMN; yylval->opc = ctpop_i32; yylval->hlp = helper_ctpop_i32; return OPCODE; }
 {ctz_i32}       { HANDLE_COLUMN; yylval->opc = ctz_i32; yylval->hlp = helper_ctz_i32; return OPCODE; }
@@ -1505,7 +1505,7 @@ xsetbv                          xsetbv
 {subb1o_i32}    { HANDLE_COLUMN; yylval->opc = subb1o_i32; return OPCODE; }
 {subbi_i32}     { HANDLE_COLUMN; yylval->opc = subbi_i32; return OPCODE; }
 {subbio_i32}    { HANDLE_COLUMN; yylval->opc = subbio_i32; return OPCODE; }
-{bswap16_i64}   { HANDLE_COLUMN; yylval->opc = bswap16_i64; return BSWAP; }
+{bswap16_i64}   { HANDLE_COLUMN; yylval->opc = bswap16_i64; return OPCODE; }
 {ctpop_i64}     { HANDLE_COLUMN; yylval->opc = ctpop_i64; yylval->hlp = helper_ctpop_i64; return OPCODE; }
 {divs_i64}      { HANDLE_COLUMN; yylval->opc = divs_i64; return OPCODE; }
 {divs2_i64}     { HANDLE_COLUMN; yylval->opc = divs2_i64; return OPCODE; }
@@ -1569,7 +1569,7 @@ xsetbv                          xsetbv
 {and_i64}       { HANDLE_COLUMN; yylval->opc = and_i64; return OPCODE; }
 {and_i32}       { HANDLE_COLUMN; yylval->opc = and_i32; return OPCODE; }
 {and_vec}       { HANDLE_COLUMN; yylval->opc = and_vec; return OPCODE; }
-{bswap32_i64}   { HANDLE_COLUMN; yylval->opc = bswap32_i64; return BSWAP; }
+{bswap32_i64}   { HANDLE_COLUMN; yylval->opc = bswap32_i64; return OPCODE; }
 {clz_i64}       { HANDLE_COLUMN; yylval->opc = clz_i64; yylval->hlp = helper_clz_i64; return OPCODE; }
 {cmp_vec}       { HANDLE_COLUMN; yylval->opc = cmp_vec; return OPCODE; }
 {ctz_i64}       { HANDLE_COLUMN; yylval->opc = ctz_i64; yylval->hlp = helper_ctz_i64; return OPCODE; }
@@ -1637,11 +1637,11 @@ xsetbv                          xsetbv
 {xor_i64}       { HANDLE_COLUMN; yylval->opc = xor_i64; return OPCODE; }
 {xor_i32}       { HANDLE_COLUMN; yylval->opc = xor_i32; return OPCODE; }
 {xor_vec}       { HANDLE_COLUMN; yylval->opc = xor_vec; return OPCODE; }
-{bswap64_i64}   { HANDLE_COLUMN; yylval->opc = bswap64_i64; return BSWAP; }
+{bswap64_i64}   { HANDLE_COLUMN; yylval->opc = bswap64_i64; return OPCODE; }
 {set_label}     { HANDLE_COLUMN; yylval->opc = set_label; return OPCODE; }
 {brcond_i64}    { HANDLE_COLUMN; yylval->opc = brcond_i64; return OPCODE; }
 {jmp_direct}    { HANDLE_COLUMN; yylval->opc = jmp_direct; return OPCODE; }
-{discard}       { HANDLE_COLUMN; yylval->opc = discard; return DISCARD; }
+{discard}       { HANDLE_COLUMN; yylval->opc = discard; return OPCODE; }
 {call}          { HANDLE_COLUMN; yylval->opc = call; return CALL; }
 {rotl_i32}      { HANDLE_COLUMN; yylval->opc = rotl_i32; return OPCODE; }
 {rotl_i64}      { HANDLE_COLUMN; yylval->opc = rotl_i64; return OPCODE; }

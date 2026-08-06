@@ -19,16 +19,6 @@ typedef signed short int16_t;
 typedef signed int int32_t;
 typedef signed long int64_t;
 
-typedef enum {
-    OP_FUNC,
-    OP_INST,
-    OP_OPC,
-    OP_SLOT,
-    OP_IMM,
-    OP_REL,
-    OP_ATTR,
-} TcgOpType;
-
 #define ENVVAR_TYPE_LIST \
     X(cc_src2) \
     X(es_base) \
@@ -1673,36 +1663,6 @@ typedef enum {
     #undef X
 } CVectorType;
 
-#include "instr_def.h"
-
-typedef struct {
-    uint16_t valid     :1;
-    uint16_t slot_type :3;
-    uint16_t slot_idx  :10;
-    uint16_t offset;
-} SlotT;
-
-typedef union {
-    uint64_t i;
-    SlotT s;
-} OperandType;
-
-typedef struct {
-    uint16_t attr_type  :4;
-    /*
-    union {
-        struct {
-            uint32_t atomic :1;
-            uint32_t alignment :3;
-            uint32_t sign_ext :1;
-            uint32_t src_size :3;
-        } storage_attr;
-        uint32_t attr_val :8;
-    } p;
-    */
-    uint16_t attr_val   :8;
-} AttributeType;
-
 #ifdef __GNUC__
 #define likely(x)    __builtin_expect(!!(x), 1)  // True with high probability
 #define unlikely(x)  __builtin_expect(!!(x), 0)  // False with high probability
@@ -1724,7 +1684,6 @@ void module_prolog(void);
 void module_epilog(void);
 void insert_instr(void *ptr_src, size_t sz);
 uint64_t get_xmm_offset(uint64_t idx);
-OperandType get_original_slot_for_debug(OperandType tmp);
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);

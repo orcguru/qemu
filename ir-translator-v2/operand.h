@@ -40,4 +40,10 @@ typedef struct {
     };
 } Operand;
 
+typedef struct {
+    Operand *data;
+    int      len;
+    int      cap;
+} OpList;
+
 #endif
