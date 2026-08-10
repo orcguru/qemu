@@ -248,6 +248,11 @@ imm_op:
         $$.kind = OP_IMM;
         $$.imm = $1;
     }
+  | VS_TOKEN IMMX
+    {
+        $$.kind = OP_IMM;
+        $$.imm = $2;
+    }
 ;
 
 label_op:
@@ -342,6 +347,10 @@ arg_list:
     {
         $$ = $1;
         op_list_add(&$$, $3);
+    }
+  | arg_list COMMA
+    {
+        $$ = $1;
     }
 ;
 
