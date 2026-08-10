@@ -53,6 +53,18 @@ static void op_list_free(OpList *l) {
     l->len = l->cap = 0;
 }
 
+/* Append a UnifiedInstr to the context's list (O(1) using tail) */
+static void append_instr(TcgContext *ctx, UnifiedInstr *u) {
+    u->next = NULL;
+    if (ctx->instr_tail) {
+        ctx->instr_tail->next = u;
+        ctx->instr_tail = u;
+    } else {
+        ctx->instr_head = u;
+        ctx->instr_tail = u;
+    }
+}
+
 #ifndef YYSTYPE
 #define YYSTYPE union YYSTYPE
 #include "tcg_lexer.yy.h"
@@ -137,14 +149,15 @@ func_list:
 func:
     INTERNAL COLON IMMX COLON instr_list
     {
-        /* Pass accumulated instruction list to handle_func */
         handle_func(ctx->instr_head, 0);
-        ctx->instr_head = NULL;   /* reset for next function */
+        ctx->instr_head = NULL;
+        ctx->instr_tail = NULL;
     }
   | EXTERNAL COLON IMMX COLON instr_list
     {
         handle_func(ctx->instr_head, 1);
         ctx->instr_head = NULL;
+        ctx->instr_tail = NULL;
     }
 ;
 
@@ -165,9 +178,7 @@ scalar_instr:
     {
         UnifiedInstr *u = emit_instr($1, false, 0, 0, $2.data, $2.len);
         op_list_free(&$2);
-        /* Prepend to context's instruction list */
-        u->next = ctx->instr_head;
-        ctx->instr_head = u;
+        append_instr(ctx, u);
         $$ = 0;
     }
 ;
@@ -178,8 +189,7 @@ vector_instr:
     {
         UnifiedInstr *u = emit_instr($1, false, $2.vs, $3.es, $4.data, $4.len);
         op_list_free(&$4);
-        u->next = ctx->instr_head;
-        ctx->instr_head = u;
+        append_instr(ctx, u);
         $$ = 0;
     }
 ;
@@ -207,8 +217,7 @@ call_instr:
         free(merged);
         op_list_free(&$8);
 
-        u->next = ctx->instr_head;
-        ctx->instr_head = u;
+        append_instr(ctx, u);
         $$ = 0;
     }
 ;
@@ -382,7 +391,7 @@ static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
     u->es = es;
     u->operand_count = nops;
     memcpy(u->operands, ops, nops * sizeof(Operand));
-    u->next = NULL;   /* will be linked by caller */
+    u->next = NULL;
 
     return u;
 }
