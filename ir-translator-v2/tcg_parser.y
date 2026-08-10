@@ -185,10 +185,10 @@ scalar_instr:
 
 /* -------- Vector instructions -------- */
 vector_instr:
-    OPCODE VS_TOKEN ES_TOKEN arg_list
+    OPCODE VS_TOKEN COMMA ES_TOKEN COMMA arg_list
     {
-        UnifiedInstr *u = emit_instr($1, false, $2.vs, $3.es, $4.data, $4.len);
-        op_list_free(&$4);
+        UnifiedInstr *u = emit_instr($1, false, $2.vs, $4.es, $6.data, $6.len);
+        op_list_free(&$6);
         append_instr(ctx, u);
         $$ = 0;
     }
