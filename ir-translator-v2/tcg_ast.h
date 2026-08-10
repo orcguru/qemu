@@ -1671,15 +1671,12 @@ typedef enum {
 #define unlikely(x)  (x)
 #endif
 
-void register_xmm(uint64_t idx, uint64_t offset);
-void register_xmm_tmp(uint64_t offset);
 void reset_tmp_mapping();
 XMMReg lookup_xmm_map(uint64_t offset);
 
 void *get_instr_buffer();
 size_t get_instr_buffer_size();
 void reset_instr_buffer(void);
-void handle_func(uint64_t val, int is_external);
 void module_prolog(void);
 void module_epilog(void);
 void insert_instr(void *ptr_src, size_t sz);

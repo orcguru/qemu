@@ -5,15 +5,15 @@
 #include <stdbool.h>
 #include "operand.h"
 
-typedef struct {
-    OpCodeType  opc;
-    bool        is_helper;
-    bool        noargs;
-    uint8_t     vs;             // 0 = scalar
-    uint8_t     es;             // ignored if vs == 0
-
-    uint8_t     operand_count;
-    Operand     operands[];     // flexible array member
+typedef struct UnifiedInstr {
+    uint8_t  opc;
+    bool     is_helper;
+    bool     noargs;
+    uint8_t  vs;
+    uint8_t  es;
+    struct UnifiedInstr *next;
+    uint8_t  operand_count;
+    Operand  operands[];
 } UnifiedInstr;
 
 #endif

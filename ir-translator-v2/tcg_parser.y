@@ -1,4 +1,3 @@
-
 %union {
     uint64_t    ival;
     OpCodeType  opc;
@@ -21,13 +20,13 @@
 #include "operand.h"
 #include "unified_instr.h"
 #include "tcg_ast.h"
-#include "operand.h"
+#include "tcg_context.h"
 
 /* External functions */
 extern void register_xmm(uint64_t idx, uint64_t offset);
 extern void register_xmm_tmp(uint64_t offset);
 extern XMMReg lookup_xmm(uint64_t offset);
-extern void handle_func(uint64_t val, int is_external);
+extern void handle_func(UnifiedInstr *head, int is_external);
 
 static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
                                 uint8_t vs, uint8_t es,
@@ -61,14 +60,14 @@ static void op_list_free(OpList *l) {
 %}
 
 %code requires {
-  typedef struct TcgContext TcgContext;
-  typedef void* yyscan_t;
-#include "tcg_ast.h"
-#include "operand.h"
+    typedef struct TcgContext TcgContext;
+    typedef void* yyscan_t;
+    #include "tcg_ast.h"
+    #include "operand.h"
 }
 
 %code {
-  extern int yylex(YYSTYPE *, yyscan_t);
+    extern int yylex(YYSTYPE *, yyscan_t);
 }
 
 %define parse.error verbose
@@ -112,12 +111,12 @@ extern uint8_t instr_buf[64];
 
 program:
     xmm_def_list func_list
-  ;
+;
 
 xmm_def_list:
     /* empty */
   | xmm_def_list xmm_def
-  ;
+;
 
 xmm_def:
     XMMVAR COLON IMMX
@@ -128,33 +127,37 @@ xmm_def:
     {
         register_xmm_tmp($3);
     }
-  ;
+;
 
-program: ;
+func_list:
+    func
+  | func_list func
+;
 
-func_list: func
-| func_list func;
-
-func: INTERNAL COLON IMMX COLON instr_list
+func:
+    INTERNAL COLON IMMX COLON instr_list
     {
-        handle_func($3, 0);
+        /* Pass accumulated instruction list to handle_func */
+        handle_func(ctx->instr_head, 0);
+        ctx->instr_head = NULL;   /* reset for next function */
     }
   | EXTERNAL COLON IMMX COLON instr_list
     {
-        handle_func($3, 1);
+        handle_func(ctx->instr_head, 1);
+        ctx->instr_head = NULL;
     }
-  ;
+;
 
 instr_list:
     /* empty */
   | instr_list instr
-  ;
+;
 
 instr:
     scalar_instr
   | vector_instr
   | call_instr
-  ;
+;
 
 /* -------- Scalar instructions -------- */
 scalar_instr:
@@ -162,9 +165,12 @@ scalar_instr:
     {
         UnifiedInstr *u = emit_instr($1, false, 0, 0, $2.data, $2.len);
         op_list_free(&$2);
+        /* Prepend to context's instruction list */
+        u->next = ctx->instr_head;
+        ctx->instr_head = u;
         $$ = 0;
     }
-  ;
+;
 
 /* -------- Vector instructions -------- */
 vector_instr:
@@ -172,9 +178,11 @@ vector_instr:
     {
         UnifiedInstr *u = emit_instr($1, false, $2.vs, $3.es, $4.data, $4.len);
         op_list_free(&$4);
+        u->next = ctx->instr_head;
+        ctx->instr_head = u;
         $$ = 0;
     }
-  ;
+;
 
 /* -------- Call instructions -------- */
 call_instr:
@@ -198,9 +206,12 @@ call_instr:
         UnifiedInstr *u = emit_instr($1, true, 0, 0, merged, total);
         free(merged);
         op_list_free(&$8);
+
+        u->next = ctx->instr_head;
+        ctx->instr_head = u;
         $$ = 0;
     }
-  ;
+;
 
 /* -------- Operand building rules -------- */
 slot_op:
@@ -210,7 +221,7 @@ slot_op:
         $$.slot.type = $1.type;
         $$.slot.idx  = $1.idx;
     }
-  ;
+;
 
 imm_op:
     IMM
@@ -228,7 +239,7 @@ imm_op:
         $$.kind = OP_IMM;
         $$.imm = $1;
     }
-  ;
+;
 
 label_op:
     LABEL
@@ -236,7 +247,7 @@ label_op:
         $$.kind = OP_LABEL;
         $$.label = (uint16_t)$1;
     }
-  ;
+;
 
 relop_op:
     RELOP
@@ -244,7 +255,7 @@ relop_op:
         $$.kind = OP_RELOP;
         $$.relop = (uint8_t)$1;
     }
-  ;
+;
 
 attr_op:
     attrs
@@ -252,7 +263,7 @@ attr_op:
         $$.kind = OP_ATTR;
         merge_attr(&$$.attr_info, $1);
     }
-  ;
+;
 
 attrs:
     attr
@@ -264,7 +275,7 @@ attrs:
         $$ = $1;
         merge_attr(&$$, $3);
     }
-  ;
+;
 
 attr:
     SWAPATTR
@@ -275,7 +286,7 @@ attr:
     {
         $$ = $1;
     }
-  ;
+;
 
 symbol_op:
     SYMBOL
@@ -283,7 +294,7 @@ symbol_op:
         $$.kind = OP_SYMBOL;
         $$.symbol = $1;
     }
-  ;
+;
 
 /* Combined env + immediate -> either env or xmm */
 /* Also handle standalone ENV (last argument in CALL) -> OP_ENV with offset 0 */
@@ -305,7 +316,7 @@ env_or_xmm_op:
             $$.env_offset = (uint16_t)$2.imm;
         }
     }
-  ;
+;
 
 /* -------- Argument list -------- */
 arg_list:
@@ -323,7 +334,7 @@ arg_list:
         $$ = $1;
         op_list_add(&$$, $3);
     }
-  ;
+;
 
 operand:
     slot_op         { $$ = $1; }
@@ -333,16 +344,22 @@ operand:
   | attr_op         { $$ = $1; }
   | symbol_op       { $$ = $1; }
   | env_or_xmm_op   { $$ = $1; }
-  ;
+;
 
 %%
 
+/* ---- Helper functions ---- */
+
 static void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src) {
     if (src.subt == SUB_ATTR_STORAGE) {
-        if (src.p.storage.atomic)     dest->p.storage.atomic = src.p.storage.atomic;
-        if (src.p.storage.alignment)  dest->p.storage.alignment = src.p.storage.alignment;
-        if (src.p.storage.ext)        dest->p.storage.ext = src.p.storage.ext;
-        if (src.p.storage.size)       dest->p.storage.size = src.p.storage.size;
+        if (src.p.storage.atomic)
+            dest->p.storage.atomic = src.p.storage.atomic;
+        if (src.p.storage.alignment)
+            dest->p.storage.alignment = src.p.storage.alignment;
+        if (src.p.storage.ext)
+            dest->p.storage.ext = src.p.storage.ext;
+        if (src.p.storage.size)
+            dest->p.storage.size = src.p.storage.size;
         dest->subt = SUB_ATTR_STORAGE;
     } else if (src.subt == SUB_ATTR_SWAP) {
         dest->p.swap |= src.p.swap;
@@ -365,6 +382,7 @@ static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
     u->es = es;
     u->operand_count = nops;
     memcpy(u->operands, ops, nops * sizeof(Operand));
+    u->next = NULL;   /* will be linked by caller */
 
     return u;
 }
@@ -375,7 +393,7 @@ void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s) {
     if (lineptr) {
         fprintf(stderr, "%s\n", lineptr);
     }
-    for(int i = 0; i < column - 1; i++) {
+    for (int i = 0; i < column - 1; i++) {
         fprintf(stderr, "_");
     }
     fprintf(stderr, "^\n");
