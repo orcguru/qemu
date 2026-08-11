@@ -24,12 +24,12 @@ endif
 
 all: tcg_parser
 
-tcg_parser: tcg_parser.tab.o tcg_lexer.yy.o tcg_ast.o instr.o helper_lookup.o
+tcg_parser: tcg_parser.tab.o tcg_lexer.yy.o tcg_mapper.o instr.o helper_lookup.o
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
 tcg_parser.tab.o: tcg_parser.tab.c tcg_lexer.yy.h
 tcg_lexer.yy.o: tcg_lexer.yy.c tcg_lexer.yy.h
-tcg_ast.o: tcg_ast.c
+tcg_mapper.o: tcg_mapper.c
 
 %.o: %.c
 	gcc $(CFLAGS) -c $< -o $@

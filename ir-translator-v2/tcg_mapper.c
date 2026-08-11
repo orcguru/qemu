@@ -11,7 +11,6 @@
 #include "tcg_context.h"
 #include "tcg_parser.tab.h"
 #include "tcg_lexer.yy.h"
-#include "api.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Target.h>
 #include <llvm-c/TargetMachine.h>
@@ -54,8 +53,8 @@
 #define OPC_VECTOR_ELEMENT_BYTES(T)     (1 << (T - LLVMInt8))
 
 #define DECLARE_AND_INIT_TYPE_FOR_ALL   \
-    uint8_t is_vec = is_vector(ptr);    \
-    LLVMType vtype = is_vec ? get_llvm_vector_type(ptr) : LLVMInvalidType;      \
+    uint8_t is_vec = is_vector(u);    \
+    LLVMType vtype = is_vec ? get_llvm_vector_type(u) : LLVMInvalidType;      \
     LLVMType type_in = is_vec ? vtype : OPC_INPUT_T;    \
     LLVMType type_out = is_vec ? vtype : OPC_OUTPUT_T;  \
     (void)type_in;  \
@@ -80,7 +79,7 @@
 #define DECLARE_AND_INIT_TYPE_FOR_VECTOR   \
     uint8_t is_vec = 1;    \
     (void)is_vec;           \
-    LLVMType type_in = get_llvm_vector_type(ptr);    \
+    LLVMType type_in = get_llvm_vector_type(u);    \
     LLVMType type_out = type_in;            \
     (void)type_in;  \
     (void)type_out;
@@ -92,6 +91,118 @@
 #define REGISTER_INDEX_SHIFT        5 
 #define STACK_INDEX_SHIFT           10
 #include "xymm_def.h"
+
+/* ============================================================
+ * New operand access API (UnifiedInstr-based)
+ * ============================================================ */
+#include "unified_instr.h"
+
+static inline const Operand *get_operand(const UnifiedInstr *u, int idx) {
+    assert(idx >= 0 && idx < u->operand_count);
+    return &u->operands[idx];
+}
+
+static inline OpCodeType get_opcode(const UnifiedInstr *u) {
+    return u->opc;
+}
+
+static inline HelperType get_helper(const UnifiedInstr *u) {
+    assert(u->is_helper);
+    const Operand *op0 = get_operand(u, 0);
+    assert(op0->kind == OP_SYMBOL);
+    return op0->symbol;
+}
+
+static inline bool is_vector(const UnifiedInstr *u) {
+    return u->vs != 0;
+}
+
+static inline LLVMType get_llvm_vector_type(const UnifiedInstr *u) {
+    if (u->vs == 64) {
+      switch (u->es) {
+      case 8: return LLVMVector8xi8;
+      case 16: return LLVMVector4xi16;
+      case 32: return LLVMVector2xi32;
+      case 64: return LLVMVector1xi64;
+      default: assert(0);
+      }
+    }
+    if (u->vs == 128) {
+      switch (u->es) {
+      case 8: return LLVMVector16xi8;
+      case 16: return LLVMVector8xi16;
+      case 32: return LLVMVector4xi32;
+      case 64: return LLVMVector2xi64;
+      default: assert(0);
+      }
+    }
+    assert(0);
+}
+
+static inline uint8_t get_label_from_instr(const UnifiedInstr *u) {
+    assert(u->operand_count > 0);
+    const Operand *op = get_operand(u, (u->operand_count - 1));
+    assert(op->kind == OP_LABEL);
+    return op->label;
+}
+
+static inline const AttrSrcInfo *get_attribute_from_instr(const UnifiedInstr *u) {
+    for (int i = 0; i < u->operand_count; i++) {
+        if (u->operands[i].kind == OP_ATTR)
+            return &u->operands[i].attr_info;
+    }
+    assert(0 && "attribute not found");
+    return NULL;
+}
+
+/* Search for a RELOP operand anywhere in the instruction */
+static inline RelopType get_relop_from_any_operand(const UnifiedInstr *u) {
+    for (int i = 0; i < u->operand_count; i++) {
+        if (u->operands[i].kind == OP_RELOP)
+            return u->operands[i].relop;
+    }
+    assert(0 && "relop not found");
+    return 0;
+}
+
+/* Alias for backward compatibility */
+#define get_relop(u) get_relop_from_any_operand(u)
+
+/* Compatibility shim for remaining get_operand_legacy(u, idx, &is_imm) call sites */
+static inline OperandType get_operand_legacy(const UnifiedInstr *u, int idx, uint32_t *is_imm) {
+    const Operand *op = get_operand(u, idx);
+    OperandType ret;
+    if (op->kind == OP_IMM) {
+        *is_imm = 1;
+        ret.i = op->imm;
+    } else {
+        *is_imm = 0;
+        switch (op->kind) {
+        case OP_SLOT:
+            ret.s.valid = 1;
+            ret.s.slot_type = op->slot.type;
+            ret.s.slot_idx = op->slot.idx;
+            ret.s.offset = 0;
+            break;
+        case OP_XMM:
+            ret.s.valid = 1;
+            ret.s.slot_type = SUB_SLOT_XMM;
+            ret.s.slot_idx = op->xmm.xmm_idx;
+            ret.s.offset = op->xmm.xmm_offset;
+            break;
+        case OP_ENV:
+            ret.s.valid = 1;
+            ret.s.slot_type = SUB_SLOT_ENV;
+            ret.s.slot_idx = 0;
+            ret.s.offset = op->env_offset;
+            break;
+        default:
+            assert(0);
+        }
+    }
+    return ret;
+}
+
 #define IS_YMM_HELPER(h)            (h > ymm_helper_begin && h < HELPER_MAX)
 #define IS_XMM_HELPER(h)            (h > xmm_helper_begin && h < ymm_helper_begin)
 #define IS_FLOATINGPOINT_INLINED_HELPER(h)            (h > floatingpoint_inlined_helper_begin && h < floatingpoint_inlined_helper_end)
@@ -641,25 +752,25 @@ static OperandType get_shadow_stack_bottom_bound(OpCodeType opc);
 static OperandType get_shadow_stack_pointer(OpCodeType opc);
 static void set_shadow_stack_pointer(OpCodeType opc, OperandType val);
 static LLVMBasicBlockRef get_bb(const char *name);
-static void handle_single_instr(OpCodeType opc, void *ptr);
+static void handle_single_instr(OpCodeType opc, const UnifiedInstr *u);
 static uint8_t do_link_helper(HelperType h, const char *build_macro, const char *bc_name, const char *c_file);
 static uint8_t is_tail_call(HelperType h);
-static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr);
+static uint8_t is_opc_end_of_control_flow(OpCodeType opc, const UnifiedInstr *u);
 static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_ret);
 static void setup_func_stack();
 static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain);
 static LLVMValueRef get_trampoline_do_not_sync_vector(HelperType h, LLVMValueRef helper_func, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int target_domain);
 static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, XMMRegType *passenger_xmm_regs, int fix_second_half_addr);
-static void translate_jmp_ind(OpCodeType opc, void *ptr);
-static void translate_jumptable(OpCodeType opc, void *ptr);
-static void translate_cc_compute_inband(OpCodeType opc, void *ptr);
-static void translate_helper_outband(OpCodeType opc, void *ptr);
+static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u);
+static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u);
+static void translate_cc_compute_inband(OpCodeType opc, const UnifiedInstr *u);
+static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u);
 static void register_labels_for_func(LLVMValueRef func);
 static uint8_t *get_current_active_labels(LLVMValueRef func);
 static uint8_t get_current_active_label_cnt(LLVMValueRef func);
 static void set_current_active_label_cnt(uint8_t current_active_label_cnt);
-static void register_idx_for_call_helper(void *ptr, uint8_t call_idx);
-static uint8_t get_idx_for_call_helper(void *ptr);
+static void register_idx_for_call_helper(const UnifiedInstr *u, uint8_t call_idx);
+static uint8_t get_idx_for_call_helper(const UnifiedInstr *u);
 static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm, OperandType operand, LLVMType tidx, int splat);
 static LLVMTypeRef get_vector_parameter_type_for_arch();
 static LLVMValueRef reload_vector(XMMRegType xmm_reg);
@@ -668,39 +779,58 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 
 #define GET_2_OPERANDS()                                \
     do {                                                \
-        uint32_t is_imm0, is_imm1;                      \
-        operand0 = get_operand(ptr, 0, &is_imm0);       \
-        operand1 = get_operand(ptr, 1, &is_imm1);       \
-        assert(!is_imm0 && operand0.s.valid && !is_imm1 && operand1.s.valid);   \
+        const Operand *op0 = get_operand(u, 0);         \
+        const Operand *op1 = get_operand(u, 1);         \
+        uint32_t is_imm0 = (op0->kind == OP_IMM);       \
+        uint32_t is_imm1 = (op1->kind == OP_IMM);       \
+        operand0 = *op0; operand1 = *op1;               \
+        assert(!is_imm0 && op0->kind == OP_SLOT &&      \
+               !is_imm1 && op1->kind == OP_SLOT);       \
     } while (0)
 
 #define GET_2_OPERANDS_NOCHECK()                        \
     do {                                                \
-        operand0 = get_operand(ptr, 0, &is_imm0);       \
-        operand1 = get_operand(ptr, 1, &is_imm1);       \
+        const Operand *op0 = get_operand(u, 0);         \
+        const Operand *op1 = get_operand(u, 1);         \
+        is_imm0 = (op0->kind == OP_IMM);                \
+        is_imm1 = (op1->kind == OP_IMM);                \
+        operand0 = *op0; operand1 = *op1;               \
     } while (0)
 
 #define GET_3_OPERANDS()                                \
     do {                                                \
-        uint32_t is_imm0, is_imm1, is_imm2;             \
-        operand0 = get_operand(ptr, 0, &is_imm0);       \
-        operand1 = get_operand(ptr, 1, &is_imm1);       \
-        operand2 = get_operand(ptr, 2, &is_imm2);       \
-        assert(!is_imm0 && operand0.s.valid && !is_imm1 && operand1.s.valid && !is_imm2 && operand2.s.valid);   \
+        const Operand *op0 = get_operand(u, 0);         \
+        const Operand *op1 = get_operand(u, 1);         \
+        const Operand *op2 = get_operand(u, 2);         \
+        uint32_t is_imm0 = (op0->kind == OP_IMM);       \
+        uint32_t is_imm1 = (op1->kind == OP_IMM);       \
+        uint32_t is_imm2 = (op2->kind == OP_IMM);       \
+        operand0 = *op0; operand1 = *op1; operand2 = *op2; \
+        assert(!is_imm0 && op0->kind == OP_SLOT &&      \
+               !is_imm1 && op1->kind == OP_SLOT &&      \
+               !is_imm2 && op2->kind == OP_SLOT);       \
     } while (0)
 
 #define GET_3_OPERANDS_NOCHECK()                        \
     do {                                                \
-        operand0 = get_operand(ptr, 0, &is_imm0);       \
-        operand1 = get_operand(ptr, 1, &is_imm1);       \
-        operand2 = get_operand(ptr, 2, &is_imm2);       \
+        const Operand *op0 = get_operand(u, 0);         \
+        const Operand *op1 = get_operand(u, 1);         \
+        const Operand *op2 = get_operand(u, 2);         \
+        is_imm0 = (op0->kind == OP_IMM);                \
+        is_imm1 = (op1->kind == OP_IMM);                \
+        is_imm2 = (op2->kind == OP_IMM);                \
+        operand0 = *op0; operand1 = *op1; operand2 = *op2; \
     } while (0)
 
 #define GET_3_OPERANDS_NOCHECK_DBG()                    \
     do {                                                \
-        operand0 = get_operand(ptr, 0, &is_imm0);       \
-        operand1 = get_operand(ptr, 1, &is_imm1);       \
-        operand2 = get_operand(ptr, 2, &is_imm2);       \
+        const Operand *op0 = get_operand(u, 0);         \
+        const Operand *op1 = get_operand(u, 1);         \
+        const Operand *op2 = get_operand(u, 2);         \
+        is_imm0 = (op0->kind == OP_IMM);                \
+        is_imm1 = (op1->kind == OP_IMM);                \
+        is_imm2 = (op2->kind == OP_IMM);                \
+        operand0 = *op0; operand1 = *op1; operand2 = *op2; \
         printf("is_imm0:%d, is_imm1:%d, is_imm2:%d\n", is_imm0, is_imm1, is_imm2);  \
         printf("operand0 - slot_type:%d, slot_idx::%d, offset:%d\n", operand0.s.slot_type, operand0.s.slot_idx, operand0.s.offset);    \
         printf("operand1 - slot_type:%d, slot_idx::%d, offset:%d\n", operand1.s.slot_type, operand1.s.slot_idx, operand1.s.offset);    \
@@ -709,23 +839,41 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 
 #define GET_4_OPERANDS()                                \
     do {                                                \
-        uint32_t is_imm0, is_imm1, is_imm2, is_imm3;             \
-        operand0 = get_operand(ptr, 0, &is_imm0);       \
-        operand1 = get_operand(ptr, 1, &is_imm1);       \
-        operand2 = get_operand(ptr, 2, &is_imm2);       \
-        operand3 = get_operand(ptr, 3, &is_imm3);       \
-        assert(!is_imm0 && operand0.s.valid && !is_imm1 && operand1.s.valid && !is_imm2 && operand2.s.valid && !is_imm3 && operand3.s.valid);   \
+        const Operand *op0 = get_operand(u, 0);         \
+        const Operand *op1 = get_operand(u, 1);         \
+        const Operand *op2 = get_operand(u, 2);         \
+        const Operand *op3 = get_operand(u, 3);         \
+        uint32_t is_imm0 = (op0->kind == OP_IMM);       \
+        uint32_t is_imm1 = (op1->kind == OP_IMM);       \
+        uint32_t is_imm2 = (op2->kind == OP_IMM);       \
+        uint32_t is_imm3 = (op3->kind == OP_IMM);       \
+        operand0 = *op0; operand1 = *op1;               \
+        operand2 = *op2; operand3 = *op3;               \
+        assert(!is_imm0 && op0->kind == OP_SLOT &&      \
+               !is_imm1 && op1->kind == OP_SLOT &&      \
+               !is_imm2 && op2->kind == OP_SLOT &&      \
+               !is_imm3 && op3->kind == OP_SLOT);       \
     } while (0)
 
 #define GET_5_OPERANDS()                                \
     do {                                                \
-        uint32_t is_imm0, is_imm1, is_imm2, is_imm3, is_imm4;             \
-        operand0 = get_operand(ptr, 0, &is_imm0);       \
-        operand1 = get_operand(ptr, 1, &is_imm1);       \
-        operand2 = get_operand(ptr, 2, &is_imm2);       \
-        operand3 = get_operand(ptr, 3, &is_imm3);       \
-        operand4 = get_operand(ptr, 4, &is_imm4);       \
-        assert(!is_imm0 && operand0.s.valid && !is_imm1 && operand1.s.valid && !is_imm2 && operand2.s.valid && !is_imm3 && operand3.s.valid && !is_imm4 && operand4.s.valid);   \
+        const Operand *op0 = get_operand(u, 0);         \
+        const Operand *op1 = get_operand(u, 1);         \
+        const Operand *op2 = get_operand(u, 2);         \
+        const Operand *op3 = get_operand(u, 3);         \
+        const Operand *op4 = get_operand(u, 4);         \
+        uint32_t is_imm0 = (op0->kind == OP_IMM);       \
+        uint32_t is_imm1 = (op1->kind == OP_IMM);       \
+        uint32_t is_imm2 = (op2->kind == OP_IMM);       \
+        uint32_t is_imm3 = (op3->kind == OP_IMM);       \
+        uint32_t is_imm4 = (op4->kind == OP_IMM);       \
+        operand0 = *op0; operand1 = *op1;               \
+        operand2 = *op2; operand3 = *op3; operand4 = *op4; \
+        assert(!is_imm0 && op0->kind == OP_SLOT &&      \
+               !is_imm1 && op1->kind == OP_SLOT &&      \
+               !is_imm2 && op2->kind == OP_SLOT &&      \
+               !is_imm3 && op3->kind == OP_SLOT &&      \
+               !is_imm4 && op4->kind == OP_SLOT);       \
     } while (0)
 
 #define GET_STORAGE_ATTR()                                      \
@@ -736,11 +884,11 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
         a2.p.storage.size = attr.attr_val & 0x7;                \
     } while (0)
 
-static uint8_t is_opc_end_of_control_flow(OpCodeType opc, void *ptr) {
+static uint8_t is_opc_end_of_control_flow(OpCodeType opc, const UnifiedInstr *u) {
     if (opc == jmp_direct) {
         return 1;
     } else if (opc == call) {
-        HelperType h = get_helper(ptr);
+        HelperType h = get_helper(u);
         if (h == helper_cc_compute_all || h == helper_cc_compute_c) {
             return 0;
         } else {
@@ -1266,18 +1414,21 @@ static LLVMValueRef get_source_node_imm_or_stack(OpCodeType opc, uint32_t is_imm
     return ret;
 }
 
-void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
+void translate_binary(OpCodeType opc, const UnifiedInstr *u, LLVM_BIN_API api) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     uint32_t idx = opcoc[opc];
-    operand0 = get_operand(ptr, 0, &is_imm0);
+    op0 = get_operand(u, 0);
+        is_imm0 = (op0->kind == OP_IMM);
     assert(!is_imm0 && operand0.s.valid);
-    operand1 = get_operand(ptr, idx, &is_imm1);
-    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+    op1 = get_operand(u, idx);
+        is_imm1 = (op1->kind == OP_IMM);
+    op2 = get_operand(u, idx + 1);
+        is_imm2 = (op2->kind == OP_IMM);
 
     LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
     LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
@@ -1285,18 +1436,21 @@ void translate_binary(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
     do_store(opc, out_val, type_out, operand0);
 }
 
-void translate_binary_splat_immediate(OpCodeType opc, void *ptr, LLVM_BIN_API api) {
+void translate_binary_splat_immediate(OpCodeType opc, const UnifiedInstr *u, LLVM_BIN_API api) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     uint32_t idx = opcoc[opc];
-    operand0 = get_operand(ptr, 0, &is_imm0);
+    op0 = get_operand(u, 0);
+        is_imm0 = (op0->kind == OP_IMM);
     assert(!is_imm0 && operand0.s.valid);
-    operand1 = get_operand(ptr, idx, &is_imm1);
-    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+    op1 = get_operand(u, idx);
+        is_imm1 = (op1->kind == OP_IMM);
+    op2 = get_operand(u, idx + 1);
+        is_imm2 = (op2->kind == OP_IMM);
 
     LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
     LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 1);
@@ -1304,9 +1458,9 @@ void translate_binary_splat_immediate(OpCodeType opc, void *ptr, LLVM_BIN_API ap
     do_store(opc, out_val, type_out, operand0);
 }
 
-void translate_add_i64(OpCodeType opc, void *ptr) {
+void translate_add_i64(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm0, is_imm1, is_imm2;
@@ -1330,9 +1484,9 @@ void translate_add_i64(OpCodeType opc, void *ptr) {
     }
 }
 
-void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
+void translate_mulxh(OpCodeType opc, const UnifiedInstr *u, LLVM_EXT_API api) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType operand0, operand1, operand2;
@@ -1350,9 +1504,9 @@ void translate_mulxh(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
     do_store(opc, out, type_out, operand0);
 }
 
-void translate_muls2(OpCodeType opc, void *ptr) {
+void translate_muls2(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType operand0, operand1, operand2, operand3;
@@ -1361,9 +1515,9 @@ void translate_muls2(OpCodeType opc, void *ptr) {
     CREATE_MULXH(operand1, operand2, operand3, LLVMBuildSExt);
 }
 
-void translate_mulu2(OpCodeType opc, void *ptr) {
+void translate_mulu2(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType operand0, operand1, operand2, operand3;
@@ -1372,9 +1526,9 @@ void translate_mulu2(OpCodeType opc, void *ptr) {
     CREATE_MULXH(operand1, operand2, operand3, LLVMBuildZExt);
 }
 
-void translate_not(OpCodeType opc, void *ptr) {
+void translate_not(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType operand0, operand1;
@@ -1382,9 +1536,9 @@ void translate_not(OpCodeType opc, void *ptr) {
     CREATE_XOR_IMM2(operand0, operand1, -1UL);
 }
 
-void translate_andc(OpCodeType opc, void *ptr) {
+void translate_andc(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
@@ -1402,9 +1556,9 @@ void translate_andc(OpCodeType opc, void *ptr) {
     CREATE_AND(operand0, operand1, tmp);
 }
 
-void translate_nand(OpCodeType opc, void *ptr) {
+void translate_nand(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
@@ -1414,9 +1568,9 @@ void translate_nand(OpCodeType opc, void *ptr) {
     CREATE_NOT(operand0, tmp);
 }
 
-void translate_eqv(OpCodeType opc, void *ptr) {
+void translate_eqv(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
@@ -1426,9 +1580,9 @@ void translate_eqv(OpCodeType opc, void *ptr) {
     CREATE_NOT(operand0, tmp);
 }
 
-void translate_nor(OpCodeType opc, void *ptr) {
+void translate_nor(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
@@ -1438,9 +1592,9 @@ void translate_nor(OpCodeType opc, void *ptr) {
     CREATE_NOT(operand0, tmp);
 }
 
-void translate_orc(OpCodeType opc, void *ptr) {
+void translate_orc(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
@@ -1450,9 +1604,9 @@ void translate_orc(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, operand1, tmp);
 }
 
-void translate_neg(OpCodeType opc, void *ptr) {
+void translate_neg(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType operand0, operand1;
@@ -1464,9 +1618,9 @@ void translate_neg(OpCodeType opc, void *ptr) {
     do_store(opc, out, type_out, operand0);
 }
 
-void translate_mov(OpCodeType opc, void *ptr) {
+void translate_mov(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     uint32_t is_imm0, is_imm1;
@@ -1486,9 +1640,9 @@ void translate_mov(OpCodeType opc, void *ptr) {
     }
 }
 
-void translate_rotr(OpCodeType opc, void *ptr) {
+void translate_rotr(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType t0 = get_tmp_and_do_alloc(type_out);
@@ -1508,9 +1662,9 @@ void translate_rotr(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, t0, t1);
 }
 
-void translate_rotl(OpCodeType opc, void *ptr) {
+void translate_rotl(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType t0 = get_tmp_and_do_alloc(type_out);
@@ -1520,7 +1674,8 @@ void translate_rotl(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1, operand2;
     uint32_t is_imm2;
     GET_2_OPERANDS();
-    operand2 = get_operand(ptr, 2, &is_imm2);
+    op2 = get_operand(u, 2);
+        is_imm2 = (op2->kind == OP_IMM);
 
     OperandType mask_slot = get_tmp_and_do_alloc_with_init(type_out, type_out == LLVMInt32 ? (32-1) : (64-1));
     if (is_imm2) {
@@ -1541,16 +1696,18 @@ void translate_rotl(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, t0, t1);
 }
 
-void translate_deposit(OpCodeType opc, void *ptr) {
+void translate_deposit(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType operand0, operand1, operand2, ofs, len;
     GET_3_OPERANDS();
     uint32_t is_imm3, is_imm4;
-    ofs = get_operand(ptr, 3, &is_imm3);
-    len = get_operand(ptr, 4, &is_imm4);
+    ofs = get_operand(u, 3);
+        is_imm3 = (ofs->kind == OP_IMM);
+    len = get_operand(u, 4);
+        is_imm4 = (len->kind == OP_IMM);
     assert(is_imm3 && is_imm4);
 
     OperandType tmp_v = get_tmp_and_do_alloc_with_init(type_out, 1);
@@ -1571,16 +1728,18 @@ void translate_deposit(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, part1, part2_1);
 }
 
-void translate_extract(OpCodeType opc, void *ptr) {
+void translate_extract(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType operand0, operand1, ofs, len;
     GET_2_OPERANDS();
     uint32_t is_imm2, is_imm3;
-    ofs = get_operand(ptr, 2, &is_imm2);
-    len = get_operand(ptr, 3, &is_imm3);
+    ofs = get_operand(u, 2);
+        is_imm2 = (ofs->kind == OP_IMM);
+    len = get_operand(u, 3);
+        is_imm3 = (len->kind == OP_IMM);
     assert(is_imm2 && is_imm3);
     OperandType tmp_v = get_tmp_and_do_alloc_with_init(type_out, 1);
     OperandType mask1 = get_tmp_and_do_alloc(type_out);
@@ -1592,16 +1751,18 @@ void translate_extract(OpCodeType opc, void *ptr) {
     CREATE_AND(operand0, arg_shifted, mask_not_shifted);
 }
 
-void translate_sextract(OpCodeType opc, void *ptr) {
+void translate_sextract(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType operand0, operand1, ofs, len;
     GET_2_OPERANDS();
     uint32_t is_imm2, is_imm3;
-    ofs = get_operand(ptr, 2, &is_imm2);
-    len = get_operand(ptr, 3, &is_imm3);
+    ofs = get_operand(u, 2);
+        is_imm2 = (ofs->kind == OP_IMM);
+    len = get_operand(u, 3);
+        is_imm3 = (len->kind == OP_IMM);
     assert(is_imm2 & is_imm3);
     OperandType t0 = get_tmp_and_do_alloc(type_out);
 
@@ -1609,24 +1770,25 @@ void translate_sextract(OpCodeType opc, void *ptr) {
     CREATE_SAR(operand0, t0, ((opc == sextract_i64 ? 64 : 32) - len.i));
 }
 
-void translate_extract2(OpCodeType opc, void *ptr) {
+void translate_extract2(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
     OperandType operand0, operand1, operand2, ofs;
     GET_3_OPERANDS();
     uint32_t is_imm;
-    ofs = get_operand(ptr, 3, &is_imm);
+    ofs = get_operand(u, 3);
+        is_imm = (ofs->kind == OP_IMM);
     assert(is_imm);
     CREATE_SHR(tmp, operand1, ofs.i);
     CREATE_DEPOSIT(operand0, tmp, operand2, ((opc == extract2_i64 ? 64 : 32) - ofs.i), ofs.i);
 }
 
-void translate_extrh(OpCodeType opc, void *ptr) {
+void translate_extrh(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType operand0, operand1;
@@ -1638,9 +1800,9 @@ void translate_extrh(OpCodeType opc, void *ptr) {
     do_store(opc, src, type_out, operand0);
 }
 
-void translate_bswap16_i32(OpCodeType opc, void *ptr) {
+void translate_bswap16_i32(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType tmp0 = get_tmp_and_do_alloc(type_out);
@@ -1648,7 +1810,7 @@ void translate_bswap16_i32(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
     CREATE_SHR(tmp0, operand1, 8);
-    AttributeType attr = get_attribute(ptr);
+    AttributeType attr = get_attribute_from_instr(u);
     if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & IZ)) {
         CREATE_EXTRACT(tmp0, tmp0, 0, 8);
     }
@@ -1664,9 +1826,9 @@ void translate_bswap16_i32(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, tmp0, tmp1);
 }
 
-void translate_bswap16_i64(OpCodeType opc, void *ptr) {
+void translate_bswap16_i64(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType tmp0 = get_tmp_and_do_alloc(type_out);
@@ -1674,7 +1836,7 @@ void translate_bswap16_i64(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1;
     GET_2_OPERANDS();
     CREATE_SHR(tmp0, operand1, 8);
-    AttributeType attr = get_attribute(ptr);
+    AttributeType attr = get_attribute_from_instr(u);
     if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & IZ)) {
         CREATE_EXTRACT(tmp0, tmp0, 0, 8);
     }
@@ -1690,9 +1852,9 @@ void translate_bswap16_i64(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, tmp0, tmp1);
 }
 
-void translate_bswap32_i32(OpCodeType opc, void *ptr) {
+void translate_bswap32_i32(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType tmp0 = get_tmp_and_do_alloc(type_out);
@@ -1710,9 +1872,9 @@ void translate_bswap32_i32(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, tmp0, tmp1);
 }
 
-void translate_bswap32_i64(OpCodeType opc, void *ptr) {
+void translate_bswap32_i64(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType tmp0 = get_tmp_and_do_alloc(type_out);
@@ -1728,7 +1890,7 @@ void translate_bswap32_i64(OpCodeType opc, void *ptr) {
     CREATE_SHL(tmp1, operand0, 48);
     CREATE_SHR(tmp0, operand0, 16);
 
-    AttributeType attr = get_attribute(ptr);
+    AttributeType attr = get_attribute_from_instr(u);
     if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OS)) {
         CREATE_SAR(tmp1, tmp1, 32);
     } else {
@@ -1737,9 +1899,9 @@ void translate_bswap32_i64(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, tmp0, tmp1);
 }
 
-void translate_bswap64_i64(OpCodeType opc, void *ptr) {
+void translate_bswap64_i64(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType t0 = get_tmp_and_do_alloc(type_out);
@@ -1764,9 +1926,9 @@ void translate_bswap64_i64(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, t0, t1);
 }
 
-void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
+void translate_count_zero(OpCodeType opc, const UnifiedInstr *u, const char *intrinsic) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm0, is_imm1, is_imm2;
@@ -1809,9 +1971,9 @@ void translate_count_zero(OpCodeType opc, void *ptr, const char *intrinsic) {
     do_store(opc, phi, type_out, operand0);
 }
 
-void translate_ctpop(OpCodeType opc, void *ptr) {
+void translate_ctpop(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType operand0, operand1;
@@ -1832,9 +1994,9 @@ void translate_ctpop(OpCodeType opc, void *ptr) {
     do_store(opc, ret, type_out, operand0);
 }
 
-void translate_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
+void translate_ext(OpCodeType opc, const UnifiedInstr *u, LLVM_EXT_API api) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm0, is_imm1;
@@ -1846,23 +2008,25 @@ void translate_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
     do_store(opc, src, type_out, operand0);
 }
 
-void translate_movcond(OpCodeType opc, void *ptr) {
+void translate_movcond(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     uint32_t is_imm0, is_imm1, is_imm2, is_imm3, is_imm4;
     OperandType operand0, operand1, operand2, operand3, operand4;
     GET_3_OPERANDS_NOCHECK();
-    operand3 = get_operand(ptr, 3, &is_imm3);
-    operand4 = get_operand(ptr, 4, &is_imm4);
+    op3 = get_operand(u, 3);
+        is_imm3 = (op3->kind == OP_IMM);
+    op4 = get_operand(u, 4);
+        is_imm4 = (op4->kind == OP_IMM);
 
     LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
     LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
     LLVMValueRef v1 = get_source_node_imm_or_stack(opc, is_imm3, operand3, type_in, 0);
     LLVMValueRef v2 = get_source_node_imm_or_stack(opc, is_imm4, operand4, type_in, 0);
 
-    RelopType r = get_relop(ptr);
+    RelopType r = get_relop(u);
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
         c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -1875,9 +2039,9 @@ void translate_movcond(OpCodeType opc, void *ptr) {
     do_store(opc, result, type_out, operand0);
 }
 
-void translate_negsetcond(OpCodeType opc, void *ptr) {
+void translate_negsetcond(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm0, is_imm1, is_imm2;
@@ -1896,16 +2060,16 @@ void translate_negsetcond(OpCodeType opc, void *ptr) {
     } else {
         in1 = operand2;
     }
-    RelopType r = get_relop(ptr);
+    RelopType r = get_relop(u);
     OperandType tmp0 = get_tmp_and_do_alloc(type_out);
     CREATE_SETCOND(tmp0, in0, in1, r);
     OperandType z = get_tmp_and_do_alloc_with_init(type_out, 0);
     CREATE_SUB(operand0, z, tmp0);
 }
 
-void translate_setcond(OpCodeType opc, void *ptr) {
+void translate_setcond(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm0, is_imm1, is_imm2;
@@ -1915,7 +2079,7 @@ void translate_setcond(OpCodeType opc, void *ptr) {
     LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
     LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
 
-    RelopType r = get_relop(ptr);
+    RelopType r = get_relop(u);
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
         c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -1927,9 +2091,9 @@ void translate_setcond(OpCodeType opc, void *ptr) {
     do_store(opc, result, type_out, operand0);
 }
 
-void translate_brcond_i64(OpCodeType opc, void *ptr) {
+void translate_brcond_i64(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm0, is_imm1;
@@ -1938,7 +2102,7 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
     LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm0, operand0, type_in, 0);
     LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
 
-    RelopType r = get_relop(ptr);
+    RelopType r = get_relop(u);
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
         c1 = LLVMBuildAnd(builder, c1, c2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
@@ -1950,7 +2114,7 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
     sprintf(false_bb_name, "bb_false%d", br_cnt);
     LLVMBasicBlockRef bb_false = LLVMAppendBasicBlock(llvm_func, false_bb_name);
     char true_bb_name[16] = {0};
-    uint8_t lbl = get_label(ptr);
+    uint8_t lbl = get_label_from_instr(u);
     sprintf(true_bb_name, "bb_L%d", lbl);
     LLVMBasicBlockRef bb_true = get_bb(true_bb_name);
     if (!bb_true) {
@@ -1971,12 +2135,12 @@ void translate_brcond_i64(OpCodeType opc, void *ptr) {
     br_cnt += 1;
 }
 
-void translate_br(OpCodeType opc, void *ptr) {
+void translate_br(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
-    uint8_t l = get_label(ptr);
+    uint8_t l = get_label_from_instr(u);
     char lstr[16];
     sprintf(lstr, "bb_L%d", l);
     LLVMBasicBlockRef label = get_bb(lstr);
@@ -2002,15 +2166,17 @@ void translate_br(OpCodeType opc, void *ptr) {
     br_cnt += 1;
 }
 
-void translate_push_ret_addr(OpCodeType opc, void *ptr) {
+void translate_push_ret_addr(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm0, is_imm1;
     OperandType operand0, func_hex;
-    operand0 = get_operand(ptr, 0, &is_imm0);
-    func_hex = get_operand(ptr, 1, &is_imm1);
+    op0 = get_operand(u, 0);
+        is_imm0 = (op0->kind == OP_IMM);
+    func_hex = get_operand(u, 1);
+        is_imm1 = (func_hex->kind == OP_IMM);
     assert(is_imm1);
 
 #ifdef CHECK_SHADOW_STACK_BOUNDARY
@@ -2074,15 +2240,16 @@ void translate_push_ret_addr(OpCodeType opc, void *ptr) {
 #endif
 }
 
-void translate_ret(OpCodeType opc, void *ptr) {
+void translate_ret(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     uint8_t new_label = 42;
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm;
     OperandType operand0;
-    operand0 = get_operand(ptr, 0, &is_imm);
+    op0 = get_operand(u, 0);
+        is_imm = (op0->kind == OP_IMM);
     assert(!is_imm && operand0.s.valid);
 
     OperandType delta = get_tmp_and_do_alloc(type_out);
@@ -2175,9 +2342,9 @@ void translate_ret(OpCodeType opc, void *ptr) {
     CREATE_LABEL(new_label);
 }
 
-void translate_ld_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
+void translate_ld_ext(OpCodeType opc, const UnifiedInstr *u, LLVM_EXT_API api) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
     OperandType operand0, operand1;
@@ -2188,15 +2355,16 @@ void translate_ld_ext(OpCodeType opc, void *ptr, LLVM_EXT_API api) {
     do_store(opc, src, type_reg, operand0);
 }
 
-void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
+void translate_ld_env_xmm(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
     OperandType operand0, operand1, operand2;
     GET_2_OPERANDS();
     uint32_t is_imm;
-    operand2 = get_operand(ptr, 2, &is_imm);
+    op2 = get_operand(u, 2);
+        is_imm = (op2->kind == OP_IMM);
 
     if (operand1.s.slot_type == SUB_SLOT_ENV ||
         operand1.s.slot_type == SUB_SLOT_XMM) {
@@ -2213,9 +2381,9 @@ void translate_ld_env_xmm(OpCodeType opc, void *ptr) {
     }
 }
 
-void translate_ld_vec(OpCodeType opc, void *ptr) {
+void translate_ld_vec(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType operand0, operand1;
@@ -2224,15 +2392,15 @@ void translate_ld_vec(OpCodeType opc, void *ptr) {
     do_store(opc, src, type_out, operand0);
 }
 
-void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
+void translate_qemu_ld2_i128(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
 
-    AttributeType attr = get_attribute(ptr);
+    AttributeType attr = get_attribute_from_instr(u);
     assert(attr.attr_type == SUB_ATTR_STORAGE);
     AttrSrcInfo a0, a1, a2;
     (void)a0;
@@ -2269,15 +2437,15 @@ void translate_qemu_ld2_i128(OpCodeType opc, void *ptr) {
     do_store(opc, result, type_reg, operand1);
 }
 
-void translate_qemu_ld(OpCodeType opc, void *ptr) {
+void translate_qemu_ld(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
     OperandType operand0, operand1;
     GET_2_OPERANDS();
 
-    AttributeType attr = get_attribute(ptr);
+    AttributeType attr = get_attribute_from_instr(u);
     assert(attr.attr_type == SUB_ATTR_STORAGE);
     AttrSrcInfo a0, a1, a2;
     (void)a0;
@@ -2317,9 +2485,9 @@ void translate_qemu_ld(OpCodeType opc, void *ptr) {
     do_store(opc, result, type_reg, operand0);
 }
 
-void translate_st(OpCodeType opc, void *ptr) {
+void translate_st(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
     uint32_t is_imm0, is_imm1;
@@ -2338,7 +2506,8 @@ void translate_st(OpCodeType opc, void *ptr) {
             alias = get_alias(operand1);
         }
         uint32_t is_imm;
-        OperandType offset = get_operand(ptr, 2, &is_imm);
+        OperandType offset = get_operand(u, 2);
+        is_imm = (offset->kind == OP_IMM);
         if (is_imm) {
             alias.s.offset += offset.i;
         }
@@ -2365,9 +2534,9 @@ void translate_st(OpCodeType opc, void *ptr) {
     }
 }
 
-void translate_st_vec(OpCodeType opc, void *ptr) {
+void translate_st_vec(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType operand0, operand1;
@@ -2376,15 +2545,15 @@ void translate_st_vec(OpCodeType opc, void *ptr) {
     do_store(opc, src, type_out, operand1);
 }
 
-void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
+void translate_qemu_st2_i128(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
     OperandType operand0, operand1, operand2;
     GET_3_OPERANDS();
 
-    AttributeType attr = get_attribute(ptr);
+    AttributeType attr = get_attribute_from_instr(u);
     assert(attr.attr_type == SUB_ATTR_STORAGE);
     AttrSrcInfo a0, a1, a2;
     (void)a0;
@@ -2419,15 +2588,15 @@ void translate_qemu_st2_i128(OpCodeType opc, void *ptr) {
     check_scalable_vector_perform_store(src2, type_mem, addr, align);
 }
 
-void translate_qemu_st(OpCodeType opc, void *ptr) {
+void translate_qemu_st(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
     OperandType operand0, operand1;
     GET_2_OPERANDS();
 
-    AttributeType attr = get_attribute(ptr);
+    AttributeType attr = get_attribute_from_instr(u);
     assert(attr.attr_type == SUB_ATTR_STORAGE);
     AttrSrcInfo a0, a1, a2;
     (void)a0;
@@ -2462,18 +2631,21 @@ void translate_qemu_st(OpCodeType opc, void *ptr) {
     check_scalable_vector_perform_store(val, type_mem, addr, align);
 }
 
-void translate_addci(OpCodeType opc, void *ptr) {
+void translate_addci(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     uint32_t idx = opcoc[opc];
-    operand0 = get_operand(ptr, 0, &is_imm0);
+    op0 = get_operand(u, 0);
+        is_imm0 = (op0->kind == OP_IMM);
     assert(!is_imm0 && operand0.s.valid);
-    operand1 = get_operand(ptr, idx, &is_imm1);
-    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+    op1 = get_operand(u, idx);
+        is_imm1 = (op1->kind == OP_IMM);
+    op2 = get_operand(u, idx + 1);
+        is_imm2 = (op2->kind == OP_IMM);
 
     LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
     LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
@@ -2484,18 +2656,21 @@ void translate_addci(OpCodeType opc, void *ptr) {
     do_store(opc, out_val, type_out, operand0);
 }
 
-void translate_addcio(OpCodeType opc, void *ptr) {
+void translate_addcio(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     uint32_t idx = opcoc[opc];
-    operand0 = get_operand(ptr, 0, &is_imm0);
+    op0 = get_operand(u, 0);
+        is_imm0 = (op0->kind == OP_IMM);
     assert(!is_imm0 && operand0.s.valid);
-    operand1 = get_operand(ptr, idx, &is_imm1);
-    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+    op1 = get_operand(u, idx);
+        is_imm1 = (op1->kind == OP_IMM);
+    op2 = get_operand(u, idx + 1);
+        is_imm2 = (op2->kind == OP_IMM);
 
     LLVMTypeRef intrinsic_types[] = {llvm_int_types[type_in], llvm_int_types[type_in]};
     char intrinsic_func_name[128] = {0};
@@ -2526,18 +2701,21 @@ void translate_addcio(OpCodeType opc, void *ptr) {
     build_store_with_alignment(builder, carry_out, carrybit_alloca, 8);
 }
 
-void translate_addco(OpCodeType opc, void *ptr) {
+void translate_addco(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     uint32_t idx = opcoc[opc];
-    operand0 = get_operand(ptr, 0, &is_imm0);
+    op0 = get_operand(u, 0);
+        is_imm0 = (op0->kind == OP_IMM);
     assert(!is_imm0 && operand0.s.valid);
-    operand1 = get_operand(ptr, idx, &is_imm1);
-    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+    op1 = get_operand(u, idx);
+        is_imm1 = (op1->kind == OP_IMM);
+    op2 = get_operand(u, idx + 1);
+        is_imm2 = (op2->kind == OP_IMM);
 
     LLVMTypeRef intrinsic_types[] = {llvm_int_types[type_in], llvm_int_types[type_in]};
     char intrinsic_func_name[128] = {0};
@@ -2559,18 +2737,21 @@ void translate_addco(OpCodeType opc, void *ptr) {
     build_store_with_alignment(builder, carry1, carrybit_alloca, 8);
 }
 
-void translate_subbi(OpCodeType opc, void *ptr) {
+void translate_subbi(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     uint32_t idx = opcoc[opc];
-    operand0 = get_operand(ptr, 0, &is_imm0);
+    op0 = get_operand(u, 0);
+        is_imm0 = (op0->kind == OP_IMM);
     assert(!is_imm0 && operand0.s.valid);
-    operand1 = get_operand(ptr, idx, &is_imm1);
-    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+    op1 = get_operand(u, idx);
+        is_imm1 = (op1->kind == OP_IMM);
+    op2 = get_operand(u, idx + 1);
+        is_imm2 = (op2->kind == OP_IMM);
 
     LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
     LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
@@ -2581,18 +2762,21 @@ void translate_subbi(OpCodeType opc, void *ptr) {
     do_store(opc, out_val, type_out, operand0);
 }
 
-void translate_subbio(OpCodeType opc, void *ptr) {
+void translate_subbio(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     uint32_t idx = opcoc[opc];
-    operand0 = get_operand(ptr, 0, &is_imm0);
+    op0 = get_operand(u, 0);
+        is_imm0 = (op0->kind == OP_IMM);
     assert(!is_imm0 && operand0.s.valid);
-    operand1 = get_operand(ptr, idx, &is_imm1);
-    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+    op1 = get_operand(u, idx);
+        is_imm1 = (op1->kind == OP_IMM);
+    op2 = get_operand(u, idx + 1);
+        is_imm2 = (op2->kind == OP_IMM);
 
     LLVMTypeRef intrinsic_types[] = {llvm_int_types[type_in], llvm_int_types[type_in]};
     char intrinsic_func_name[128] = {0};
@@ -2623,18 +2807,21 @@ void translate_subbio(OpCodeType opc, void *ptr) {
     build_store_with_alignment(builder, borrow_out, borrowbit_alloca, 8);
 }
 
-void translate_subbo(OpCodeType opc, void *ptr) {
+void translate_subbo(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType operand0, operand1, operand2;
     uint32_t idx = opcoc[opc];
-    operand0 = get_operand(ptr, 0, &is_imm0);
+    op0 = get_operand(u, 0);
+        is_imm0 = (op0->kind == OP_IMM);
     assert(!is_imm0 && operand0.s.valid);
-    operand1 = get_operand(ptr, idx, &is_imm1);
-    operand2 = get_operand(ptr, idx + 1, &is_imm2);
+    op1 = get_operand(u, idx);
+        is_imm1 = (op1->kind == OP_IMM);
+    op2 = get_operand(u, idx + 1);
+        is_imm2 = (op2->kind == OP_IMM);
 
     LLVMTypeRef intrinsic_types[] = {llvm_int_types[type_in], llvm_int_types[type_in]};
     char intrinsic_func_name[128] = {0};
@@ -2657,9 +2844,9 @@ void translate_subbo(OpCodeType opc, void *ptr) {
 }
 
 // Vector
-void translate_abs_vec(OpCodeType opc, void *ptr) {
+void translate_abs_vec(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType operand0, operand1;
@@ -2685,9 +2872,9 @@ void translate_abs_vec(OpCodeType opc, void *ptr) {
     do_store(opc, ret, type_out, operand0);
 }
 
-void translate_binary_intrinsic(OpCodeType opc, void *ptr, const char *intrinsic_prefix) {
+void translate_binary_intrinsic(OpCodeType opc, const UnifiedInstr *u, const char *intrinsic_prefix) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType operand0, operand1, operand2;
@@ -2713,9 +2900,9 @@ void translate_binary_intrinsic(OpCodeType opc, void *ptr, const char *intrinsic
     do_store(opc, ret, type_out, operand0);
 }
 
-void translate_bitsel_vec(OpCodeType opc, void *ptr) {
+void translate_bitsel_vec(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType operand0, operand1, operand2, operand3;
@@ -2726,22 +2913,22 @@ void translate_bitsel_vec(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, operand0, tmp);
 }
 
-void translate_cmpsel_vec(OpCodeType opc, void *ptr) {
+void translate_cmpsel_vec(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType operand0, operand1, operand2, operand3, operand4;
     GET_5_OPERANDS();
-    RelopType r = get_relop(ptr);
+    RelopType r = get_relop(u);
     OperandType tmp = get_tmp_and_do_alloc(type_out);
     CREATE_CMP_VEC(tmp, operand1, operand2, r);
     CREATE_BITSEL_VEC(operand0, tmp, operand3, operand4);
 }
 
-void translate_cmp_vec(OpCodeType opc, void *ptr) {
+void translate_cmp_vec(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     uint32_t is_imm0, is_imm1, is_imm2;
@@ -2751,7 +2938,7 @@ void translate_cmp_vec(OpCodeType opc, void *ptr) {
     LLVMValueRef src1 = get_source_node_imm_or_stack(opc, is_imm1, operand1, type_in, 0);
     LLVMValueRef src2 = get_source_node_imm_or_stack(opc, is_imm2, operand2, type_in, 0);
 
-    RelopType r = get_relop(ptr);
+    RelopType r = get_relop(u);
     assert(r < RELOPMAX && llvm_predicate[r]);
     LLVMValueRef bool_vec = LLVMBuildICmp(builder, llvm_predicate[r], src1, src2, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
 
@@ -2766,9 +2953,9 @@ void translate_cmp_vec(OpCodeType opc, void *ptr) {
     do_store(opc, result, type_out, operand0);
 }
 
-void translate_dupm_vec(OpCodeType opc, void *ptr) {
+void translate_dupm_vec(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType operand0, operand1;
@@ -2814,9 +3001,9 @@ void translate_dupm_vec(OpCodeType opc, void *ptr) {
 #endif
 }
 
-void translate_rotl_vec(OpCodeType opc, void *ptr) {
+void translate_rotl_vec(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType t0 = get_tmp_and_do_alloc(type_out);
@@ -2825,7 +3012,8 @@ void translate_rotl_vec(OpCodeType opc, void *ptr) {
     OperandType operand0, operand1, operand2, operand_shift;
     GET_2_OPERANDS();
     uint32_t is_imm2;
-    operand2 = get_operand(ptr, 2, &is_imm2);
+    op2 = get_operand(u, 2);
+        is_imm2 = (op2->kind == OP_IMM);
     if (is_imm2) {
         operand_shift = get_tmp_and_do_alloc_with_init(OPC_VECTOR_TO_FIXED(type_in), operand2.i);
     } else {
@@ -2840,9 +3028,9 @@ void translate_rotl_vec(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, t0, t1);
 }
 
-void translate_rotlv_vec(OpCodeType opc, void *ptr) {
+void translate_rotlv_vec(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType t0 = get_tmp_and_do_alloc(type_out);
@@ -2862,9 +3050,9 @@ void translate_rotlv_vec(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, t0, t1);
 }
 
-void translate_rotrv_vec(OpCodeType opc, void *ptr) {
+void translate_rotrv_vec(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType t0 = get_tmp_and_do_alloc(type_out);
@@ -2884,9 +3072,9 @@ void translate_rotrv_vec(OpCodeType opc, void *ptr) {
     CREATE_OR(operand0, t0, t1);
 }
 
-void translate_maxmin_vec(OpCodeType opc, void *ptr, RelopType r) {
+void translate_maxmin_vec(OpCodeType opc, const UnifiedInstr *u, RelopType r) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
     OperandType operand0, operand1, operand2;
@@ -2940,7 +3128,7 @@ static void set_current_active_label_cnt(uint8_t current_active_label_cnt) {
     }
 }
 
-static void register_idx_for_call_helper(void *ptr, uint8_t call_idx) {
+static void register_idx_for_call_helper(const UnifiedInstr *u, uint8_t call_idx) {
 #ifdef DEBUG
     printf("%s %lx call%d\n", __FUNCTION__, ptr, call_idx); fflush(NULL);
 #endif
@@ -2960,7 +3148,7 @@ static void register_idx_for_call_helper(void *ptr, uint8_t call_idx) {
     }
 }
 
-static uint8_t get_idx_for_call_helper(void *ptr) {
+static uint8_t get_idx_for_call_helper(const UnifiedInstr *u) {
     helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, ptr);
     while (info) {
         if (info->ptr == ptr) {
@@ -2971,12 +3159,12 @@ static uint8_t get_idx_for_call_helper(void *ptr) {
     return current_call_idx++;
 }
 
-void translate_set_label(OpCodeType opc, void *ptr) {
+void translate_set_label(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
-    uint8_t l = get_label(ptr);
+    uint8_t l = get_label_from_instr(u);
     char lstr[16];
     sprintf(lstr, "bb_L%d", l);
     LLVMBasicBlockRef label = get_bb(lstr);
@@ -3013,12 +3201,12 @@ void translate_set_label(OpCodeType opc, void *ptr) {
     }
 }
 
-void translate_set_label_fix_branch(OpCodeType opc, void *ptr) {
+void translate_set_label_fix_branch(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
-    uint8_t l = get_label(ptr);
+    uint8_t l = get_label_from_instr(u);
     char lstr[16];
     sprintf(lstr, "bb_L%d", l);
     LLVMBasicBlockRef label = get_bb(lstr);
@@ -3037,14 +3225,15 @@ void translate_set_label_fix_branch(OpCodeType opc, void *ptr) {
     }
 }
 
-void translate_jmp_direct(OpCodeType opc, void *ptr) {
+void translate_jmp_direct(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm;
     OperandType delta;
-    delta = get_operand(ptr, 0, &is_imm);
+    delta = get_operand(u, 0);
+        is_imm = (delta->kind == OP_IMM);
     assert(is_imm);
 
     char func_name[64] = {0};
@@ -3061,13 +3250,14 @@ void translate_jmp_direct(OpCodeType opc, void *ptr) {
     LLVMBuildRetVoid(builder);
 }
 
-void translate_discard(OpCodeType opc, void *ptr) {
+void translate_discard(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf("%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm;
-    OperandType operand0 = get_operand(ptr, 0, &is_imm);
+    OperandType op0 = get_operand(u, 0);
+        is_imm = (op0->kind == OP_IMM);
     assert(!is_imm && operand0.s.valid);
     if (operand0.s.slot_type == SUB_SLOT_XREG) {
         build_store_with_alignment(builder, LLVMGetPoison(llvm_int_types[func_xreg_llvmtype[operand0.s.slot_idx]]), func_xreg_alloca[operand0.s.slot_idx].alloca, func_xreg_alloca[operand0.s.slot_idx].alignment);
@@ -4064,17 +4254,17 @@ static LLVMValueRef create_reference_to_external_array(LLVMModuleRef module, con
 }
 
 // FIXME: can this be merged into common logic?
-static void translate_jmp_ind(OpCodeType opc, void *ptr) {
+static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
     printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
-    HelperType h = get_helper(ptr);
+    HelperType h = get_helper(u);
     char *second_half_name = "jmp_ind_callback";
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     int operands_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand(ptr, (i + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -4155,8 +4345,8 @@ static void translate_jmp_ind(OpCodeType opc, void *ptr) {
     LLVMBuildRetVoid(builder);
 
     LLVMValueRef llvm_func_backup = llvm_func;
-    void *ptr_init = get_instr_buffer();
-    void *ptr_max = ptr_init + get_instr_buffer_size();
+    UnifiedInstr *head = (UnifiedInstr *)get_instr_buffer();  /* now holds list head */
+    (void)head;  /* may be unused */
     // Check if we got remaining BBs
     do {
         llvm_func = llvm_func_backup;
@@ -4166,7 +4356,7 @@ static void translate_jmp_ind(OpCodeType opc, void *ptr) {
         }
         uint8_t *current_active_labels = get_current_active_labels(llvm_func);
         uint8_t tgt_lbl = current_active_labels[0];
-        void *ptr_tmp = NULL;
+        UnifiedInstr *ptr_tmp = NULL;
         for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
             if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
@@ -4188,17 +4378,17 @@ static void translate_jmp_ind(OpCodeType opc, void *ptr) {
 #endif
 }
 
-static void translate_jumptable(OpCodeType opc, void *ptr) {
+static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
     printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
 #endif
-    HelperType h = get_helper(ptr);
+    HelperType h = get_helper(u);
     char *second_half_name = "jmp_ind_callback";
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     int operands_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand(ptr, (i + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -4358,8 +4548,8 @@ static void translate_jumptable(OpCodeType opc, void *ptr) {
     LLVMBuildRetVoid(builder);
 
     LLVMValueRef llvm_func_backup = llvm_func;
-    void *ptr_init = get_instr_buffer();
-    void *ptr_max = ptr_init + get_instr_buffer_size();
+    UnifiedInstr *head = (UnifiedInstr *)get_instr_buffer();  /* now holds list head */
+    (void)head;  /* may be unused */
     // Check if we got remaining BBs
     do {
         llvm_func = llvm_func_backup;
@@ -4369,7 +4559,7 @@ static void translate_jumptable(OpCodeType opc, void *ptr) {
         }
         uint8_t *current_active_labels = get_current_active_labels(llvm_func);
         uint8_t tgt_lbl = current_active_labels[0];
-        void *ptr_tmp = NULL;
+        UnifiedInstr *ptr_tmp = NULL;
         for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
             if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
@@ -4391,20 +4581,21 @@ static void translate_jumptable(OpCodeType opc, void *ptr) {
 #endif
 }
 
-static void translate_cc_compute_inband(OpCodeType opc, void *ptr) {
-    HelperType h = get_helper(ptr);
+static void translate_cc_compute_inband(OpCodeType opc, const UnifiedInstr *u) {
+    HelperType h = get_helper(u);
 #ifdef DEBUG
     printf("%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], ptr); fflush(NULL);
 #endif
     OperandType oarg;
     uint32_t is_imm_dummy;
-    oarg = get_operand(ptr, 0, &is_imm_dummy);
+    oarg = get_operand(u, 0);
+        is_imm_dummy = (oarg->kind == OP_IMM);
     assert(!is_imm_dummy && oarg.s.valid);
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     int operands_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand(ptr, (i + (helper_return_type[h] != LLVMInvalidType ? 1 : 0)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + (helper_return_type[h] != LLVMInvalidType ? 1 : 0)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -4462,8 +4653,8 @@ static LLVMValueRef reload_vector(XMMRegType xmm_reg) {
     return check_scalable_vector_perform_load(LLVMVector2xi64, addr, 16);
 }
 
-static void translate_helper_outband(OpCodeType opc, void *ptr) {
-    HelperType h = get_helper(ptr);
+static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
+    HelperType h = get_helper(u);
 #ifdef DEBUG
     printf(">>>%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], ptr); fflush(NULL);
 #endif
@@ -4506,7 +4697,8 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
     oarg.s.valid = 0;
     uint32_t is_imm_dummy;
     if (helper_return_type[h] != LLVMInvalidType) {
-      oarg = get_operand(ptr, 0, &is_imm_dummy);
+      oarg = get_operand(u, 0);
+        is_imm_dummy = (oarg->kind == OP_IMM);
       assert(!is_imm_dummy && oarg.s.valid);
     }
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
@@ -4515,7 +4707,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
     uint16_t vec_slots[MAX_OPERANDS_COUNT] = {0};
     int vec_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand(ptr, (i + (helper_return_type[h] != LLVMInvalidType ? 1 : 0)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + (helper_return_type[h] != LLVMInvalidType ? 1 : 0)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -4564,7 +4756,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
     // Operands for the exception handler
     int operands_cnt_for_eh = 0;
     do {
-        operands_for_eh[operands_cnt_for_eh] = get_operand(ptr, (operands_cnt_for_eh + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &is_imm_for_eh[operands_cnt_for_eh]);
+        operands_for_eh[operands_cnt_for_eh] = get_operand_legacy(u, (operands_cnt_for_eh + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &is_imm_for_eh[operands_cnt_for_eh]);
         if (is_imm_for_eh[operands_cnt_for_eh] == 0 && operands_for_eh[operands_cnt_for_eh].s.valid == 0) {
             break;
         }
@@ -4801,8 +4993,8 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
     LLVMBuildRetVoid(builder);
 
     LLVMValueRef llvm_func_backup = llvm_func;
-    void *ptr_init = get_instr_buffer();
-    void *ptr_max = ptr_init + get_instr_buffer_size();
+    UnifiedInstr *head = (UnifiedInstr *)get_instr_buffer();  /* now holds list head */
+    (void)head;  /* may be unused */
     // Check if we got remaining BBs
     do {
         llvm_func = llvm_func_backup;
@@ -4812,7 +5004,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
         }
         uint8_t *current_active_labels = get_current_active_labels(llvm_func);
         uint8_t tgt_lbl = current_active_labels[0];
-        void *ptr_tmp = NULL;
+        UnifiedInstr *ptr_tmp = NULL;
         for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
             if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
@@ -4824,7 +5016,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
             OpCodeType opc = get_opcode(ptr_tmp);
             handle_single_instr(opc, ptr_tmp);
             memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-            if (is_opc_end_of_control_flow(opc, ptr)) {
+            if (is_opc_end_of_control_flow(opc, u)) {
                 break;
             }
         }
@@ -4935,7 +5127,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
     }
 
     // Start from the one after ptr
-    for (void *ptr_tmp = move_to_next(ptr); ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+    for (UnifiedInstr *ptr_tmp = head; ptr_tmp; ptr_tmp = ptr_tmp->next) {
         OpCodeType opc = get_opcode(ptr_tmp);
         handle_single_instr(opc, ptr_tmp);
         memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
@@ -4943,7 +5135,7 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
             while (get_current_active_label_cnt(second_half_func)) {
                 uint8_t *current_active_labels = get_current_active_labels(second_half_func);
                 uint8_t tgt_lbl = current_active_labels[0];
-                void *ptr_tmp = NULL;
+                UnifiedInstr *ptr_tmp = NULL;
                 for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
                     OpCodeType opc = get_opcode(ptr_tmp);
                     if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
@@ -4969,9 +5161,9 @@ static void translate_helper_outband(OpCodeType opc, void *ptr) {
 #endif
 }
 
-void translate_call(OpCodeType opc, void *ptr) {
+void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
-    HelperType h = get_helper(ptr);
+    HelperType h = get_helper(u);
 
 #ifdef HELPER_COUNTERS
     {
@@ -4993,17 +5185,17 @@ void translate_call(OpCodeType opc, void *ptr) {
 #endif
 
     if (h == helper_jmp_ind) {
-        return translate_jmp_ind(opc, ptr);
+        return translate_jmp_ind(opc, u);
     } else if (h == helper_jumptable) {
-        return translate_jumptable(opc, ptr);
+        return translate_jumptable(opc, u);
     } else if (h == helper_cc_compute_all || h == helper_cc_compute_c || h == helper_cc_compute_nz) {
         if (helper_require_exception_path[h]) {
-            return translate_helper_outband(opc, ptr);
+            return translate_helper_outband(opc, u);
         } else {
-            return translate_cc_compute_inband(opc, ptr);
+            return translate_cc_compute_inband(opc, u);
         }
     } else if (INLINE_HELPER_ENABLED(h)) {
-        return translate_helper_outband(opc, ptr);
+        return translate_helper_outband(opc, u);
     }
     // We cannot inline below helpers currently, so their invocations incur context backup penalty.
 #ifdef DEBUG
@@ -5046,7 +5238,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     int do_not_sync_vector_alias_slot_idx_cnt = 0;
     int operands_cnt = 0;
     do {
-        operands[operands_cnt] = get_operand(ptr, (operands_cnt + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &is_imm[operands_cnt]);
+        operands[operands_cnt] = get_operand_legacy(u, (operands_cnt + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &is_imm[operands_cnt]);
         if (is_imm[operands_cnt] == 0 && operands[operands_cnt].s.valid == 0) {
             break;
         }
@@ -5160,8 +5352,8 @@ void translate_call(OpCodeType opc, void *ptr) {
     LLVMBuildRetVoid(builder);
 
     LLVMValueRef llvm_func_backup = llvm_func;
-    void *ptr_init = get_instr_buffer();
-    void *ptr_max = ptr_init + get_instr_buffer_size();
+    UnifiedInstr *head = (UnifiedInstr *)get_instr_buffer();  /* now holds list head */
+    (void)head;  /* may be unused */
     // Check if we got remaining BBs
     do {
         llvm_func = llvm_func_backup;
@@ -5171,7 +5363,7 @@ void translate_call(OpCodeType opc, void *ptr) {
         }
         uint8_t *current_active_labels = get_current_active_labels(llvm_func);
         uint8_t tgt_lbl = current_active_labels[0];
-        void *ptr_tmp = NULL;
+        UnifiedInstr *ptr_tmp = NULL;
         for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
             OpCodeType opc = get_opcode(ptr_tmp);
             if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
@@ -5217,7 +5409,8 @@ void translate_call(OpCodeType opc, void *ptr) {
     // Get output from helper func
     if (HELPER_DEFINES_OUTPUT(h)) {
         uint32_t is_imm;
-        OperandType oarg = get_operand(ptr, 0, &is_imm);
+        OperandType oarg = get_operand(u, 0);
+        is_imm = (oarg->kind == OP_IMM);
         assert(!is_imm && oarg.s.valid);
         assert(FIXED_VECTOR_PARAM_COUNT < LLVMCountParams(llvm_func));
         LLVMValueRef param = LLVMGetParam(llvm_func, FIXED_VECTOR_PARAM_COUNT);
@@ -5307,7 +5500,7 @@ void translate_call(OpCodeType opc, void *ptr) {
     }
 
     // Start from the one after ptr
-    for (void *ptr_tmp = move_to_next(ptr); ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
+    for (UnifiedInstr *ptr_tmp = head; ptr_tmp; ptr_tmp = ptr_tmp->next) {
         OpCodeType opc = get_opcode(ptr_tmp);
         handle_single_instr(opc, ptr_tmp);
         memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
@@ -5315,7 +5508,7 @@ void translate_call(OpCodeType opc, void *ptr) {
             while (get_current_active_label_cnt(second_half_func)) {
                 uint8_t *current_active_labels = get_current_active_labels(second_half_func);
                 uint8_t tgt_lbl = current_active_labels[0];
-                void *ptr_tmp = NULL;
+                UnifiedInstr *ptr_tmp = NULL;
                 for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
                     OpCodeType opc = get_opcode(ptr_tmp);
                     if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
@@ -5469,9 +5662,10 @@ static void register_labels_for_func(LLVMValueRef func) {
     }
 }
 
-static int process_op_type(uint32_t slot_idx, void *ptr, OpCodeType opc, LLVMType vtype, uint32_t noargs, uint8_t *tmp_has_known_def) {
+static int process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType opc, LLVMType vtype, uint32_t noargs, uint8_t *tmp_has_known_def) {
     uint32_t is_imm = 0;
-    OperandType operand = get_operand(ptr, slot_idx, &is_imm);
+    OperandType op = get_operand(u, slot_idx);
+        is_imm = (op->kind == OP_IMM);
     // End-of-operands
     if (!is_imm && !operand.s.valid) {
         return 0;
@@ -5482,7 +5676,7 @@ static int process_op_type(uint32_t slot_idx, void *ptr, OpCodeType opc, LLVMTyp
                          (slot_idx < opcoc[opc] ? OPC_OUTPUT_T : OPC_INPUT_T)) :
                         vtype;
     if (slot_idx == 0 && opc == call) {
-        HelperType h = get_helper(ptr);
+        HelperType h = get_helper(u);
         if (helper_return_type[h] != LLVMInvalidType) {
             operand_type = helper_return_type[h];
         }
@@ -5539,34 +5733,34 @@ void handle_func(uint64_t val, int is_external) {
     current_func_offset = val;
     ir_var_name_idx = 0;
     memset(tmp_var_available, 0xff, sizeof(tmp_var_available));
-    void *ptr_init = get_instr_buffer();
-    void *ptr_max = ptr_init + get_instr_buffer_size();
-    void *ptr;
+    UnifiedInstr *head = (UnifiedInstr *)get_instr_buffer();  /* now holds list head */
+    (void)head;  /* may be unused */
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint8_t tmp_has_known_def[1<<STACK_INDEX_SHIFT] = {0};
-    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
-        OpCodeType opc = get_opcode(ptr);
+    for (UnifiedInstr *u = head; u; u = u->next) {
+        OpCodeType opc = u->opc;
         uint32_t noargs = 0;
         OperandType oarg;
-        uint32_t is_immo;
+        uint32_t is_immo = 0;
         oarg.s.valid = 0;
         if (opc == call) {
-            noargs = HELPER_DEFINES_OUTPUT(get_helper(ptr));
+            noargs = HELPER_DEFINES_OUTPUT(get_helper(u));
             if (noargs) {
-                oarg = get_operand(ptr, 0, &is_immo);
+                oarg = *get_operand(u, 0);
+                is_immo = (get_operand(u, 0)->kind == OP_IMM);
                 assert(!is_immo && oarg.s.valid);
             }
-            register_idx_for_call_helper(ptr, current_call_idx);
+            register_idx_for_call_helper(u, current_call_idx);
         }
-        uint8_t is_vec = is_vector(ptr);
+        uint8_t is_vec = is_vector(u);
         LLVMType vtype = LLVMInvalidType;
         if (is_vec) {
-          vtype = get_llvm_vector_type(ptr);
+          vtype = get_llvm_vector_type(u);
         }
         // Input arguments first
         uint32_t slot_idx = opc == call ? noargs : opcoc[opc];
         do {
-            if (!process_op_type(slot_idx, ptr, opc, vtype, noargs, tmp_has_known_def)) {
+            if (!process_op_type(slot_idx, u, opc, vtype, noargs, tmp_has_known_def)) {
                 break;
             }
             slot_idx += 1;
@@ -5574,7 +5768,7 @@ void handle_func(uint64_t val, int is_external) {
 
         // Output argument
         if (opc == call ? noargs : opcoc[opc]) {
-            process_op_type(0, ptr, opc, vtype, noargs, tmp_has_known_def);
+            process_op_type(0, u, opc, vtype, noargs, tmp_has_known_def);
         }
 
         if (opc == call) {
@@ -5619,31 +5813,30 @@ void handle_func(uint64_t val, int is_external) {
 
     // Handle each IR translation
     LLVMValueRef llvm_func_backup = llvm_func;
-    for (ptr = ptr_init; ptr < ptr_max; ptr = move_to_next(ptr)) {
-        OpCodeType opc = get_opcode(ptr);
-        handle_single_instr(opc, ptr);
+    for (UnifiedInstr *u = head; u; u = u->next) {
+        OpCodeType opc = u->opc;
+        handle_single_instr(opc, u);
         memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-        if (is_opc_end_of_control_flow(opc, ptr)) {
+        if (is_opc_end_of_control_flow(opc, u)) {
             while (get_current_active_label_cnt(llvm_func_backup)) {
                 uint8_t *current_active_labels = get_current_active_labels(llvm_func_backup);
                 uint8_t tgt_lbl = current_active_labels[0];
-                void *ptr_tmp = NULL;
-                for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-                    OpCodeType opc = get_opcode(ptr_tmp);
-                    if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+                UnifiedInstr *u_tmp = NULL;
+                for (u_tmp = head; u_tmp; u_tmp = u_tmp->next) {
+                    if (u_tmp->opc == set_label && get_label_from_instr(u_tmp) == tgt_lbl) {
                         break;
                     }
                 }
-                assert(ptr_tmp < ptr_max);
-                for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-                    OpCodeType opc = get_opcode(ptr_tmp);
-                    if (opc == set_label && get_label(ptr_tmp) != tgt_lbl) {
-                        translate_set_label_fix_branch(opc, ptr_tmp);
+                assert(u_tmp != NULL);
+                for (; u_tmp; u_tmp = u_tmp->next) {
+                    OpCodeType opc2 = u_tmp->opc;
+                    if (opc2 == set_label && get_label_from_instr(u_tmp) != tgt_lbl) {
+                        translate_set_label_fix_branch(opc2, u_tmp);
                         break;
                     }
-                    handle_single_instr(opc, ptr_tmp);
+                    handle_single_instr(opc2, u_tmp);
                     memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-                    if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
+                    if (is_opc_end_of_control_flow(opc2, u_tmp)) {
                         break;
                     }
                 }
@@ -5655,7 +5848,7 @@ void handle_func(uint64_t val, int is_external) {
     cleanup_func_resource();
 }
 
-static void handle_single_instr(OpCodeType opc, void *ptr) {
+static void handle_single_instr(OpCodeType opc, const UnifiedInstr *u) {
 #if 0
     printf("handle_single_instr: %s ptr:%lx", opcode_type_str[opc], ptr); fflush(NULL);
     void *next = move_to_next(ptr);
@@ -5682,279 +5875,279 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
 
     case addci_i32:
     case addci_i64:
-        translate_addci(opc, ptr);
+        translate_addci(opc, u);
         break;
     case addcio_i32:
     case addcio_i64:
-        translate_addcio(opc, ptr);
+        translate_addcio(opc, u);
         break;
     case addco_i32:
     case addco_i64:
-        translate_addco(opc, ptr);
+        translate_addco(opc, u);
         break;
     case subbi_i32:
     case subbi_i64:
-        translate_subbi(opc, ptr);
+        translate_subbi(opc, u);
         break;
     case subbio_i32:
     case subbio_i64:
-        translate_subbio(opc, ptr);
+        translate_subbio(opc, u);
         break;
     case subbo_i32:
     case subbo_i64:
-        translate_subbo(opc, ptr);
+        translate_subbo(opc, u);
         break;
     case abs_vec:
-        translate_abs_vec(opc, ptr);
+        translate_abs_vec(opc, u);
         break;
     case bitsel_vec:
-        translate_bitsel_vec(opc, ptr);
+        translate_bitsel_vec(opc, u);
         break;
     case cmpsel_vec:
-        translate_cmpsel_vec(opc, ptr);
+        translate_cmpsel_vec(opc, u);
         break;
     case ctpop_i32:
     case ctpop_i64:
-        translate_ctpop(opc, ptr);
+        translate_ctpop(opc, u);
         break;
     case divs_i32:
     case divs_i64:
-        translate_binary(opc, ptr, LLVMBuildSDiv);
+        translate_binary(opc, u, LLVMBuildSDiv);
         break;
     case divu_i32:
     case divu_i64:
-        translate_binary(opc, ptr, LLVMBuildUDiv);
+        translate_binary(opc, u, LLVMBuildUDiv);
         break;
     case rems_i32:
     case rems_i64:
-        translate_binary(opc, ptr, LLVMBuildSRem);
+        translate_binary(opc, u, LLVMBuildSRem);
         break;
     case remu_i32:
     case remu_i64:
-        translate_binary(opc, ptr, LLVMBuildURem);
+        translate_binary(opc, u, LLVMBuildURem);
         break;
     case rotli_vec:
     case rotls_vec:
-        translate_rotl_vec(opc, ptr);
+        translate_rotl_vec(opc, u);
         break;
     case rotlv_vec:
-        translate_rotlv_vec(opc, ptr);
+        translate_rotlv_vec(opc, u);
         break;
     case rotrv_vec:
-        translate_rotrv_vec(opc, ptr);
+        translate_rotrv_vec(opc, u);
         break;
     case sari_vec:
     case sars_vec:
-        translate_binary_splat_immediate(opc, ptr, LLVMBuildAShr);
+        translate_binary_splat_immediate(opc, u, LLVMBuildAShr);
         break;
     case sarv_vec:
-        translate_binary(opc, ptr, LLVMBuildAShr);
+        translate_binary(opc, u, LLVMBuildAShr);
         break;
     case shlv_vec:
-        translate_binary(opc, ptr, LLVMBuildShl);
+        translate_binary(opc, u, LLVMBuildShl);
         break;
     case shrv_vec:
-        translate_binary(opc, ptr, LLVMBuildLShr);
+        translate_binary(opc, u, LLVMBuildLShr);
         break;
     case smax_vec:
-        translate_binary_intrinsic(opc, ptr, "llvm.smax");
+        translate_binary_intrinsic(opc, u, "llvm.smax");
         break;
     case smin_vec:
-        translate_binary_intrinsic(opc, ptr, "llvm.smin");
+        translate_binary_intrinsic(opc, u, "llvm.smin");
         break;
     case ssadd_vec:
-        translate_binary_intrinsic(opc, ptr, "llvm.sadd.sat");
+        translate_binary_intrinsic(opc, u, "llvm.sadd.sat");
         break;
     case sssub_vec:
-        translate_binary_intrinsic(opc, ptr, "llvm.ssub.sat");
+        translate_binary_intrinsic(opc, u, "llvm.ssub.sat");
         break;
     case usadd_vec:
-        translate_binary_intrinsic(opc, ptr, "llvm.uadd.sat");
+        translate_binary_intrinsic(opc, u, "llvm.uadd.sat");
         break;
     case ussub_vec:
-        translate_binary_intrinsic(opc, ptr, "llvm.usub.sat");
+        translate_binary_intrinsic(opc, u, "llvm.usub.sat");
         break;
     case add_i64:
-        translate_add_i64(opc, ptr);
+        translate_add_i64(opc, u);
         break;
     case add_i32:
     case add_vec:
-        translate_binary(opc, ptr, LLVMBuildAdd);
+        translate_binary(opc, u, LLVMBuildAdd);
         break;
     case andc_i32:
     case andc_i64:
     case andc_vec:
-        translate_andc(opc, ptr);
+        translate_andc(opc, u);
         break;
     case and_i32:
     case and_i64:
     case and_vec:
-        translate_binary(opc, ptr, LLVMBuildAnd);
+        translate_binary(opc, u, LLVMBuildAnd);
         break;
     case nor_i32:
     case nor_i64:
     case nor_vec:
-        translate_nor(opc, ptr);
+        translate_nor(opc, u);
         break;
     case orc_i32:
     case orc_i64:
     case orc_vec:
-        translate_orc(opc, ptr);
+        translate_orc(opc, u);
         break;
     case nand_i32:
     case nand_i64:
     case nand_vec:
-        translate_nand(opc, ptr);
+        translate_nand(opc, u);
         break;
     case eqv_i32:
     case eqv_i64:
     case eqv_vec:
-        translate_eqv(opc, ptr);
+        translate_eqv(opc, u);
         break;
     case bswap16_i32:
-        translate_bswap16_i32(opc, ptr);
+        translate_bswap16_i32(opc, u);
         break;
     case bswap16_i64:
-        translate_bswap16_i64(opc, ptr);
+        translate_bswap16_i64(opc, u);
         break;
     case bswap32_i32:
-        translate_bswap32_i32(opc, ptr);
+        translate_bswap32_i32(opc, u);
         break;
     case bswap32_i64:
-        translate_bswap32_i64(opc, ptr);
+        translate_bswap32_i64(opc, u);
         break;
     case bswap64_i64:
-        translate_bswap64_i64(opc, ptr);
+        translate_bswap64_i64(opc, u);
         break;
     case clz_i32:
-        translate_count_zero(opc, ptr, "llvm.ctlz.i32");
+        translate_count_zero(opc, u, "llvm.ctlz.i32");
         break;
     case clz_i64:
-        translate_count_zero(opc, ptr, "llvm.ctlz.i64");
+        translate_count_zero(opc, u, "llvm.ctlz.i64");
         break;
     case cmp_vec:
-        translate_cmp_vec(opc, ptr);
+        translate_cmp_vec(opc, u);
         break;
     case ctz_i32:
-        translate_count_zero(opc, ptr, "llvm.cttz.i32");
+        translate_count_zero(opc, u, "llvm.cttz.i32");
         break;
     case ctz_i64:
-        translate_count_zero(opc, ptr, "llvm.cttz.i64");
+        translate_count_zero(opc, u, "llvm.cttz.i64");
         break;
     case deposit_i32:
     case deposit_i64:
-        translate_deposit(opc, ptr);
+        translate_deposit(opc, u);
         break;
     case dupm_vec:
-        translate_dupm_vec(opc, ptr);
+        translate_dupm_vec(opc, u);
         break;
     case extract2_i32:
     case extract2_i64:
-        translate_extract2(opc, ptr);
+        translate_extract2(opc, u);
         break;
     case extract_i32:
     case extract_i64:
-        translate_extract(opc, ptr);
+        translate_extract(opc, u);
         break;
     case extrh_i64_i32:
-        translate_extrh(opc, ptr);
+        translate_extrh(opc, u);
         break;
     case extrl_i64_i32:
     case mov_i32:
     case mov_i64:
     case mov_vec:
-        translate_mov(opc, ptr);
+        translate_mov(opc, u);
         break;
     case ext_i32_i64:
-        translate_ext(opc, ptr, LLVMBuildSExt);
+        translate_ext(opc, u, LLVMBuildSExt);
         break;
     case extu_i32_i64:
-        translate_ext(opc, ptr, LLVMBuildZExt);
+        translate_ext(opc, u, LLVMBuildZExt);
         break;
     case movcond_i32:
     case movcond_i64:
     case movcond_vec:
-        translate_movcond(opc, ptr);
+        translate_movcond(opc, u);
         break;
     case mul_i32:
     case mul_i64:
     case mul_vec:
-        translate_binary(opc, ptr, LLVMBuildMul);
+        translate_binary(opc, u, LLVMBuildMul);
         break;
     case mulsh_i32:
     case mulsh_i64:
-        translate_mulxh(opc, ptr, LLVMBuildSExt);
+        translate_mulxh(opc, u, LLVMBuildSExt);
         break;
     case muluh_i32:
     case muluh_i64:
-        translate_mulxh(opc, ptr, LLVMBuildZExt);
+        translate_mulxh(opc, u, LLVMBuildZExt);
         break;
     case muls2_i32:
     case muls2_i64:
-        translate_muls2(opc, ptr);
+        translate_muls2(opc, u);
         break;
     case mulu2_i32:
     case mulu2_i64:
-        translate_mulu2(opc, ptr);
+        translate_mulu2(opc, u);
         break;
     case neg_i32:
     case neg_i64:
     case neg_vec:
-        translate_neg(opc, ptr);
+        translate_neg(opc, u);
         break;
     case negsetcond_i32:
     case negsetcond_i64:
-        translate_negsetcond(opc, ptr);
+        translate_negsetcond(opc, u);
         break;
     case not_i32:
     case not_i64:
     case not_vec:
-        translate_not(opc, ptr);
+        translate_not(opc, u);
         break;
     case or_i32:
     case or_i64:
-        translate_binary(opc, ptr, LLVMBuildOr);
+        translate_binary(opc, u, LLVMBuildOr);
         break;
     case or_vec:
-        translate_binary(opc, ptr, LLVMBuildOr);
+        translate_binary(opc, u, LLVMBuildOr);
         break;
     case push_ret_addr:
-        translate_push_ret_addr(opc, ptr);
+        translate_push_ret_addr(opc, u);
         break;
     case ld8u_i32:
     case ld8u_i64:
     case ld16u_i32:
     case ld16u_i64:
     case ld32u_i64:
-        translate_ld_ext(opc, ptr, LLVMBuildZExt);
+        translate_ld_ext(opc, u, LLVMBuildZExt);
         break;
     case ld8s_i32:
     case ld8s_i64:
     case ld16s_i32:
     case ld16s_i64:
     case ld32s_i64:
-        translate_ld_ext(opc, ptr, LLVMBuildSExt);
+        translate_ld_ext(opc, u, LLVMBuildSExt);
         break;
     case ld_vec:
-        translate_ld_vec(opc, ptr);
+        translate_ld_vec(opc, u);
         break;
     case ld_i32:
     case ld_i64:
-        translate_ld_env_xmm(opc, ptr);
+        translate_ld_env_xmm(opc, u);
         break;
     case qemu_ld2_i128:
-        translate_qemu_ld2_i128(opc, ptr);
+        translate_qemu_ld2_i128(opc, u);
         break;
     case qemu_ld_i32:
     case qemu_ld_i64:
-        translate_qemu_ld(opc, ptr);
+        translate_qemu_ld(opc, u);
         break;
     case qemu_st2_i128:
-        translate_qemu_st2_i128(opc, ptr);
+        translate_qemu_st2_i128(opc, u);
         break;
     case qemu_st_i32:
     case qemu_st_i64:
-        translate_qemu_st(opc, ptr);
+        translate_qemu_st(opc, u);
         break;
     case st8_i32:
     case st8_i64:
@@ -5963,85 +6156,85 @@ static void handle_single_instr(OpCodeType opc, void *ptr) {
     case st32_i64:
     case st_i32:
     case st_i64:
-        translate_st(opc, ptr);
+        translate_st(opc, u);
         break;
     case st_vec:
-        translate_st_vec(opc, ptr);
+        translate_st_vec(opc, u);
         break;
     case ret:
-        translate_ret(opc, ptr);
+        translate_ret(opc, u);
         break;
     case rotr_i32:
     case rotr_i64:
-        translate_rotr(opc, ptr);
+        translate_rotr(opc, u);
         break;
     case rotl_i32:
     case rotl_i64:
-        translate_rotl(opc, ptr);
+        translate_rotl(opc, u);
         break;
     case sar_i32:
     case sar_i64:
-        translate_binary(opc, ptr, LLVMBuildAShr);
+        translate_binary(opc, u, LLVMBuildAShr);
         break;
     case setcond_i32:
     case setcond_i64:
-        translate_setcond(opc, ptr);
+        translate_setcond(opc, u);
         break;
     case sextract_i32:
     case sextract_i64:
-        translate_sextract(opc, ptr);
+        translate_sextract(opc, u);
         break;
     case shl_i32:
     case shl_i64:
-        translate_binary(opc, ptr, LLVMBuildShl);
+        translate_binary(opc, u, LLVMBuildShl);
         break;
     case shli_vec:
     case shls_vec:
-        translate_binary_splat_immediate(opc, ptr, LLVMBuildShl);
+        translate_binary_splat_immediate(opc, u, LLVMBuildShl);
         break;
     case shri_vec:
     case shrs_vec:
-        translate_binary_splat_immediate(opc, ptr, LLVMBuildLShr);
+        translate_binary_splat_immediate(opc, u, LLVMBuildLShr);
         break;
     case shr_i32:
     case shr_i64:
-        translate_binary(opc, ptr, LLVMBuildLShr);
+        translate_binary(opc, u, LLVMBuildLShr);
         break;
     case sub_i32:
     case sub_i64:
-        translate_binary(opc, ptr, LLVMBuildSub);
+        translate_binary(opc, u, LLVMBuildSub);
         break;
     case sub_vec:
-        translate_binary(opc, ptr, LLVMBuildSub);
+        translate_binary(opc, u, LLVMBuildSub);
         break;
     case umax_vec:
-        translate_maxmin_vec(opc, ptr, gtu);
+        translate_maxmin_vec(opc, u, gtu);
         break;
     case umin_vec:
-        translate_maxmin_vec(opc, ptr, ltu);
+        translate_maxmin_vec(opc, u, ltu);
         break;
     case xor_i32:
     case xor_i64:
     case xor_vec:
-        translate_binary(opc, ptr, LLVMBuildXor);
+        translate_binary(opc, u, LLVMBuildXor);
         break;
     case set_label:
-        translate_set_label(opc, ptr);
+        translate_set_label(opc, u);
         break;
     case brcond_i64:
-        translate_brcond_i64(opc, ptr);
+        translate_brcond_i64(opc, u);
         break;
     case jmp_direct:
-        translate_jmp_direct(opc, ptr);
+        translate_jmp_direct(opc, u);
         break;
     case discard:
-        translate_discard(opc, ptr);
+        translate_discard(opc, u);
         break;
     case call:
-        translate_call(opc, ptr);
+        translate_call(opc, u);
         break;
     case br:
-        translate_br(opc, ptr);
+        translate_br(opc, u);
         break;
     default: assert(0);
     }

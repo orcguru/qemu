@@ -1663,6 +1663,23 @@ typedef enum {
     #undef X
 } CVectorType;
 
+typedef struct {
+    uint16_t valid     :1;
+    uint16_t slot_type :3;
+    uint16_t slot_idx  :10;
+    uint16_t offset;
+} SlotT;
+
+typedef union {
+    uint64_t i;
+    SlotT s;
+} OperandType;
+
+typedef struct {
+    OpCodeType o;
+    HelperType h;
+} OHType;
+
 #ifdef __GNUC__
 #define likely(x)    __builtin_expect(!!(x), 1)  // True with high probability
 #define unlikely(x)  __builtin_expect(!!(x), 0)  // False with high probability
