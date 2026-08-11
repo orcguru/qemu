@@ -8,7 +8,6 @@
 typedef struct UnifiedInstr {
     uint8_t  opc;
     bool     is_helper;
-    bool     noargs;
     uint8_t  vs;
     uint8_t  es;
     struct UnifiedInstr *next;

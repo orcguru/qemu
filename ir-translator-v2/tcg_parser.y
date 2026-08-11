@@ -395,7 +395,6 @@ static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
 
     u->opc = opc;
     u->is_helper = is_helper;
-    u->noargs = (nops == 0);
     u->vs = vs;
     u->es = es;
     u->operand_count = nops;
