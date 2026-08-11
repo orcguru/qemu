@@ -648,6 +648,7 @@ static LLVMModuleRef module = NULL;
 static LLVMBuilderRef builder = NULL;
 static LLVMValueRef llvm_func = NULL;
 static LLVMBasicBlockRef last_active_bb = NULL;
+static UnifiedInstr *func_head = NULL;
 #define FIXED_PARAM_COUNT           XREG_MAX
 #define FIXED_VECTOR_PARAM_COUNT   (XREG_MAX + XMM_COUNT * 2)
 
@@ -736,7 +737,7 @@ typedef struct active_label_info {
 static GHashTable *current_active_label_info = NULL;
 
 typedef struct helper_aux_info {
-    void *ptr;
+    const UnifiedInstr *u;
     uint8_t idx;
     struct helper_aux_info *next;
 } helper_aux_info_t;
@@ -3094,28 +3095,28 @@ static void set_current_active_label_cnt(uint8_t current_active_label_cnt) {
 
 static void register_idx_for_call_helper(const UnifiedInstr *u, uint8_t call_idx) {
 #ifdef DEBUG
-    printf("%s %lx call%d\n", __FUNCTION__, ptr, call_idx); fflush(NULL);
+    printf("%s %lx call%d\n", __FUNCTION__, u, call_idx); fflush(NULL);
 #endif
     helper_aux_info_t *call_info = (helper_aux_info_t *)calloc(1, sizeof(helper_aux_info_t));
-    call_info->ptr = ptr;
+    call_info->u = u;
     call_info->idx = call_idx;
-    helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, ptr);
+    helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, (void *)u);
     if (!info) {
-        g_hash_table_insert(current_helper_aux_info, ptr, call_info);
+        g_hash_table_insert(current_helper_aux_info, (void *)u, call_info);
     } else {
         while (info->next) {
-            assert(info->ptr != ptr);
+            assert(info->u != u);
             info = info->next;
         }
-        assert(info->ptr != ptr);
+        assert(info->u != u);
         info->next = call_info;
     }
 }
 
 static uint8_t get_idx_for_call_helper(const UnifiedInstr *u) {
-    helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, ptr);
+    helper_aux_info_t *info = g_hash_table_lookup(current_helper_aux_info, (void *)u);
     while (info) {
-        if (info->ptr == ptr) {
+        if (info->u == u) {
             return info->idx;
         }
         info = info->next;
@@ -4307,8 +4308,6 @@ static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u) {
     LLVMBuildRetVoid(builder);
 
     LLVMValueRef llvm_func_backup = llvm_func;
-    UnifiedInstr *head = (UnifiedInstr *)get_instr_buffer();  /* now holds list head */
-    (void)head;  /* may be unused */
     // Check if we got remaining BBs
     do {
         llvm_func = llvm_func_backup;
@@ -4318,19 +4317,19 @@ static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u) {
         }
         uint8_t *current_active_labels = get_current_active_labels(llvm_func);
         uint8_t tgt_lbl = current_active_labels[0];
-        UnifiedInstr *ptr_tmp = NULL;
-        for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-            OpCodeType opc = get_opcode(ptr_tmp);
-            if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+        UnifiedInstr *u_tmp = NULL;
+        for (u_tmp = func_head; u_tmp; u_tmp = u_tmp->next) {
+            OpCodeType opc = get_opcode(u_tmp);
+            if (opc == set_label && get_label_from_instr(u_tmp) == tgt_lbl) {
                 break;
             }
         }
-        assert(ptr_tmp < ptr_max);
-        for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-            OpCodeType opc = get_opcode(ptr_tmp);
-            handle_single_instr(opc, ptr_tmp);
+        assert(u_tmp);
+        for (; u_tmp; u_tmp = u_tmp->next) {
+            OpCodeType opc = get_opcode(u_tmp);
+            handle_single_instr(opc, u_tmp);
             memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-            if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
+            if (is_opc_end_of_control_flow(opc, u_tmp)) {
                 break;
             }
         }
@@ -4510,8 +4509,6 @@ static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u) {
     LLVMBuildRetVoid(builder);
 
     LLVMValueRef llvm_func_backup = llvm_func;
-    UnifiedInstr *head = (UnifiedInstr *)get_instr_buffer();  /* now holds list head */
-    (void)head;  /* may be unused */
     // Check if we got remaining BBs
     do {
         llvm_func = llvm_func_backup;
@@ -4521,19 +4518,19 @@ static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u) {
         }
         uint8_t *current_active_labels = get_current_active_labels(llvm_func);
         uint8_t tgt_lbl = current_active_labels[0];
-        UnifiedInstr *ptr_tmp = NULL;
-        for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-            OpCodeType opc = get_opcode(ptr_tmp);
-            if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+        UnifiedInstr *u_tmp = NULL;
+        for (u_tmp = func_head; u_tmp; u_tmp = u_tmp->next) {
+            OpCodeType opc = get_opcode(u_tmp);
+            if (opc == set_label && get_label_from_instr(u_tmp) == tgt_lbl) {
                 break;
             }
         }
-        assert(ptr_tmp < ptr_max);
-        for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-            OpCodeType opc = get_opcode(ptr_tmp);
-            handle_single_instr(opc, ptr_tmp);
+        assert(u_tmp);
+        for (; u_tmp; u_tmp = u_tmp->next) {
+            OpCodeType opc = get_opcode(u_tmp);
+            handle_single_instr(opc, u_tmp);
             memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-            if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
+            if (is_opc_end_of_control_flow(opc, u_tmp)) {
                 break;
             }
         }
@@ -4872,7 +4869,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     }
 
     char second_half_name[64];
-    uint8_t call_idx = get_idx_for_call_helper(ptr);
+    uint8_t call_idx = get_idx_for_call_helper(u);
     sprintf(second_half_name, "%s%sfunc_%lx_call%d", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset, call_idx);
 
     char helper_func_name[1024] = {0};
@@ -4953,8 +4950,6 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     LLVMBuildRetVoid(builder);
 
     LLVMValueRef llvm_func_backup = llvm_func;
-    UnifiedInstr *head = (UnifiedInstr *)get_instr_buffer();  /* now holds list head */
-    (void)head;  /* may be unused */
     // Check if we got remaining BBs
     do {
         llvm_func = llvm_func_backup;
@@ -4964,17 +4959,17 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
         }
         uint8_t *current_active_labels = get_current_active_labels(llvm_func);
         uint8_t tgt_lbl = current_active_labels[0];
-        UnifiedInstr *ptr_tmp = NULL;
-        for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-            OpCodeType opc = get_opcode(ptr_tmp);
-            if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+        UnifiedInstr *u_tmp = NULL;
+        for (u_tmp = func_head; u_tmp; u_tmp = u_tmp->next) {
+            OpCodeType opc = get_opcode(u_tmp);
+            if (opc == set_label && get_label_from_instr(u_tmp) == tgt_lbl) {
                 break;
             }
         }
-        assert(ptr_tmp < ptr_max);
-        for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-            OpCodeType opc = get_opcode(ptr_tmp);
-            handle_single_instr(opc, ptr_tmp);
+        assert(u_tmp);
+        for (; u_tmp; u_tmp = u_tmp->next) {
+            OpCodeType opc = get_opcode(u_tmp);
+            handle_single_instr(opc, u_tmp);
             memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
             if (is_opc_end_of_control_flow(opc, u)) {
                 break;
@@ -5086,28 +5081,28 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
         }
     }
 
-    // Start from the one after ptr
-    for (UnifiedInstr *ptr_tmp = head; ptr_tmp; ptr_tmp = ptr_tmp->next) {
-        OpCodeType opc = get_opcode(ptr_tmp);
-        handle_single_instr(opc, ptr_tmp);
+    // Start from the one after u
+    for (const UnifiedInstr *u_tmp = u; u_tmp; u_tmp = u_tmp->next) {
+        OpCodeType opc = get_opcode(u_tmp);
+        handle_single_instr(opc, u_tmp);
         memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-        if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
+        if (is_opc_end_of_control_flow(opc, u_tmp)) {
             while (get_current_active_label_cnt(second_half_func)) {
                 uint8_t *current_active_labels = get_current_active_labels(second_half_func);
                 uint8_t tgt_lbl = current_active_labels[0];
-                UnifiedInstr *ptr_tmp = NULL;
-                for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-                    OpCodeType opc = get_opcode(ptr_tmp);
-                    if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+                UnifiedInstr *u_tmp = NULL;
+                for (u_tmp = func_head; u_tmp; u_tmp = u_tmp->next) {
+                    OpCodeType opc = get_opcode(u_tmp);
+                    if (opc == set_label && get_label_from_instr(u_tmp) == tgt_lbl) {
                         break;
                     }
                 }
-                assert(ptr_tmp < ptr_max);
-                for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-                    OpCodeType opc = get_opcode(ptr_tmp);
-                    handle_single_instr(opc, ptr_tmp);
+                assert(u_tmp);
+                for (; u_tmp; u_tmp = u_tmp->next) {
+                    OpCodeType opc = get_opcode(u_tmp);
+                    handle_single_instr(opc, u_tmp);
                     memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-                    if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
+                    if (is_opc_end_of_control_flow(opc, u_tmp)) {
                         break;
                     }
                 }
@@ -5189,7 +5184,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     }
 
     char second_half_name[64];
-    uint8_t call_idx = get_idx_for_call_helper(ptr);
+    uint8_t call_idx = get_idx_for_call_helper(u);
     sprintf(second_half_name, "%s%sfunc_%lx_call%d", func_name_prefix, func_name_prefix[0] ? "_" : "", current_func_offset, call_idx);
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
@@ -5312,8 +5307,6 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     LLVMBuildRetVoid(builder);
 
     LLVMValueRef llvm_func_backup = llvm_func;
-    UnifiedInstr *head = (UnifiedInstr *)get_instr_buffer();  /* now holds list head */
-    (void)head;  /* may be unused */
     // Check if we got remaining BBs
     do {
         llvm_func = llvm_func_backup;
@@ -5323,19 +5316,19 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
         }
         uint8_t *current_active_labels = get_current_active_labels(llvm_func);
         uint8_t tgt_lbl = current_active_labels[0];
-        UnifiedInstr *ptr_tmp = NULL;
-        for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-            OpCodeType opc = get_opcode(ptr_tmp);
-            if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+        UnifiedInstr *u_tmp = NULL;
+        for (u_tmp = func_head; u_tmp; u_tmp = u_tmp->next) {
+            OpCodeType opc = get_opcode(u_tmp);
+            if (opc == set_label && get_label_from_instr(u_tmp) == tgt_lbl) {
                 break;
             }
         }
-        assert(ptr_tmp < ptr_max);
-        for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-            OpCodeType opc = get_opcode(ptr_tmp);
-            handle_single_instr(opc, ptr_tmp);
+        assert(u_tmp);
+        for (; u_tmp; u_tmp = u_tmp->next) {
+            OpCodeType opc = get_opcode(u_tmp);
+            handle_single_instr(opc, u_tmp);
             memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-            if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
+            if (is_opc_end_of_control_flow(opc, u_tmp)) {
                 break;
             }
         }
@@ -5458,28 +5451,28 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
         }
     }
 
-    // Start from the one after ptr
-    for (UnifiedInstr *ptr_tmp = head; ptr_tmp; ptr_tmp = ptr_tmp->next) {
-        OpCodeType opc = get_opcode(ptr_tmp);
-        handle_single_instr(opc, ptr_tmp);
+    // Start from the one after u
+    for (const UnifiedInstr *u_tmp = u; u_tmp; u_tmp = u_tmp->next) {
+        OpCodeType opc = get_opcode(u_tmp);
+        handle_single_instr(opc, u_tmp);
         memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-        if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
+        if (is_opc_end_of_control_flow(opc, u_tmp)) {
             while (get_current_active_label_cnt(second_half_func)) {
                 uint8_t *current_active_labels = get_current_active_labels(second_half_func);
                 uint8_t tgt_lbl = current_active_labels[0];
-                UnifiedInstr *ptr_tmp = NULL;
-                for (ptr_tmp = ptr_init; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-                    OpCodeType opc = get_opcode(ptr_tmp);
-                    if (opc == set_label && get_label(ptr_tmp) == tgt_lbl) {
+                UnifiedInstr *u_tmp = NULL;
+                for (u_tmp = func_head; u_tmp; u_tmp = u_tmp->next) {
+                    OpCodeType opc = get_opcode(u_tmp);
+                    if (opc == set_label && get_label_from_instr(u_tmp) == tgt_lbl) {
                         break;
                     }
                 }
-                assert(ptr_tmp < ptr_max);
-                for (; ptr_tmp < ptr_max; ptr_tmp = move_to_next(ptr_tmp)) {
-                    OpCodeType opc = get_opcode(ptr_tmp);
-                    handle_single_instr(opc, ptr_tmp);
+                assert(u_tmp);
+                for (; u_tmp; u_tmp = u_tmp->next) {
+                    OpCodeType opc = get_opcode(u_tmp);
+                    handle_single_instr(opc, u_tmp);
                     memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
-                    if (is_opc_end_of_control_flow(opc, ptr_tmp)) {
+                    if (is_opc_end_of_control_flow(opc, u_tmp)) {
                         break;
                     }
                 }
@@ -5684,15 +5677,14 @@ static int process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType 
     return 1;
 }
 
-void handle_func(uint64_t val, int is_external) {
+void handle_func(uint64_t off, UnifiedInstr *head, int is_external) {
 #ifdef DEBUG
-    printf("func %lx\n", val); fflush(NULL);
+    printf("func %lx\n", off); fflush(NULL);
 #endif
-    current_func_offset = val;
+    func_head = head;
+    current_func_offset = off;
     ir_var_name_idx = 0;
     memset(tmp_var_available, 0xff, sizeof(tmp_var_available));
-    UnifiedInstr *head = (UnifiedInstr *)get_instr_buffer();  /* now holds list head */
-    (void)head;  /* may be unused */
     /// Loop through all xreg/slot/xmm, handle arguments, stack alloc/store etc.
     uint8_t tmp_has_known_def[1<<STACK_INDEX_SHIFT] = {0};
     for (UnifiedInstr *u = head; u; u = u->next) {
@@ -5746,7 +5738,7 @@ void handle_func(uint64_t val, int is_external) {
     memcpy(tmp_var_available_backup, tmp_var_available, sizeof(tmp_var_available_backup));
 
     char func_name[64];
-    sprintf(func_name, "%s%sfunc_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", val);
+    sprintf(func_name, "%s%sfunc_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", off);
     if (is_external == 0) {
         llvm_func = get_or_add_func_with_qemuaot_cc(func_name, 0);
         LLVMSetLinkage(llvm_func, LLVMInternalLinkage);
@@ -5806,16 +5798,6 @@ void handle_func(uint64_t val, int is_external) {
 }
 
 static void handle_single_instr(OpCodeType opc, const UnifiedInstr *u) {
-#if 0
-    printf("handle_single_instr: %s ptr:%lx", opcode_type_str[opc], ptr); fflush(NULL);
-    void *next = move_to_next(ptr);
-    unsigned char *byte = (unsigned char *)ptr;
-    while (byte != (unsigned char *)next) {
-        printf(" %02x", byte[0]);
-        byte += 1;
-    }
-    printf("\n"); fflush(NULL);
-#endif
     switch (opc) {
     case addc1o_i32:
     case addc1o_i64:

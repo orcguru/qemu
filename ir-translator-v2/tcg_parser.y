@@ -26,7 +26,7 @@
 extern void register_xmm(uint64_t idx, uint64_t offset);
 extern void register_xmm_tmp(uint64_t offset);
 extern XMMReg lookup_xmm(uint64_t offset);
-extern void handle_func(UnifiedInstr *head, int is_external);
+extern void handle_func(uint64_t off, UnifiedInstr *head, int is_external);
 
 static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
                                 uint8_t vs, uint8_t es,
@@ -149,13 +149,13 @@ func_list:
 func:
     INTERNAL COLON IMMX COLON instr_list
     {
-        handle_func(ctx->instr_head, 0);
+        handle_func($3, ctx->instr_head, 0);
         ctx->instr_head = NULL;
         ctx->instr_tail = NULL;
     }
   | EXTERNAL COLON IMMX COLON instr_list
     {
-        handle_func(ctx->instr_head, 1);
+        handle_func($3, ctx->instr_head, 1);
         ctx->instr_head = NULL;
         ctx->instr_tail = NULL;
     }
