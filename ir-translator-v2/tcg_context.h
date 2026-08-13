@@ -49,27 +49,4 @@ static inline void tcg_context_init(TcgContext *ctx) {
     ctx->lineptr = NULL;
 }
 
-/* Reset the instruction list for the next function block */
-static inline void tcg_context_reset_instrs(TcgContext *ctx) {
-    /* Note: caller is responsible for freeing the UnifiedInstr nodes
-       (e.g., inside handle_func) before resetting the head. */
-    ctx->instr_head = NULL;
-    ctx->instr_tail = NULL;
-}
-
-/* Helper: reverse the instruction list (since we prepend, the list is
-   in reverse order of appearance). Returns the new head. */
-static inline UnifiedInstr *tcg_context_reverse_instrs(TcgContext *ctx) {
-    UnifiedInstr *prev = NULL;
-    UnifiedInstr *curr = ctx->instr_head;
-    while (curr) {
-        UnifiedInstr *next = curr->next;
-        curr->next = prev;
-        prev = curr;
-        curr = next;
-    }
-    ctx->instr_head = prev;
-    return prev;
-}
-
 #endif /* TCG_CONTEXT_H */

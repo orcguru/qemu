@@ -30,7 +30,7 @@
 //#define BUILD_RISCV_ON_AARCH        1
 //#define DUMP_IR                     1
 //#define VERBOSE_VAR                 1
-//#define DEBUG                       1
+#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_OUTPUT_T        opciosz[opc][1]
@@ -171,8 +171,13 @@ static inline RelopType get_relop_from_any_operand(const UnifiedInstr *u) {
 
 /* Compatibility shim for remaining get_operand_legacy(u, idx, &is_imm) call sites */
 static inline OperandType get_operand_legacy(const UnifiedInstr *u, int idx, uint32_t *is_imm) {
-    const Operand *op = get_operand(u, idx);
     OperandType ret;
+    *is_imm = 0;
+    ret.s.valid = 0;
+    if (idx >= u->operand_count) {
+        return ret;
+    }
+    const Operand *op = get_operand(u, idx);
     if (op->kind == OP_IMM) {
         *is_imm = 1;
         ret.i = op->imm;
@@ -198,7 +203,8 @@ static inline OperandType get_operand_legacy(const UnifiedInstr *u, int idx, uin
             ret.s.offset = op->env_offset;
             break;
         default:
-            assert(0);
+            // invalid operand e.g. RELOP,ATTR
+            break;
         }
     }
     return ret;
@@ -387,8 +393,7 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
     do {                                                \
         op0 = get_operand_legacy(u, 0, &is_imm0); \
         op1 = get_operand_legacy(u, 1, &is_imm1); \
-        assert(!is_imm0 && op0.s.slot_type == OP_SLOT && \
-               !is_imm1 && op1.s.slot_type == OP_SLOT);  \
+        assert(!is_imm0 && op0.s.valid && !is_imm1 && op1.s.valid);  \
     } while (0)
 
 #define GET_2_OPERANDS_NOCHECK()                        \
@@ -402,9 +407,7 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
         op0 = get_operand_legacy(u, 0, &is_imm0); \
         op1 = get_operand_legacy(u, 1, &is_imm1); \
         op2 = get_operand_legacy(u, 2, &is_imm2); \
-        assert(!is_imm0 && op0.s.slot_type == OP_SLOT && \
-               !is_imm1 && op1.s.slot_type == OP_SLOT && \
-               !is_imm2 && op2.s.slot_type == OP_SLOT);  \
+        assert(!is_imm0 && op0.s.valid && !is_imm1 && op1.s.valid && !is_imm2 && op2.s.valid);  \
     } while (0)
 
 #define GET_3_OPERANDS_NOCHECK()                        \
@@ -431,10 +434,7 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
         op1 = get_operand_legacy(u, 1, &is_imm1); \
         op2 = get_operand_legacy(u, 2, &is_imm2); \
         op3 = get_operand_legacy(u, 3, &is_imm3); \
-        assert(!is_imm0 && op0.s.slot_type == OP_SLOT && \
-               !is_imm1 && op1.s.slot_type == OP_SLOT && \
-               !is_imm2 && op2.s.slot_type == OP_SLOT && \
-               !is_imm3 && op3.s.slot_type == OP_SLOT);  \
+        assert(!is_imm0 && op0.s.valid && !is_imm1 && op1.s.valid && !is_imm2 && op2.s.valid && !is_imm3 && op3.s.valid);  \
     } while (0)
 
 #define GET_5_OPERANDS()                                \
@@ -444,11 +444,7 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
         op2 = get_operand_legacy(u, 2, &is_imm2); \
         op3 = get_operand_legacy(u, 3, &is_imm3); \
         op4 = get_operand_legacy(u, 4, &is_imm4); \
-        assert(!is_imm0 && op0.s.slot_type == OP_SLOT && \
-               !is_imm1 && op1.s.slot_type == OP_SLOT && \
-               !is_imm2 && op2.s.slot_type == OP_SLOT && \
-               !is_imm3 && op3.s.slot_type == OP_SLOT && \
-               !is_imm4 && op4.s.slot_type == OP_SLOT);  \
+        assert(!is_imm0 && op0.s.valid && !is_imm1 && op1.s.valid && !is_imm2 && op2.s.valid && !is_imm3 && op3.s.valid && !is_imm4 && op4.s.valid);  \
     } while (0)
 
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc, const UnifiedInstr *u) {
@@ -1929,16 +1925,18 @@ void translate_ld_env_xmm(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
-    uint32_t is_imm0, is_imm1, is_imm2;
-    OperandType op0, op1, op2;
+    uint32_t is_imm0, is_imm1;
+    OperandType op0, op1;
     GET_2_OPERANDS();
-    op2 = get_operand_legacy(u, 2, &is_imm2);
 
     if (op1.s.slot_type == SUB_SLOT_ENV ||
         op1.s.slot_type == SUB_SLOT_XMM) {
         LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op1, type_mem, 0);
         do_store(opc, val, type_reg, op0);
     } else if (op1.s.slot_type == SUB_SLOT_TMP) {
+        OperandType op2;
+        uint32_t is_imm2;
+        op2 = get_operand_legacy(u, 2, &is_imm2);
         assert(has_alias(op1) && is_imm2);
         OperandType alias = get_alias(op1);
         assert(alias.s.valid);
@@ -3800,7 +3798,7 @@ static LLVMValueRef create_reference_to_external_array(LLVMModuleRef module, con
 // FIXME: can this be merged into common logic?
 static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
 #endif
     HelperType h = get_helper(u);
     char *second_half_name = "jmp_ind_callback";
@@ -3916,13 +3914,13 @@ static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u) {
         }
     } while (1);
 #ifdef DEBUG
-    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
 #endif
 }
 
 static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
 #endif
     HelperType h = get_helper(u);
     char *second_half_name = "jmp_ind_callback";
@@ -4117,14 +4115,14 @@ static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u) {
         }
     } while (1);
 #ifdef DEBUG
-    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
 #endif
 }
 
 static void translate_cc_compute_inband(OpCodeType opc, const UnifiedInstr *u) {
     HelperType h = get_helper(u);
 #ifdef DEBUG
-    printf("%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], ptr); fflush(NULL);
+    printf("%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], u); fflush(NULL);
 #endif
     OperandType oarg;
     uint32_t is_imm_dummy;
@@ -4195,7 +4193,7 @@ static LLVMValueRef reload_vector(XMMRegType xmm_reg) {
 static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     HelperType h = get_helper(u);
 #ifdef DEBUG
-    printf(">>>%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], ptr); fflush(NULL);
+    printf(">>>%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], u); fflush(NULL);
 #endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef shadow_pointer = NULL;
@@ -4560,7 +4558,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
 
     if (second_half_already_exists) {
 #ifdef DEBUG
-        printf("<<<%s %s %lx return early\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+        printf("<<<%s %s %lx return early\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
 #endif
         return;
     }
@@ -4663,7 +4661,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     }
 
     // Start from the one after u
-    for (const UnifiedInstr *u_tmp = u; u_tmp; u_tmp = u_tmp->next) {
+    for (const UnifiedInstr *u_tmp = u->next; u_tmp; u_tmp = u_tmp->next) {
         OpCodeType opc = get_opcode(u_tmp);
         handle_single_instr(opc, u_tmp);
         memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
@@ -4693,7 +4691,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     }
     llvm_func = NULL;
 #ifdef DEBUG
-    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
 #endif
 }
 
@@ -4735,7 +4733,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     }
     // We cannot inline below helpers currently, so their invocations incur context backup penalty.
 #ifdef DEBUG
-    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
 #endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef shadow_pointer = NULL;
@@ -4917,7 +4915,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
 
     if (second_half_disabled || second_half_already_exists) {
 #ifdef DEBUG
-        printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+        printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
 #endif
         return;
     }
@@ -5033,7 +5031,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     }
 
     // Start from the one after u
-    for (const UnifiedInstr *u_tmp = u; u_tmp; u_tmp = u_tmp->next) {
+    for (const UnifiedInstr *u_tmp = u->next; u_tmp; u_tmp = u_tmp->next) {
         OpCodeType opc = get_opcode(u_tmp);
         handle_single_instr(opc, u_tmp);
         memcpy(tmp_var_available, tmp_var_available_backup, sizeof(tmp_var_available));
@@ -5063,7 +5061,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     }
     llvm_func = NULL;
 #ifdef DEBUG
-    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], ptr); fflush(NULL);
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
 #endif
 }
 
@@ -5195,7 +5193,7 @@ static void register_labels_for_func(LLVMValueRef func) {
     }
 }
 
-static int process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType opc, LLVMType vtype, uint32_t noargs, uint8_t *tmp_has_known_def) {
+static int process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType opc, LLVMType vtype, uint32_t base_input_idx_for_call, uint8_t *tmp_has_known_def) {
     uint32_t is_imm = 0;
     OperandType operand = get_operand_legacy(u, slot_idx, &is_imm);
     // End-of-operands
@@ -5227,7 +5225,7 @@ static int process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType 
             xmm_valid |= (1UL<<operand.s.slot_idx);
         }
         if (operand.s.slot_type == SUB_SLOT_TMP) {
-            if ((opc == call && slot_idx >= noargs) || (opc != call && slot_idx >= opcoc[opc])) {
+            if ((opc == call && slot_idx >= base_input_idx_for_call) || (opc != call && slot_idx >= opcoc[opc])) {
                 if (!tmp_has_known_def[operand.s.slot_idx]) {
                     // At this stage, we do not have alias information yet, so we need to check later
 #ifdef DEBUG
@@ -5243,7 +5241,7 @@ static int process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType 
             }
             if (opc != call && slot_idx < opcoc[opc]) {
                 tmp_has_known_def[operand.s.slot_idx] = 1;
-            } else if (opc == call && slot_idx < noargs) {
+            } else if (opc == call && slot_idx < base_input_idx_for_call) {
 #ifdef DEBUG
                 OperandType orig_slot = get_original_slot_for_debug(operand);
                 printf("  unregister cross_call tmp:%d orig:%s%d\n", operand.s.slot_idx, orig_slot.s.valid ? (orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp") : "NA", orig_slot.s.valid ? orig_slot.s.slot_idx : 0); fflush(NULL);
@@ -5277,7 +5275,7 @@ void handle_func(uint64_t off, UnifiedInstr *head, int is_external) {
         if (opc == call) {
             noargs = HELPER_DEFINES_OUTPUT(get_helper(u));
             if (noargs) {
-                oarg = get_operand_legacy(u, 0, &is_immo);
+                oarg = get_operand_legacy(u, 3, &is_immo);
                 assert(!is_immo && oarg.s.valid);
             }
             register_idx_for_call_helper(u, current_call_idx);
@@ -5288,9 +5286,9 @@ void handle_func(uint64_t off, UnifiedInstr *head, int is_external) {
           vtype = get_llvm_vector_type(u);
         }
         // Input arguments first
-        uint32_t slot_idx = opc == call ? noargs : opcoc[opc];
+        uint32_t slot_idx = opc == call ? (noargs + 3) : opcoc[opc];
         do {
-            if (!process_op_type(slot_idx, u, opc, vtype, noargs, tmp_has_known_def)) {
+            if (!process_op_type(slot_idx, u, opc, vtype, (noargs + 3), tmp_has_known_def)) {
                 break;
             }
             slot_idx += 1;
@@ -5298,7 +5296,7 @@ void handle_func(uint64_t off, UnifiedInstr *head, int is_external) {
 
         // Output argument
         if (opc == call ? noargs : opcoc[opc]) {
-            process_op_type(0, u, opc, vtype, noargs, tmp_has_known_def);
+            process_op_type(3, u, opc, vtype, (noargs + 3), tmp_has_known_def);
         }
 
         if (opc == call) {
@@ -6101,6 +6099,7 @@ void parse_tcg_instructions(const char *filename) {
     }
 
     TcgContext ctx;
+    tcg_context_init(&ctx);
     yyscan_t scanner;
     yylex_init(&scanner);
     yyset_in(source_file, scanner);

@@ -33,6 +33,15 @@ static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
                                 Operand *ops, int nops);
 static void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src);
 
+/* Free a singly-linked list of UnifiedInstr (and their operand data). */
+static void free_instr_list(UnifiedInstr *head) {
+    while (head) {
+        UnifiedInstr *next = head->next;
+        free(head);
+        head = next;
+    }
+}
+
 static void op_list_init(OpList *l) {
     l->data = NULL;
     l->len = 0;
@@ -63,6 +72,17 @@ static void append_instr(TcgContext *ctx, UnifiedInstr *u) {
         ctx->instr_head = u;
         ctx->instr_tail = u;
     }
+}
+
+/*
+ * Reset the instruction list in the context, freeing all allocated
+ * UnifiedInstr nodes.  After this call, instr_head and instr_tail
+ * are both NULL and the associated memory has been released.
+ */
+static void tcg_context_reset_instrs(TcgContext *ctx) {
+    free_instr_list(ctx->instr_head);
+    ctx->instr_head = NULL;
+    ctx->instr_tail = NULL;
 }
 
 #ifndef YYSTYPE
@@ -150,14 +170,12 @@ func:
     INTERNAL COLON IMMX COLON instr_list
     {
         handle_func($3, ctx->instr_head, 0);
-        ctx->instr_head = NULL;
-        ctx->instr_tail = NULL;
+        tcg_context_reset_instrs(ctx);
     }
   | EXTERNAL COLON IMMX COLON instr_list
     {
         handle_func($3, ctx->instr_head, 1);
-        ctx->instr_head = NULL;
-        ctx->instr_tail = NULL;
+        tcg_context_reset_instrs(ctx);
     }
 ;
 

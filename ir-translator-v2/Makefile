@@ -7,7 +7,7 @@ ifeq ($(ARCH_TARGET), aarch64)
 else ifeq ($(ARCH_TARGET), riscv64)
     LLVM_PATH = /home/felix/Install/llvm_riscv
 endif
-CFLAGS = -O2 -g -Wall -I/usr/include/glib-2.0 -I$(LLVM_PATH)/include
+CFLAGS = -O0 -g -Wall -I/usr/include/glib-2.0 -I$(LLVM_PATH)/include
 ifeq ($(ARCH_HOST), aarch64)
     CFLAGS += -I/usr/lib64/glib-2.0/include
 else ifeq ($(ARCH_HOST), riscv64)

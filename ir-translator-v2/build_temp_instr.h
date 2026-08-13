@@ -210,5 +210,4 @@ static inline void __bi_set_symbol(UnifiedInstr *u, int idx, HelperType h)
         __bi_set_attr(__bi_u, (idx), &__bi_attr);                         \
     } while (0)
 
-
 #endif /* BUILD_TEMP_INSTR_H */
