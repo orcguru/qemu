@@ -590,11 +590,11 @@ static inline OperandType get_operand_legacy(const UnifiedInstr *u, int idx, uin
         tmp_opc.o = qemu_ld_i64;                    \
         AttrSrcInfo a0, a1, a2;                     \
         a0.subt = SUB_ATTR_ATOMIC;                  \
-        a0.p.storage.attr.atomic = NONATOMIC;       \
+        a0.p.storage.atomic = NONATOMIC;       \
         a1.subt = SUB_ATTR_ALIGNMENT;               \
-        a1.p.storage.attr.alignment = ALIGN_MEM_SIZE;   \
+        a1.p.storage.alignment = ALIGN_MEM_SIZE;   \
         a2.subt = SUB_ATTR_SRCSIZEEXT;              \
-        a2.p.storage.attr.ext = ZERO;               \
+        a2.p.storage.ext = ZERO;               \
         a2.p.storage.size = SRC8B;                  \
         create_scalar_slot2_attr3_num(buf, tmp_opc, L, ADDR, a0, a1, a2, 2);      \
         translate_qemu_ld(tmp_opc.o, buf);        \
@@ -607,11 +607,11 @@ static inline OperandType get_operand_legacy(const UnifiedInstr *u, int idx, uin
         tmp_opc.o = qemu_st_i64;                    \
         AttrSrcInfo a0, a1, a2;                     \
         a0.subt = SUB_ATTR_ATOMIC;                  \
-        a0.p.storage.attr.atomic = NONATOMIC;       \
+        a0.p.storage.atomic = NONATOMIC;       \
         a1.subt = SUB_ATTR_ALIGNMENT;               \
-        a1.p.storage.attr.alignment = ALIGN_MEM_SIZE;   \
+        a1.p.storage.alignment = ALIGN_MEM_SIZE;   \
         a2.subt = SUB_ATTR_SRCSIZEEXT;              \
-        a2.p.storage.attr.ext = ZERO;               \
+        a2.p.storage.ext = ZERO;               \
         a2.p.storage.size = SRC8B;                  \
         create_scalar_slot2_attr3_num(buf, tmp_opc, R, ADDR, a0, a1, a2, 2);      \
         translate_qemu_st(tmp_opc.o, buf);        \
@@ -870,9 +870,9 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 
 #define GET_STORAGE_ATTR()                                      \
     do {                                                        \
-        a0.p.storage.attr.atomic = attr.attr_val >> 7;          \
-        a1.p.storage.attr.alignment = (attr.attr_val >> 4) & 0x7;   \
-        a2.p.storage.attr.ext = (attr.attr_val >> 3) & 0x1;     \
+        a0.p.storage.atomic = attr.attr_val >> 7;          \
+        a1.p.storage.alignment = (attr.attr_val >> 4) & 0x7;   \
+        a2.p.storage.ext = (attr.attr_val >> 3) & 0x1;     \
         a2.p.storage.size = attr.attr_val & 0x7;                \
     } while (0)
 
@@ -2388,19 +2388,19 @@ void translate_qemu_ld2_i128(OpCodeType opc, const UnifiedInstr *u) {
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op2, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     unsigned align = 1;
-    if (a1.p.storage.attr.alignment == UNALIGN) {
+    if (a1.p.storage.alignment == UNALIGN) {
         align = 1;
-    } else if (a1.p.storage.attr.alignment == ALIGN_2) {
+    } else if (a1.p.storage.alignment == ALIGN_2) {
         align = 2;
-    } else if (a1.p.storage.attr.alignment == ALIGN_4) {
+    } else if (a1.p.storage.alignment == ALIGN_4) {
         align = 4;
-    } else if (a1.p.storage.attr.alignment == ALIGN_8) {
+    } else if (a1.p.storage.alignment == ALIGN_8) {
         align = 8;
-    } else if (a1.p.storage.attr.alignment == ALIGN_16) {
+    } else if (a1.p.storage.alignment == ALIGN_16) {
         align = 16;
-    } else if (a1.p.storage.attr.alignment == ALIGN_32) {
+    } else if (a1.p.storage.alignment == ALIGN_32) {
         align = 32;
-    } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
+    } else if (a1.p.storage.alignment == ALIGN_MEM_SIZE) {
         align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
     } else {
         assert(0);
@@ -2435,26 +2435,26 @@ void translate_qemu_ld(OpCodeType opc, const UnifiedInstr *u) {
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op1, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     unsigned align = 1;
-    if (a1.p.storage.attr.alignment == UNALIGN) {
+    if (a1.p.storage.alignment == UNALIGN) {
         align = 1;
-    } else if (a1.p.storage.attr.alignment == ALIGN_2) {
+    } else if (a1.p.storage.alignment == ALIGN_2) {
         align = 2;
-    } else if (a1.p.storage.attr.alignment == ALIGN_4) {
+    } else if (a1.p.storage.alignment == ALIGN_4) {
         align = 4;
-    } else if (a1.p.storage.attr.alignment == ALIGN_8) {
+    } else if (a1.p.storage.alignment == ALIGN_8) {
         align = 8;
-    } else if (a1.p.storage.attr.alignment == ALIGN_16) {
+    } else if (a1.p.storage.alignment == ALIGN_16) {
         align = 16;
-    } else if (a1.p.storage.attr.alignment == ALIGN_32) {
+    } else if (a1.p.storage.alignment == ALIGN_32) {
         align = 32;
-    } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
+    } else if (a1.p.storage.alignment == ALIGN_MEM_SIZE) {
         align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
     } else {
         assert(0);
     }
     LLVMValueRef result = build_load_with_alignment(builder, llvm_int_types[type_mem], pointer, get_next_var_name(opcode_type_str[opc], op0), align);
     if (type_mem < type_reg) {
-        if (a2.p.storage.attr.ext == ZERO) {
+        if (a2.p.storage.ext == ZERO) {
             result = LLVMBuildZExt(builder, result, llvm_int_types[type_reg], get_next_var_name(opcode_type_str[opc], op0));
         } else {
             result = LLVMBuildSExt(builder, result, llvm_int_types[type_reg], get_next_var_name(opcode_type_str[opc], op0));
@@ -2541,19 +2541,19 @@ void translate_qemu_st2_i128(OpCodeType opc, const UnifiedInstr *u) {
     LLVMValueRef src2 = get_source_node_imm_or_stack(opc, 0, op1, type_reg, 0);
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op2, OPC_ADDR_T, 0);
     unsigned align = 1;
-    if (a1.p.storage.attr.alignment == UNALIGN) {
+    if (a1.p.storage.alignment == UNALIGN) {
         align = 1;
-    } else if (a1.p.storage.attr.alignment == ALIGN_2) {
+    } else if (a1.p.storage.alignment == ALIGN_2) {
         align = 2;
-    } else if (a1.p.storage.attr.alignment == ALIGN_4) {
+    } else if (a1.p.storage.alignment == ALIGN_4) {
         align = 4;
-    } else if (a1.p.storage.attr.alignment == ALIGN_8) {
+    } else if (a1.p.storage.alignment == ALIGN_8) {
         align = 8;
-    } else if (a1.p.storage.attr.alignment == ALIGN_16) {
+    } else if (a1.p.storage.alignment == ALIGN_16) {
         align = 16;
-    } else if (a1.p.storage.attr.alignment == ALIGN_32) {
+    } else if (a1.p.storage.alignment == ALIGN_32) {
         align = 32;
-    } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
+    } else if (a1.p.storage.alignment == ALIGN_MEM_SIZE) {
         align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
     } else {
         assert(0);
@@ -2588,19 +2588,19 @@ void translate_qemu_st(OpCodeType opc, const UnifiedInstr *u) {
     }
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op1, OPC_ADDR_T, 0);
     unsigned align = 1;
-    if (a1.p.storage.attr.alignment == UNALIGN) {
+    if (a1.p.storage.alignment == UNALIGN) {
         align = 1;
-    } else if (a1.p.storage.attr.alignment == ALIGN_2) {
+    } else if (a1.p.storage.alignment == ALIGN_2) {
         align = 2;
-    } else if (a1.p.storage.attr.alignment == ALIGN_4) {
+    } else if (a1.p.storage.alignment == ALIGN_4) {
         align = 4;
-    } else if (a1.p.storage.attr.alignment == ALIGN_8) {
+    } else if (a1.p.storage.alignment == ALIGN_8) {
         align = 8;
-    } else if (a1.p.storage.attr.alignment == ALIGN_16) {
+    } else if (a1.p.storage.alignment == ALIGN_16) {
         align = 16;
-    } else if (a1.p.storage.attr.alignment == ALIGN_32) {
+    } else if (a1.p.storage.alignment == ALIGN_32) {
         align = 32;
-    } else if (a1.p.storage.attr.alignment == ALIGN_MEM_SIZE) {
+    } else if (a1.p.storage.alignment == ALIGN_MEM_SIZE) {
         align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
     } else {
         assert(0);
