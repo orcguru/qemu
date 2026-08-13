@@ -45,9 +45,7 @@
 #define OPC_VECTOR_TO_VES(T)      ((T - OPC_FIRST_SCALAR_TYPE) % 4)
 #define OPC_VECTOR_SIZE(T)          (\
   (LLVMVector16xi8 <= T && T <= LLVMVector2xi64) ? VS128 : ( \
-    (LLVMVector32xi8 <= T && T <= LLVMVector4xi64) ? VS256 : (  \
-      (LLVMVector8xi8 <= T && T <= LLVMVector1xi64) ? VS64 : VS_INVALID \
-      ) \
+    (LLVMVector8xi8 <= T && T <= LLVMVector1xi64) ? VS64 : VS_INVALID \
     ) \
   )
 #define OPC_VECTOR_ELEMENT_BYTES(T)     (1 << (T - LLVMInt8))
@@ -96,6 +94,9 @@
  * New operand access API (UnifiedInstr-based)
  * ============================================================ */
 #include "unified_instr.h"
+#include "build_temp_instr.h"
+/* New CREATE_* macros – see patch_create_macros.h */
+#include "patch_create_macros.h"
 
 static inline const Operand *get_operand(const UnifiedInstr *u, int idx) {
     assert(idx >= 0 && idx < u->operand_count);
@@ -219,402 +220,6 @@ static inline OperandType get_operand_legacy(const UnifiedInstr *u, int idx, uin
     do {                                                        \
         char *type_str = LLVMPrintTypeToString(ft);             \
         printf("DEBUG_FUNCTION_TYPE:%s\n", type_str);           \
-    } while (0)
-
-#define CREATE_NOT(OUT, IN)                         \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        if (is_vec) {                               \
-            tmp_opc.o = not_vec;                    \
-            AttrSrcInfo vs;                         \
-            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-            AttrSrcInfo ves;                        \
-            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-            create_vector_slot2(buf, tmp_opc, vs, ves, OUT, IN); \
-        } else {                                    \
-            tmp_opc.o = type_out == LLVMInt32 ? not_i32 : not_i64;      \
-            create_scalar_slot2(buf, tmp_opc, OUT, IN); \
-        }                                           \
-        translate_not(tmp_opc.o, buf);      \
-    } while (0)
-
-#define CREATE_AND(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        if (is_vec) {                               \
-            tmp_opc.o = and_vec;                    \
-            AttrSrcInfo vs;                         \
-            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-            AttrSrcInfo ves;                        \
-            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
-        } else {                                    \
-            assert(OPC_OUTPUT_T != LLVMInvalidType);  \
-            tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? and_i32 : and_i64;      \
-            create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
-        }                                           \
-        translate_binary(tmp_opc.o, buf, LLVMBuildAnd);     \
-    } while (0)
-
-#define CREATE_ANDC_VEC(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(is_vec);                             \
-        tmp_opc.o = andc_vec;                    \
-        AttrSrcInfo vs;                         \
-        vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-        AttrSrcInfo ves;                         \
-        ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-        create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
-        translate_andc(tmp_opc.o, buf);     \
-    } while (0)
-
-#define CREATE_XOR(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        if (is_vec) {                               \
-            tmp_opc.o = xor_vec;                    \
-            AttrSrcInfo vs;                         \
-            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-            AttrSrcInfo ves;                         \
-            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
-        } else {                                    \
-            assert(OPC_OUTPUT_T != LLVMInvalidType);  \
-            tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? xor_i32 : xor_i64;      \
-            create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
-        }                               \
-        translate_binary(tmp_opc.o, buf, LLVMBuildXor);     \
-    } while (0)
-
-#define CREATE_XOR_IMM2(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        if (is_vec) {                               \
-            tmp_opc.o = xor_vec;                    \
-            AttrSrcInfo vs;                         \
-            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-            AttrSrcInfo ves;                         \
-            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-            create_vector_slot2_imm(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
-        } else {                                    \
-            assert(OPC_OUTPUT_T != LLVMInvalidType);  \
-            tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? xor_i32 : xor_i64;      \
-            create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
-        }                               \
-        translate_binary(tmp_opc.o, buf, LLVMBuildXor);     \
-    } while (0)
-
-#define CREATE_EXTRACT(OUT, IN0, IN1, IN2)          \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? extract_i32 : extract_i64;      \
-        create_scalar_slot2_imm2(buf, tmp_opc, OUT, IN0, IN1, IN2); \
-        translate_extract(tmp_opc.o, buf);              \
-    } while (0)
-
-#define CREATE_SHR(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? shr_i32 : shr_i64;      \
-        create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
-        translate_binary(tmp_opc.o, buf, LLVMBuildLShr);              \
-    } while (0)
-
-#define CREATE_SHR_SLOT(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? shr_i32 : shr_i64;      \
-        create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
-        translate_binary(tmp_opc.o, buf, LLVMBuildLShr);              \
-    } while (0)
-
-#define CREATE_SHR_VEC(OUT, IN0, IN1, SPLAT)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(is_vec);                             \
-        tmp_opc.o = shri_vec;                    \
-        AttrSrcInfo vs;                         \
-        vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-        AttrSrcInfo ves;                         \
-        ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-        if (SPLAT) {                            \
-            create_vector_slot2_imm(buf, tmp_opc, vs, ves, OUT, IN0, IN1.i); \
-            translate_binary_splat_immediate(tmp_opc.o, buf, LLVMBuildLShr);   \
-        } else {                                \
-            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
-            translate_binary(tmp_opc.o, buf, LLVMBuildLShr);   \
-        }                                       \
-    } while (0)
-
-#define CREATE_SHL(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? shl_i32 : shl_i64;      \
-        create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
-        translate_binary(tmp_opc.o, buf, LLVMBuildShl);              \
-    } while (0)
-
-#define CREATE_SHL_SLOT(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? shl_i32 : shl_i64;      \
-        create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
-        translate_binary(tmp_opc.o, buf, LLVMBuildShl);              \
-    } while (0)
-
-#define CREATE_SHL_VEC(OUT, IN0, IN1, SPLAT)        \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(is_vec);                             \
-        tmp_opc.o = shli_vec;                    \
-        AttrSrcInfo vs;                         \
-        vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-        AttrSrcInfo ves;                         \
-        ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-        if (SPLAT) {                                \
-            create_vector_slot2_imm(buf, tmp_opc, vs, ves, OUT, IN0, IN1.i); \
-            translate_binary_splat_immediate(tmp_opc.o, buf, LLVMBuildShl);   \
-        } else {                                    \
-            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
-            translate_binary(tmp_opc.o, buf, LLVMBuildShl);   \
-        }                                           \
-    } while (0)
-
-#define CREATE_OR(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        if (is_vec) {                               \
-            tmp_opc.o = or_vec;                     \
-            AttrSrcInfo vs;                         \
-            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-            AttrSrcInfo ves;                         \
-            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
-            translate_binary(tmp_opc.o, buf, LLVMBuildOr);     \
-        } else {                                        \
-            assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-            tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? or_i32 : or_i64;      \
-            create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
-            translate_binary(tmp_opc.o, buf, LLVMBuildOr);    \
-        }                                           \
-    } while (0)
-
-#define CREATE_DEPOSIT(OUT, IN0, IN1, OFS, LEN)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? deposit_i32 : deposit_i64;      \
-        create_scalar_slot3_imm2(buf, tmp_opc, OUT, IN0, IN1, OFS, LEN); \
-        translate_deposit(tmp_opc.o, buf);    \
-    } while (0)
-
-#define CREATE_SAR(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? sar_i32 : sar_i64;      \
-        create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
-        translate_binary(tmp_opc.o, buf, LLVMBuildAShr);              \
-    } while (0)
-
-#define CREATE_ADD(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? add_i32 : add_i64;      \
-        create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
-        translate_binary(tmp_opc.o, buf, LLVMBuildAdd);  \
-    } while (0)
-
-#define CREATE_ADD64(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.o = add_i64;      \
-        create_scalar_slot2_imm(buf, tmp_opc, OUT, IN0, IN1); \
-        translate_binary(tmp_opc.o, buf, LLVMBuildAdd);  \
-    } while (0)
-
-#define CREATE_SUB(OUT, IN0, IN1)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        if (is_vec) {                               \
-            tmp_opc.o = sub_vec;                     \
-            AttrSrcInfo vs;                         \
-            vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-            AttrSrcInfo ves;                         \
-            ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-            create_vector_slot3(buf, tmp_opc, vs, ves, OUT, IN0, IN1); \
-        } else {                                        \
-            assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-            tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? sub_i32 : sub_i64;      \
-            create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
-        }                                               \
-        translate_binary(tmp_opc.o, buf, LLVMBuildSub);  \
-    } while (0)
-
-#define CREATE_SETCOND(OUT, IN0, IN1, RELOP)        \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? setcond_i32 : setcond_i64;      \
-        create_scalar_slot3_relop(buf, tmp_opc, OUT, IN0, IN1, RELOP); \
-        translate_setcond(tmp_opc.o, buf);  \
-    } while (0)
-
-#define CREATE_MOV(OUT, IN)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? mov_i32 : mov_i64;      \
-        create_scalar_slot2(buf, tmp_opc, OUT, IN); \
-        translate_mov(tmp_opc.o, buf);  \
-    } while (0)
-
-#define CREATE_MOV_VEC(VS, VES, OUT, IN)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.o = mov_vec;      \
-        create_vector_slot2(buf, tmp_opc, VS, VES, OUT, IN); \
-        translate_mov(tmp_opc.o, buf);  \
-    } while (0)
-
-#define CREATE_MOVCOND_VEC(VS, VES, OUT, IN0, IN1, CMP0, CMP1, ROP)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.o = movcond_vec;      \
-        create_vector_slot5_relop(buf, tmp_opc, VS, VES, OUT, IN0, IN1, CMP0, CMP1, ROP); \
-        translate_movcond(tmp_opc.o, buf);  \
-    } while (0)
-
-#define CREATE_CMP_VEC(OUT, IN0, IN1, ROP)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.o = cmp_vec;      \
-        AttrSrcInfo vs;                         \
-        vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-        AttrSrcInfo ves;                         \
-        ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-        create_vector_slot3_relop(buf, tmp_opc, vs, ves, OUT, IN0, IN1, ROP); \
-        translate_cmp_vec(tmp_opc.o, buf);  \
-    } while (0)
-
-#define CREATE_BITSEL_VEC(OUT, IN0, IN1, IN2)       \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.o = cmp_vec;      \
-        AttrSrcInfo vs;                         \
-        vs.p.vs = OPC_VECTOR_SIZE(type_out);    \
-        AttrSrcInfo ves;                         \
-        ves.p.ves = OPC_VECTOR_TO_VES(type_out); \
-        create_vector_slot4(buf, tmp_opc, vs, ves, OUT, IN0, IN1, IN2); \
-        translate_bitsel_vec(tmp_opc.o, buf);  \
-    } while (0)
-
-#define CREATE_MUL(OUT, IN0, IN1)          \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? mul_i32 : mul_i64;      \
-        create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
-        translate_binary(tmp_opc.o, buf, LLVMBuildMul);       \
-    } while (0)
-
-#define CREATE_MULXH(OUT, IN0, IN1, EXT)          \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        assert(OPC_OUTPUT_T != LLVMInvalidType);    \
-        tmp_opc.o = OPC_OUTPUT_T == LLVMInt32 ? mulsh_i32 : mulsh_i64;      \
-        create_scalar_slot3(buf, tmp_opc, OUT, IN0, IN1); \
-        translate_binary(tmp_opc.o, buf, LLVMBuildMul);       \
-        translate_mulxh(tmp_opc.o, buf, EXT);       \
-    } while (0)
-
-#define CREATE_LABEL(LABEL)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.o = set_label;     \
-        create_setlabel(buf, tmp_opc, LABEL); \
-        translate_set_label(tmp_opc.o, buf);  \
-    } while (0)
-
-#define CREATE_LD_ENV_XMM(OPC, OUT, ALIAS)           \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.o = OPC;                 \
-        if (ALIAS.s.slot_type == SUB_SLOT_ENV) {    \
-            create_scalar_slot_env_imm(buf, tmp_opc, OUT, ALIAS.s.offset);    \
-        } else {                                    \
-            create_scalar_slot_env_imm(buf, tmp_opc, OUT, get_xmm_offset(ALIAS.s.slot_idx/2) + 16*(ALIAS.s.slot_idx%2) + ALIAS.s.offset);    \
-        }                                           \
-        translate_ld_env_xmm(tmp_opc.o, buf); \
-    } while (0)
-
-#define CREATE_LD(L, ADDR)                \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.o = qemu_ld_i64;                    \
-        AttrSrcInfo a0, a1, a2;                     \
-        a0.subt = SUB_ATTR_ATOMIC;                  \
-        a0.p.storage.atomic = NONATOMIC;       \
-        a1.subt = SUB_ATTR_ALIGNMENT;               \
-        a1.p.storage.alignment = ALIGN_MEM_SIZE;   \
-        a2.subt = SUB_ATTR_SRCSIZEEXT;              \
-        a2.p.storage.ext = ZERO;               \
-        a2.p.storage.size = SRC8B;                  \
-        create_scalar_slot2_attr3_num(buf, tmp_opc, L, ADDR, a0, a1, a2, 2);      \
-        translate_qemu_ld(tmp_opc.o, buf);        \
-    } while (0)
-
-#define CREATE_ST(R, ADDR)                \
-    do {                                            \
-        uint8_t buf[16];                            \
-        OHType tmp_opc;                             \
-        tmp_opc.o = qemu_st_i64;                    \
-        AttrSrcInfo a0, a1, a2;                     \
-        a0.subt = SUB_ATTR_ATOMIC;                  \
-        a0.p.storage.atomic = NONATOMIC;       \
-        a1.subt = SUB_ATTR_ALIGNMENT;               \
-        a1.p.storage.alignment = ALIGN_MEM_SIZE;   \
-        a2.subt = SUB_ATTR_SRCSIZEEXT;              \
-        a2.p.storage.ext = ZERO;               \
-        a2.p.storage.size = SRC8B;                  \
-        create_scalar_slot2_attr3_num(buf, tmp_opc, R, ADDR, a0, a1, a2, 2);      \
-        translate_qemu_st(tmp_opc.o, buf);        \
     } while (0)
 
 #define GET_LLVM_TYPE_ALIGNMENT(type)       (type <= LLVMInt64 ? 8 : 16)
@@ -780,30 +385,23 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 
 #define GET_2_OPERANDS()                                \
     do {                                                \
-        uint32_t is_imm0;                                \
-        uint32_t is_imm1;                                \
-        const OperandType op0 = get_operand_legacy(u, 0, &is_imm0); \
-        const OperandType op1 = get_operand_legacy(u, 1, &is_imm1); \
+        op0 = get_operand_legacy(u, 0, &is_imm0); \
+        op1 = get_operand_legacy(u, 1, &is_imm1); \
         assert(!is_imm0 && op0.s.slot_type == OP_SLOT && \
                !is_imm1 && op1.s.slot_type == OP_SLOT);  \
     } while (0)
 
 #define GET_2_OPERANDS_NOCHECK()                        \
     do {                                                \
-        uint32_t is_imm0;                                \
-        uint32_t is_imm1;                                \
-        const OperandType op0 = get_operand_legacy(u, 0, &is_imm0); \
-        const OperandType op1 = get_operand_legacy(u, 1, &is_imm1); \
+        op0 = get_operand_legacy(u, 0, &is_imm0); \
+        op1 = get_operand_legacy(u, 1, &is_imm1); \
     } while (0)
 
 #define GET_3_OPERANDS()                                \
     do {                                                \
-        uint32_t is_imm0;                                \
-        uint32_t is_imm1;                                \
-        uint32_t is_imm2;                                \
-        const OperandType op0 = get_operand_legacy(u, 0, &is_imm0); \
-        const OperandType op1 = get_operand_legacy(u, 1, &is_imm1); \
-        const OperandType op2 = get_operand_legacy(u, 2, &is_imm2); \
+        op0 = get_operand_legacy(u, 0, &is_imm0); \
+        op1 = get_operand_legacy(u, 1, &is_imm1); \
+        op2 = get_operand_legacy(u, 2, &is_imm2); \
         assert(!is_imm0 && op0.s.slot_type == OP_SLOT && \
                !is_imm1 && op1.s.slot_type == OP_SLOT && \
                !is_imm2 && op2.s.slot_type == OP_SLOT);  \
@@ -811,22 +409,16 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 
 #define GET_3_OPERANDS_NOCHECK()                        \
     do {                                                \
-        uint32_t is_imm0;                                \
-        uint32_t is_imm1;                                \
-        uint32_t is_imm2;                                \
-        const OperandType op0 = get_operand_legacy(u, 0, &is_imm0); \
-        const OperandType op1 = get_operand_legacy(u, 1, &is_imm1); \
-        const OperandType op2 = get_operand_legacy(u, 2, &is_imm2); \
+        op0 = get_operand_legacy(u, 0, &is_imm0); \
+        op1 = get_operand_legacy(u, 1, &is_imm1); \
+        op2 = get_operand_legacy(u, 2, &is_imm2); \
     } while (0)
 
 #define GET_3_OPERANDS_NOCHECK_DBG()                    \
     do {                                                \
-        uint32_t is_imm0;                                \
-        uint32_t is_imm1;                                \
-        uint32_t is_imm2;                                \
-        const OperandType op0 = get_operand_legacy(u, 0, &is_imm0); \
-        const OperandType op1 = get_operand_legacy(u, 1, &is_imm1); \
-        const OperandType op2 = get_operand_legacy(u, 2, &is_imm2); \
+        op0 = get_operand_legacy(u, 0, &is_imm0); \
+        op1 = get_operand_legacy(u, 1, &is_imm1); \
+        op2 = get_operand_legacy(u, 2, &is_imm2); \
         printf("is_imm0:%d, is_imm1:%d, is_imm2:%d\n", is_imm0, is_imm1, is_imm2);  \
         printf("op0 - slot_type:%d, slot_idx::%d, offset:%d\n", op0.s.slot_type, op0.s.slot_idx, op0.s.offset);    \
         printf("op1 - slot_type:%d, slot_idx::%d, offset:%d\n", op1.s.slot_type, op1.s.slot_idx, op1.s.offset);    \
@@ -835,14 +427,10 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 
 #define GET_4_OPERANDS()                                \
     do {                                                \
-        uint32_t is_imm0;                                \
-        uint32_t is_imm1;                                \
-        uint32_t is_imm2;                                \
-        uint32_t is_imm3;                                \
-        const OperandType op0 = get_operand_legacy(u, 0, &is_imm0); \
-        const OperandType op1 = get_operand_legacy(u, 1, &is_imm1); \
-        const OperandType op2 = get_operand_legacy(u, 2, &is_imm2); \
-        const OperandType op3 = get_operand_legacy(u, 3, &is_imm3); \
+        op0 = get_operand_legacy(u, 0, &is_imm0); \
+        op1 = get_operand_legacy(u, 1, &is_imm1); \
+        op2 = get_operand_legacy(u, 2, &is_imm2); \
+        op3 = get_operand_legacy(u, 3, &is_imm3); \
         assert(!is_imm0 && op0.s.slot_type == OP_SLOT && \
                !is_imm1 && op1.s.slot_type == OP_SLOT && \
                !is_imm2 && op2.s.slot_type == OP_SLOT && \
@@ -851,29 +439,16 @@ static int collect_arguments_and_types(HelperType h, int target_domain, int gen_
 
 #define GET_5_OPERANDS()                                \
     do {                                                \
-        uint32_t is_imm0;                                \
-        uint32_t is_imm1;                                \
-        uint32_t is_imm2;                                \
-        uint32_t is_imm3;                                \
-        uint32_t is_imm4;                                \
-        const OperandType op0 = get_operand_legacy(u, 0, &is_imm0); \
-        const OperandType op1 = get_operand_legacy(u, 1, &is_imm1); \
-        const OperandType op2 = get_operand_legacy(u, 2, &is_imm2); \
-        const OperandType op3 = get_operand_legacy(u, 3, &is_imm3); \
-        const OperandType op4 = get_operand_legacy(u, 4, &is_imm4); \
+        op0 = get_operand_legacy(u, 0, &is_imm0); \
+        op1 = get_operand_legacy(u, 1, &is_imm1); \
+        op2 = get_operand_legacy(u, 2, &is_imm2); \
+        op3 = get_operand_legacy(u, 3, &is_imm3); \
+        op4 = get_operand_legacy(u, 4, &is_imm4); \
         assert(!is_imm0 && op0.s.slot_type == OP_SLOT && \
                !is_imm1 && op1.s.slot_type == OP_SLOT && \
                !is_imm2 && op2.s.slot_type == OP_SLOT && \
                !is_imm3 && op3.s.slot_type == OP_SLOT && \
                !is_imm4 && op4.s.slot_type == OP_SLOT);  \
-    } while (0)
-
-#define GET_STORAGE_ATTR()                                      \
-    do {                                                        \
-        a0.p.storage.atomic = attr.attr_val >> 7;          \
-        a1.p.storage.alignment = (attr.attr_val >> 4) & 0x7;   \
-        a2.p.storage.ext = (attr.attr_val >> 3) & 0x1;     \
-        a2.p.storage.size = attr.attr_val & 0x7;                \
     } while (0)
 
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc, const UnifiedInstr *u) {
@@ -1414,8 +989,7 @@ void translate_binary(OpCodeType opc, const UnifiedInstr *u, LLVM_BIN_API api) {
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     uint32_t idx = opcoc[opc];
-    uint32_t is_imm0;
-    const OperandType op0 = get_operand_legacy(u, 0, &is_imm0);
+    op0 = get_operand_legacy(u, 0, &is_imm0);
     assert(!is_imm0 && op0.s.valid);
     op1 = get_operand_legacy(u, idx, &is_imm1);
     op2 = get_operand_legacy(u, idx + 1, &is_imm2);
@@ -1434,8 +1008,7 @@ void translate_binary_splat_immediate(OpCodeType opc, const UnifiedInstr *u, LLV
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     uint32_t idx = opcoc[opc];
-    uint32_t is_imm0;
-    const OperandType op0 = get_operand_legacy(u, 0, &is_imm0);
+    op0 = get_operand_legacy(u, 0, &is_imm0);
     assert(!is_imm0 && op0.s.valid);
     op1 = get_operand_legacy(u, idx, &is_imm1);
     op2 = get_operand_legacy(u, idx + 1, &is_imm2);
@@ -1477,6 +1050,7 @@ void translate_mulxh(OpCodeType opc, const UnifiedInstr *u, LLVM_EXT_API api) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
     LLVMTypeRef dtype = (opc == mulsh_i64 || opc == muluh_i64) ? LLVMInt128Type() : LLVMInt64Type();
@@ -1497,6 +1071,7 @@ void translate_muls2(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
+    uint32_t is_imm0, is_imm1, is_imm2, is_imm3;
     OperandType op0, op1, op2, op3;
     GET_4_OPERANDS();
     CREATE_MUL(op0, op2, op3);
@@ -1508,6 +1083,7 @@ void translate_mulu2(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
+    uint32_t is_imm0, is_imm1, is_imm2, is_imm3;
     OperandType op0, op1, op2, op3;
     GET_4_OPERANDS();
     CREATE_MUL(op0, op2, op3);
@@ -1519,6 +1095,7 @@ void translate_not(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
     CREATE_XOR_IMM2(op0, op1, -1UL);
@@ -1550,6 +1127,7 @@ void translate_nand(OpCodeType opc, const UnifiedInstr *u) {
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
     CREATE_AND(tmp, op1, op2);
@@ -1562,6 +1140,7 @@ void translate_eqv(OpCodeType opc, const UnifiedInstr *u) {
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
     CREATE_XOR(tmp, op1, op2);
@@ -1574,6 +1153,7 @@ void translate_nor(OpCodeType opc, const UnifiedInstr *u) {
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
     CREATE_OR(tmp, op1, op2);
@@ -1586,6 +1166,7 @@ void translate_orc(OpCodeType opc, const UnifiedInstr *u) {
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
     CREATE_NOT(tmp, op2);
@@ -1597,6 +1178,7 @@ void translate_neg(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_ALL;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
 
@@ -1637,6 +1219,7 @@ void translate_rotr(OpCodeType opc, const UnifiedInstr *u) {
     OperandType t1 = get_tmp_and_do_alloc(type_out);
     OperandType t2 = get_tmp_and_do_alloc(type_out);
     OperandType t3 = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
 
@@ -1659,11 +1242,10 @@ void translate_rotl(OpCodeType opc, const UnifiedInstr *u) {
     OperandType t1 = get_tmp_and_do_alloc(type_out);
     OperandType t2 = get_tmp_and_do_alloc(type_out);
     OperandType t3 = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
-    uint32_t is_imm2;
     GET_2_OPERANDS();
-    uint32_t is_imm2;
-    const OperandType op2 = get_operand_legacy(u, 2, &is_imm2);
+    op2 = get_operand_legacy(u, 2, &is_imm2);
 
     OperandType mask_slot = get_tmp_and_do_alloc_with_init(type_out, type_out == LLVMInt32 ? (32-1) : (64-1));
     if (is_imm2) {
@@ -1689,6 +1271,7 @@ void translate_deposit(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2, ofs, len;
     GET_3_OPERANDS();
     uint32_t is_imm3, is_imm4;
@@ -1719,9 +1302,9 @@ void translate_extract(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
+    uint32_t is_imm0, is_imm1, is_imm2, is_imm3;
     OperandType op0, op1, ofs, len;
     GET_2_OPERANDS();
-    uint32_t is_imm2, is_imm3;
     ofs = get_operand_legacy(u, 2, &is_imm2);
     len = get_operand_legacy(u, 3, &is_imm3);
     assert(is_imm2 && is_imm3);
@@ -1740,6 +1323,7 @@ void translate_sextract(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1, ofs, len;
     GET_2_OPERANDS();
     uint32_t is_imm2, is_imm3;
@@ -1758,6 +1342,7 @@ void translate_extract2(OpCodeType opc, const UnifiedInstr *u) {
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType tmp = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2, ofs;
     GET_3_OPERANDS();
     uint32_t is_imm;
@@ -1772,6 +1357,7 @@ void translate_extrh(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
     OperandType input_shifted = get_tmp_and_do_alloc(type_in);
@@ -1788,17 +1374,18 @@ void translate_bswap16_i32(OpCodeType opc, const UnifiedInstr *u) {
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType tmp0 = get_tmp_and_do_alloc(type_out);
     OperandType tmp1 = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
     CREATE_SHR(tmp0, op1, 8);
-    AttributeType attr = get_attribute_from_instr(u);
-    if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & IZ)) {
+    const AttrSrcInfo *attr = get_attribute_from_instr(u);
+    if (attr->subt == SUB_ATTR_SWAP && (attr->p.swap & IZ)) {
         CREATE_EXTRACT(tmp0, tmp0, 0, 8);
     }
-    if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OS)) {
+    if (attr->subt == SUB_ATTR_SWAP && (attr->p.swap & OS)) {
         CREATE_SHL(tmp1, op1, 24);
         CREATE_SAR(tmp1, tmp1, 16);
-    } else if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OZ)) {
+    } else if (attr->subt == SUB_ATTR_SWAP && (attr->p.swap & OZ)) {
         CREATE_EXTRACT(tmp1, op1, 0, 8);
         CREATE_SHL(tmp1, tmp1, 8);
     } else {
@@ -1814,17 +1401,18 @@ void translate_bswap16_i64(OpCodeType opc, const UnifiedInstr *u) {
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType tmp0 = get_tmp_and_do_alloc(type_out);
     OperandType tmp1 = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
     CREATE_SHR(tmp0, op1, 8);
-    AttributeType attr = get_attribute_from_instr(u);
-    if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & IZ)) {
+    const AttrSrcInfo *attr = get_attribute_from_instr(u);
+    if (attr->subt == SUB_ATTR_SWAP && (attr->p.swap & IZ)) {
         CREATE_EXTRACT(tmp0, tmp0, 0, 8);
     }
-    if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OS)) {
+    if (attr->subt == SUB_ATTR_SWAP && (attr->p.swap & OS)) {
         CREATE_SHL(tmp1, op1, 56);
         CREATE_SAR(tmp1, tmp1, 48);
-    } else if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OZ)) {
+    } else if (attr->subt == SUB_ATTR_SWAP && (attr->p.swap & OZ)) {
         CREATE_EXTRACT(tmp1, op1, 0, 8);
         CREATE_SHL(tmp1, tmp1, 8);
     } else {
@@ -1841,6 +1429,7 @@ void translate_bswap32_i32(OpCodeType opc, const UnifiedInstr *u) {
     OperandType tmp0 = get_tmp_and_do_alloc(type_out);
     OperandType tmp1 = get_tmp_and_do_alloc(type_out);
     OperandType tmp2 = get_tmp_and_do_alloc_with_init(type_out, 0x00ff00ff);
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
     CREATE_SHR(tmp0, op1, 8);
@@ -1861,6 +1450,7 @@ void translate_bswap32_i64(OpCodeType opc, const UnifiedInstr *u) {
     OperandType tmp0 = get_tmp_and_do_alloc(type_out);
     OperandType tmp1 = get_tmp_and_do_alloc(type_out);
     OperandType tmp2 = get_tmp_and_do_alloc_with_init(type_out, 0x00ff00ff);
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
     CREATE_SHR(tmp0, op1, 8);
@@ -1871,8 +1461,8 @@ void translate_bswap32_i64(OpCodeType opc, const UnifiedInstr *u) {
     CREATE_SHL(tmp1, op0, 48);
     CREATE_SHR(tmp0, op0, 16);
 
-    AttributeType attr = get_attribute_from_instr(u);
-    if (attr.attr_type == SUB_ATTR_SWAP && (attr.attr_val & OS)) {
+    const AttrSrcInfo *attr = get_attribute_from_instr(u);
+    if (attr->subt == SUB_ATTR_SWAP && (attr->p.swap & OS)) {
         CREATE_SAR(tmp1, tmp1, 32);
     } else {
         CREATE_SHR(tmp1, tmp1, 32);
@@ -1887,6 +1477,7 @@ void translate_bswap64_i64(OpCodeType opc, const UnifiedInstr *u) {
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     OperandType t0 = get_tmp_and_do_alloc(type_out);
     OperandType t1 = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
 
@@ -1957,6 +1548,7 @@ void translate_ctpop(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
 
@@ -1997,10 +1589,8 @@ void translate_movcond(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm0, is_imm1, is_imm2, is_imm3, is_imm4;
     OperandType op0, op1, op2, op3, op4;
     GET_3_OPERANDS_NOCHECK();
-    uint32_t is_imm3;
-    const OperandType op3 = get_operand_legacy(u, 3, &is_imm3);
-    uint32_t is_imm4;
-    const OperandType op4 = get_operand_legacy(u, 4, &is_imm4);
+    op3 = get_operand_legacy(u, 3, &is_imm3);
+    op4 = get_operand_legacy(u, 4, &is_imm4);
 
     LLVMValueRef c1 = get_source_node_imm_or_stack(opc, is_imm1, op1, type_in, 0);
     LLVMValueRef c2 = get_source_node_imm_or_stack(opc, is_imm2, op2, type_in, 0);
@@ -2154,8 +1744,7 @@ void translate_push_ret_addr(OpCodeType opc, const UnifiedInstr *u) {
     DECLARE_AND_INIT_TYPE_FOR_SCALAR;
     uint32_t is_imm0, is_imm1;
     OperandType op0, func_hex;
-    uint32_t is_imm0;
-    const OperandType op0 = get_operand_legacy(u, 0, &is_imm0);
+    op0 = get_operand_legacy(u, 0, &is_imm0);
     func_hex = get_operand_legacy(u, 1, &is_imm1);
     assert(is_imm1);
 
@@ -2326,6 +1915,7 @@ void translate_ld_ext(OpCodeType opc, const UnifiedInstr *u, LLVM_EXT_API api) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
 
@@ -2339,17 +1929,17 @@ void translate_ld_env_xmm(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_2_OPERANDS();
-    uint32_t is_imm;
-    op2 = get_operand_legacy(u, 2, &is_imm);
+    op2 = get_operand_legacy(u, 2, &is_imm2);
 
     if (op1.s.slot_type == SUB_SLOT_ENV ||
         op1.s.slot_type == SUB_SLOT_XMM) {
         LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op1, type_mem, 0);
         do_store(opc, val, type_reg, op0);
     } else if (op1.s.slot_type == SUB_SLOT_TMP) {
-        assert(has_alias(op1) && is_imm);
+        assert(has_alias(op1) && is_imm2);
         OperandType alias = get_alias(op1);
         assert(alias.s.valid);
         alias.s.offset += op2.i;
@@ -2364,6 +1954,7 @@ void translate_ld_vec(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
     LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, op1, type_in, 0);
@@ -2375,32 +1966,30 @@ void translate_qemu_ld2_i128(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
 
-    AttributeType attr = get_attribute_from_instr(u);
-    assert(attr.attr_type == SUB_ATTR_STORAGE);
-    AttrSrcInfo a0, a1, a2;
-    (void)a0;
-    GET_STORAGE_ATTR();
-    assert(a2.p.storage.size == SRC16B);
+    const AttrSrcInfo *attr = get_attribute_from_instr(u);
+    assert(attr->subt == SUB_ATTR_STORAGE);
+    assert(attr->p.storage.size == SRC16B);
 
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op2, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     unsigned align = 1;
-    if (a1.p.storage.alignment == UNALIGN) {
+    if (attr->p.storage.alignment == INVALID_ALIGNMENT) {
         align = 1;
-    } else if (a1.p.storage.alignment == ALIGN_2) {
+    } else if (attr->p.storage.alignment == ALIGN_2) {
         align = 2;
-    } else if (a1.p.storage.alignment == ALIGN_4) {
+    } else if (attr->p.storage.alignment == ALIGN_4) {
         align = 4;
-    } else if (a1.p.storage.alignment == ALIGN_8) {
+    } else if (attr->p.storage.alignment == ALIGN_8) {
         align = 8;
-    } else if (a1.p.storage.alignment == ALIGN_16) {
+    } else if (attr->p.storage.alignment == ALIGN_16) {
         align = 16;
-    } else if (a1.p.storage.alignment == ALIGN_32) {
+    } else if (attr->p.storage.alignment == ALIGN_32) {
         align = 32;
-    } else if (a1.p.storage.alignment == ALIGN_MEM_SIZE) {
+    } else if (attr->p.storage.alignment == ALIGN_MEM_SIZE) {
         align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
     } else {
         assert(0);
@@ -2420,41 +2009,39 @@ void translate_qemu_ld(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
 
-    AttributeType attr = get_attribute_from_instr(u);
-    assert(attr.attr_type == SUB_ATTR_STORAGE);
-    AttrSrcInfo a0, a1, a2;
-    (void)a0;
-    GET_STORAGE_ATTR();
-    assert(a2.p.storage.size <= SRC8B);
-    type_mem = (a2.p.storage.size - SRC1B) + LLVMInt8;
+    const AttrSrcInfo *attr = get_attribute_from_instr(u);
+    assert(attr->subt == SUB_ATTR_STORAGE);
+    assert(attr->p.storage.size <= SRC8B);
+    type_mem = (attr->p.storage.size - SRC1B) + LLVMInt8;
     assert(type_mem <= type_reg);
 
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op1, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     unsigned align = 1;
-    if (a1.p.storage.alignment == UNALIGN) {
+    if (attr->p.storage.alignment == INVALID_ALIGNMENT) {
         align = 1;
-    } else if (a1.p.storage.alignment == ALIGN_2) {
+    } else if (attr->p.storage.alignment == ALIGN_2) {
         align = 2;
-    } else if (a1.p.storage.alignment == ALIGN_4) {
+    } else if (attr->p.storage.alignment == ALIGN_4) {
         align = 4;
-    } else if (a1.p.storage.alignment == ALIGN_8) {
+    } else if (attr->p.storage.alignment == ALIGN_8) {
         align = 8;
-    } else if (a1.p.storage.alignment == ALIGN_16) {
+    } else if (attr->p.storage.alignment == ALIGN_16) {
         align = 16;
-    } else if (a1.p.storage.alignment == ALIGN_32) {
+    } else if (attr->p.storage.alignment == ALIGN_32) {
         align = 32;
-    } else if (a1.p.storage.alignment == ALIGN_MEM_SIZE) {
+    } else if (attr->p.storage.alignment == ALIGN_MEM_SIZE) {
         align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
     } else {
         assert(0);
     }
     LLVMValueRef result = build_load_with_alignment(builder, llvm_int_types[type_mem], pointer, get_next_var_name(opcode_type_str[opc], op0), align);
     if (type_mem < type_reg) {
-        if (a2.p.storage.ext == ZERO) {
+        if (attr->p.storage.ext == ZERO) {
             result = LLVMBuildZExt(builder, result, llvm_int_types[type_reg], get_next_var_name(opcode_type_str[opc], op0));
         } else {
             result = LLVMBuildSExt(builder, result, llvm_int_types[type_reg], get_next_var_name(opcode_type_str[opc], op0));
@@ -2516,6 +2103,7 @@ void translate_st_vec(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
     LLVMValueRef src = get_source_node_imm_or_stack(opc, 0, op0, type_in, 0);
@@ -2527,33 +2115,31 @@ void translate_qemu_st2_i128(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
 
-    AttributeType attr = get_attribute_from_instr(u);
-    assert(attr.attr_type == SUB_ATTR_STORAGE);
-    AttrSrcInfo a0, a1, a2;
-    (void)a0;
-    GET_STORAGE_ATTR();
-    assert(a2.p.storage.size == SRC16B);
+    const AttrSrcInfo *attr = get_attribute_from_instr(u);
+    assert(attr->subt == SUB_ATTR_STORAGE);
+    assert(attr->p.storage.size == SRC16B);
 
     LLVMValueRef src1 = get_source_node_imm_or_stack(opc, 0, op0, type_reg, 0);
     LLVMValueRef src2 = get_source_node_imm_or_stack(opc, 0, op1, type_reg, 0);
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op2, OPC_ADDR_T, 0);
     unsigned align = 1;
-    if (a1.p.storage.alignment == UNALIGN) {
+    if (attr->p.storage.alignment == INVALID_ALIGNMENT) {
         align = 1;
-    } else if (a1.p.storage.alignment == ALIGN_2) {
+    } else if (attr->p.storage.alignment == ALIGN_2) {
         align = 2;
-    } else if (a1.p.storage.alignment == ALIGN_4) {
+    } else if (attr->p.storage.alignment == ALIGN_4) {
         align = 4;
-    } else if (a1.p.storage.alignment == ALIGN_8) {
+    } else if (attr->p.storage.alignment == ALIGN_8) {
         align = 8;
-    } else if (a1.p.storage.alignment == ALIGN_16) {
+    } else if (attr->p.storage.alignment == ALIGN_16) {
         align = 16;
-    } else if (a1.p.storage.alignment == ALIGN_32) {
+    } else if (attr->p.storage.alignment == ALIGN_32) {
         align = 32;
-    } else if (a1.p.storage.alignment == ALIGN_MEM_SIZE) {
+    } else if (attr->p.storage.alignment == ALIGN_MEM_SIZE) {
         align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
     } else {
         assert(0);
@@ -2570,16 +2156,14 @@ void translate_qemu_st(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_MEM;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
 
-    AttributeType attr = get_attribute_from_instr(u);
-    assert(attr.attr_type == SUB_ATTR_STORAGE);
-    AttrSrcInfo a0, a1, a2;
-    (void)a0;
-    GET_STORAGE_ATTR();
-    assert(a2.p.storage.size <= SRC8B);
-    type_mem = (a2.p.storage.size - SRC1B) + LLVMInt8;
+    const AttrSrcInfo *attr = get_attribute_from_instr(u);
+    assert(attr->subt == SUB_ATTR_STORAGE);
+    assert(attr->p.storage.size <= SRC8B);
+    type_mem = (attr->p.storage.size - SRC1B) + LLVMInt8;
     assert(type_mem <= type_reg);
 
     LLVMValueRef val = get_source_node_imm_or_stack(opc, 0, op0, type_reg, 0);
@@ -2588,19 +2172,19 @@ void translate_qemu_st(OpCodeType opc, const UnifiedInstr *u) {
     }
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op1, OPC_ADDR_T, 0);
     unsigned align = 1;
-    if (a1.p.storage.alignment == UNALIGN) {
+    if (attr->p.storage.alignment == INVALID_ALIGNMENT) {
         align = 1;
-    } else if (a1.p.storage.alignment == ALIGN_2) {
+    } else if (attr->p.storage.alignment == ALIGN_2) {
         align = 2;
-    } else if (a1.p.storage.alignment == ALIGN_4) {
+    } else if (attr->p.storage.alignment == ALIGN_4) {
         align = 4;
-    } else if (a1.p.storage.alignment == ALIGN_8) {
+    } else if (attr->p.storage.alignment == ALIGN_8) {
         align = 8;
-    } else if (a1.p.storage.alignment == ALIGN_16) {
+    } else if (attr->p.storage.alignment == ALIGN_16) {
         align = 16;
-    } else if (a1.p.storage.alignment == ALIGN_32) {
+    } else if (attr->p.storage.alignment == ALIGN_32) {
         align = 32;
-    } else if (a1.p.storage.alignment == ALIGN_MEM_SIZE) {
+    } else if (attr->p.storage.alignment == ALIGN_MEM_SIZE) {
         align = llvm_vector_elem_bit_counts[type_mem*2+1]/8;
     } else {
         assert(0);
@@ -2616,8 +2200,7 @@ void translate_addci(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     uint32_t idx = opcoc[opc];
-    uint32_t is_imm0;
-    const OperandType op0 = get_operand_legacy(u, 0, &is_imm0);
+    op0 = get_operand_legacy(u, 0, &is_imm0);
     assert(!is_imm0 && op0.s.valid);
     op1 = get_operand_legacy(u, idx, &is_imm1);
     op2 = get_operand_legacy(u, idx + 1, &is_imm2);
@@ -2639,8 +2222,7 @@ void translate_addcio(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     uint32_t idx = opcoc[opc];
-    uint32_t is_imm0;
-    const OperandType op0 = get_operand_legacy(u, 0, &is_imm0);
+    op0 = get_operand_legacy(u, 0, &is_imm0);
     assert(!is_imm0 && op0.s.valid);
     op1 = get_operand_legacy(u, idx, &is_imm1);
     op2 = get_operand_legacy(u, idx + 1, &is_imm2);
@@ -2682,8 +2264,7 @@ void translate_addco(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     uint32_t idx = opcoc[opc];
-    uint32_t is_imm0;
-    const OperandType op0 = get_operand_legacy(u, 0, &is_imm0);
+    op0 = get_operand_legacy(u, 0, &is_imm0);
     assert(!is_imm0 && op0.s.valid);
     op1 = get_operand_legacy(u, idx, &is_imm1);
     op2 = get_operand_legacy(u, idx + 1, &is_imm2);
@@ -2716,8 +2297,7 @@ void translate_subbi(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     uint32_t idx = opcoc[opc];
-    uint32_t is_imm0;
-    const OperandType op0 = get_operand_legacy(u, 0, &is_imm0);
+    op0 = get_operand_legacy(u, 0, &is_imm0);
     assert(!is_imm0 && op0.s.valid);
     op1 = get_operand_legacy(u, idx, &is_imm1);
     op2 = get_operand_legacy(u, idx + 1, &is_imm2);
@@ -2739,8 +2319,7 @@ void translate_subbio(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     uint32_t idx = opcoc[opc];
-    uint32_t is_imm0;
-    const OperandType op0 = get_operand_legacy(u, 0, &is_imm0);
+    op0 = get_operand_legacy(u, 0, &is_imm0);
     assert(!is_imm0 && op0.s.valid);
     op1 = get_operand_legacy(u, idx, &is_imm1);
     op2 = get_operand_legacy(u, idx + 1, &is_imm2);
@@ -2782,8 +2361,7 @@ void translate_subbo(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     uint32_t idx = opcoc[opc];
-    uint32_t is_imm0;
-    const OperandType op0 = get_operand_legacy(u, 0, &is_imm0);
+    op0 = get_operand_legacy(u, 0, &is_imm0);
     assert(!is_imm0 && op0.s.valid);
     op1 = get_operand_legacy(u, idx, &is_imm1);
     op2 = get_operand_legacy(u, idx + 1, &is_imm2);
@@ -2814,6 +2392,7 @@ void translate_abs_vec(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
 
@@ -2842,6 +2421,7 @@ void translate_binary_intrinsic(OpCodeType opc, const UnifiedInstr *u, const cha
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
 
@@ -2870,6 +2450,7 @@ void translate_bitsel_vec(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
+    uint32_t is_imm0, is_imm1, is_imm2, is_imm3;
     OperandType op0, op1, op2, op3;
     GET_4_OPERANDS();
     OperandType tmp = get_tmp_and_do_alloc(type_out);
@@ -2883,6 +2464,7 @@ void translate_cmpsel_vec(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
+    uint32_t is_imm0, is_imm1, is_imm2, is_imm3, is_imm4;
     OperandType op0, op1, op2, op3, op4;
     GET_5_OPERANDS();
     RelopType r = get_relop(u);
@@ -2923,6 +2505,7 @@ void translate_dupm_vec(OpCodeType opc, const UnifiedInstr *u) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
+    uint32_t is_imm0, is_imm1;
     OperandType op0, op1;
     GET_2_OPERANDS();
 #if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
@@ -2974,11 +2557,10 @@ void translate_rotl_vec(OpCodeType opc, const UnifiedInstr *u) {
     OperandType t0 = get_tmp_and_do_alloc(type_out);
     OperandType t1 = get_tmp_and_do_alloc(type_out);
     OperandType t2 = get_tmp_and_do_alloc(OPC_VECTOR_TO_FIXED(type_out));
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2, operand_shift;
     GET_2_OPERANDS();
-    uint32_t is_imm2;
-    uint32_t is_imm2;
-    const OperandType op2 = get_operand_legacy(u, 2, &is_imm2);
+    op2 = get_operand_legacy(u, 2, &is_imm2);
     if (is_imm2) {
         operand_shift = get_tmp_and_do_alloc_with_init(OPC_VECTOR_TO_FIXED(type_in), op2.i);
     } else {
@@ -3001,6 +2583,7 @@ void translate_rotlv_vec(OpCodeType opc, const UnifiedInstr *u) {
     OperandType t0 = get_tmp_and_do_alloc(type_out);
     OperandType t1 = get_tmp_and_do_alloc(type_out);
     OperandType t2 = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
 
@@ -3008,7 +2591,7 @@ void translate_rotlv_vec(OpCodeType opc, const UnifiedInstr *u) {
     OperandType constant_val;
     constant_val.i = llvm_vector_elem_bit_counts[type_in*2+1];
     LLVMValueRef constant_splat_val = get_source_node_imm_or_stack(opc, 1, constant_val, type_in, 1);
-    OperandType constant_splat;
+    OperandType constant_splat = get_tmp_and_do_alloc(type_in);
     do_store(opc, constant_splat_val, type_in, constant_splat);
     CREATE_SUB(t2, constant_splat, op2);
     CREATE_SHR_VEC(t1, op1, t2, 0/*NO_SPLAT*/);
@@ -3023,6 +2606,7 @@ void translate_rotrv_vec(OpCodeType opc, const UnifiedInstr *u) {
     OperandType t0 = get_tmp_and_do_alloc(type_out);
     OperandType t1 = get_tmp_and_do_alloc(type_out);
     OperandType t2 = get_tmp_and_do_alloc(type_out);
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
 
@@ -3030,7 +2614,7 @@ void translate_rotrv_vec(OpCodeType opc, const UnifiedInstr *u) {
     OperandType constant_val;
     constant_val.i = llvm_vector_elem_bit_counts[type_in*2+1];
     LLVMValueRef constant_splat_val = get_source_node_imm_or_stack(opc, 1, constant_val, type_in, 1);
-    OperandType constant_splat;
+    OperandType constant_splat = get_tmp_and_do_alloc(type_in);
     do_store(opc, constant_splat_val, type_in, constant_splat);
     CREATE_SUB(t2, constant_splat, op2);
     CREATE_SHL_VEC(t1, op1, t2, 0/*NO_SPLAT*/);
@@ -3042,18 +2626,15 @@ void translate_maxmin_vec(OpCodeType opc, const UnifiedInstr *u, RelopType r) {
     printf("%s %s %p\n", __FUNCTION__, opcode_type_str[opc], (void*)u); fflush(NULL);
 #endif
     DECLARE_AND_INIT_TYPE_FOR_VECTOR;
+    uint32_t is_imm0, is_imm1, is_imm2;
     OperandType op0, op1, op2;
     GET_3_OPERANDS();
-    AttrSrcInfo vs;
-    vs.p.vs = OPC_VECTOR_SIZE(type_out);
-    AttrSrcInfo ves;
-    ves.p.ves = OPC_VECTOR_TO_VES(type_out);
     OperandType tmp1 = get_tmp_and_do_alloc(type_out);
     OperandType tmp2 = get_tmp_and_do_alloc(type_out);
 
-    CREATE_MOV_VEC(vs, ves, tmp1, op1);
-    CREATE_MOV_VEC(vs, ves, tmp2, op2);
-    CREATE_MOVCOND_VEC(vs, ves, op0, op1, op2, tmp1, tmp2, r);
+    CREATE_MOV_VEC(OPC_VECTOR_SIZE(type_out), OPC_VECTOR_TO_VES(type_out), tmp1, op1);
+    CREATE_MOV_VEC(OPC_VECTOR_SIZE(type_out), OPC_VECTOR_TO_VES(type_out), tmp2, op2);
+    CREATE_MOVCOND_VEC(OPC_VECTOR_SIZE(type_out), OPC_VECTOR_TO_VES(type_out), op0, op1, op2, tmp1, tmp2, r);
 }
 
 static uint8_t *get_current_active_labels(LLVMValueRef func) {

@@ -1459,6 +1459,17 @@ typedef enum {
     #undef X
 } AttrType;
 
+#define VECTOR_SIZE_LIST \
+    X(VS_INVALID) \
+    X(VS64) \
+    X(VS128)
+
+typedef enum {
+    #define X(name) name,
+    VECTOR_SIZE_LIST
+    #undef X
+} VectorSizeType;
+
 typedef struct {
     AttrType subt;
     union {
