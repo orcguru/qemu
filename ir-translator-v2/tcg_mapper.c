@@ -30,7 +30,7 @@
 //#define BUILD_RISCV_ON_AARCH        1
 //#define DUMP_IR                     1
 //#define VERBOSE_VAR                 1
-#define DEBUG                       1
+//#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_OUTPUT_T        opciosz[opc][1]
@@ -1975,7 +1975,7 @@ void translate_qemu_ld2_i128(OpCodeType opc, const UnifiedInstr *u) {
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op2, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     unsigned align = 1;
-    if (attr->p.storage.alignment == INVALID_ALIGNMENT) {
+    if (attr->p.storage.alignment == UNALIGNED) {
         align = 1;
     } else if (attr->p.storage.alignment == ALIGN_2) {
         align = 2;
@@ -2020,7 +2020,7 @@ void translate_qemu_ld(OpCodeType opc, const UnifiedInstr *u) {
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op1, OPC_ADDR_T, 0);
     LLVMValueRef pointer = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(llvm_int_types[type_mem], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     unsigned align = 1;
-    if (attr->p.storage.alignment == INVALID_ALIGNMENT) {
+    if (attr->p.storage.alignment == UNALIGNED) {
         align = 1;
     } else if (attr->p.storage.alignment == ALIGN_2) {
         align = 2;
@@ -2125,7 +2125,7 @@ void translate_qemu_st2_i128(OpCodeType opc, const UnifiedInstr *u) {
     LLVMValueRef src2 = get_source_node_imm_or_stack(opc, 0, op1, type_reg, 0);
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op2, OPC_ADDR_T, 0);
     unsigned align = 1;
-    if (attr->p.storage.alignment == INVALID_ALIGNMENT) {
+    if (attr->p.storage.alignment == UNALIGNED) {
         align = 1;
     } else if (attr->p.storage.alignment == ALIGN_2) {
         align = 2;
@@ -2170,7 +2170,7 @@ void translate_qemu_st(OpCodeType opc, const UnifiedInstr *u) {
     }
     LLVMValueRef addr = get_source_node_imm_or_stack(opc, 0, op1, OPC_ADDR_T, 0);
     unsigned align = 1;
-    if (attr->p.storage.alignment == INVALID_ALIGNMENT) {
+    if (attr->p.storage.alignment == UNALIGNED) {
         align = 1;
     } else if (attr->p.storage.alignment == ALIGN_2) {
         align = 2;
@@ -3806,7 +3806,7 @@ static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     int operands_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand_legacy(u, (i + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + (HELPER_DEFINES_OUTPUT(h) ? 4 : 3)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -3928,7 +3928,7 @@ static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     int operands_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand_legacy(u, (i + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + (HELPER_DEFINES_OUTPUT(h) ? 4 : 3)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -4126,13 +4126,13 @@ static void translate_cc_compute_inband(OpCodeType opc, const UnifiedInstr *u) {
 #endif
     OperandType oarg;
     uint32_t is_imm_dummy;
-    oarg = get_operand_legacy(u, 0, &is_imm_dummy);
+    oarg = get_operand_legacy(u, 3, &is_imm_dummy);
     assert(!is_imm_dummy && oarg.s.valid);
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     int operands_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand_legacy(u, (i + (helper_return_type[h] != LLVMInvalidType ? 1 : 0)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + (helper_return_type[h] != LLVMInvalidType ? 4 : 3)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -4234,7 +4234,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     oarg.s.valid = 0;
     uint32_t is_imm_dummy;
     if (helper_return_type[h] != LLVMInvalidType) {
-      oarg = get_operand_legacy(u, 0, &is_imm_dummy);
+      oarg = get_operand_legacy(u, 3, &is_imm_dummy);
       assert(!is_imm_dummy && oarg.s.valid);
     }
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
@@ -4243,7 +4243,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     uint16_t vec_slots[MAX_OPERANDS_COUNT] = {0};
     int vec_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand_legacy(u, (i + (helper_return_type[h] != LLVMInvalidType ? 1 : 0)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + (helper_return_type[h] != LLVMInvalidType ? 4 : 3)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -4292,7 +4292,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     // Operands for the exception handler
     int operands_cnt_for_eh = 0;
     do {
-        operands_for_eh[operands_cnt_for_eh] = get_operand_legacy(u, (operands_cnt_for_eh + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &is_imm_for_eh[operands_cnt_for_eh]);
+        operands_for_eh[operands_cnt_for_eh] = get_operand_legacy(u, (operands_cnt_for_eh + (HELPER_DEFINES_OUTPUT(h) ? 4 : 3)), &is_imm_for_eh[operands_cnt_for_eh]);
         if (is_imm_for_eh[operands_cnt_for_eh] == 0 && operands_for_eh[operands_cnt_for_eh].s.valid == 0) {
             break;
         }
@@ -4772,7 +4772,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     int do_not_sync_vector_alias_slot_idx_cnt = 0;
     int operands_cnt = 0;
     do {
-        operands[operands_cnt] = get_operand_legacy(u, (operands_cnt + (HELPER_DEFINES_OUTPUT(h) ? 1 : 0)), &is_imm[operands_cnt]);
+        operands[operands_cnt] = get_operand_legacy(u, (operands_cnt + (HELPER_DEFINES_OUTPUT(h) ? 4 : 3)), &is_imm[operands_cnt]);
         if (is_imm[operands_cnt] == 0 && operands[operands_cnt].s.valid == 0) {
             break;
         }
@@ -4941,7 +4941,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     // Get output from helper func
     if (HELPER_DEFINES_OUTPUT(h)) {
         uint32_t is_imm;
-        OperandType oarg = get_operand_legacy(u, 0, &is_imm);
+        OperandType oarg = get_operand_legacy(u, 3, &is_imm);
         assert(!is_imm && oarg.s.valid);
         assert(FIXED_VECTOR_PARAM_COUNT < LLVMCountParams(llvm_func));
         LLVMValueRef param = LLVMGetParam(llvm_func, FIXED_VECTOR_PARAM_COUNT);
@@ -5295,8 +5295,10 @@ void handle_func(uint64_t off, UnifiedInstr *head, int is_external) {
         } while (1);
 
         // Output argument
-        if (opc == call ? noargs : opcoc[opc]) {
+        if (opc == call && noargs) {
             process_op_type(3, u, opc, vtype, (noargs + 3), tmp_has_known_def);
+        } else if (opcoc[opc]) {
+            process_op_type(0, u, opc, vtype, noargs, tmp_has_known_def);
         }
 
         if (opc == call) {

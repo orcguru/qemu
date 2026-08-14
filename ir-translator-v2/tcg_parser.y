@@ -27,6 +27,7 @@ extern void register_xmm(uint64_t idx, uint64_t offset);
 extern void register_xmm_tmp(uint64_t offset);
 extern XMMReg lookup_xmm(uint64_t offset);
 extern void handle_func(uint64_t off, UnifiedInstr *head, int is_external);
+extern SlotInfo get_mapped_slot(SlotType type, uint16_t idx);
 
 static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
                                 uint8_t vs, uint8_t es,
@@ -245,8 +246,7 @@ slot_op:
     SLOT
     {
         $$.kind = OP_SLOT;
-        $$.slot.type = $1.type;
-        $$.slot.idx  = $1.idx;
+        $$.slot = get_mapped_slot($1.type, $1.idx);
     }
 ;
 

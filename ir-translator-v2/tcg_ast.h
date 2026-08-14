@@ -1390,6 +1390,7 @@ typedef enum {
 
 #define ALIGNMENT_TYPE_LIST \
     X(INVALID_ALIGNMENT) \
+    X(UNALIGNED) \
     X(ALIGN_MEM_SIZE) \
     X(ALIGN_2) \
     X(ALIGN_4) \

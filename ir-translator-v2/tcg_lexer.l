@@ -1388,23 +1388,23 @@ xsetbv                          xsetbv
 {IMMD}            { HANDLE_COLUMN; errno = 0; yylval->ival = strtoll(yytext + 1, NULL, 10); assert(!errno); return IMMD; }
 {NUM}             { HANDLE_COLUMN; yylval->ival = atoi(yytext); return IMM; }
 {LABEL}           { HANDLE_COLUMN; yylval->ival = atoi(yytext + 2); return LABEL; }
-{noat}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ATOMIC; yylval->attr_info.p.storage.atomic = NONATOMIC; return MEMATTR; }
-{un}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = INVALID_ALIGNMENT; return MEMATTR; }
-{unal}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = INVALID_ALIGNMENT; return MEMATTR; }
-{al}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = ALIGN_MEM_SIZE; return MEMATTR; }
-{al2}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = ALIGN_2; return MEMATTR; }
-{al4}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = ALIGN_4; return MEMATTR; }
-{al8}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = ALIGN_8; return MEMATTR; }
-{al16}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = ALIGN_16; return MEMATTR; }
-{al32}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_ALIGNMENT; yylval->attr_info.p.storage.alignment = ALIGN_32; return MEMATTR; }
-{sb}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_SRCSIZEEXT; yylval->attr_info.p.storage.ext = SIGN; yylval->attr_info.p.storage.size = SRC1B; return MEMATTR; }
-{lesw}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_SRCSIZEEXT; yylval->attr_info.p.storage.ext = SIGN; yylval->attr_info.p.storage.size = SRC2B; return MEMATTR; }
-{lesl}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_SRCSIZEEXT; yylval->attr_info.p.storage.ext = SIGN; yylval->attr_info.p.storage.size = SRC4B; return MEMATTR; }
-{ub}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_SRCSIZEEXT; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC1B; return MEMATTR; }
-{leuw}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_SRCSIZEEXT; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC2B; return MEMATTR; }
-{leul}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_SRCSIZEEXT; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC4B; return MEMATTR; }
-{leq}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_SRCSIZEEXT; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC8B; return MEMATTR; }
-{leo}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_SRCSIZEEXT; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC16B; return MEMATTR; }
+{noat}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.atomic = NONATOMIC; return MEMATTR; }
+{un}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = UNALIGNED; return MEMATTR; }
+{unal}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = UNALIGNED; return MEMATTR; }
+{al}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_MEM_SIZE; return MEMATTR; }
+{al2}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_2; return MEMATTR; }
+{al4}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_4; return MEMATTR; }
+{al8}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_8; return MEMATTR; }
+{al16}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_16; return MEMATTR; }
+{al32}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_32; return MEMATTR; }
+{sb}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = SIGN; yylval->attr_info.p.storage.size = SRC1B; return MEMATTR; }
+{lesw}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = SIGN; yylval->attr_info.p.storage.size = SRC2B; return MEMATTR; }
+{lesl}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = SIGN; yylval->attr_info.p.storage.size = SRC4B; return MEMATTR; }
+{ub}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC1B; return MEMATTR; }
+{leuw}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC2B; return MEMATTR; }
+{leul}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC4B; return MEMATTR; }
+{leq}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC8B; return MEMATTR; }
+{leo}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC16B; return MEMATTR; }
 {cc_src2}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = cc_src2; return SLOT; }
 {es_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = es_base; return SLOT; }
 {cs_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = cs_base; return SLOT; }
