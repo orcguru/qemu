@@ -30,7 +30,7 @@
 //#define BUILD_RISCV_ON_AARCH        1
 //#define DUMP_IR                     1
 //#define VERBOSE_VAR                 1
-//#define DEBUG                       1
+#define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
 #define OPC_OUTPUT_T        opciosz[opc][1]
@@ -4427,6 +4427,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     char build_macro[4096] = {0};
     sprintf(build_macro, "-DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\"", XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST);
     char vector_seq_name[512] = {0};
+    printf("vec_cnt:%d\n", vec_cnt);
     for (int i = 0; i < vec_cnt; ++i) {
         uint16_t xmm_idx = vec_slots[i];
         for (int j = 0; j < passenger_xmm_regs_cnt; ++j) {

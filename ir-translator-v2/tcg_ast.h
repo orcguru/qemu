@@ -1449,10 +1449,7 @@ typedef enum {
 #define ATTR_TYPE_LIST \
     X(SUB_ATTR_INVALID) \
     X(SUB_ATTR_STORAGE) \
-    X(SUB_ATTR_SWAP) \
-    X(SUB_ATTR_ATOMIC) \
-    X(SUB_ATTR_ALIGNMENT) \
-    X(SUB_ATTR_SRCSIZEEXT)
+    X(SUB_ATTR_SWAP)
 
 typedef enum {
     #define X(name) name,

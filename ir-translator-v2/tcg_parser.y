@@ -132,7 +132,7 @@ extern uint8_t instr_buf[64];
 
 /* Non‑terminal types */
 %type <opnd>    slot_op imm_op label_op relop_op attr_op symbol_op
-%type <opnd>    env_or_xmm_op
+%type <opnd>    env
 %type <opnd>    operand
 %type <oplist>  arg_list
 %type <ival>    scalar_instr vector_instr call_instr
@@ -330,23 +330,11 @@ symbol_op:
 
 /* Combined env + immediate -> either env or xmm */
 /* Also handle standalone ENV (last argument in CALL) -> OP_ENV with offset 0 */
-env_or_xmm_op:
+env:
     ENV
     {
         $$.kind = OP_ENV;
         $$.env_offset = 0;
-    }
-  | ENV imm_op
-    {
-        XMMReg x = lookup_xmm($2.imm);
-        if (x.xmm_idx != NON_XMM) {
-            $$.kind = OP_XMM;
-            $$.xmm.xmm_idx = x.xmm_idx;
-            $$.xmm.xmm_offset = x.xmm_offset;
-        } else {
-            $$.kind = OP_ENV;
-            $$.env_offset = (uint16_t)$2.imm;
-        }
     }
 ;
 
@@ -379,7 +367,7 @@ operand:
   | relop_op        { $$ = $1; }
   | attr_op         { $$ = $1; }
   | symbol_op       { $$ = $1; }
-  | env_or_xmm_op   { $$ = $1; }
+  | env             { $$ = $1; }
 ;
 
 %%
@@ -415,8 +403,27 @@ static UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
     u->is_helper = is_helper;
     u->vs = vs;
     u->es = es;
-    u->operand_count = nops;
-    memcpy(u->operands, ops, nops * sizeof(Operand));
+    int skip_cnt = 0;
+    int dst_idx = 0;
+    for (int i = 0; i < nops; ++i) {
+        if (ops[i].kind == OP_ENV && (i + 1) < nops && ops[i + 1].kind == OP_IMM) {
+            XMMReg x = lookup_xmm(ops[i + 1].imm);
+            if (x.xmm_idx != NON_XMM) {
+                u->operands[dst_idx].kind = OP_XMM;
+                u->operands[dst_idx].xmm.xmm_idx = x.xmm_idx;
+                u->operands[dst_idx].xmm.xmm_offset = x.xmm_offset;
+            } else {
+                u->operands[dst_idx].kind = OP_ENV;
+                u->operands[dst_idx].env_offset = (uint16_t)ops[i + 1].imm;
+            }
+            i += 1;
+            skip_cnt += 1;
+        } else {
+            u->operands[dst_idx] = ops[i];
+        }
+        dst_idx += 1;
+    }
+    u->operand_count = nops - skip_cnt;
     u->next = NULL;
 
     return u;
