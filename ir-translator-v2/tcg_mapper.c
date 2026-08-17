@@ -88,6 +88,7 @@
 #define QEMUAOT_CC                  124
 #define REGISTER_INDEX_SHIFT        5 
 #define STACK_INDEX_SHIFT           10
+#define TCG_CALL_PREFIX_COUNT       3
 #include "xymm_def.h"
 
 /* ============================================================
@@ -98,9 +99,48 @@
 /* New CREATE_* macros – see patch_create_macros.h */
 #include "patch_create_macros.h"
 
+extern char *lineptr;
+extern const char *opcode_type_str[];
+extern const char *llvm_type_str[];
+extern const char *cvector_str[];
+extern const LLVMType opciosz[OPCODE_MAX][2];
+extern const uint8_t opcoc[OPCODE_MAX];
+extern const uint8_t opcmem_addr_nzidx[OPCODE_MAX];
+extern const char *helper_str[];
+extern const char *xmmreg_str[];
+extern const uint64_t xreg_offsets[XREG_MAX];
+extern const CVectorType cvector_type_for_llvm_type[LLVMMAXType];
+extern const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS];
+extern const LLVMType helper_return_type[HELPER_MAX];
+extern const int helper_require_exception_path[HELPER_MAX];
+extern const int helper_do_not_sync_vector[HELPER_MAX];
+
 static inline const Operand *get_operand(const UnifiedInstr *u, int idx) {
     assert(idx >= 0 && idx < u->operand_count);
     return &u->operands[idx];
+}
+
+static inline int helper_defines_output(const UnifiedInstr *u) {
+    assert(u->is_helper);
+    const Operand *op = get_operand(u, 2);
+    assert(op->kind == OP_IMM);
+    return op->imm;
+}
+
+static inline int get_first_in_op_idx(const UnifiedInstr *u) {
+    return u->opc == call ? (helper_defines_output(u) + TCG_CALL_PREFIX_COUNT) : opcoc[u->opc];
+}
+
+static inline int get_first_out_op_idx(const UnifiedInstr *u) {
+    if (u->opc == call) {
+        if (helper_defines_output(u)) {
+            return TCG_CALL_PREFIX_COUNT;
+        }
+    } else if (opcoc[u->opc]) {
+        return 0;
+    }
+    // does not define output, return invalid index
+    return u->operand_count;
 }
 
 static inline OpCodeType get_opcode(const UnifiedInstr *u) {
@@ -232,22 +272,6 @@ static inline OperandType get_operand_legacy(const UnifiedInstr *u, int idx, uin
 
 #define GET_ALIGNMENT_FROM_CONSTANT(c)      ((c) % 8 == 0 ? 8 : ((c) % 4 == 0 ? 4 : ((c) % 2 == 0 ? 2 : 1)))
 
-extern char *lineptr;
-extern const char *opcode_type_str[];
-extern const char *llvm_type_str[];
-extern const char *cvector_str[];
-extern const LLVMType opciosz[OPCODE_MAX][2];
-extern const uint8_t opcoc[OPCODE_MAX];
-extern const uint8_t opcmem_addr_nzidx[OPCODE_MAX];
-extern const char *helper_str[];
-extern const char *xmmreg_str[];
-extern const uint64_t xreg_offsets[XREG_MAX];
-extern const CVectorType cvector_type_for_llvm_type[LLVMMAXType];
-extern const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS];
-extern const LLVMType helper_return_type[HELPER_MAX];
-extern const int helper_require_exception_path[HELPER_MAX];
-extern const int helper_do_not_sync_vector[HELPER_MAX];
-
 static char func_name_prefix[33] = {0};
 static LLVMAttributeRef target_features_attr = NULL;
 static LLVMAttributeRef NoInlineAttr = NULL;
@@ -278,7 +302,6 @@ static UnifiedInstr *func_head = NULL;
 #define TYPE_ONLY               1
 #define VALUE_ONLY              2
 
-#define HELPER_DEFINES_OUTPUT(h)        (helper_return_type[h] != LLVMInvalidType)
 #define REQUIRES_CARRY_BIT(opc)         (opc == addci_i32 || opc == addci_i64 ||    \
                                          opc == addcio_i32 || opc == addcio_i64 ||  \
                                          opc == addco_i32 || opc == addco_i64)
@@ -370,9 +393,9 @@ static uint8_t is_tail_call(HelperType h);
 static uint8_t is_opc_end_of_control_flow(OpCodeType opc, const UnifiedInstr *u);
 static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, int with_ret);
 static void setup_func_stack();
-static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain);
-static LLVMValueRef get_trampoline_do_not_sync_vector(HelperType h, LLVMValueRef helper_func, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int target_domain);
-static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, XMMRegType *passenger_xmm_regs, int fix_second_half_addr);
+static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain, const UnifiedInstr *u);
+static LLVMValueRef get_trampoline_do_not_sync_vector(HelperType h, LLVMValueRef helper_func, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int target_domain, const UnifiedInstr *u);
+static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, XMMRegType *passenger_xmm_regs, int fix_second_half_addr, const UnifiedInstr *u);
 static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u);
 static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u);
 static void translate_cc_compute_inband(OpCodeType opc, const UnifiedInstr *u);
@@ -2806,10 +2829,10 @@ void translate_discard(OpCodeType opc, const UnifiedInstr *u) {
     }
 }
 
-static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain) {
+static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8_t do_return, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, int fix_second_half_addr, int target_domain, const UnifiedInstr *u) {
     char trampoline_name[4096] = {0};
 #ifdef COLLECT_TRAMPOLINE_IR
-    sprintf(trampoline_name, "trampoline_do_not_sync_vector_param%d%s", operands_cnt, HELPER_DEFINES_OUTPUT(h) ? "_with_return" : "");
+    sprintf(trampoline_name, "trampoline_do_not_sync_vector_param%d%s", operands_cnt, helper_defines_output(u) ? "_with_return" : "");
     int env_cnt = 0;
     for (int i = 0; i < operands_cnt; ++i) {
         if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_ENV && operands[i].s.offset == 0) {
@@ -2820,7 +2843,7 @@ static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8
         }
     }
 #else
-    sprintf(trampoline_name, "%s%strampoline%s_r%d_param%d", func_name_prefix, func_name_prefix[0] ? "_" : "", do_return ? "" : "_noreturn", with_ret, operands_cnt);
+    sprintf(trampoline_name, "%s%strampoline%s_r%d_param%d", func_name_prefix, func_name_prefix[0] ? "_" : "", do_return ? "" : "_noreturn", helper_defines_output(u), operands_cnt);
     int env_cnt = 0;
     for (int i = 0; i < operands_cnt; ++i) {
         if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_ENV && operands[i].s.offset == 0) {
@@ -2937,10 +2960,10 @@ static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8
     // Get the helper call target from argument, since I would like to reuse trampoline for different helper targets
     LLVMValueRef call_helper_inst = NULL;
 #ifndef COLLECT_TRAMPOLINE_IR
-    call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, call_arg_cnt, with_ret ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
+    call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, call_arg_cnt, helper_defines_output(u) ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
 #else
     LLVMValueRef the_helper = LLVMBuildIntToPtr(builder, LLVMGetParam(trampoline, j), LLVMPointerType(helper_type, 0), get_next_var_name("helper_func", dummy_slot_for_debug));
-    call_helper_inst = LLVMBuildCall2(builder, helper_type, the_helper, call_args, call_arg_cnt, with_ret ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
+    call_helper_inst = LLVMBuildCall2(builder, helper_type, the_helper, call_args, call_arg_cnt, helper_defines_output(u) ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
 #endif
     if (!do_return) {
         LLVMSetTailCall(call_helper_inst, 1);
@@ -2953,7 +2976,7 @@ static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8
 
     // Load all fixed from ENV
     LLVMValueRef return_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
-    if (with_ret) {
+    if (helper_defines_output(u)) {
         return_args[FIXED_VECTOR_PARAM_COUNT] = call_helper_inst;
     }
     // ENV must be re-initialized after the call
@@ -2998,9 +3021,9 @@ static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8
 #ifdef DEBUG
         printf("BuildCall2:%s\n", LLVMGetValueName(next_func)); fflush(NULL);
 #endif
-        call_next_inst = LLVMBuildCall2(builder, next_type, the_next, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), "");
+        call_next_inst = LLVMBuildCall2(builder, next_type, the_next, return_args, (FIXED_VECTOR_PARAM_COUNT + (helper_defines_output(u) ? 1 : 0)), "");
     } else {
-        call_next_inst = LLVMBuildCall2(builder, next_type, next_func, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), "");
+        call_next_inst = LLVMBuildCall2(builder, next_type, next_func, return_args, (FIXED_VECTOR_PARAM_COUNT + (helper_defines_output(u) ? 1 : 0)), "");
     }
     LLVMSetTailCall(call_next_inst, 1);
     LLVMSetInstructionCallConv(call_next_inst, QEMUAOT_CC);
@@ -3011,9 +3034,9 @@ static LLVMValueRef get_trampoline(HelperType h, LLVMValueRef helper_func, uint8
     return trampoline;
 }
 
-static LLVMValueRef get_trampoline_do_not_sync_vector(HelperType h, LLVMValueRef helper_func, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int target_domain) {
+static LLVMValueRef get_trampoline_do_not_sync_vector(HelperType h, LLVMValueRef helper_func, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int target_domain, const UnifiedInstr *u) {
     char trampoline_name[256] = {0};
-    sprintf(trampoline_name, "trampoline_do_not_sync_vector_param%d%s", operands_cnt, HELPER_DEFINES_OUTPUT(h) ? "_with_return" : "");
+    sprintf(trampoline_name, "trampoline_do_not_sync_vector_param%d%s", operands_cnt, helper_defines_output(u) ? "_with_return" : "");
     int env_cnt = 0;
     for (int i = 0; i < operands_cnt; ++i) {
         if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_ENV && operands[i].s.offset == 0) {
@@ -3061,9 +3084,9 @@ static LLVMValueRef get_trampoline_do_not_sync_vector(HelperType h, LLVMValueRef
     return trampoline;
 }
 
-static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, XMMRegType *passenger_xmm_regs, int fix_second_half_addr) {
+static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func, uint8_t with_ret, OperandType *operands, uint32_t *is_imm, uint8_t operands_cnt, LLVMValueRef next_func, int spill_cnt, XMMRegType *spilled_xmm_regs, XMMRegType *passenger_xmm_regs, int fix_second_half_addr, const UnifiedInstr *u) {
     char handler_name[4096] = {0};
-    sprintf(handler_name, "%s%sexception_handler_r%d_param_cnt%d", func_name_prefix, func_name_prefix[0] ? "_" : "", with_ret, operands_cnt);
+    sprintf(handler_name, "%s%sexception_handler_r%d_param_cnt%d", func_name_prefix, func_name_prefix[0] ? "_" : "", helper_defines_output(u), operands_cnt);
     int env_cnt = 0;
     for (int i = 0; i < operands_cnt; ++i) {
         if (is_imm[i] == 0 && operands[i].s.slot_type == SUB_SLOT_ENV && operands[i].s.offset == 0) {
@@ -3194,11 +3217,11 @@ static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func
     printf("BuildCall2:%s\n", LLVMGetValueName(helper_func)); fflush(NULL);
 #endif
     // Get the helper call target from argument, since I would like to reuse handler for different helper targets
-    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, call_arg_cnt, with_ret ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
+    LLVMValueRef call_helper_inst = LLVMBuildCall2(builder, helper_type, helper_func, call_args, call_arg_cnt, helper_defines_output(u) ? get_next_var_name("helper_return", dummy_slot_for_debug) : "");
 
     // Load all fixed from ENV
     LLVMValueRef return_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
-    if (with_ret) {
+    if (helper_defines_output(u)) {
         return_args[FIXED_VECTOR_PARAM_COUNT] = call_helper_inst;
     }
     // ENV must be re-initialized after the call
@@ -3242,9 +3265,9 @@ static LLVMValueRef get_exception_handler(HelperType h, LLVMValueRef helper_func
 #ifdef DEBUG
         printf("BuildCall2:%s\n", LLVMGetValueName(next_func)); fflush(NULL);
 #endif
-        call_next_inst = LLVMBuildCall2(builder, next_type, the_next, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), "");
+        call_next_inst = LLVMBuildCall2(builder, next_type, the_next, return_args, (FIXED_VECTOR_PARAM_COUNT + (helper_defines_output(u) ? 1 : 0)), "");
     } else {
-        call_next_inst = LLVMBuildCall2(builder, next_type, next_func, return_args, (FIXED_VECTOR_PARAM_COUNT + (with_ret ? 1 : 0)), "");
+        call_next_inst = LLVMBuildCall2(builder, next_type, next_func, return_args, (FIXED_VECTOR_PARAM_COUNT + (helper_defines_output(u) ? 1 : 0)), "");
     }
     LLVMSetTailCall(call_next_inst, 1);
     LLVMSetInstructionCallConv(call_next_inst, QEMUAOT_CC);
@@ -3806,7 +3829,7 @@ static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     int operands_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand_legacy(u, (i + (HELPER_DEFINES_OUTPUT(h) ? 4 : 3)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + get_first_in_op_idx(u)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -3872,7 +3895,7 @@ static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u) {
         LLVMSetSection(helper_jit_func, ".text.helper");
     }
 
-    LLVMValueRef jit_trampoline = get_trampoline(h, helper_jit_func, 0, 0, operands_for_jit, is_imm_for_jit, 2, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER);
+    LLVMValueRef jit_trampoline = get_trampoline(h, helper_jit_func, 0, 0, operands_for_jit, is_imm_for_jit, 2, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER, u);
     LLVMValueRef jit_trampoline_addr = LLVMBuildPtrToInt(builder, jit_trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, second_half_addr, jit_trampoline_addr, llvm_func, NULL, 0, call_args, helper_str[h]);
@@ -3928,7 +3951,7 @@ static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u) {
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     int operands_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand_legacy(u, (i + (HELPER_DEFINES_OUTPUT(h) ? 4 : 3)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + get_first_in_op_idx(u)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -4073,7 +4096,7 @@ static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u) {
         LLVMSetSection(helper_jit_func, ".text.helper");
     }
 
-    LLVMValueRef jit_trampoline = get_trampoline(h, helper_jit_func, 0, 0, operands_for_jit, is_imm_for_jit, 2, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER);
+    LLVMValueRef jit_trampoline = get_trampoline(h, helper_jit_func, 0, 0, operands_for_jit, is_imm_for_jit, 2, NULL, 0, NULL, 0, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER, u);
     LLVMValueRef jit_trampoline_addr = LLVMBuildPtrToInt(builder, jit_trampoline, llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     int call_arg_cnt = collect_arguments_and_types(h, TARGET_QEMUAOT_HELPER, VALUE_ONLY, operands, is_imm, operands_cnt, second_half_addr, jit_trampoline_addr, llvm_func, NULL, 0, call_args, helper_str[h]);
@@ -4126,13 +4149,13 @@ static void translate_cc_compute_inband(OpCodeType opc, const UnifiedInstr *u) {
 #endif
     OperandType oarg;
     uint32_t is_imm_dummy;
-    oarg = get_operand_legacy(u, 3, &is_imm_dummy);
+    oarg = get_operand_legacy(u, get_first_out_op_idx(u), &is_imm_dummy);
     assert(!is_imm_dummy && oarg.s.valid);
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
     uint32_t is_imm[MAX_OPERANDS_COUNT] = {0};
     int operands_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand_legacy(u, (i + (helper_return_type[h] != LLVMInvalidType ? 4 : 3)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + get_first_in_op_idx(u)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -4234,7 +4257,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     oarg.s.valid = 0;
     uint32_t is_imm_dummy;
     if (helper_return_type[h] != LLVMInvalidType) {
-      oarg = get_operand_legacy(u, 3, &is_imm_dummy);
+      oarg = get_operand_legacy(u, get_first_out_op_idx(u), &is_imm_dummy);
       assert(!is_imm_dummy && oarg.s.valid);
     }
     OperandType operands[MAX_OPERANDS_COUNT] = {0};
@@ -4243,7 +4266,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     uint16_t vec_slots[MAX_OPERANDS_COUNT] = {0};
     int vec_cnt = 0;
     for (int i = 0; i < MAX_OPERANDS_COUNT; ++i) {
-        operands[i] = get_operand_legacy(u, (i + (helper_return_type[h] != LLVMInvalidType ? 4 : 3)), &(is_imm[i]));
+        operands[i] = get_operand_legacy(u, (i + get_first_in_op_idx(u)), &(is_imm[i]));
         if (is_imm[i] == 0 && operands[i].s.valid == 0) {
             break;
         }
@@ -4292,7 +4315,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     // Operands for the exception handler
     int operands_cnt_for_eh = 0;
     do {
-        operands_for_eh[operands_cnt_for_eh] = get_operand_legacy(u, (operands_cnt_for_eh + (HELPER_DEFINES_OUTPUT(h) ? 4 : 3)), &is_imm_for_eh[operands_cnt_for_eh]);
+        operands_for_eh[operands_cnt_for_eh] = get_operand_legacy(u, (operands_cnt_for_eh + get_first_in_op_idx(u)), &is_imm_for_eh[operands_cnt_for_eh]);
         if (is_imm_for_eh[operands_cnt_for_eh] == 0 && operands_for_eh[operands_cnt_for_eh].s.valid == 0) {
             break;
         }
@@ -4509,7 +4532,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
             }
             param_cnt += 1;
         }
-        exception_path_trampoline = get_exception_handler(h, helper_func, helper_return_type[h] != LLVMInvalidType ? 1 : 0, operands_for_eh, is_imm_for_eh, operands_cnt_for_eh, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs, passenger_xmm_regs, param_cnt == MAX_ADDED_ARGS);
+        exception_path_trampoline = get_exception_handler(h, helper_func, helper_return_type[h] != LLVMInvalidType ? 1 : 0, operands_for_eh, is_imm_for_eh, operands_cnt_for_eh, second_half_func, passenger_xmm_regs_cnt, spilled_xmm_regs, passenger_xmm_regs, param_cnt == MAX_ADDED_ARGS, u);
     }
 
     // Generate the fast path inlined helper
@@ -4773,7 +4796,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     int do_not_sync_vector_alias_slot_idx_cnt = 0;
     int operands_cnt = 0;
     do {
-        operands[operands_cnt] = get_operand_legacy(u, (operands_cnt + (HELPER_DEFINES_OUTPUT(h) ? 4 : 3)), &is_imm[operands_cnt]);
+        operands[operands_cnt] = get_operand_legacy(u, (operands_cnt + get_first_in_op_idx(u)), &is_imm[operands_cnt]);
         if (is_imm[operands_cnt] == 0 && operands[operands_cnt].s.valid == 0) {
             break;
         }
@@ -4810,7 +4833,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     } while (1);
     assert(operands_cnt <= MAX_OPERANDS_COUNT);
 #ifdef DEBUG
-    printf("%s_%s defines_output:%d operands_cnt:%d\n", helper_str[h], second_half_name, HELPER_DEFINES_OUTPUT(h), operands_cnt); fflush(NULL);
+    printf("%s_%s defines_output:%d operands_cnt:%d\n", helper_str[h], second_half_name, helper_defines_output(u), operands_cnt); fflush(NULL);
 #endif
     // Get the second half
     uint8_t second_half_disabled = is_tail_call(h);
@@ -4863,12 +4886,12 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     if (helper_do_not_sync_vector[h]) {
         assert(!second_half_disabled);
         assert(param_cnt < MAX_ADDED_ARGS);
-        trampoline = get_trampoline_do_not_sync_vector(h, helper_func, operands, is_imm, operands_cnt, second_half_func, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
+        trampoline = get_trampoline_do_not_sync_vector(h, helper_func, operands, is_imm, operands_cnt, second_half_func, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER, u);
     } else {
 #else
     {
 #endif
-        trampoline = get_trampoline(h, helper_func, second_half_disabled ? 0 : 1, HELPER_DEFINES_OUTPUT(h), operands, is_imm, operands_cnt, second_half_func, 0, NULL, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER);
+        trampoline = get_trampoline(h, helper_func, second_half_disabled ? 0 : 1, helper_defines_output(u), operands, is_imm, operands_cnt, second_half_func, 0, NULL, param_cnt == MAX_ADDED_ARGS, TARGET_QEMUAOT_TRAMPOLINE_FOR_DEFAULT_HELPER_EXPAND_ALIAS_POINTER, u);
     }
     LLVMTypeRef call_types[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
     LLVMValueRef call_args[FIXED_VECTOR_PARAM_COUNT + MAX_OPERANDS_COUNT] = {NULL};
@@ -4927,7 +4950,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
         LLVMValueRef param = LLVMGetParam(llvm_func, j);
         LLVMSetValueName(param, fixed_vector_arg_names[j]);
     }
-    if (HELPER_DEFINES_OUTPUT(h)) {
+    if (helper_defines_output(u)) {
         assert(FIXED_VECTOR_PARAM_COUNT < LLVMCountParams(llvm_func));
         LLVMValueRef param = LLVMGetParam(llvm_func, FIXED_VECTOR_PARAM_COUNT);
         LLVMSetValueName(param, "helper_result");
@@ -4940,9 +4963,9 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     setup_func_stack();
 
     // Get output from helper func
-    if (HELPER_DEFINES_OUTPUT(h)) {
+    if (helper_defines_output(u)) {
         uint32_t is_imm;
-        OperandType oarg = get_operand_legacy(u, 3, &is_imm);
+        OperandType oarg = get_operand_legacy(u, get_first_out_op_idx(u), &is_imm);
         assert(!is_imm && oarg.s.valid);
         assert(FIXED_VECTOR_PARAM_COUNT < LLVMCountParams(llvm_func));
         LLVMValueRef param = LLVMGetParam(llvm_func, FIXED_VECTOR_PARAM_COUNT);
@@ -5194,12 +5217,15 @@ static void register_labels_for_func(LLVMValueRef func) {
     }
 }
 
-static int process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType opc, LLVMType vtype, uint32_t base_input_idx_for_call, uint8_t *tmp_has_known_def) {
+// FIXME: handling on tmp_shadow_offset should be redesigned to handle multiple calls within one function,
+// and also some variable may should have been preserved across the first call, released during the second
+// call; or in reversed situation.
+static void process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType opc, LLVMType vtype, uint8_t *tmp_has_known_def) {
     uint32_t is_imm = 0;
     OperandType operand = get_operand_legacy(u, slot_idx, &is_imm);
     // End-of-operands
     if (!is_imm && !operand.s.valid) {
-        return 0;
+        return;
     }
     LLVMType operand_type = vtype == LLVMInvalidType ?
                         (opcmem_addr_nzidx[opc] > 0 ?
@@ -5226,7 +5252,7 @@ static int process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType 
             xmm_valid |= (1UL<<operand.s.slot_idx);
         }
         if (operand.s.slot_type == SUB_SLOT_TMP) {
-            if ((opc == call && slot_idx >= base_input_idx_for_call) || (opc != call && slot_idx >= opcoc[opc])) {
+            if ((opc == call && slot_idx >= get_first_in_op_idx(u)) || (opc != call && slot_idx >= opcoc[opc])) {
                 if (!tmp_has_known_def[operand.s.slot_idx]) {
                     // At this stage, we do not have alias information yet, so we need to check later
 #ifdef DEBUG
@@ -5242,7 +5268,7 @@ static int process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType 
             }
             if (opc != call && slot_idx < opcoc[opc]) {
                 tmp_has_known_def[operand.s.slot_idx] = 1;
-            } else if (opc == call && slot_idx < base_input_idx_for_call) {
+            } else if (opc == call && slot_idx < get_first_in_op_idx(u)) {
 #ifdef DEBUG
                 OperandType orig_slot = get_original_slot_for_debug(operand);
                 printf("  unregister cross_call tmp:%d orig:%s%d\n", operand.s.slot_idx, orig_slot.s.valid ? (orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp") : "NA", orig_slot.s.valid ? orig_slot.s.slot_idx : 0); fflush(NULL);
@@ -5254,7 +5280,7 @@ static int process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType 
             }
         }
     }
-    return 1;
+    return;
 }
 
 void handle_func(uint64_t off, UnifiedInstr *head, int is_external) {
@@ -5269,14 +5295,12 @@ void handle_func(uint64_t off, UnifiedInstr *head, int is_external) {
     uint8_t tmp_has_known_def[1<<STACK_INDEX_SHIFT] = {0};
     for (UnifiedInstr *u = head; u; u = u->next) {
         OpCodeType opc = u->opc;
-        uint32_t noargs = 0;
         OperandType oarg;
         uint32_t is_immo = 0;
         oarg.s.valid = 0;
         if (opc == call) {
-            noargs = HELPER_DEFINES_OUTPUT(get_helper(u));
-            if (noargs) {
-                oarg = get_operand_legacy(u, 3, &is_immo);
+            if (helper_defines_output(u)) {
+                oarg = get_operand_legacy(u, get_first_out_op_idx(u), &is_immo);
                 assert(!is_immo && oarg.s.valid);
             }
             register_idx_for_call_helper(u, current_call_idx);
@@ -5286,20 +5310,13 @@ void handle_func(uint64_t off, UnifiedInstr *head, int is_external) {
         if (is_vec) {
           vtype = get_llvm_vector_type(u);
         }
-        // Input arguments first
-        uint32_t slot_idx = opc == call ? (noargs + 3) : opcoc[opc];
-        do {
-            if (!process_op_type(slot_idx, u, opc, vtype, (noargs + 3), tmp_has_known_def)) {
-                break;
-            }
-            slot_idx += 1;
-        } while (1);
-
-        // Output argument
-        if (opc == call && noargs) {
-            process_op_type(3, u, opc, vtype, (noargs + 3), tmp_has_known_def);
-        } else if (opcoc[opc]) {
-            process_op_type(0, u, opc, vtype, noargs, tmp_has_known_def);
+        // Input arguments
+        for (int i = get_first_in_op_idx(u); i < u->operand_count; ++i) {
+            process_op_type(i, u, opc, vtype, tmp_has_known_def);
+        }
+        // Output arguments
+        for (int i = get_first_out_op_idx(u), sentinal = get_first_in_op_idx(u); i < sentinal; ++i) {
+            process_op_type(i, u, opc, vtype, tmp_has_known_def);
         }
 
         if (opc == call) {
