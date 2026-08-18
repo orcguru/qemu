@@ -111,7 +111,7 @@ static inline void __bi_set_env(UnifiedInstr *u, int idx, uint16_t offset)
     assert(idx >= 0 && idx < u->operand_count);
     Operand *op = &u->operands[idx];
     op->kind = OP_ENV;
-    op->env_offset = offset;
+    op->env.env_offset = offset;
 }
 
 /*

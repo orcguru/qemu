@@ -19,24 +19,34 @@ typedef enum {
 typedef struct {
     SlotType type;
     uint16_t idx;
+    LLVMType op_type;
+    LLVMType stack_type;
 } SlotInfo;
 
 typedef struct {
     uint8_t xmm_idx;
     uint8_t xmm_offset;
+    LLVMType op_type;
+    LLVMType stack_type;
 } XmmInfo;
+
+typedef struct {
+    uint16_t env_offset;
+    LLVMType op_type;
+    LLVMType stack_type;
+} EnvInfo;
 
 typedef struct {
     OperandKind kind;
     union {
         SlotInfo   slot;
+        XmmInfo    xmm;
+        EnvInfo    env;
         uint64_t   imm;
         uint16_t   label;
         RelopType  relop;
         AttrSrcInfo attr_info;
         HelperType symbol;
-        XmmInfo    xmm;
-        uint16_t   env_offset;
     };
 } Operand;
 

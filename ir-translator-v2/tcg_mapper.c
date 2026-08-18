@@ -7,10 +7,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include "tcg_ast.h"
-#include "tcg_context.h"
-#include "tcg_parser.tab.h"
-#include "tcg_lexer.yy.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Target.h>
 #include <llvm-c/TargetMachine.h>
@@ -20,6 +16,11 @@
 #include <llvm-c/Support.h>
 #include <stdbool.h>
 #include <glib.h>
+#include "tcg_ast.h"
+#include "tcg_context.h"
+#include "tcg_parser.tab.h"
+#include "tcg_lexer.yy.h"
+#include "tcg_mapper.h"
 
 #define LARGE_SHADOW_MAP              1
 //#define CHECK_SHADOW_STACK_BOUNDARY   1
@@ -240,7 +241,7 @@ static inline OperandType get_operand_legacy(const UnifiedInstr *u, int idx, uin
             ret.s.valid = 1;
             ret.s.slot_type = SUB_SLOT_ENV;
             ret.s.slot_idx = 0;
-            ret.s.offset = op->env_offset;
+            ret.s.offset = op->env.env_offset;
             break;
         default:
             // invalid operand e.g. RELOP,ATTR
@@ -5093,7 +5094,6 @@ static void cleanup_func_resource() {
 #ifdef DEBUG
     printf("%s\n", __FUNCTION__); fflush(NULL);
 #endif
-    reset_instr_buffer();
     for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
         alias_tmp[i].i = 0;
     }

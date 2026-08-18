@@ -36,6 +36,9 @@ struct TcgContext {
     int      lineno;
     int      column;
     char    *lineptr;   /* current line text for error display */
+
+    /* Alias map */
+    Operand *alias_map;
 };
 
 /* Initialize a TcgContext */

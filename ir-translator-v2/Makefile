@@ -24,7 +24,7 @@ endif
 
 all: tcg_parser
 
-tcg_parser: tcg_parser.tab.o tcg_lexer.yy.o tcg_mapper.o instr.o helper_lookup.o
+tcg_parser: tcg_parser.tab.o tcg_lexer.yy.o tcg_mapper.o instr.o helper_lookup.o parser_util.o operand_static_types.o
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
 tcg_parser.tab.o: tcg_parser.tab.c tcg_lexer.yy.h
