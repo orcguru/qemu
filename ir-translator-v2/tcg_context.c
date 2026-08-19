@@ -14,13 +14,11 @@ void tcg_context_init(TcgContext *ctx) {
     ctx->lineno = 1;
     ctx->column = 1;
     ctx->lineptr = NULL;
-    ctx->alias_ops_pool = (Operand *)malloc(DEFAULT_ALIAS_OPS_POOL_SIZE * sizeof(Operand));
-    assert(ctx->alias_ops_pool);
+    ctx->alias_ops_pool = NULL;
     ctx->plen = 0;
-    ctx->pcap = DEFAULT_ALIAS_OPS_POOL_SIZE;
+    ctx->pcap = 0;
     ctx->alias_map = g_hash_table_new(NULL, NULL);
     ctx->slot_map = g_hash_table_new(NULL, NULL);
+    ctx->stack_type_map = g_hash_table_new(NULL, NULL);
     ctx->next_tmp_idx = 0;
 }
-
-

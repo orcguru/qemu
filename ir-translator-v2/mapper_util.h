@@ -94,7 +94,6 @@ static inline const AttrSrcInfo *get_attribute_from_instr(const UnifiedInstr *u)
         if (u->operands[i].kind == OP_ATTR)
             return &u->operands[i].attr_info;
     }
-    assert(0 && "attribute not found");
     return NULL;
 }
 

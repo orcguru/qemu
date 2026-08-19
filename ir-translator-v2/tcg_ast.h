@@ -1551,6 +1551,7 @@ typedef struct {
 
 #define LLVM_TYPE_LIST \
     X(LLVMInvalidType) \
+    X(LLVMIntANY) \
     X(LLVMInt8) \
     X(LLVMInt16) \
     X(LLVMInt32) \

@@ -101,7 +101,6 @@ XMMReg lookup_xmm_map(uint64_t offset) {
     return x;
 }
 
-/* Free a singly-linked list of UnifiedInstr (and their operand data). */
 void free_instr_list(UnifiedInstr *head) {
     while (head) {
         UnifiedInstr *next = head->next;
@@ -130,7 +129,6 @@ void op_list_free(OpList *l) {
     l->len = l->cap = 0;
 }
 
-/* Append a UnifiedInstr to the context's list (O(1) using tail) */
 void append_instr(TcgContext *ctx, UnifiedInstr *u) {
     u->next = NULL;
     if (ctx->instr_tail) {
@@ -142,11 +140,6 @@ void append_instr(TcgContext *ctx, UnifiedInstr *u) {
     }
 }
 
-/*
- * Reset the instruction list in the context, freeing all allocated
- * UnifiedInstr nodes.  After this call, instr_head and instr_tail
- * are both NULL and the associated memory has been released.
- */
 void tcg_context_reset_instrs(TcgContext *ctx) {
     free_instr_list(ctx->instr_head);
     ctx->instr_head = NULL;
@@ -169,7 +162,10 @@ void init_alias_map(TcgContext *ctx) {
 void register_alias(TcgContext *ctx, Operand *s, Operand *xmm_env) {
     assert(s->kind == OP_SLOT && s->slot.type == SUB_SLOT_TMP);
     assert(xmm_env->kind == OP_XMM || xmm_env->kind == OP_ENV);
-    assert(ctx->plen < ctx->pcap);
+    if (ctx->plen >= ctx->pcap) {
+        ctx->pcap = ctx->pcap ? ctx->pcap * 2 : 8;
+        ctx->alias_ops_pool = realloc(ctx->alias_ops_pool, ctx->pcap * sizeof(Operand));
+    }
     ctx->alias_ops_pool[ctx->plen] = *xmm_env;
     if (g_hash_table_contains(ctx->alias_map, (gconstpointer)(long)s->slot.idx)) {
         g_hash_table_replace(ctx->alias_map, (gpointer)(long)s->slot.idx, &ctx->alias_ops_pool[ctx->plen]);
@@ -177,11 +173,6 @@ void register_alias(TcgContext *ctx, Operand *s, Operand *xmm_env) {
         g_hash_table_insert(ctx->alias_map, (gpointer)(long)s->slot.idx, &ctx->alias_ops_pool[ctx->plen]);
     }
     ctx->plen += 1;
-    if (ctx->plen == ctx->pcap) {
-        ctx->pcap *= 2;
-        ctx->alias_ops_pool = (Operand *)realloc(ctx->alias_ops_pool, ctx->pcap);
-        assert(ctx->alias_ops_pool);
-    }
 }
 
 void try_unregister_alias(TcgContext *ctx, Operand *op) {
@@ -228,9 +219,20 @@ LLVMType vec_op_type(uint8_t vs, uint8_t es) {
     return LLVMInvalidType;
 }
 
-void set_operand_type(Operand *op, LLVMType ty) {
+void set_operand_type(TcgContext *ctx, Operand *op, LLVMType ty) {
     if (op->kind == OP_SLOT) {
         op->slot.op_type = ty;
+        if (op->slot.type == SUB_SLOT_TMP) {
+            LLVMType stack_ty = ty > LLVMInt64 ? LLVMVector2xi64 : ty;
+            if (g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)op->slot.idx)) {
+                LLVMType current_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)op->slot.idx);
+                if (stack_ty > current_ty) {
+                    g_hash_table_replace(ctx->stack_type_map, (gpointer)(long)op->slot.idx, (gpointer)(long)stack_ty);
+                }
+            } else {
+                g_hash_table_insert(ctx->stack_type_map, (gpointer)(long)op->slot.idx, (gpointer)(long)stack_ty);
+            }
+        }
     } else if (op->kind == OP_XMM) {
         op->xmm.op_type = ty;
     } else if (op->kind == OP_ENV) {
@@ -238,74 +240,168 @@ void set_operand_type(Operand *op, LLVMType ty) {
     }
 }
 
-void update_slot_types(TcgContext *ctx,
-                              uint8_t opc, bool is_helper,
-                              uint8_t vs, uint8_t es,
-                              Operand *ops, int nops) {
+void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
     LLVMType ty = LLVMInvalidType;
     /* Vector */
-    if (vs > 0) {
-        ty = vec_op_type(vs, es);
-        for (int i = 0; i < nops; ++i) {
-            set_operand_type(&ops[i], ty);
+    if (u->vs > 0) {
+        ty = vec_op_type(u->vs, u->es);
+        for (int i = 0; i < u->operand_count; ++i) {
+            set_operand_type(ctx, &u->operands[i], ty);
         }
         return;
     }
     /* Call helper */
-    if (is_helper) {
+    if (u->is_helper) {
         int first_input_idx = TCG_CALL_PREFIX_COUNT;
-        assert(ops[0].kind == OP_SYMBOL);
-        assert(ops[2].kind == OP_IMM);
-        HelperType h = ops[0].symbol;
+        assert(u->operands[0].kind == OP_SYMBOL);
+        assert(u->operands[2].kind == OP_IMM);
+        HelperType h = u->operands[0].symbol;
         // Handle output
-        if (ops[2].imm) {
+        if (u->operands[2].imm) {
             first_input_idx += 1;
-            assert(ops[TCG_CALL_PREFIX_COUNT].kind == OP_SLOT);
-            ops[TCG_CALL_PREFIX_COUNT].slot.op_type = helper_return_type[h];
+            assert(u->operands[TCG_CALL_PREFIX_COUNT].kind == OP_SLOT);
+            set_operand_type(ctx, &u->operands[TCG_CALL_PREFIX_COUNT], helper_return_type[h]);
         }
         int type_lookup_idx = 0;
-        for (int i = first_input_idx; i < nops; ++i) {
-            if (ops[i].kind == OP_SLOT) {
-                assert(helper_collapse_xmm_arg_type[h][type_lookup_idx] != LLVMInvalidType);
-                ops[i].slot.op_type = helper_collapse_xmm_arg_type[h][type_lookup_idx];
+        for (int i = first_input_idx; i < u->operand_count; ++i) {
+            if (u->operands[i].kind == OP_SLOT) {
+                assert(type_lookup_idx < MAX_ADDED_ARGS);
+                if (helper_collapse_xmm_arg_type[h][type_lookup_idx] != LLVMInvalidType) {
+                    set_operand_type(ctx, &u->operands[i], helper_collapse_xmm_arg_type[h][type_lookup_idx]);
+                } else {
+                    set_operand_type(ctx, &u->operands[i], LLVMInt64);
+                }
                 type_lookup_idx += 1;
-            } else if (ops[i].kind == OP_XMM) {
-                ops[i].xmm.op_type = LLVMVector2xi64;
-            } else if (ops[i].kind == OP_ENV) {
-                ops[i].env.op_type = LLVMVector2xi64;
+            } else if (u->operands[i].kind == OP_XMM) {
+                u->operands[i].xmm.op_type = LLVMVector2xi64;
+            } else if (u->operands[i].kind == OP_ENV) {
+                assert(xmm_offsets[XMM_TMP_IDX]);
+                if (u->operands[i].env.env_offset == xmm_offsets[XMM_TMP_IDX]) {
+                    u->operands[i].env.op_type = LLVMVector2xi64;
+                } else {
+                    u->operands[i].env.op_type = LLVMInt64;
+                }
             }
         }
         return;
     }
     /* Scalar */
-    for (int i = 0; i < nops; ++i) {
-        if (opcmem_addr_nzidx[opc] > 0) {
+    for (int i = 0; i < u->operand_count; ++i) {
+        if (u->operands[i].kind != OP_SLOT &&
+            u->operands[i].kind != OP_XMM &&
+            u->operands[i].kind != OP_ENV) {
+            continue;
+        }
+        if (opcmem_addr_nzidx[u->opc] > 0) {
             // Memory operations
-            if (i < opcmem_addr_nzidx[opc]) {
-                assert(ops[i].kind == OP_SLOT);
+            if (i < opcmem_addr_nzidx[u->opc]) {
+                assert(u->operands[i].kind == OP_SLOT);
                 // Register-bits
-                set_operand_type(&ops[i], opciosz[opc][1]);
+                set_operand_type(ctx, &u->operands[i], opciosz[u->opc][1]);
             } else {
                 // Memory-bits
-                set_operand_type(&ops[i], opciosz[opc][0]);
+                if (opciosz[u->opc][0] == LLVMInvalidType) {
+                    const AttrSrcInfo *attr = get_attribute_from_instr(u);
+                    assert(attr);
+                    assert(attr->subt == SUB_ATTR_STORAGE);
+                    assert(attr->p.storage.size != INVALID_SRCSIZE);
+                    switch (attr->p.storage.size) {
+                    case SRC1B:
+                        set_operand_type(ctx, &u->operands[i], LLVMInt8);
+                        break;
+                    case SRC2B:
+                        set_operand_type(ctx, &u->operands[i], LLVMInt16);
+                        break;
+                    case SRC4B:
+                        set_operand_type(ctx, &u->operands[i], LLVMInt32);
+                        break;
+                    case SRC8B:
+                        set_operand_type(ctx, &u->operands[i], LLVMInt64);
+                        break;
+                    default:
+                        assert(0);
+                    }
+                } else {
+                    set_operand_type(ctx, &u->operands[i], opciosz[u->opc][0]);
+                }
             }
         } else {
-            if (i < opcoc[opc]) {
+            if (i < opcoc[u->opc]) {
                 // Output-bits
-                set_operand_type(&ops[i], opciosz[opc][1]);
+                set_operand_type(ctx, &u->operands[i], opciosz[u->opc][1]);
             } else {
                 // Input-bits
-                set_operand_type(&ops[i], opciosz[opc][0]);
+                if (opciosz[u->opc][0] == LLVMInvalidType) {
+                    const AttrSrcInfo *attr = get_attribute_from_instr(u);
+                    assert(attr);
+                    assert(attr->subt == SUB_ATTR_STORAGE);
+                    assert(attr->p.storage.size != INVALID_SRCSIZE);
+                    switch (attr->p.storage.size) {
+                    case SRC1B:
+                        set_operand_type(ctx, &u->operands[i], LLVMInt8);
+                        break;
+                    case SRC2B:
+                        set_operand_type(ctx, &u->operands[i], LLVMInt16);
+                        break;
+                    case SRC4B:
+                        set_operand_type(ctx, &u->operands[i], LLVMInt32);
+                        break;
+                    case SRC8B:
+                        set_operand_type(ctx, &u->operands[i], LLVMInt64);
+                        break;
+                    default:
+                        assert(0);
+                    }
+                } else {
+                    set_operand_type(ctx, &u->operands[i], opciosz[u->opc][0]);
+                }
             }
         }
     }
     return;
 }
 
+void sanity_check_op_type_solid(TcgContext *ctx) {
+    for (const UnifiedInstr *u = ctx->instr_head; u; u = u->next) {
+        for (int i = 0; i < u->operand_count; ++i) {
+            const Operand *op = &u->operands[i];
+            if (op->kind == OP_SLOT) {
+                assert(op->slot.op_type);
+            } else if (op->kind == OP_XMM) {
+                assert(op->xmm.op_type);
+            } else if (op->kind == OP_ENV) {
+                assert(op->env.op_type);
+            }       
+        }
+    }
+}
+
 void type_map_apply(TcgContext *ctx) {
+    for (UnifiedInstr *u = ctx->instr_head; u; u = u->next) {
+        for (int i = 0; i < u->operand_count; ++i) {
+            Operand *op = &u->operands[i];
+            if (op->kind == OP_SLOT) {
+                if (op->slot.type == SUB_SLOT_TMP) {
+                    LLVMType stack_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)op->slot.idx);
+                    assert(stack_ty != LLVMInvalidType);
+                    op->slot.stack_type = stack_ty;
+                } else {
+                    assert(op->slot.stack_type != LLVMInvalidType);
+                }
+            } else if (op->kind == OP_XMM) {
+                assert(op->xmm.stack_type != LLVMInvalidType);
+            }       
+        }
+    }
 }
 
 void type_map_reset(TcgContext *ctx) {
+    GHashTableIter iter;
+    gpointer key, value;
+    g_hash_table_iter_init(&iter, ctx->stack_type_map);
+    while (g_hash_table_iter_next(&iter, &key, &value)) {
+        g_hash_table_iter_remove(&iter);
+    }
 }
 
 void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src) {
@@ -337,23 +433,31 @@ UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
     u->es = es;
     int skip_cnt = 0;
     int dst_idx = 0;
-    for (int i = 0; i < nops; ++i) {
-        if (ops[i].kind == OP_ENV && (i + 1) < nops && ops[i + 1].kind == OP_IMM) {
-            XMMReg x = lookup_xmm(ops[i + 1].imm);
-            if (x.xmm_idx != NON_XMM) {
-                u->operands[dst_idx].kind = OP_XMM;
-                u->operands[dst_idx].xmm.xmm_idx = x.xmm_idx;
-                u->operands[dst_idx].xmm.xmm_offset = x.xmm_offset;
+    if (is_helper) {
+        memcpy(u->operands, ops, (nops * sizeof(Operand)));
+    } else {
+        for (int i = 0; i < nops; ++i) {
+            if (ops[i].kind == OP_ENV && (i + 1) < nops && ops[i + 1].kind == OP_IMM) {
+                XMMReg x = lookup_xmm(ops[i + 1].imm);
+                if (x.xmm_idx != NON_XMM) {
+                    u->operands[dst_idx].kind = OP_XMM;
+                    u->operands[dst_idx].xmm.xmm_idx = x.xmm_idx;
+                    u->operands[dst_idx].xmm.xmm_offset = x.xmm_offset;
+                    u->operands[dst_idx].xmm.op_type = LLVMInvalidType;
+                    u->operands[dst_idx].xmm.stack_type = LLVMVector2xi64;
+                } else {
+                    u->operands[dst_idx].kind = OP_ENV;
+                    u->operands[dst_idx].env.env_offset = (uint16_t)ops[i + 1].imm;
+                    u->operands[dst_idx].env.op_type = LLVMInvalidType;
+                    u->operands[dst_idx].env.stack_type = LLVMInvalidType;
+                }
+                i += 1;
+                skip_cnt += 1;
             } else {
-                u->operands[dst_idx].kind = OP_ENV;
-                u->operands[dst_idx].env.env_offset = (uint16_t)ops[i + 1].imm;
+                u->operands[dst_idx] = ops[i];
             }
-            i += 1;
-            skip_cnt += 1;
-        } else {
-            u->operands[dst_idx] = ops[i];
+            dst_idx += 1;
         }
-        dst_idx += 1;
     }
     u->operand_count = nops - skip_cnt;
     u->next = NULL;

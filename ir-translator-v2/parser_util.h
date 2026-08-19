@@ -50,10 +50,8 @@ void expand_slot_alias(TcgContext *ctx, UnifiedInstr *u);
  * -----------------------------------------------------------------
  */
 LLVMType vec_op_type(uint8_t vs, uint8_t es);
-void update_slot_types(TcgContext *ctx,
-                              uint8_t opc, bool is_helper,
-                              uint8_t vs, uint8_t es,
-                              Operand *ops, int nops);
+void update_slot_types(TcgContext *ctx, UnifiedInstr *u);
+void sanity_check_op_type_solid(TcgContext *ctx);
 void type_map_apply(TcgContext *ctx);
 void type_map_reset(TcgContext *ctx);
 

@@ -47,6 +47,9 @@ struct TcgContext {
     /* Slot name map */
     GHashTable *slot_map;
     uint16_t next_tmp_idx;
+
+    /* Stack type for slot operand */
+    GHashTable *stack_type_map;
 };
 
 void tcg_context_init(TcgContext *ctx);

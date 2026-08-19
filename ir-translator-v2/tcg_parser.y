@@ -108,6 +108,7 @@ func:
     INTERNAL COLON IMMX COLON instr_list
     {
         /* End of function – apply final slot types */
+        sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);
         handle_func($3, ctx->instr_head, 0);
         tcg_context_reset_instrs(ctx);
@@ -118,6 +119,7 @@ func:
     | EXTERNAL COLON IMMX COLON instr_list
     {
         /* End of function – apply final slot types */
+        sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);
         handle_func($3, ctx->instr_head, 1);
         tcg_context_reset_instrs(ctx);
@@ -144,11 +146,14 @@ scalar_instr:
     {
         UnifiedInstr *u = emit_instr($1, false, 0, 0, $2.data, $2.len);
         expand_slot_alias(ctx, u);
-        update_slot_types(ctx, $1, false, 0, 0, u->operands, u->operand_count);
+        update_slot_types(ctx, u);
+        int skip_alias_instr = 0;
         if (u->opc == add_i64 && u->operand_count == 2) {
             register_alias(ctx, &u->operands[0], &u->operands[1]);
+            skip_alias_instr = 1;
         } else if (u->opc == mov_i64 && (u->operands[1].kind == OP_XMM || u->operands[1].kind == OP_ENV)) {
             register_alias(ctx, &u->operands[0], &u->operands[1]);
+            skip_alias_instr = 1;
         } else if (u->opc == call && u->operands[2].kind == OP_IMM && u->operands[2].imm) {
             try_unregister_alias(ctx, &u->operands[3]);
         } else if (opcoc[u->opc] > 0) {
@@ -156,8 +161,12 @@ scalar_instr:
                 try_unregister_alias(ctx, &u->operands[i]);
             }
         }
-        op_list_free(&$2);
-        append_instr(ctx, u);
+        if (skip_alias_instr == 0) {
+            op_list_free(&$2);
+            append_instr(ctx, u);
+        } else {
+            free(u);
+        }
         $$ = 0;
     }
 ;
@@ -168,7 +177,7 @@ vector_instr:
     {
         UnifiedInstr *u = emit_instr($1, false, $2.vs, $4.es, $6.data, $6.len);
         expand_slot_alias(ctx, u);
-        update_slot_types(ctx, $1, false, $2.vs, $4.es, u->operands, u->operand_count);
+        update_slot_types(ctx, u);
         op_list_free(&$6);
         append_instr(ctx, u);
         $$ = 0;
@@ -194,7 +203,7 @@ call_instr:
         free(pre.data);
         UnifiedInstr *u = emit_instr($1, true, 0, 0, merged, total);
         expand_slot_alias(ctx, u);
-        update_slot_types(ctx, $1, true, 0, 0, u->operands, u->operand_count);
+        update_slot_types(ctx, u);
         free(merged);
         op_list_free(&$8);
         append_instr(ctx, u);

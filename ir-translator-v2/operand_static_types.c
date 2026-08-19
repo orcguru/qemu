@@ -9,17 +9,19 @@
 const LLVMType opciosz[OPCODE_MAX][2] = {
 #define SAME(T)     {T, T}
     // Not supported OPC
-    [addc1o_i32] = SAME(LLVMInvalidType),
-    [addc1o_i64] = SAME(LLVMInvalidType),
-    [subb1o_i32] = SAME(LLVMInvalidType),
-    [subb1o_i64] = SAME(LLVMInvalidType),
-    [brcond_i32] = SAME(LLVMInvalidType),
-    [divs2_i32] = SAME(LLVMInvalidType),
-    [divs2_i64] = SAME(LLVMInvalidType),
-    [divu2_i32] = SAME(LLVMInvalidType),
-    [divu2_i64] = SAME(LLVMInvalidType),
+    // FIXME: should support all opc
+    [addc1o_i32] = SAME(LLVMInt32),
+    [addc1o_i64] = SAME(LLVMInt64),
+    [subb1o_i32] = SAME(LLVMInt32),
+    [subb1o_i64] = SAME(LLVMInt64),
+    [brcond_i32] = {LLVMInt32, LLVMInvalidType},
+    [divs2_i32] = SAME(LLVMInt32),
+    [divs2_i64] = SAME(LLVMInt64),
+    [divu2_i32] = SAME(LLVMInt32),
+    [divu2_i64] = SAME(LLVMInt64),
     [dup_vec] = SAME(LLVMInvalidType),
     // Define supported OPC:
+    [discard] = SAME(LLVMIntANY),
     [addci_i32] = SAME(LLVMInt32),
     [addci_i64] = SAME(LLVMInt64),
     [addcio_i32] = SAME(LLVMInt32),
@@ -233,6 +235,7 @@ const uint8_t opcmem_addr_nzidx[OPCODE_MAX] = {
 };
 
 // Make sure argument type matches, otherwise inline could not happen!
+// FIXME: double check this list includes all helpers that can get inlined
 const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_jmp_ind] = {LLVMInt64, LLVMInt64, LLVMInt64},
     [helper_cc_compute_all] = {LLVMInt64, LLVMInt64, LLVMInt64, LLVMInt32},
