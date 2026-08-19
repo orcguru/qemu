@@ -22,9 +22,12 @@ else ifeq ($(ARCH_HOST), riscv64)
     LDFLAGS += -L/usr/lib/riscv64-linux-gnu
 endif
 
-all: tcg_parser
+all: tcg_mapper tcg_printer
 
-tcg_parser: tcg_parser.tab.o tcg_lexer.yy.o tcg_mapper.o instr.o helper_lookup.o parser_util.o operand_static_types.o
+tcg_mapper: tcg_parser.tab.o tcg_lexer.yy.o tcg_mapper.o mapper_util.o helper_lookup.o parser_util.o operand_static_types.o tcg_context.o
+	gcc -o $@ $^ $(LDFLAGS) -lfl
+
+tcg_printer: tcg_parser.tab.o tcg_lexer.yy.o tcg_printer.o mapper_util.o helper_lookup.o parser_util.o operand_static_types.o tcg_context.o
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
 tcg_parser.tab.o: tcg_parser.tab.c tcg_lexer.yy.h
@@ -43,4 +46,4 @@ tcg_parser.tab.c: tcg_parser.y
 helper_lookup.c: helpers.gperf
 	gperf -t -L ANSI-C -N lookup_helper $^ > helper_lookup.c
 clean:
-	rm -f *.o tcg_parser.tab.* tcg_lexer.yy.* tcg_parser helper_lookup.c
+	rm -f *.o tcg_parser.tab.* tcg_lexer.yy.* tcg_mapper tcg_printer helper_lookup.c

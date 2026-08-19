@@ -57,6 +57,5 @@ void translate_mulxh(OpCodeType opc, const UnifiedInstr *u, LLVM_EXT_API api);
 void translate_binary(OpCodeType opc, const UnifiedInstr *u, LLVM_BIN_API api);
 void translate_binary_splat_immediate(OpCodeType opc, const UnifiedInstr *u, LLVM_BIN_API api);
 void translate_setcond(OpCodeType opc, const UnifiedInstr *u);
-extern OperandType get_original_slot_for_debug(OperandType tmp);
 
 #endif

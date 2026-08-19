@@ -46,8 +46,9 @@
 %lex-param { yyscan_t scanner }
 
 %{
-#include "tcg_context.h"
 #include <stdio.h>
+#include "tcg_context.h"
+#include "mapper_util.h"
 
 void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s);
 extern int column;
@@ -110,6 +111,8 @@ func:
         type_map_apply(ctx);
         handle_func($3, ctx->instr_head, 0);
         tcg_context_reset_instrs(ctx);
+        init_alias_map(ctx);
+        reset_slot_map(ctx);
         type_map_reset(ctx);
     }
     | EXTERNAL COLON IMMX COLON instr_list
@@ -118,6 +121,8 @@ func:
         type_map_apply(ctx);
         handle_func($3, ctx->instr_head, 1);
         tcg_context_reset_instrs(ctx);
+        init_alias_map(ctx);
+        reset_slot_map(ctx);
         type_map_reset(ctx);
     }
 ;
@@ -138,7 +143,19 @@ scalar_instr:
     OPCODE arg_list
     {
         UnifiedInstr *u = emit_instr($1, false, 0, 0, $2.data, $2.len);
+        expand_slot_alias(ctx, u);
         update_slot_types(ctx, $1, false, 0, 0, u->operands, u->operand_count);
+        if (u->opc == add_i64 && u->operand_count == 2) {
+            register_alias(ctx, &u->operands[0], &u->operands[1]);
+        } else if (u->opc == mov_i64 && (u->operands[1].kind == OP_XMM || u->operands[1].kind == OP_ENV)) {
+            register_alias(ctx, &u->operands[0], &u->operands[1]);
+        } else if (u->opc == call && u->operands[2].kind == OP_IMM && u->operands[2].imm) {
+            try_unregister_alias(ctx, &u->operands[3]);
+        } else if (opcoc[u->opc] > 0) {
+            for (int i = 0; i < opcoc[u->opc]; ++i) {
+                try_unregister_alias(ctx, &u->operands[i]);
+            }
+        }
         op_list_free(&$2);
         append_instr(ctx, u);
         $$ = 0;
@@ -150,6 +167,7 @@ vector_instr:
     OPCODE VS_TOKEN COMMA ES_TOKEN COMMA arg_list
     {
         UnifiedInstr *u = emit_instr($1, false, $2.vs, $4.es, $6.data, $6.len);
+        expand_slot_alias(ctx, u);
         update_slot_types(ctx, $1, false, $2.vs, $4.es, u->operands, u->operand_count);
         op_list_free(&$6);
         append_instr(ctx, u);
@@ -175,6 +193,7 @@ call_instr:
         memcpy(merged + pre.len, $8.data, $8.len * sizeof(Operand));
         free(pre.data);
         UnifiedInstr *u = emit_instr($1, true, 0, 0, merged, total);
+        expand_slot_alias(ctx, u);
         update_slot_types(ctx, $1, true, 0, 0, u->operands, u->operand_count);
         free(merged);
         op_list_free(&$8);
@@ -188,7 +207,11 @@ slot_op:
     SLOT
     {
         $$.kind = OP_SLOT;
-        $$.slot = get_mapped_slot($1.type, $1.idx);
+        if ($1.type == SUB_SLOT_TMPL || $1.type == SUB_SLOT_TMPT) {
+            $$.slot = get_mapped_slot(ctx, $1.type, $1.idx);
+        } else {
+            $$.slot = $1;
+        }
     }
 ;
 

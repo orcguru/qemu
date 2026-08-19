@@ -5,9 +5,6 @@
 #include <string.h>
 #include "tcg_ast.h"
 
-//#define BUILD_RISCV_ON_AARCH      1
-//#define DEBUG                     1
-
 const char *opcode_type_str[] = {
     #define X(name) #name,
     OPCODE_TYPE_LIST
@@ -59,18 +56,6 @@ const char *srcext_type_str[] = {
 const char *slot_type_str[] = {
     #define X(name) #name,
     SLOT_TYPE_LIST
-    #undef X
-};
-
-const char *instr_type_str[] = {
-    #define X(name) #name,
-    INSTR_TYPE_LIST
-    #undef X
-};
-
-const char *instr_ext_type_str[] = {
-    #define X(name) #name,
-    INSTR_EXT_TYPE_LIST
     #undef X
 };
 

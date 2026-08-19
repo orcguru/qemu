@@ -10,7 +10,9 @@
 
 #define MAX_ADDED_ARGS              6
 #define STACK_INDEX_SHIFT           10
-#define MAX_TMP_SLOTS               ((1 << STACK_INDEX_SHIFT) - 1)
+#define TCG_CALL_PREFIX_COUNT       3
+// FIXME: test small value
+#define DEFAULT_ALIAS_OPS_POOL_SIZE 2
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -32,7 +34,7 @@ typedef signed long int64_t;
     X(gs_base) \
     X(ENVVarMAX)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     ENVVAR_TYPE_LIST
     #undef X
@@ -61,7 +63,7 @@ typedef enum {
     X(rip) \
     X(XREG_MAX)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     XREG_TYPE_LIST
     #undef X
@@ -110,7 +112,7 @@ typedef enum {
     X(tstne) \
     X(RELOPMAX)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     RELOP_TYPE_LIST
     #undef X
@@ -1195,7 +1197,7 @@ typedef enum {
     X(helper_vtestps_ymm) \
     X(HELPER_MAX)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     HELPER_LIST
     #undef X
@@ -1385,7 +1387,7 @@ typedef enum {
     X(xor_vec)           \
     X(OPCODE_MAX)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     OPCODE_TYPE_LIST
     #undef X
@@ -1401,7 +1403,7 @@ typedef enum {
     X(ALIGN_16) \
     X(ALIGN_32)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     ALIGNMENT_TYPE_LIST
     #undef X
@@ -1411,7 +1413,7 @@ typedef enum {
     X(INVALID_ATOMIC) \
     X(NONATOMIC)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     ATOMIC_TYPE_LIST
     #undef X
@@ -1422,7 +1424,7 @@ typedef enum {
     X(ZERO) \
     X(SIGN)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     SRCEXT_TYPE_LIST
     #undef X
@@ -1436,13 +1438,13 @@ typedef enum {
     X(SRC8B) \
     X(SRC16B)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     SRCSIZE_TYPE_LIST
     #undef X
 } SrcSizeType;
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     IZ = (1 << 0),
     OZ = (1 << 1),
     IS = (1 << 2),
@@ -1454,7 +1456,7 @@ typedef enum {
     X(SUB_ATTR_STORAGE) \
     X(SUB_ATTR_SWAP)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     ATTR_TYPE_LIST
     #undef X
@@ -1465,7 +1467,7 @@ typedef enum {
     X(VS64) \
     X(VS128)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     VECTOR_SIZE_LIST
     #undef X
@@ -1488,12 +1490,12 @@ typedef struct {
     X(SUB_SLOT_ENVVAR) \
     X(SUB_SLOT_XREG) \
     X(SUB_SLOT_TMP) \
-    X(SUB_SLOT_XMM) \
     X(SUB_SLOT_ENV) \
+    X(SUB_SLOT_XMM) \
     X(SUB_SLOT_TMPL) \
     X(SUB_SLOT_TMPT)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     SLOT_TYPE_LIST
     #undef X
@@ -1536,7 +1538,7 @@ typedef enum {
     X(ymm_tmp_h) \
     X(NON_XMM)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     XMM_REG_LIST
     #undef X
@@ -1546,91 +1548,6 @@ typedef struct {
     uint16_t xmm_idx    :7;
     uint16_t xmm_offset :4;
 } XMMReg;
-
-#define INSTR_TYPE_LIST \
-    X(SIZE2B) \
-    X(SIZEXB)
-
-typedef enum {
-    #define X(name) name,
-    INSTR_TYPE_LIST
-    #undef X
-} InstrType;
-
-#define INSTR_EXT_TYPE_LIST \
-    X(Instr1B14_ext) \
-    X(Instr1B28_ext) \
-    X(Instr1B44_ext) \
-    X(Instr1B48_ext) \
-    X(Instr1B4_ext) \
-    X(Instr1BV4X_ext) \
-    X(Instr1BV4XE_ext) \
-    X(Instr1B41I2_ext) \
-    X(Instr1B4X_ext) \
-    X(Instr1B22_ext) \
-    X(Instr1B21_ext) \
-    X(Instr1B2_ext) \
-    X(Instr1BH4_ext) \
-    X(Instr1BV4_ext) \
-    X(Instr1BV42_ext) \
-    X(Instr1BV8_ext) \
-    X(Instr1BH141_ext) \
-    X(Instr1BV21_ext) \
-    X(Instr1BV212_ext) \
-    X(Instr1B41_ext) \
-    X(Instr1BV4I_ext) \
-    X(Instr1B24_ext) \
-    X(Instr1BV4S2_ext) \
-    X(Instr1BV41_ext) \
-    X(Instr1BH24I_ENV0_ext) \
-    X(Instr1B2S_ext) \
-    X(Instr1B41I_ext) \
-    X(Instr1B422_ext) \
-    X(Instr1B411_ext) \
-    X(Instr1B142_ext) \
-    X(Instr1B142E_ext) \
-    X(Instr1BH21_ext) \
-    X(Instr1BH21_ENV0_ext) \
-    X(Instr1BH21_ENV1_ext) \
-    X(Instr1B4111_ext) \
-    X(Instr1B8_ext) \
-    X(Instr1BH4I_ext) \
-    X(Instr1BH4I_ENV0_ext) \
-    X(Instr1BH5I_ENV0_ext) \
-    X(Instr1BH5I2_ENV0_ext) \
-    X(Instr1B42_ext) \
-    X(Instr1BH2_ENV0_ext) \
-    X(Instr1BH21S_ENV0_ext) \
-    X(Instr1B281_ext) \
-    X(Instr1BH4S2_ext) \
-    X(Instr1BH4S3_ext) \
-    X(Instr1BH4S3_ENV0_ext) \
-    X(Instr1BH4S4_ENV0_ext) \
-    X(Instr1B4112_ext) \
-    X(Instr1BH412_ext) \
-    X(Instr1BH41_ext) \
-    X(Instr1BH41_ENV0_ext) \
-    X(Instr1BH42_ENV0_ext) \
-    X(Instr1B41R_ext) \
-    X(Instr1BH24_ENV0_ext) \
-    X(Instr1BH211_ENV0_ext) \
-    X(Instr1BH212_ENV0_ext) \
-    X(Instr1BH212_ext) \
-    X(Instr1B1111_ext) \
-    X(Instr1BH4S_ENV0_ext) \
-    X(Instr1BH4S_ENV1_ext) \
-    X(Instr4B_ext) \
-    X(Instr1B143_ext) \
-    X(Instr1BH4I1_ext) \
-    X(Instr1B41122_ext) \
-    X(Instr1BH4I11_ext) \
-    X(Instr1BH42_ext)
-
-typedef enum {
-    #define X(name) name,
-    INSTR_EXT_TYPE_LIST
-    #undef X
-} InstrExtType;
 
 #define LLVM_TYPE_LIST \
     X(LLVMInvalidType) \
@@ -1652,7 +1569,7 @@ typedef enum {
     X(LLVMVector4xi64) \
     X(LLVMInt128)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     LLVM_TYPE_LIST
     #undef X
@@ -1669,7 +1586,7 @@ typedef enum {
     X(v16ushort) \
     X(v32uchar)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     #define X(name) name,
     C_VECTOR_TYPE
     #undef X

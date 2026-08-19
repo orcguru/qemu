@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <glib.h>
 
 #include "operand.h"
 #include "unified_instr.h"
@@ -37,19 +38,17 @@ struct TcgContext {
     int      column;
     char    *lineptr;   /* current line text for error display */
 
-    /* Alias map */
-    Operand *alias_map;
+    /* Alias map and it's Operand pool */
+    Operand *alias_ops_pool;
+    int plen;
+    int pcap;
+    GHashTable *alias_map;
+
+    /* Slot name map */
+    GHashTable *slot_map;
+    uint16_t next_tmp_idx;
 };
 
-/* Initialize a TcgContext */
-static inline void tcg_context_init(TcgContext *ctx) {
-    ctx->instr_head = NULL;
-    ctx->instr_tail = NULL;
-    ctx->current_func_id = 0;
-    ctx->current_is_external = 0;
-    ctx->lineno = 1;
-    ctx->column = 1;
-    ctx->lineptr = NULL;
-}
+void tcg_context_init(TcgContext *ctx);
 
 #endif /* TCG_CONTEXT_H */

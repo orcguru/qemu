@@ -30,7 +30,6 @@
 #define HELPER_COUNTERS_OFFSET      128
 //#define BUILD_RISCV_ON_AARCH        1
 //#define DUMP_IR                     1
-//#define VERBOSE_VAR                 1
 #define DEBUG                       1
 // FIXME: maybe change all uint8_t to int???
 #define OPC_INPUT_T         opciosz[opc][0]
@@ -89,7 +88,6 @@
 #define QEMUAOT_CC                  124
 #define REGISTER_INDEX_SHIFT        5 
 #define STACK_INDEX_SHIFT           10
-#define TCG_CALL_PREFIX_COUNT       3
 #include "xymm_def.h"
 
 /* ============================================================
@@ -99,6 +97,7 @@
 #include "build_temp_instr.h"
 /* New CREATE_* macros – see patch_create_macros.h */
 #include "patch_create_macros.h"
+#include "mapper_util.h"
 
 extern char *lineptr;
 extern const char *opcode_type_str[];
@@ -116,141 +115,7 @@ extern const LLVMType helper_return_type[HELPER_MAX];
 extern const int helper_require_exception_path[HELPER_MAX];
 extern const int helper_do_not_sync_vector[HELPER_MAX];
 
-static inline const Operand *get_operand(const UnifiedInstr *u, int idx) {
-    assert(idx >= 0 && idx < u->operand_count);
-    return &u->operands[idx];
-}
-
-static inline int helper_defines_output(const UnifiedInstr *u) {
-    assert(u->is_helper);
-    const Operand *op = get_operand(u, 2);
-    assert(op->kind == OP_IMM);
-    return op->imm;
-}
-
-static inline int get_first_in_op_idx(const UnifiedInstr *u) {
-    return u->opc == call ? (helper_defines_output(u) + TCG_CALL_PREFIX_COUNT) : opcoc[u->opc];
-}
-
-static inline int get_first_out_op_idx(const UnifiedInstr *u) {
-    if (u->opc == call) {
-        if (helper_defines_output(u)) {
-            return TCG_CALL_PREFIX_COUNT;
-        }
-    } else if (opcoc[u->opc]) {
-        return 0;
-    }
-    // does not define output, return invalid index
-    return u->operand_count;
-}
-
-static inline OpCodeType get_opcode(const UnifiedInstr *u) {
-    return u->opc;
-}
-
-static inline HelperType get_helper(const UnifiedInstr *u) {
-    assert(u->is_helper);
-    const Operand *op0 = get_operand(u, 0);
-    assert(op0->kind == OP_SYMBOL);
-    return op0->symbol;
-}
-
-static inline bool is_vector(const UnifiedInstr *u) {
-    return u->vs != 0;
-}
-
-static inline LLVMType get_llvm_vector_type(const UnifiedInstr *u) {
-    if (u->vs == 64) {
-      switch (u->es) {
-      case 8: return LLVMVector8xi8;
-      case 16: return LLVMVector4xi16;
-      case 32: return LLVMVector2xi32;
-      case 64: return LLVMVector1xi64;
-      default: assert(0);
-      }
-    }
-    if (u->vs == 128) {
-      switch (u->es) {
-      case 8: return LLVMVector16xi8;
-      case 16: return LLVMVector8xi16;
-      case 32: return LLVMVector4xi32;
-      case 64: return LLVMVector2xi64;
-      default: assert(0);
-      }
-    }
-    assert(0);
-}
-
-static inline uint8_t get_label_from_instr(const UnifiedInstr *u) {
-    assert(u->operand_count > 0);
-    const Operand *op = get_operand(u, (u->operand_count - 1));
-    assert(op->kind == OP_LABEL);
-    return op->label;
-}
-
-static inline const AttrSrcInfo *get_attribute_from_instr(const UnifiedInstr *u) {
-    for (int i = 0; i < u->operand_count; i++) {
-        if (u->operands[i].kind == OP_ATTR)
-            return &u->operands[i].attr_info;
-    }
-    assert(0 && "attribute not found");
-    return NULL;
-}
-
-/* Search for a RELOP operand anywhere in the instruction */
-static inline RelopType get_relop_from_any_operand(const UnifiedInstr *u) {
-    for (int i = 0; i < u->operand_count; i++) {
-        if (u->operands[i].kind == OP_RELOP)
-            return u->operands[i].relop;
-    }
-    assert(0 && "relop not found");
-    return 0;
-}
-
-/* Alias for backward compatibility */
 #define get_relop(u) get_relop_from_any_operand(u)
-
-/* Compatibility shim for remaining get_operand_legacy(u, idx, &is_imm) call sites */
-static inline OperandType get_operand_legacy(const UnifiedInstr *u, int idx, uint32_t *is_imm) {
-    OperandType ret;
-    *is_imm = 0;
-    ret.s.valid = 0;
-    if (idx >= u->operand_count) {
-        return ret;
-    }
-    const Operand *op = get_operand(u, idx);
-    if (op->kind == OP_IMM) {
-        *is_imm = 1;
-        ret.i = op->imm;
-    } else {
-        *is_imm = 0;
-        switch (op->kind) {
-        case OP_SLOT:
-            ret.s.valid = 1;
-            ret.s.slot_type = op->slot.type;
-            ret.s.slot_idx = op->slot.idx;
-            ret.s.offset = 0;
-            break;
-        case OP_XMM:
-            ret.s.valid = 1;
-            ret.s.slot_type = SUB_SLOT_XMM;
-            ret.s.slot_idx = op->xmm.xmm_idx;
-            ret.s.offset = op->xmm.xmm_offset;
-            break;
-        case OP_ENV:
-            ret.s.valid = 1;
-            ret.s.slot_type = SUB_SLOT_ENV;
-            ret.s.slot_idx = 0;
-            ret.s.offset = op->env.env_offset;
-            break;
-        default:
-            // invalid operand e.g. RELOP,ATTR
-            break;
-        }
-    }
-    return ret;
-}
-
 #define IS_YMM_HELPER(h)            (h > ymm_helper_begin && h < HELPER_MAX)
 #define IS_XMM_HELPER(h)            (h > xmm_helper_begin && h < ymm_helper_begin)
 #define IS_FLOATINGPOINT_INLINED_HELPER(h)            (h > floatingpoint_inlined_helper_begin && h < floatingpoint_inlined_helper_end)
@@ -661,24 +526,7 @@ static OperandType get_tmp_and_do_alloc_with_init(LLVMType type, uint64_t val) {
 
 static const char *get_next_var_name(const char *tag, OperandType slot_name_for_debug) {
     assert(ir_var_name_idx < sizeof(ir_var_name)/sizeof(const char *));
-#ifndef VERBOSE_VAR
     return ir_var_name[ir_var_name_idx++];
-#else
-    char *orig_slot_info = "";
-    char info[64] = {0};
-    if (slot_name_for_debug.s.valid) {
-      OperandType orig_slot = get_original_slot_for_debug(slot_name_for_debug);
-      if (orig_slot.s.valid) {
-        sprintf(info, "%s%d", orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp", orig_slot.s.slot_idx);
-        assert(strlen(info) < sizeof(info));
-        orig_slot_info = info;
-      }
-    }
-    static char verbose_name[128] = {0};
-    sprintf(verbose_name, "%s_%s_%s", tag, orig_slot_info, ir_var_name[ir_var_name_idx++]);
-    assert(strlen(verbose_name) < sizeof(verbose_name));
-    return (const char *)verbose_name;
-#endif
 }
 
 #ifdef CHECK_SHADOW_STACK_BOUNDARY
@@ -2698,7 +2546,7 @@ static void set_current_active_label_cnt(uint8_t current_active_label_cnt) {
 
 static void register_idx_for_call_helper(const UnifiedInstr *u, uint8_t call_idx) {
 #ifdef DEBUG
-    printf("%s %lx call%d\n", __FUNCTION__, u, call_idx); fflush(NULL);
+    printf("%s %lx call%d\n", __FUNCTION__, (long)u, call_idx); fflush(NULL);
 #endif
     helper_aux_info_t *call_info = (helper_aux_info_t *)calloc(1, sizeof(helper_aux_info_t));
     call_info->u = u;
@@ -3822,7 +3670,7 @@ static LLVMValueRef create_reference_to_external_array(LLVMModuleRef module, con
 // FIXME: can this be merged into common logic?
 static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
+    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], (long)u); fflush(NULL);
 #endif
     HelperType h = get_helper(u);
     char *second_half_name = "jmp_ind_callback";
@@ -3938,13 +3786,13 @@ static void translate_jmp_ind(OpCodeType opc, const UnifiedInstr *u) {
         }
     } while (1);
 #ifdef DEBUG
-    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], (long)u); fflush(NULL);
 #endif
 }
 
 static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u) {
 #ifdef DEBUG
-    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
+    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], (long)u); fflush(NULL);
 #endif
     HelperType h = get_helper(u);
     char *second_half_name = "jmp_ind_callback";
@@ -4139,14 +3987,14 @@ static void translate_jumptable(OpCodeType opc, const UnifiedInstr *u) {
         }
     } while (1);
 #ifdef DEBUG
-    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], (long)u); fflush(NULL);
 #endif
 }
 
 static void translate_cc_compute_inband(OpCodeType opc, const UnifiedInstr *u) {
     HelperType h = get_helper(u);
 #ifdef DEBUG
-    printf("%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], u); fflush(NULL);
+    printf("%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], (long)u); fflush(NULL);
 #endif
     OperandType oarg;
     uint32_t is_imm_dummy;
@@ -4191,33 +4039,25 @@ static void translate_cc_compute_inband(OpCodeType opc, const UnifiedInstr *u) {
 }
 
 static void spill_vector(LLVMValueRef xmm_val, XMMRegType xmm_reg) {
-    char debug_name[64] = {0};
-#ifdef VERBOSE_VAR
-    sprintf(debug_name, "vector_spill_%s", xmmreg_str[xmm_reg]);
-#endif
     LLVMValueRef env_raw = get_env_ptr_raw();
     uint64_t xmm_offset = get_xmm_offset(xmm_reg/2) + 16*(xmm_reg%2);
     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
-    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(debug_name, dummy_slot_for_debug));
+    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("", dummy_slot_for_debug));
     check_scalable_vector_perform_store(xmm_val, LLVMVector2xi64, addr, 16);
 }
 
 static LLVMValueRef reload_vector(XMMRegType xmm_reg) {
-    char debug_name[64] = {0};
-#ifdef VERBOSE_VAR
-    sprintf(debug_name, "vector_reload_%s", xmmreg_str[xmm_reg]);
-#endif
     LLVMValueRef env_raw = get_env_ptr_raw();
     uint64_t xmm_offset = get_xmm_offset(xmm_reg/2) + 16*(xmm_reg%2);
     LLVMValueRef off = LLVMConstInt(llvm_int_types[OPC_ADDR_T], xmm_offset, 0);
-    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name(debug_name, dummy_slot_for_debug));
+    LLVMValueRef addr = LLVMBuildAdd(builder, env_raw, off, get_next_var_name("", dummy_slot_for_debug));
     return check_scalable_vector_perform_load(LLVMVector2xi64, addr, 16);
 }
 
 static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     HelperType h = get_helper(u);
 #ifdef DEBUG
-    printf(">>>%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], u); fflush(NULL);
+    printf(">>>%s %s %s %lx\n", __FUNCTION__, opcode_type_str[opc], helper_str[h], (long)u); fflush(NULL);
 #endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef shadow_pointer = NULL;
@@ -4583,7 +4423,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
 
     if (second_half_already_exists) {
 #ifdef DEBUG
-        printf("<<<%s %s %lx return early\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
+        printf("<<<%s %s %lx return early\n", __FUNCTION__, opcode_type_str[opc], (long)u); fflush(NULL);
 #endif
         return;
     }
@@ -4716,7 +4556,7 @@ static void translate_helper_outband(OpCodeType opc, const UnifiedInstr *u) {
     }
     llvm_func = NULL;
 #ifdef DEBUG
-    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], (long)u); fflush(NULL);
 #endif
 }
 
@@ -4758,7 +4598,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     }
     // We cannot inline below helpers currently, so their invocations incur context backup penalty.
 #ifdef DEBUG
-    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
+    printf(">>>%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], (long)u); fflush(NULL);
 #endif
     // Store tmp_shadow_offset[this call][non-zero offset] contents to the shadow_stack
     LLVMValueRef shadow_pointer = NULL;
@@ -4940,7 +4780,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
 
     if (second_half_disabled || second_half_already_exists) {
 #ifdef DEBUG
-        printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
+        printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], (long)u); fflush(NULL);
 #endif
         return;
     }
@@ -5086,7 +4926,7 @@ void translate_call(OpCodeType opc, const UnifiedInstr *u) {
     }
     llvm_func = NULL;
 #ifdef DEBUG
-    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], u); fflush(NULL);
+    printf("<<<%s %s %lx\n", __FUNCTION__, opcode_type_str[opc], (long)u); fflush(NULL);
 #endif
 }
 
@@ -5112,7 +4952,6 @@ static void cleanup_func_resource() {
     memset(tmp_var_available_backup, 0, sizeof(tmp_var_available_backup));
     memset(tmp_bits_type, 0, sizeof(tmp_bits_type));
     memset(tmp_shadow_offset, 0, sizeof(tmp_shadow_offset));
-    reset_tmp_mapping();
 
     // Cleanup hash-tables
     GHashTableIter iter;
@@ -5153,24 +4992,10 @@ static void setup_func_stack() {
             }
         }
     }
-#ifdef VERBOSE_VAR
-    static char tmp_name_buf[1<<STACK_INDEX_SHIFT][64];
-#endif
     if (tmp_valid_non_zero) {
         for (int i = 0; i < (1<<STACK_INDEX_SHIFT); ++i) {
             if (tmp_available_test(tmp_valid, i)) {
                 assert(tmp_bits_type[i]);
-#ifdef VERBOSE_VAR
-                OperandType slot_name_for_debug;
-                slot_name_for_debug.s.valid = 1;
-                slot_name_for_debug.s.slot_type = SUB_SLOT_TMP;
-                slot_name_for_debug.s.slot_idx = i;
-                OperandType orig_slot = get_original_slot_for_debug(slot_name_for_debug);
-                if (orig_slot.s.valid) {
-                    snprintf(tmp_name_buf[i], sizeof(tmp_name_buf[i]), "tmp%d_%s%d.stack", i, orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp", orig_slot.s.slot_idx);
-                    tmp_stack_names[i] = tmp_name_buf[i];
-                }
-#endif
                 LLVMValueRef alloca_inst = LLVMBuildAlloca(builder, llvm_int_types[tmp_bits_type[i]], tmp_stack_names[i]);
                 LLVMSetAlignment(alloca_inst, GET_LLVM_TYPE_ALIGNMENT(tmp_bits_type[i]));
                 func_tmp_alloca[i].alloca = alloca_inst;
@@ -5255,10 +5080,6 @@ static void process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType
             if ((opc == call && slot_idx >= get_first_in_op_idx(u)) || (opc != call && slot_idx >= opcoc[opc])) {
                 if (!tmp_has_known_def[operand.s.slot_idx]) {
                     // At this stage, we do not have alias information yet, so we need to check later
-#ifdef DEBUG
-                    OperandType orig_slot = get_original_slot_for_debug(operand);
-                    printf("  register cross_call tmp:%d orig:%s%d\n", operand.s.slot_idx, orig_slot.s.valid ? (orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp") : "NA", orig_slot.s.valid ? orig_slot.s.slot_idx : 0); fflush(NULL);
-#endif
                     if (tmp_shadow_offset[operand.s.slot_idx] == 0) {
                         tmp_shadow_offset[operand.s.slot_idx] = (0 - shadow_call_offset);
                         shadow_call_offset += 16;
@@ -5269,10 +5090,6 @@ static void process_op_type(uint32_t slot_idx, const UnifiedInstr *u, OpCodeType
             if (opc != call && slot_idx < opcoc[opc]) {
                 tmp_has_known_def[operand.s.slot_idx] = 1;
             } else if (opc == call && slot_idx < get_first_in_op_idx(u)) {
-#ifdef DEBUG
-                OperandType orig_slot = get_original_slot_for_debug(operand);
-                printf("  unregister cross_call tmp:%d orig:%s%d\n", operand.s.slot_idx, orig_slot.s.valid ? (orig_slot.s.slot_type == SUB_SLOT_TMPL ? "loc" : "tmp") : "NA", orig_slot.s.valid ? orig_slot.s.slot_idx : 0); fflush(NULL);
-#endif
                 tmp_has_known_def[operand.s.slot_idx] = 1;
                 if (tmp_shadow_offset[operand.s.slot_idx] != 0) {
                     tmp_shadow_offset[operand.s.slot_idx] = 0;
