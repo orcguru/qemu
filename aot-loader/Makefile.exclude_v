@@ -1,7 +1,7 @@
 ARCH_HOST := $(shell uname -m)
 CFLAGS = -O2 -g -Wall
 ifeq ($(ARCH_HOST), riscv64)
-    CFLAGS += -march=rv64gv
+    CFLAGS += -march=rv64g
 endif
 
 all: libaotloader.a
