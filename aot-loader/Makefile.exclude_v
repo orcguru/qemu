@@ -1,5 +1,5 @@
 ARCH_HOST := $(shell uname -m)
-CFLAGS = -O2 -g -Wall
+CFLAGS = -O2 -g -Wall -fPIC
 ifeq ($(ARCH_HOST), riscv64)
     CFLAGS += -march=rv64g
 endif
