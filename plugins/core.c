@@ -145,6 +145,10 @@ static void plugin_cb__udata(enum qemu_plugin_event ev)
 
             func(cb->ctx->id, cb->udata);
         }
+#ifdef DUMP_AOT_INSTR_CNT
+        CPUState *cpu = current_cpu;
+        printf("AOT Instr CNT: %lu\n", cpu->neg.iec.aot_cnt);
+#endif
         break;
     default:
         g_assert_not_reached();
