@@ -129,6 +129,8 @@ const LLVMType opciosz[OPCODE_MAX][2] = {
     [call] = SAME(LLVMInvalidType),
     [push_ret_addr] = SAME(LLVMInt64),
     [ret] = SAME(LLVMInt64),
+    [func_addr] = SAME(LLVMInt64),
+    [tail_call] = SAME(LLVMInt64),
     // Load
     //Memory-bits, Register-bits
     [ld16s_i32] = {LLVMInt16, LLVMInt32},
