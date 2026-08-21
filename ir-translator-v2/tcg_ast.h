@@ -1385,6 +1385,8 @@ typedef enum __attribute__((packed)) {
     X(xor_i32)           \
     X(xor_i64)           \
     X(xor_vec)           \
+    X(func_addr)         \
+    X(tail_call)         \
     X(OPCODE_MAX)
 
 typedef enum __attribute__((packed)) {

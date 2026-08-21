@@ -2391,7 +2391,6 @@ gen_eob(DisasContext *s, int mode)
             gen_helper_jmp_ind(cpu_eip);
         } else if (s->base.jmp_type == TR_IS_RET) {
             tcg_gen_ret(cpu_eip);
-            gen_helper_jmp_ind(cpu_eip);
         } else if (s->base.jmp_type == TR_IS_IRET) {
             gen_helper_iret_ind(tcg_env);
         } else if (s->base.jmp_type == TR_IS_LCALL || s->base.jmp_type == TR_IS_LJMP) {
@@ -2413,7 +2412,6 @@ gen_eob(DisasContext *s, int mode)
             tcg_gen_jmp_direct(s->rip_at_exit);
         } else if (s->base.jmp_type == TR_IS_RET) {
             tcg_gen_ret(cpu_eip);
-            gen_helper_jmp_ind(cpu_eip);
         } else if (s->base.jmp_type == TR_IS_CALL) {
             assert(s->eip_next_tl_set);
             tcg_gen_push_ret_addr(s->eip_next_tl_val, s->eip_next_pc);

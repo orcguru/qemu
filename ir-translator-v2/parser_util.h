@@ -54,5 +54,8 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u);
 void sanity_check_op_type_solid(TcgContext *ctx);
 void type_map_apply(TcgContext *ctx);
 void type_map_reset(TcgContext *ctx);
+void expand_push_ret_addr(TcgContext *ctx);
+void expand_ret(TcgContext *ctx);
+void expand_jmp_direct(TcgContext *ctx);
 
 #endif

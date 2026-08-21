@@ -463,3 +463,77 @@ UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
     u->next = NULL;
     return u;
 }
+
+void replace_and_release_macro_by_instr_list(UnifiedInstr *prev, UnifiedInstr *next,
+                                UnifiedInstr *new_head, UnifiedInstr *new_tail) {
+
+}
+
+UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
+
+}
+
+void expand_push_ret_addr(TcgContext *ctx) {
+    UnifiedInstr *tgt = get_single_target_opc(ctx, push_ret_addr);
+    if (!tgt) {
+        return;
+    }
+    // - GET pointer to the shadow stack ptr
+    // add_i64 tmp_N1,env,-8UL
+    // - LOAD the shadow stack ptr
+    // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
+    // - ALLOCATE an entry on the shadow stack
+    // add_i64 tmp_N2,tmp_N2,-8UL
+    // - STORE x64_ret_addr into the entry
+    // qemu_st_i64 op0,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+    // - ALLOCATE an entry on the shadow stack
+    // add_i64 tmp_N2,tmp_N2,-8UL
+    // - GET the address of return
+    // func_addr tmp_N3,op2
+    // - STORE the address of return into the entry
+    // qemu_st_i64 tmp_N3,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+    // - UPDATE the shadow stack ptr
+    // qemu_st_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
+
+}
+
+void expand_ret(TcgContext *ctx) {
+    UnifiedInstr *tgt = get_single_target_opc(ctx, ret);
+    if (!tgt) {
+        return;
+    }
+    // - GET pointer to the shadow stack ptr
+    // add_i64 tmp_N1,env,-8UL
+    // - LOAD the shadow stack ptr
+    // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
+    // - LOAD the address of return
+    // qemu_ld_i64 tmp_N3,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+    // - POP the shadow stack
+    // add_i64 tmp_N2,tmp_N2,8UL
+    // - LOAD the x64_ret_addr
+    // qemu_ld_i64 tmp_N4,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+    // - POP the shadow stack
+    // add_i64 tmp_N2,tmp_N2,8UL
+    // - UPDATE the shadow stack ptr
+    // qemu_st_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
+    // - CHECK if lookup is needed
+    // brcond_i64 op0,tmp_N4,ne,L0
+    // - TAIL call
+    // tail_call tmp_N3
+    // - LOOKUP return address
+    // set_label L0
+    // call jmp_ind,0x1,0,op0
+
+}
+
+void expand_jmp_direct(TcgContext *ctx) {
+    UnifiedInstr *tgt = get_single_target_opc(ctx, jmp_direct);
+    if (!tgt) {
+        return;
+    }
+    // - GET the address of return
+    // func_addr tmp_N1,op0
+    // - TAIL call
+    // tail_call tmp_N1
+
+}

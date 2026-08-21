@@ -23,7 +23,6 @@
 #include "tcg_mapper.h"
 
 #define LARGE_SHADOW_MAP              1
-//#define CHECK_SHADOW_STACK_BOUNDARY   1
 //#define COLLECT_TRAMPOLINE_IR       1
 //#define HELPER_COUNTERS             1
 #define TRAMPOLINE_CNT_OFFSET       104
@@ -246,10 +245,6 @@ static GHashTable *current_helper_aux_info = NULL;
 static void do_store(OpCodeType opc, LLVMValueRef val, LLVMType val_tidx, OperandType out);
 static LLVMValueRef get_env_ptr_raw();
 static OperandType get_env_ptr(OpCodeType opc);
-#ifdef CHECK_SHADOW_STACK_BOUNDARY
-static OperandType get_shadow_stack_top_bound(OpCodeType opc);
-static OperandType get_shadow_stack_bottom_bound(OpCodeType opc);
-#endif
 static OperandType get_shadow_stack_pointer(OpCodeType opc);
 static void set_shadow_stack_pointer(OpCodeType opc, OperandType val);
 static LLVMBasicBlockRef get_bb(const char *name);
@@ -528,26 +523,6 @@ static const char *get_next_var_name(const char *tag, OperandType slot_name_for_
     assert(ir_var_name_idx < sizeof(ir_var_name)/sizeof(const char *));
     return ir_var_name[ir_var_name_idx++];
 }
-
-#ifdef CHECK_SHADOW_STACK_BOUNDARY
-static OperandType get_shadow_stack_top_bound(OpCodeType opc) {
-    OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
-    OperandType env = get_env_ptr(opc);
-    CREATE_ADD64(ptr_addr, env, -24UL);
-    OperandType ptr_val = get_tmp_and_do_alloc(OPC_ADDR_T);
-    CREATE_LD(ptr_val, ptr_addr);
-    return ptr_val;
-}
-
-static OperandType get_shadow_stack_bottom_bound(OpCodeType opc) {
-    OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
-    OperandType env = get_env_ptr(opc);
-    CREATE_ADD64(ptr_addr, env, -16UL);
-    OperandType ptr_val = get_tmp_and_do_alloc(OPC_ADDR_T);
-    CREATE_LD(ptr_val, ptr_addr);
-    return ptr_val;
-}
-#endif
 
 static OperandType get_shadow_stack_pointer(OpCodeType opc) {
     OperandType ptr_addr = get_tmp_and_do_alloc(OPC_ADDR_T);
@@ -1616,45 +1591,6 @@ void translate_push_ret_addr(OpCodeType opc, const UnifiedInstr *u) {
     func_hex = get_operand_legacy(u, 1, &is_imm1);
     assert(is_imm1);
 
-#ifdef CHECK_SHADOW_STACK_BOUNDARY
-    LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(opc, is_imm0, op0, type_in, 0);
-    OperandType ptr_val = get_shadow_stack_pointer(opc);
-    LLVMValueRef shadow_ptr_val = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
-    OperandType bottom_bound = get_shadow_stack_bottom_bound(opc);
-    LLVMValueRef shadow_bottom_bound = get_source_node_imm_or_stack(opc, 0, bottom_bound, OPC_ADDR_T, 0);
-
-    LLVMValueRef bool1 = LLVMBuildICmp(builder, LLVMIntUGT, shadow_ptr_val, shadow_bottom_bound, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-
-    LLVMBasicBlockRef bb_ss_valid = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMBasicBlockRef bb_ss_overflow = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMBasicBlockRef bb_ss_merge = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-
-    LLVMBuildCondBr(builder, bool1, bb_ss_valid, bb_ss_overflow);
-    LLVMPositionBuilderAtEnd(builder, bb_ss_valid);
-    CREATE_ADD(ptr_val, ptr_val, -8UL);
-    LLVMValueRef shadow_val0 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
-    LLVMValueRef shadow_ptr0 = LLVMBuildIntToPtr(builder, shadow_val0, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    build_store_with_alignment(builder, x64_ret_addr, shadow_ptr0, 8);
-
-    char func_name[64] = {0};
-    sprintf(func_name, "%s%sfunc_%lx", func_name_prefix, func_name_prefix[0] ? "_" : "", func_hex.i);
-    assert(strlen(func_name) < sizeof(func_name));
-    LLVMValueRef func_addr = LLVMBuildPtrToInt(builder, get_or_add_func_with_qemuaot_cc(func_name, 0), llvm_int_types[OPC_ADDR_T], get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    add_list_info(func_name, "declare");
-    CREATE_ADD(ptr_val, ptr_val, -8UL);
-    LLVMValueRef shadow_val1 = get_source_node_imm_or_stack(opc, 0, ptr_val, OPC_ADDR_T, 0);
-    LLVMValueRef shadow_ptr1 = LLVMBuildIntToPtr(builder, shadow_val1, LLVMPointerType(llvm_int_types[OPC_ADDR_T], 0), get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    build_store_with_alignment(builder, func_addr, shadow_ptr1, 8);
-
-    set_shadow_stack_pointer(opc, ptr_val);
-    LLVMBuildBr(builder, bb_ss_merge);
-
-    LLVMPositionBuilderAtEnd(builder, bb_ss_overflow);
-    LLVMBuildBr(builder, bb_ss_merge);
-
-    LLVMPositionBuilderAtEnd(builder, bb_ss_merge);
-    last_active_bb = bb_ss_merge;
-#else
     LLVMValueRef x64_ret_addr = get_source_node_imm_or_stack(opc, is_imm0, op0, type_in, 0);
     OperandType ss = get_shadow_stack_pointer(opc);
     CREATE_ADD(ss, ss, -8UL);
@@ -1674,7 +1610,6 @@ void translate_push_ret_addr(OpCodeType opc, const UnifiedInstr *u) {
     build_store_with_alignment(builder, func_addr, shadow_ptr1, 8);
 
     set_shadow_stack_pointer(opc, ss);
-#endif
 }
 
 void translate_ret(OpCodeType opc, const UnifiedInstr *u) {
@@ -1690,40 +1625,6 @@ void translate_ret(OpCodeType opc, const UnifiedInstr *u) {
 
     OperandType delta = get_tmp_and_do_alloc(type_out);
     OperandType shadow_stack_host = get_tmp_and_do_alloc(type_out);
-#ifdef CHECK_SHADOW_STACK_BOUNDARY
-    OperandType loc606 = get_tmp_and_do_alloc(type_out);
-    OperandType loc607 = get_tmp_and_do_alloc(type_out);
-    OperandType loc609 = get_tmp_and_do_alloc(type_out);
-    OperandType loc611 = get_tmp_and_do_alloc(type_out);
-
-    OperandType shadow_stack = get_shadow_stack_pointer(opc);
-    LLVMValueRef shadow_ptr_val = get_source_node_imm_or_stack(opc, 0, shadow_stack, OPC_ADDR_T, 0);
-    OperandType top_bound = get_shadow_stack_top_bound(opc);
-    LLVMValueRef shadow_top_bound = get_source_node_imm_or_stack(opc, 0, top_bound, OPC_ADDR_T, 0);
-
-    LLVMValueRef bool1 = LLVMBuildICmp(builder, LLVMIntULT, shadow_ptr_val, shadow_top_bound, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-
-    LLVMBasicBlockRef bb_ss_valid = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMBasicBlockRef bb_ss_underflow = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    LLVMBasicBlockRef bb_ss_merge = LLVMAppendBasicBlock(llvm_func, get_next_var_name(opcode_type_str[opc], dummy_slot_for_debug));
-    char false_bb_name[16] = {0};
-    sprintf(false_bb_name, "bb_false%d", br_cnt);
-    LLVMBasicBlockRef bb_false = LLVMAppendBasicBlock(llvm_func, false_bb_name);
-    char true_bb_name[16] = {0};
-    sprintf(true_bb_name, "bb_L%d", new_label);
-    assert(!get_bb(true_bb_name));
-    LLVMBasicBlockRef bb_true = LLVMAppendBasicBlock(llvm_func, true_bb_name);
-    LLVMBuildCondBr(builder, bool1, bb_ss_valid, bb_ss_underflow);
-    LLVMPositionBuilderAtEnd(builder, bb_ss_valid);
-
-    CREATE_MOV(loc606, shadow_stack);
-    CREATE_ADD(loc607, loc606, 8);
-    CREATE_LD(shadow_stack_host, loc606);
-    CREATE_LD(loc609, loc607);
-    CREATE_SUB(delta, op0, loc609);
-    CREATE_ADD(loc611, loc606, 0x10);
-    set_shadow_stack_pointer(opc, loc611);
-#else
     OperandType ss = get_shadow_stack_pointer(opc);
 
     char false_bb_name[16] = {0};
@@ -1742,7 +1643,6 @@ void translate_ret(OpCodeType opc, const UnifiedInstr *u) {
     CREATE_SUB(delta, op0, shadow_stack_guest);
     CREATE_ADD(ss, ss, 8UL);
     set_shadow_stack_pointer(opc, ss);
-#endif
 
     OperandType op_imm;
     op_imm.i = 0;
@@ -1765,15 +1665,7 @@ void translate_ret(OpCodeType opc, const UnifiedInstr *u) {
     LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
     LLVMBuildRetVoid(builder);
 
-#ifdef CHECK_SHADOW_STACK_BOUNDARY
-    LLVMPositionBuilderAtEnd(builder, bb_ss_underflow);
-    LLVMBuildBr(builder, bb_ss_merge);
-
-    LLVMPositionBuilderAtEnd(builder, bb_ss_merge);
-    last_active_bb = bb_ss_merge;
-#else
     last_active_bb = bb_false;
-#endif
 
     CREATE_LABEL(new_label);
 }
