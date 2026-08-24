@@ -5,11 +5,16 @@
 #include <stdbool.h>
 #include "operand.h"
 
-typedef struct UnifiedInstr {
+typedef struct __attribute__((packed)) UnifiedInstr {
     uint8_t  opc;
     bool     is_helper;
-    uint8_t  vs;
-    uint8_t  es;
+    union {
+        struct {
+            uint8_t  vs;
+            uint8_t  es;
+        };
+        uint16_t helper_index;
+    };
     struct UnifiedInstr *next;
     uint8_t  operand_count;
     Operand  operands[];

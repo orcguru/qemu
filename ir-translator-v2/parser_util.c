@@ -65,16 +65,6 @@ SlotInfo get_mapped_slot(TcgContext *ctx, SlotType type, uint16_t idx) {
     return ret;
 }
 
-void reset_slot_map(TcgContext *ctx) {
-    GHashTableIter iter;
-    gpointer key, value;
-    g_hash_table_iter_init(&iter, ctx->slot_map);
-    while (g_hash_table_iter_next(&iter, &key, &value)) {
-        g_hash_table_iter_remove(&iter);
-    }
-    ctx->next_tmp_idx = 0;
-}
-
 XMMReg lookup_xmm_map(uint64_t offset) {
     uint16_t off = (uint16_t)offset;
     XMMReg x;
@@ -143,16 +133,12 @@ void append_instr(TcgContext *ctx, UnifiedInstr *u) {
     }
 }
 
-void tcg_context_reset_instrs(TcgContext *ctx) {
+void tcg_context_reset(TcgContext *ctx) {
     free_instr_list(ctx->instr_head);
     ctx->instr_head = NULL;
     ctx->instr_tail = NULL;
-}
 
-/*
- * Logic to handle alias e.g. add_i64 loc6,env,$0x5e0
- */
-void init_alias_map(TcgContext *ctx) {
+    // init_alias_map
     ctx->plen = 0;
     GHashTableIter iter;
     gpointer key, value;
@@ -160,8 +146,31 @@ void init_alias_map(TcgContext *ctx) {
     while (g_hash_table_iter_next(&iter, &key, &value)) {
         g_hash_table_iter_remove(&iter);
     }
+
+    // reset_slot_map
+    g_hash_table_iter_init(&iter, ctx->slot_map);
+    while (g_hash_table_iter_next(&iter, &key, &value)) {
+        g_hash_table_iter_remove(&iter);
+    }
+    ctx->next_tmp_idx = 0;
+
+    // type_map_reset
+    g_hash_table_iter_init(&iter, ctx->stack_type_map);
+    while (g_hash_table_iter_next(&iter, &key, &value)) {
+        g_hash_table_iter_remove(&iter);
+    }
+
+    // Reset the next helper index
+    ctx->next_helper_idx = 0;
+
+    // Reset stack alloca bit array
+    ctx->xreg_valid = 0;
+    ctx->xmm_valid = 0;
 }
 
+/*
+ * Logic to handle alias e.g. add_i64 loc6,env,$0x5e0
+ */
 void register_alias(TcgContext *ctx, Operand *s, Operand *xmm_env) {
     assert(s->kind == OP_SLOT && s->slot.type == SUB_SLOT_TMP);
     assert(xmm_env->kind == OP_XMM || xmm_env->kind == OP_ENV);
@@ -240,6 +249,17 @@ void set_operand_type(TcgContext *ctx, Operand *op, LLVMType ty) {
         op->xmm.op_type = ty;
     } else if (op->kind == OP_ENV) {
         op->env.op_type = ty;
+    }
+}
+
+void register_stack_alloca(TcgContext *ctx, UnifiedInstr *u) {
+    for (int i = 0; i < u->operand_count; ++i) {
+        if (u->operands[i].kind == OP_XMM) {
+            ctx->xmm_valid |= (1 << u->operands[i].xmm.xmm_idx);
+        }
+        if (u->operands[i].kind == OP_SLOT && u->operands[i].slot.type == SUB_SLOT_XREG) {
+            ctx->xreg_valid |= (1 << u->operands[i].slot.idx);
+        }
     }
 }
 
@@ -398,15 +418,6 @@ void type_map_apply(TcgContext *ctx) {
     }
 }
 
-void type_map_reset(TcgContext *ctx) {
-    GHashTableIter iter;
-    gpointer key, value;
-    g_hash_table_iter_init(&iter, ctx->stack_type_map);
-    while (g_hash_table_iter_next(&iter, &key, &value)) {
-        g_hash_table_iter_remove(&iter);
-    }
-}
-
 void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src) {
     if (src.subt == SUB_ATTR_STORAGE) {
         if (src.p.storage.atomic)
@@ -424,19 +435,24 @@ void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src) {
     }
 }
 
-UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
+UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
                                 uint8_t vs, uint8_t es,
                                 Operand *ops, int nops) {
     size_t sz = sizeof(UnifiedInstr) + nops * sizeof(Operand);
     UnifiedInstr *u = malloc(sz);
     memset(u, 0, sz);
     u->opc = opc;
-    u->is_helper = is_helper;
+    if (opc == call) {
+        u->is_helper = true;
+        u->helper_index = ctx->next_helper_idx++;
+    } else {
+        u->is_helper = false;
+    }
     u->vs = vs;
     u->es = es;
     int skip_cnt = 0;
     int dst_idx = 0;
-    if (is_helper) {
+    if (u->is_helper) {
         memcpy(u->operands, ops, (nops * sizeof(Operand)));
     } else {
         for (int i = 0; i < nops; ++i) {
@@ -499,13 +515,14 @@ UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
     return NULL;
 }
 
-#define EMIT_INSTR_LIST(ctx, nh, nt, opc, is_helper, vs, es, ...)           \
+#define EMIT_INSTR_LIST(ctx, nh, nt, opc, vs, es, ...)           \
     do {                                                                    \
         Operand _ops[] = { __VA_ARGS__ };                                   \
         size_t _cnt = sizeof(_ops) / sizeof(_ops[0]);                       \
-        UnifiedInstr *_u = emit_instr(opc, is_helper, vs, es, _ops, _cnt);  \
+        UnifiedInstr *_u = emit_instr(ctx, opc, vs, es, _ops, _cnt);  \
         expand_slot_alias(ctx, _u);                                         \
         update_slot_types(ctx, _u);                                         \
+        register_stack_alloca(ctx, _u);                                         \
         if (!(nh)) (nh) = _u;                                               \
         if (nt) (nt)->next = _u;                                            \
         (nt) = _u;                                                          \
@@ -538,24 +555,24 @@ void expand_push_ret_addr(TcgContext *ctx) {
     // - GET pointer to the shadow stack ptr
     // mov_i64 tmp_N1,env
     // add_i64 tmp_N1,tmp_N1,-8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, mov_i64, false, 0, 0,
+    EMIT_INSTR_LIST(ctx, nh, nt, mov_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         ENV_OP(0));
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, false, 0, 0,
+    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         IMM_OP(-8ULL));
 
     // - LOAD the shadow stack ptr
     // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, false, 0, 0,
+    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - ALLOCATE an entry on the shadow stack
     // add_i64 tmp_N2,tmp_N2,-8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, false, 0, 0,
+    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         IMM_OP(-8ULL));
@@ -563,14 +580,14 @@ void expand_push_ret_addr(TcgContext *ctx) {
     // - STORE x64_ret_addr into the entry
     // qemu_st_i64 op0,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
     assert(tgt->operands[0].kind == OP_SLOT);
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, false, 0, 0,
+    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, 0, 0,
         SLOT_OP_EXTRA(tgt->operands[0].slot.type, tgt->operands[0].slot.idx, tgt->operands[0].slot.op_type, tgt->operands[0].slot.stack_type),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - ALLOCATE an entry on the shadow stack
     // add_i64 tmp_N2,tmp_N2,-8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, false, 0, 0,
+    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         IMM_OP(-8ULL));
@@ -578,20 +595,20 @@ void expand_push_ret_addr(TcgContext *ctx) {
     // - GET the address of return
     // func_addr tmp_N3,op2
     assert(tgt->operands[1].kind == OP_IMM);
-    EMIT_INSTR_LIST(ctx, nh, nt, func_addr, false, 0, 0,
+    EMIT_INSTR_LIST(ctx, nh, nt, func_addr, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp3),
         IMM_OP(tgt->operands[1].imm));
 
     // - STORE the address of return into the entry
     // qemu_st_i64 tmp_N3,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, false, 0, 0,
+    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp3),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - UPDATE the shadow stack ptr
     // qemu_st_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, false, 0, 0,
+    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
@@ -612,47 +629,47 @@ void expand_ret(TcgContext *ctx) {
     // - GET pointer to the shadow stack ptr
     // mov_i64 tmp_N1,env
     // add_i64 tmp_N1,tmp_N1,-8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, mov_i64, false, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, false, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
+    EMIT_INSTR_LIST(ctx, nh, nt, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
+    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
 
     // - LOAD the shadow stack ptr
     // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, false, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - LOAD the address of return
     // qemu_ld_i64 tmp_N3,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, false, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - POP the shadow stack
     // add_i64 tmp_N2,tmp_N2,8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, false, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
+    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
 
     // - LOAD the x64_ret_addr
     // qemu_ld_i64 tmp_N4,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, false, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp4), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp4), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - POP the shadow stack
     // add_i64 tmp_N2,tmp_N2,8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, false, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
+    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
 
     // - UPDATE the shadow stack ptr
     // qemu_st_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, false, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - CHECK if lookup is needed
     // brcond_i64 op0,tmp_N4,ne,L0
     assert(tgt->operands[0].kind == OP_SLOT);
-    EMIT_INSTR_LIST(ctx, nh, nt, brcond_i64, false, 0, 0, SLOT_OP_EXTRA(tgt->operands[0].slot.type, tgt->operands[0].slot.idx, tgt->operands[0].slot.op_type, tgt->operands[0].slot.stack_type), SLOT_OP(SUB_SLOT_TMP, tmp4), RELOP_OP(ne), LABEL_OP(0));
+    EMIT_INSTR_LIST(ctx, nh, nt, brcond_i64, 0, 0, SLOT_OP_EXTRA(tgt->operands[0].slot.type, tgt->operands[0].slot.idx, tgt->operands[0].slot.op_type, tgt->operands[0].slot.stack_type), SLOT_OP(SUB_SLOT_TMP, tmp4), RELOP_OP(ne), LABEL_OP(0));
 
     // - TAIL call
     // tail_call tmp_N3
-    EMIT_INSTR_LIST(ctx, nh, nt, tail_call, false, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3));
+    EMIT_INSTR_LIST(ctx, nh, nt, tail_call, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3));
 
     // - LOOKUP return address
     // set_label L0
     // call jmp_ind,0x1,0,op0
-    EMIT_INSTR_LIST(ctx, nh, nt, set_label, false, 0, 0, LABEL_OP(0));
-    EMIT_INSTR_LIST(ctx, nh, nt, call, true, 0, 0, SYMBOL_OP(helper_jmp_ind), IMM_OP(0x1), IMM_OP(0), SLOT_OP_EXTRA(tgt->operands[0].slot.type, tgt->operands[0].slot.idx, tgt->operands[0].slot.op_type, tgt->operands[0].slot.stack_type));
+    EMIT_INSTR_LIST(ctx, nh, nt, set_label, 0, 0, LABEL_OP(0));
+    EMIT_INSTR_LIST(ctx, nh, nt, call, 0, 0, SYMBOL_OP(helper_jmp_ind), IMM_OP(0x1), IMM_OP(0), SLOT_OP_EXTRA(tgt->operands[0].slot.type, tgt->operands[0].slot.idx, tgt->operands[0].slot.op_type, tgt->operands[0].slot.stack_type));
 
     replace_and_release_macro_by_instr_list(ctx, tgt, nh, nt);
 }
@@ -668,13 +685,13 @@ void expand_jmp_direct(TcgContext *ctx) {
     // - GET the address of return
     // func_addr tmp_N1,op0
     assert(tgt->operands[0].kind == OP_IMM);
-    EMIT_INSTR_LIST(ctx, nh, nt, func_addr, false, 0, 0,
+    EMIT_INSTR_LIST(ctx, nh, nt, func_addr, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         IMM_OP(tgt->operands[0].imm));
 
     // - TAIL call
     // tail_call tmp_N1
-    EMIT_INSTR_LIST(ctx, nh, nt, tail_call, false, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1));
+    EMIT_INSTR_LIST(ctx, nh, nt, tail_call, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1));
 
     replace_and_release_macro_by_instr_list(ctx, tgt, nh, nt);
 }

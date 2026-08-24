@@ -13,9 +13,8 @@ void register_xmm_tmp(uint64_t offset);
 XMMReg lookup_xmm(uint64_t offset);
 void handle_func(uint64_t off, UnifiedInstr *head, int is_external);
 SlotInfo get_mapped_slot(TcgContext *ctx, SlotType type, uint16_t idx);
-void reset_slot_map(TcgContext *ctx);
 
-UnifiedInstr *emit_instr(uint8_t opc, bool is_helper,
+UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
                                 uint8_t vs, uint8_t es,
                                 Operand *ops, int nops);
 void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src);
@@ -34,12 +33,11 @@ void append_instr(TcgContext *ctx, UnifiedInstr *u);
  * UnifiedInstr nodes.  After this call, instr_head and instr_tail
  * are both NULL and the associated memory has been released.
  */
-void tcg_context_reset_instrs(TcgContext *ctx);
+void tcg_context_reset(TcgContext *ctx);
 
 /*
  * Logic to handle alias e.g. add_i64 loc6,env,$0x5e0
  */
-void init_alias_map(TcgContext *ctx);
 void register_alias(TcgContext *ctx, Operand *s, Operand *xmm_env);
 void try_unregister_alias(TcgContext *ctx, Operand *op);
 void expand_slot_alias(TcgContext *ctx, UnifiedInstr *u);
@@ -51,9 +49,9 @@ void expand_slot_alias(TcgContext *ctx, UnifiedInstr *u);
  */
 LLVMType vec_op_type(uint8_t vs, uint8_t es);
 void update_slot_types(TcgContext *ctx, UnifiedInstr *u);
+void register_stack_alloca(TcgContext *ctx, UnifiedInstr *u);
 void sanity_check_op_type_solid(TcgContext *ctx);
 void type_map_apply(TcgContext *ctx);
-void type_map_reset(TcgContext *ctx);
 void expand_push_ret_addr(TcgContext *ctx);
 void expand_ret(TcgContext *ctx);
 void expand_jmp_direct(TcgContext *ctx);

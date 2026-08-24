@@ -115,10 +115,7 @@ func:
         sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);
         handle_func($3, ctx->instr_head, 0);
-        tcg_context_reset_instrs(ctx);
-        init_alias_map(ctx);
-        reset_slot_map(ctx);
-        type_map_reset(ctx);
+        tcg_context_reset(ctx);
     }
     | EXTERNAL COLON IMMX COLON instr_list
     {
@@ -130,10 +127,7 @@ func:
         sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);
         handle_func($3, ctx->instr_head, 1);
-        tcg_context_reset_instrs(ctx);
-        init_alias_map(ctx);
-        reset_slot_map(ctx);
-        type_map_reset(ctx);
+        tcg_context_reset(ctx);
     }
 ;
 
@@ -152,9 +146,10 @@ instr:
 scalar_instr:
     OPCODE arg_list
     {
-        UnifiedInstr *u = emit_instr($1, false, 0, 0, $2.data, $2.len);
+        UnifiedInstr *u = emit_instr(ctx, $1, 0, 0, $2.data, $2.len);
         expand_slot_alias(ctx, u);
         update_slot_types(ctx, u);
+        register_stack_alloca(ctx, u);
         int skip_alias_instr = 0;
         if (u->opc == add_i64 && u->operand_count == 2) {
             register_alias(ctx, &u->operands[0], &u->operands[1]);
@@ -183,9 +178,10 @@ scalar_instr:
 vector_instr:
     OPCODE VS_TOKEN COMMA ES_TOKEN COMMA arg_list
     {
-        UnifiedInstr *u = emit_instr($1, false, $2.vs, $4.es, $6.data, $6.len);
+        UnifiedInstr *u = emit_instr(ctx, $1, $2.vs, $4.es, $6.data, $6.len);
         expand_slot_alias(ctx, u);
         update_slot_types(ctx, u);
+        register_stack_alloca(ctx, u);
         op_list_free(&$6);
         append_instr(ctx, u);
         $$ = 0;
@@ -209,9 +205,10 @@ call_instr:
         memcpy(merged, pre.data, pre.len * sizeof(Operand));
         memcpy(merged + pre.len, $8.data, $8.len * sizeof(Operand));
         free(pre.data);
-        UnifiedInstr *u = emit_instr($1, true, 0, 0, merged, total);
+        UnifiedInstr *u = emit_instr(ctx, $1, 0, 0, merged, total);
         expand_slot_alias(ctx, u);
         update_slot_types(ctx, u);
+        register_stack_alloca(ctx, u);
         free(merged);
         op_list_free(&$8);
         append_instr(ctx, u);
