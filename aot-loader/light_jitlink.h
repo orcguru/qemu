@@ -180,6 +180,7 @@ private:
     size_t calculateTotalSize(const MinimalELF64Parser& parser);
     bool allocateMemory(size_t size, uint64_t preferredAddr);
     void buildSymbolTable(const MinimalELF64Parser& parser, void *HelperFuncs, size_t HelperFuncsCnt);
+    uint64_t readSymbolValueFromELFFile(const MinimalELF64Parser& parser, const std::string& symName);
     bool copySectionsAndRelocate(const MinimalELF64Parser& parser,
                                 uint64_t startCode,
                                 void (*register_mapping)(uint64_t, uint64_t, uint64_t),

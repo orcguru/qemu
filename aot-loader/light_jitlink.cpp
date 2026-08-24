@@ -249,6 +249,40 @@ uint64_t lookup_function(const FuncMapSection* funcmap, uint64_t guest_pc) {
     return 0;
 }
 
+uint64_t MinimalJITLinker::readSymbolValueFromELFFile(const MinimalELF64Parser& parser, const std::string& symName) {
+    for (size_t i = 0; ; i++) {
+        auto shdr = parser.getSectionHeader(i);
+        if (!shdr) break;
+        if (shdr->sh_type == SHT_SYMTAB) {
+            const char* symtabData = parser.getData() + shdr->sh_offset;
+            size_t symCount = shdr->sh_size / sizeof(Elf64_Sym);
+
+            auto strtabShdr = parser.getSectionHeader(shdr->sh_link);
+            if (!strtabShdr) continue;
+            const char* strtab = parser.getData() + strtabShdr->sh_offset;
+
+            for (size_t j = 0; j < symCount; j++) {
+                const Elf64_Sym* sym = reinterpret_cast<const Elf64_Sym*>(
+                    symtabData + j * sizeof(Elf64_Sym));
+                const char* name = strtab + sym->st_name;
+                if (name && symName == name) {
+                    auto secShdr = parser.getSectionHeader(sym->st_shndx);
+                    if (!secShdr) continue;
+
+                    uint64_t fileOffset = secShdr->sh_offset + sym->st_value;
+                    if (fileOffset + sizeof(uint64_t) > parser.getSize())
+                        continue;
+
+                    uint64_t value = *reinterpret_cast<const uint64_t*>(
+                        parser.getData() + fileOffset);
+                    return value;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
                                               uint64_t startCode,
                                               void (*register_mapping)(uint64_t, uint64_t, uint64_t),
@@ -280,7 +314,6 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
     uint64_t *funcmap_ptr = NULL;
     uint64_t *helpermap_ptr = NULL;
     size_t helpermap_size = 0;
-    uint64_t x64_exec_end = 0;
     int progbits_cnt = 0;
     uint64_t host_exec_start = 0;
     uint64_t host_exec_size = 0;
@@ -293,12 +326,6 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
         if (shdr->sh_type == 1 && shdr->sh_size > 0) {
             progbits_cnt += 1;
             const char* src = parser.getData() + shdr->sh_offset;
-            // FIXME: the second SHT_PROGBITS section is .rodata
-            if (progbits_cnt == 2) {
-                uint64_t *ptr = (uint64_t *)(parser.getData() + shdr->sh_offset);
-                x64_exec_end = *ptr;
-            }
-
             uint64_t offset = shdr->sh_addr - lowestAddr;
 
             if (offset + shdr->sh_size > Ctx.CurrentAlloc.Size) {
@@ -353,6 +380,7 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
             }
         }
     }
+    uint64_t x64_exec_end = readSymbolValueFromELFFile(parser, "x64_exec_end");
     assert(x64_exec_end != 0);
 
     if (register_mapping) {
