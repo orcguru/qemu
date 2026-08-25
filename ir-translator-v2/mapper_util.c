@@ -506,10 +506,6 @@ const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
     [LLVMVector4xi32] = v4uint,
     [LLVMVector8xi16] = v8ushort,
     [LLVMVector16xi8] = v16uchar,
-    [LLVMVector4xi64] = v4ulong,
-    [LLVMVector8xi32] = v8uint,
-    [LLVMVector16xi16] = v16ushort,
-    [LLVMVector32xi8] = v32uchar,
 };
 
 // FIXME: sanity check and cover more helpers

@@ -808,33 +808,191 @@ void build_per_instr_masks_collect_use_def(TcgContext *ctx) {
         or_mask(accum, &ctx->use_mask[i * words], words);
     }
     free(accum);
+    /*
+    for (int i = 0; i < n; i++) {
+        printf("Instr %d\n", i);
+        printf("reaching_def: ");
+        uint64_t *ptr = &ctx->reaching_def_exclude_self_def[i * words];
+        for (int j = 0; j < words; ++j) {
+            printf(" 0x%lx", ptr[j]);
+        }
+        printf("\n");
+        printf("forward use: ");
+        ptr = &ctx->forward_use[i * words];
+        for (int j = 0; j < words; ++j) {
+            printf(" 0x%lx", ptr[j]);
+        }
+        printf("\n");
+    }
+    */
 }
 
-void traverse_instr_reverse(UnifiedInstr *head,
-                            void (*callback)(UnifiedInstr *, void *),
-                            void *user_data)
-{
-    if (!head) return;
-
-    int count = 0;
-    UnifiedInstr *cur = head;
-    while (cur) {
-        count++;
-        cur = cur->next;
+void insert_instr(TcgContext *ctx, UnifiedInstr *prev, UnifiedInstr *nh, UnifiedInstr *nt) {
+    if (!prev) {
+        nt->next = ctx->instr_head;
+        ctx->instr_head = nh;
+    } else {
+        nt->next = prev->next;
+        prev->next = nh;
     }
+}
 
-    UnifiedInstr **arr = (UnifiedInstr **)malloc(count * sizeof(UnifiedInstr *));
-    assert(arr);
+#define TMP_SLOT_PRESERVE_OFFSET_MAX      (4096 - 32)
 
-    cur = head;
-    for (int i = 0; i < count; i++) {
-        arr[i] = cur;
-        cur = cur->next;
+void expand_tmp_slot_preservation(TcgContext *ctx) {
+    uint64_t *buf = calloc(ctx->words_needed, sizeof(uint64_t));
+    UnifiedInstr *u = ctx->instr_head;
+    UnifiedInstr *prev = NULL;
+    int uidx = 0;
+    while (u) {
+        if (u->opc != call) {
+            prev = u;
+            u = u->next;
+            uidx += 1;
+            continue;
+        }
+        UnifiedInstr *c = u;
+        u = u->next;
+
+        uint64_t accumulated = 0;
+        for (int i = 0; i < ctx->words_needed; ++i) {
+            buf[i] = ctx->reaching_def_exclude_self_def[uidx * ctx->words_needed + i] & ctx->forward_use[uidx * ctx->words_needed + i];
+            accumulated |= buf[i];
+        }
+        // Instructions to backup slot contents
+        if (accumulated) {
+            uint64_t tmp_slot_preserve_offset = 16;
+            UnifiedInstr *nh = NULL, *nt = NULL;
+            int tmp1 = get_next_tmp_idx(ctx);
+            int tmp2 = get_next_tmp_idx(ctx);
+            int tmp3 = get_next_tmp_idx(ctx);
+            // - GET pointer to the shadow stack ptr
+            // mov_i64 tmp_N1,env
+            // add_i64 tmp_N1,tmp_N1,-8UL
+            EMIT_INSTR_LIST(ctx, nh, nt, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
+            EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
+            // - LOAD the shadow stack ptr
+            // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
+            EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+
+            for (int i = 0; i < ctx->next_tmp_idx; ++i) {
+                if (test_tmp_bit(buf, i)) {
+                    // - CALCULATE negative offset into the shadow stack
+                    // sub_i64 tmp_N3, tmp_N2, $tmp_slot_preserve_offset
+                    assert(tmp_slot_preserve_offset < TMP_SLOT_PRESERVE_OFFSET_MAX);
+                    EMIT_INSTR_LIST(ctx, nh, nt, sub_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(tmp_slot_preserve_offset));
+                    tmp_slot_preserve_offset += 16;
+                    assert(g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)i));
+                    LLVMType current_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
+                    SrcSizeType src_sz = INVALID_SRCSIZE;
+                    switch (current_ty) {
+                    case LLVMInt64:
+                    case LLVMVector8xi8:
+                    case LLVMVector4xi16:
+                    case LLVMVector2xi32:
+                    case LLVMVector1xi64:
+                        src_sz += (SRC8B - SRC4B);
+                    case LLVMInt32:
+                        src_sz += (SRC4B - SRC2B);
+                    case LLVMInt16:
+                        src_sz += (SRC2B - SRC1B);
+                    case LLVMInt8:
+                        src_sz += (SRC1B - INVALID_SRCSIZE);
+                        // - BACKUP tmp slot
+                        // qemu_st_i64 i,tmp_N3,attr:NONATOMIC,ALIGN_16,$src_sz
+                        EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, 0, 0,
+                            SLOT_OP(SUB_SLOT_TMP, i),
+                            SLOT_OP(SUB_SLOT_TMP, tmp3),
+                            ATTR_STORAGE_OP(NONATOMIC, ALIGN_16, src_sz));
+                        break;
+                    case LLVMVector16xi8:
+                    case LLVMVector8xi16:
+                    case LLVMVector4xi32:
+                    case LLVMVector2xi64:
+                    case LLVMInt128:
+                        // - BACKUP tmp slot
+                        // st_vec v128,e8,tmp_i,tmp_N3
+                        EMIT_INSTR_LIST(ctx, nh, nt, st_vec, 128, 8,
+                            SLOT_OP(SUB_SLOT_TMP, i),
+                            SLOT_OP(SUB_SLOT_TMP, tmp3));
+                        break;
+                    default:
+                        assert(0);
+                    }
+                }
+            }
+            insert_instr(ctx, prev, nh, nt);
+        }
+        // Instructions to restore slot contents
+        if (accumulated) {
+            uint64_t tmp_slot_preserve_offset = 16;
+            UnifiedInstr *nh = NULL, *nt = NULL;
+            int tmp1 = get_next_tmp_idx(ctx);
+            int tmp2 = get_next_tmp_idx(ctx);
+            int tmp3 = get_next_tmp_idx(ctx);
+            // - GET pointer to the shadow stack ptr
+            // mov_i64 tmp_N1,env
+            // add_i64 tmp_N1,tmp_N1,-8UL
+            EMIT_INSTR_LIST(ctx, nh, nt, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
+            EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
+            // - LOAD the shadow stack ptr
+            // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
+            EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+
+            for (int i = 0; i < ctx->next_tmp_idx; ++i) {
+                if (test_tmp_bit(buf, i)) {
+                    // - CALCULATE negative offset into the shadow stack
+                    // sub_i64 tmp_N3, tmp_N2, $tmp_slot_preserve_offset
+                    assert(tmp_slot_preserve_offset < TMP_SLOT_PRESERVE_OFFSET_MAX);
+                    EMIT_INSTR_LIST(ctx, nh, nt, sub_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(tmp_slot_preserve_offset));
+                    tmp_slot_preserve_offset += 16;
+                    assert(g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)i));
+                    LLVMType current_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
+                    SrcSizeType src_sz = INVALID_SRCSIZE;
+                    switch (current_ty) {
+                    case LLVMInt64:
+                    case LLVMVector8xi8:
+                    case LLVMVector4xi16:
+                    case LLVMVector2xi32:
+                    case LLVMVector1xi64:
+                        src_sz += (SRC8B - SRC4B);
+                    case LLVMInt32:
+                        src_sz += (SRC4B - SRC2B);
+                    case LLVMInt16:
+                        src_sz += (SRC2B - SRC1B);
+                    case LLVMInt8:
+                        src_sz += (SRC1B - INVALID_SRCSIZE);
+                        // - RESTORE tmp slot
+                        // qemu_ld_i64 i,tmp_N3,attr:NONATOMIC,ALIGN_16,$src_sz
+                        EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0,
+                            SLOT_OP(SUB_SLOT_TMP, i),
+                            SLOT_OP(SUB_SLOT_TMP, tmp3),
+                            ATTR_STORAGE_OP(NONATOMIC, ALIGN_16, src_sz));
+                        break;
+                    case LLVMVector16xi8:
+                    case LLVMVector8xi16:
+                    case LLVMVector4xi32:
+                    case LLVMVector2xi64:
+                    case LLVMInt128:
+                        // - RESTORE tmp slot
+                        // ld_vec v128,e8,tmp_i,tmp_N3
+                        EMIT_INSTR_LIST(ctx, nh, nt, ld_vec, 128, 8,
+                            SLOT_OP(SUB_SLOT_TMP, i),
+                            SLOT_OP(SUB_SLOT_TMP, tmp3));
+                        break;
+                    default:
+                        assert(0);
+                    }
+                }
+            }
+            insert_instr(ctx, c, nh, nt);
+            prev = nt;
+        }
+        // Setup prev for the next round
+        if (!accumulated) {
+            prev = c;
+        }
+        uidx += 1;
     }
-
-    for (int i = count - 1; i >= 0; i--) {
-        callback(arr[i], user_data);
-    }
-
-    free(arr);
+    free(buf);
 }

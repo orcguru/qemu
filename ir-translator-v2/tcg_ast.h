@@ -1567,10 +1567,6 @@ typedef struct {
     X(LLVMVector8xi16) \
     X(LLVMVector4xi32) \
     X(LLVMVector2xi64) \
-    X(LLVMVector32xi8) \
-    X(LLVMVector16xi16) \
-    X(LLVMVector8xi32) \
-    X(LLVMVector4xi64) \
     X(LLVMInt128)
 
 typedef enum __attribute__((packed)) {
