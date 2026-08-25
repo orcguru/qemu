@@ -57,6 +57,17 @@ struct TcgContext {
     /* Bit array for stack alloca */
     uint32_t xreg_valid;
     uint32_t xmm_valid;
+
+    /* TMP slot DEF/USE tracking */
+    /*
+     * This is a hack preserve stack slots during call
+     */
+    int words_needed;
+    int num_instrs;
+    uint64_t *def_mask;
+    uint64_t *use_mask;
+    uint64_t *reaching_def_exclude_self_def;
+    uint64_t *forward_use;
 };
 
 void tcg_context_init(TcgContext *ctx);

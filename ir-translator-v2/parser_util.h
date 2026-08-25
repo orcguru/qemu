@@ -55,5 +55,9 @@ void type_map_apply(TcgContext *ctx);
 void expand_push_ret_addr(TcgContext *ctx);
 void expand_ret(TcgContext *ctx);
 void expand_jmp_direct(TcgContext *ctx);
+void build_per_instr_masks_collect_use_def(TcgContext *ctx);
+void traverse_instr_reverse(UnifiedInstr *head,
+                            void (*callback)(UnifiedInstr *, void *),
+                            void *user_data);
 
 #endif

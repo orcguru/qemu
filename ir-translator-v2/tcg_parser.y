@@ -108,6 +108,7 @@ func:
     INTERNAL COLON IMMX COLON instr_list
     {
         /* Expand macro instructions */
+        build_per_instr_masks_collect_use_def(ctx);
         expand_push_ret_addr(ctx);
         expand_ret(ctx);
         expand_jmp_direct(ctx);
@@ -120,6 +121,7 @@ func:
     | EXTERNAL COLON IMMX COLON instr_list
     {
         /* Expand macro instructions */
+        build_per_instr_masks_collect_use_def(ctx);
         expand_push_ret_addr(ctx);
         expand_ret(ctx);
         expand_jmp_direct(ctx);

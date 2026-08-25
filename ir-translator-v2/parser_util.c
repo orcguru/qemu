@@ -45,6 +45,29 @@ XMMReg lookup_xmm(uint64_t offset) {
     return x;
 }
 
+#define TMP_WORD(idx)  ((idx) / 64)
+#define TMP_BIT(idx)   ((idx) % 64)
+
+static inline void set_tmp_bit(uint64_t *base, int tmp_idx) {
+    base[TMP_WORD(tmp_idx)] |= (1ULL << TMP_BIT(tmp_idx));
+}
+
+static inline bool test_tmp_bit(const uint64_t *base, int tmp_idx) {
+    return (base[TMP_WORD(tmp_idx)] >> TMP_BIT(tmp_idx)) & 1ULL;
+}
+
+static inline void copy_mask(uint64_t *dst, const uint64_t *src, int words) {
+    memcpy(dst, src, words * sizeof(uint64_t));
+}
+
+static inline void or_mask(uint64_t *dst, const uint64_t *src, int words) {
+    for (int w = 0; w < words; w++) dst[w] |= src[w];
+}
+
+static inline void clear_mask(uint64_t *dst, const uint64_t *src, int words) {
+    for (int w = 0; w < words; w++) dst[w] &= ~src[w];
+}
+
 /*
  * Both loc* and tmp* are mapped to linear tmp space
  */
@@ -166,6 +189,17 @@ void tcg_context_reset(TcgContext *ctx) {
     // Reset stack alloca bit array
     ctx->xreg_valid = 0;
     ctx->xmm_valid = 0;
+
+    free(ctx->def_mask);
+    free(ctx->use_mask);
+    free(ctx->reaching_def_exclude_self_def);
+    free(ctx->forward_use);
+    ctx->def_mask = NULL;
+    ctx->use_mask = NULL;
+    ctx->reaching_def_exclude_self_def = NULL;
+    ctx->forward_use = NULL;
+    ctx->num_instrs = 0;
+    ctx->words_needed = 0;
 }
 
 /*
@@ -694,4 +728,113 @@ void expand_jmp_direct(TcgContext *ctx) {
     EMIT_INSTR_LIST(ctx, nh, nt, tail_call, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1));
 
     replace_and_release_macro_by_instr_list(ctx, tgt, nh, nt);
+}
+
+static int get_def_tmp_indices(UnifiedInstr *u, int *out_idx, int out_cnt) {
+    int ret_cnt = 0;
+    if (u->opc == call &&
+        u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM && u->operands[TCG_CALL_OUT_FLAG_IDX].imm &&
+        u->operands[TCG_CALL_PREFIX_COUNT].kind == OP_SLOT && u->operands[TCG_CALL_PREFIX_COUNT].slot.type == SUB_SLOT_TMP) {
+        out_idx[ret_cnt++] = u->operands[TCG_CALL_PREFIX_COUNT].slot.idx;
+    } else {
+        for (int i = 0; i < opcoc[u->opc]; ++i) {
+            if (u->operands[i].kind == OP_SLOT && u->operands[i].slot.type == SUB_SLOT_TMP) {
+                out_idx[ret_cnt++] = u->operands[i].slot.idx;
+            }
+        }
+    }
+    return ret_cnt;
+}
+
+static int get_use_tmp_indices(UnifiedInstr *u, int *out_idx, int out_cnt) {
+    int ret_cnt = 0;
+    int in_idx = 0;
+    if (u->opc == call) {
+        in_idx = TCG_CALL_PREFIX_COUNT;
+        if (u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM && u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
+            in_idx += 1;
+        }
+    } else {
+        in_idx = opcoc[u->opc];
+    }
+    for (int i = in_idx; i < u->operand_count; ++i) {
+        if (u->operands[i].kind == OP_SLOT && u->operands[i].slot.type == SUB_SLOT_TMP) {
+            out_idx[ret_cnt++] = u->operands[i].slot.idx;
+        }
+    }
+    return ret_cnt;
+}
+
+void build_per_instr_masks_collect_use_def(TcgContext *ctx) {
+    int n = 0;
+    UnifiedInstr *u = ctx->instr_head;
+    while (u) { n++; u = u->next; }
+    ctx->num_instrs = n;
+
+    int max_tmp = ctx->next_tmp_idx;
+    int words = (max_tmp + 63) / 64;
+    ctx->words_needed = words;
+
+    ctx->def_mask = calloc(n * words, sizeof(uint64_t));
+    ctx->use_mask = calloc(n * words, sizeof(uint64_t));
+    ctx->reaching_def_exclude_self_def = calloc(n * words, sizeof(uint64_t));
+    ctx->forward_use = calloc(n * words, sizeof(uint64_t));
+
+    int idx = 0;
+    u = ctx->instr_head;
+    while (u) {
+        int def_indices[2];
+        int def_cnt = get_def_tmp_indices(u, def_indices, sizeof(def_indices)/sizeof(int));
+        for (int i = 0; i < def_cnt; i++)
+            set_tmp_bit(&ctx->def_mask[idx * words], def_indices[i]);
+        int use_indices[16];
+        int use_cnt = get_use_tmp_indices(u, use_indices, sizeof(use_indices)/sizeof(int));
+        for (int i = 0; i < use_cnt; i++)
+            set_tmp_bit(&ctx->use_mask[idx * words], use_indices[i]);
+
+        u = u->next;
+        idx++;
+    }
+    // Setup USE/DEF
+    uint64_t *accum = calloc(words, sizeof(uint64_t));
+    for (int i = 0; i < n; i++) {
+        copy_mask(&ctx->reaching_def_exclude_self_def[i * words], accum, words);
+        clear_mask(&ctx->reaching_def_exclude_self_def[i * words], &ctx->def_mask[i * words], words);
+        or_mask(accum, &ctx->def_mask[i * words], words);
+    }
+    memset(accum, 0, (words * sizeof(uint64_t)));
+    for (int i = n - 1; i >= 0; i--) {
+        copy_mask(&ctx->forward_use[i * words], accum, words);
+        or_mask(accum, &ctx->use_mask[i * words], words);
+    }
+    free(accum);
+}
+
+void traverse_instr_reverse(UnifiedInstr *head,
+                            void (*callback)(UnifiedInstr *, void *),
+                            void *user_data)
+{
+    if (!head) return;
+
+    int count = 0;
+    UnifiedInstr *cur = head;
+    while (cur) {
+        count++;
+        cur = cur->next;
+    }
+
+    UnifiedInstr **arr = (UnifiedInstr **)malloc(count * sizeof(UnifiedInstr *));
+    assert(arr);
+
+    cur = head;
+    for (int i = 0; i < count; i++) {
+        arr[i] = cur;
+        cur = cur->next;
+    }
+
+    for (int i = count - 1; i >= 0; i--) {
+        callback(arr[i], user_data);
+    }
+
+    free(arr);
 }

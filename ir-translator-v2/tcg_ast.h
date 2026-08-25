@@ -10,6 +10,7 @@
 
 #define MAX_ADDED_ARGS              6
 #define STACK_INDEX_SHIFT           10
+#define TCG_CALL_OUT_FLAG_IDX       2
 #define TCG_CALL_PREFIX_COUNT       3
 // FIXME: test small value
 #define DEFAULT_ALIAS_OPS_POOL_SIZE 2
