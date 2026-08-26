@@ -317,6 +317,7 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
         if (u->operands[2].imm) {
             first_input_idx += 1;
             assert(u->operands[TCG_CALL_PREFIX_COUNT].kind == OP_SLOT);
+            assert(helper_return_type[h] != LLVMInvalidType);
             set_operand_type(ctx, &u->operands[TCG_CALL_PREFIX_COUNT], helper_return_type[h]);
         }
         int type_lookup_idx = 0;
