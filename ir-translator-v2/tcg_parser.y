@@ -113,6 +113,7 @@ func:
         expand_push_ret_addr(ctx);
         expand_ret(ctx);
         expand_jmp_direct(ctx);
+        expand_llvm_func(ctx);
         /* End of function – apply final slot types */
         sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);

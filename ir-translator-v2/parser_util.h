@@ -56,6 +56,10 @@ void expand_push_ret_addr(TcgContext *ctx);
 void expand_ret(TcgContext *ctx);
 void expand_jmp_direct(TcgContext *ctx);
 void expand_tmp_slot_preservation(TcgContext *ctx);
+void expand_xmm_reuse(TcgContext *ctx);
+void expand_llvm_func(TcgContext *ctx);
 void build_per_instr_masks_collect_use_def(TcgContext *ctx);
+void collect_func_instr_list_for_llvm(TcgContext *ctx,
+                                    const UnifiedInstr *next);
 
 #endif

@@ -9,6 +9,9 @@
 void tcg_context_init(TcgContext *ctx) {
     ctx->instr_head = NULL;
     ctx->instr_tail = NULL;
+    ctx->llvm_func_set.lists = NULL;
+    ctx->llvm_func_set.num_lists = 0;
+    ctx->llvm_func_set.capacity = 0;
     ctx->current_func_id = 0;
     ctx->current_is_external = 0;
     ctx->lineno = 1;

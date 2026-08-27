@@ -15,6 +15,18 @@ struct TcgContext;
 typedef struct TcgContext TcgContext;
 typedef void* yyscan_t;
 
+typedef struct FuncInstrList {
+    UnifiedInstr *head;
+    UnifiedInstr *tail;
+    int           count;
+} FuncInstrList;
+
+typedef struct FuncListSet {
+    FuncInstrList *lists;
+    int            num_lists;
+    int            capacity;
+} FuncListSet;
+
 /*
  * TcgContext – parsing context for the TCG‑IR parser.
  *
@@ -27,6 +39,9 @@ struct TcgContext {
        ends, handle_func() is called with this pointer. */
     UnifiedInstr *instr_head;
     UnifiedInstr *instr_tail;
+
+    /* Set of llvm functions formed by one TCG IR block */
+    FuncListSet llvm_func_set;
 
     /* Optional: track the current function ID and external flag
        (populated by the INTERNAL/EXTERNAL rules) */
