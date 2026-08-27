@@ -120,6 +120,8 @@ func:
         debug_print_instr($3, ctx, "after expand_jmp_direct");
         expand_llvm_func(ctx);
         debug_print_instr($3, ctx, "after expand_llvm_func");
+        expand_call_inline(ctx);
+        debug_print_instr($3, ctx, "after call_inline");
         /* End of function – apply final slot types */
         sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);
@@ -141,6 +143,8 @@ func:
         debug_print_instr($3, ctx, "after expand_jmp_direct");
         expand_llvm_func(ctx);
         debug_print_instr($3, ctx, "after expand_llvm_func");
+        expand_call_inline(ctx);
+        debug_print_instr($3, ctx, "after call_inline");
         /* End of function – apply final slot types */
         sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);

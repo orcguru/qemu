@@ -523,7 +523,7 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
     UnifiedInstr *u = malloc(sz);
     memset(u, 0, sz);
     u->opc = opc;
-    if (opc == call) {
+    if (is_call(u)) {
         u->is_helper = true;
         u->helper_index = ctx->next_helper_idx++;
     } else {
@@ -783,7 +783,7 @@ void expand_jmp_direct(TcgContext *ctx) {
 
 static int get_def_tmp_indices(UnifiedInstr *u, int *out_idx, int out_cnt) {
     int ret_cnt = 0;
-    if (u->opc == call &&
+    if (is_call(u) &&
         u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM && u->operands[TCG_CALL_OUT_FLAG_IDX].imm &&
         u->operands[TCG_CALL_PREFIX_COUNT].kind == OP_SLOT && u->operands[TCG_CALL_PREFIX_COUNT].slot.type == SUB_SLOT_TMP) {
         out_idx[ret_cnt++] = u->operands[TCG_CALL_PREFIX_COUNT].slot.idx;
@@ -800,7 +800,7 @@ static int get_def_tmp_indices(UnifiedInstr *u, int *out_idx, int out_cnt) {
 static int get_use_tmp_indices(UnifiedInstr *u, int *out_idx, int out_cnt) {
     int ret_cnt = 0;
     int in_idx = 0;
-    if (u->opc == call) {
+    if (is_call(u)) {
         in_idx = TCG_CALL_PREFIX_COUNT;
         if (u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM && u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
             in_idx += 1;
@@ -1145,12 +1145,17 @@ UnifiedInstr *clone_instr(const UnifiedInstr *src) {
     return dst;
 }
 
+#define IS_YMM_HELPER(h)            (h > ymm_helper_begin && h < HELPER_MAX)
+#define IS_XMM_HELPER(h)            (h > xmm_helper_begin && h < ymm_helper_begin)
+#define IS_FLOATINGPOINT_INLINED_HELPER(h)            (h > floatingpoint_inlined_helper_begin && h < floatingpoint_inlined_helper_end)
+#define INLINE_HELPER_ENABLED(h)    (IS_XMM_HELPER(h) || IS_YMM_HELPER(h) || IS_FLOATINGPOINT_INLINED_HELPER(h))
+
 static inline bool is_instr_end_of_control_flow(const UnifiedInstr *u) {
     if (u->opc == tail_call)
         return true;
-    if (u->opc == call) {
+    if (is_call(u)) {
         assert(u->operands[0].kind == OP_SYMBOL);
-        if (u->operands[0].symbol == helper_cc_compute_all || u->operands[0].symbol == helper_cc_compute_c)
+        if (INLINE_HELPER_ENABLED(u->operands[0].symbol) && !helper_require_exception_path[u->operands[0].symbol])
             return false;
         else
             return true;
@@ -1252,4 +1257,16 @@ static void collect_func_instr_list_for_llvm(TcgContext *ctx,
 
 void expand_llvm_func(TcgContext *ctx) {
     collect_func_instr_list_for_llvm(ctx, ctx->instr_head);
+}
+
+void expand_call_inline(TcgContext *ctx) {
+    for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
+        for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
+            if (is_call(u)) {
+                assert(u->operands[0].kind == OP_SYMBOL);
+                if (INLINE_HELPER_ENABLED(u->operands[0].symbol) && !helper_require_exception_path[u->operands[0].symbol])
+                    u->opc = call_inline;
+            }
+        }
+    }
 }

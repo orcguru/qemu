@@ -12,6 +12,7 @@
 #include "tcg_parser.tab.h"
 #include "tcg_lexer.yy.h"
 #include "mapper_util.h"
+#include "parser_util.h"
 
 extern char *lineptr;
 extern const char *helper_str[];
@@ -67,7 +68,7 @@ void print_operand(Operand *op, int is_output) {
 
 void print_instr(UnifiedInstr *u) {
     printf("%s", opcode_type_str[u->opc]);
-    if (u->opc == call) {
+    if (is_call(u)) {
         printf(" %s,", helper_str[u->operands[0].symbol]);
         for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
             print_operand(&u->operands[i], (u->operands[2].imm && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);

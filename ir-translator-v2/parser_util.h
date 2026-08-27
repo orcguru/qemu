@@ -59,6 +59,14 @@ void expand_jmp_direct(TcgContext *ctx);
 void expand_tmp_slot_preservation(TcgContext *ctx);
 void expand_xmm_reuse(TcgContext *ctx);
 void expand_llvm_func(TcgContext *ctx);
+void expand_call_inline(TcgContext *ctx);
 void build_per_instr_masks_collect_use_def(TcgContext *ctx);
+
+static inline bool is_call(const UnifiedInstr *u) {
+    if (u->opc == call || (u->opc > __artifical_opc_begin__ && (u->opc == call_inline || u->opc == call_inline_exception || u->opc == call_runtime_wi_next || u->opc == call_runtime_wo_next))) {
+        return true;
+    }
+    return false;
+}
 
 #endif
