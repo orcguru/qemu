@@ -91,12 +91,34 @@ void print_instr(UnifiedInstr *u) {
     printf("\n");
 }
 
-void handle_func(uint64_t off, UnifiedInstr *head, int is_external) {
-    printf("0x%lx %s:\n", off, is_external ? "EXT":"INT");
-    for (UnifiedInstr *u = head; u; u = u->next) {
-        print_instr(u);
+void debug_print_instr(uint64_t off, TcgContext *ctx, const char *msg) {
+#ifdef DEBUG
+    printf("===============================================\n");
+    printf("0x%lx %s:\n", off, msg);
+    if (ctx->llvm_func_set.num_lists) {
+        for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
+            for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
+                print_instr(u);
+            }
+            printf("\n");
+        }
+    } else {
+        for (UnifiedInstr *u = ctx->instr_head; u; u = u->next) {
+            print_instr(u);
+        }
+        printf("\n");
     }
-    printf("\n");
+#endif
+}
+
+void handle_func(uint64_t off, TcgContext *ctx, int is_external) {
+    printf("0x%lx %s:\n", off, is_external ? "EXT":"INT");
+    for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
+        for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
+            print_instr(u);
+        }
+        printf("\n");
+    }
 }
 
 void parse_tcg_instructions(const char *filename) {

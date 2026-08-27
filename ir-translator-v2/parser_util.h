@@ -11,7 +11,8 @@
 void register_xmm(uint64_t idx, uint64_t offset);
 void register_xmm_tmp(uint64_t offset);
 XMMReg lookup_xmm(uint64_t offset);
-void handle_func(uint64_t off, UnifiedInstr *head, int is_external);
+void handle_func(uint64_t off, TcgContext *ctx, int is_external);
+void debug_print_instr(uint64_t off, TcgContext *ctx, const char *msg);
 SlotInfo get_mapped_slot(TcgContext *ctx, SlotType type, uint16_t idx);
 
 UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
@@ -59,7 +60,5 @@ void expand_tmp_slot_preservation(TcgContext *ctx);
 void expand_xmm_reuse(TcgContext *ctx);
 void expand_llvm_func(TcgContext *ctx);
 void build_per_instr_masks_collect_use_def(TcgContext *ctx);
-void collect_func_instr_list_for_llvm(TcgContext *ctx,
-                                    const UnifiedInstr *next);
 
 #endif

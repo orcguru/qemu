@@ -479,20 +479,22 @@ void sanity_check_op_type_solid(TcgContext *ctx) {
 }
 
 void type_map_apply(TcgContext *ctx) {
-    for (UnifiedInstr *u = ctx->instr_head; u; u = u->next) {
-        for (int i = 0; i < u->operand_count; ++i) {
-            Operand *op = &u->operands[i];
-            if (op->kind == OP_SLOT) {
-                if (op->slot.type == SUB_SLOT_TMP) {
-                    LLVMType stack_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)op->slot.idx);
-                    assert(stack_ty != LLVMInvalidType);
-                    op->slot.stack_type = stack_ty;
-                } else {
-                    assert(op->slot.stack_type != LLVMInvalidType);
+    for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
+        for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
+            for (int i = 0; i < u->operand_count; ++i) {
+                Operand *op = &u->operands[i];
+                if (op->kind == OP_SLOT) {
+                    if (op->slot.type == SUB_SLOT_TMP) {
+                        LLVMType stack_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)op->slot.idx);
+                        assert(stack_ty != LLVMInvalidType);
+                        op->slot.stack_type = stack_ty;
+                    } else {
+                        assert(op->slot.stack_type != LLVMInvalidType);
+                    }
+                } else if (op->kind == OP_XMM) {
+                    assert(op->xmm.stack_type != LLVMInvalidType);
                 }
-            } else if (op->kind == OP_XMM) {
-                assert(op->xmm.stack_type != LLVMInvalidType);
-            }       
+            }
         }
     }
 }
@@ -754,25 +756,29 @@ void expand_ret(TcgContext *ctx) {
 }
 
 void expand_jmp_direct(TcgContext *ctx) {
-    UnifiedInstr *tgt = get_single_target_opc(ctx, jmp_direct);
-    if (!tgt) {
-        return;
+    UnifiedInstr *u = ctx->instr_head;
+    while (u) {
+        if (u->opc != jmp_direct) {
+            u = u->next;
+            continue;
+        }
+        UnifiedInstr *nh = NULL, *nt = NULL;
+        int tmp1 = get_next_tmp_idx(ctx);
+
+        // - GET the address of return
+        // func_addr tmp_N1,op0
+        assert(u->operands[0].kind == OP_IMM);
+        EMIT_INSTR_LIST(ctx, nh, nt, func_addr, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            IMM_OP(u->operands[0].imm));
+
+        // - TAIL call
+        // tail_call tmp_N1
+        EMIT_INSTR_LIST(ctx, nh, nt, tail_call, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1));
+
+        replace_and_release_macro_by_instr_list(ctx, u, nh, nt);
+        u = nt->next;
     }
-    UnifiedInstr *nh = NULL, *nt = NULL;
-    int tmp1 = get_next_tmp_idx(ctx);
-
-    // - GET the address of return
-    // func_addr tmp_N1,op0
-    assert(tgt->operands[0].kind == OP_IMM);
-    EMIT_INSTR_LIST(ctx, nh, nt, func_addr, 0, 0,
-        SLOT_OP(SUB_SLOT_TMP, tmp1),
-        IMM_OP(tgt->operands[0].imm));
-
-    // - TAIL call
-    // tail_call tmp_N1
-    EMIT_INSTR_LIST(ctx, nh, nt, tail_call, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1));
-
-    replace_and_release_macro_by_instr_list(ctx, tgt, nh, nt);
 }
 
 static int get_def_tmp_indices(UnifiedInstr *u, int *out_idx, int out_cnt) {
@@ -1046,6 +1052,91 @@ void expand_xmm_reuse(TcgContext *ctx) {
 
 }
 
+/*
+ * -----------------------------------------------------------------
+ *  Label tracker: dynamic array (replaces GHashTable)
+ * -----------------------------------------------------------------
+ *
+ * Each entry tracks a label number and its "seen" status (0 or 1).
+ * The array is kept sorted by label so that lookup/insert are O(log n)
+ * and iteration is trivially ordered.
+ */
+typedef struct {
+    uint16_t label;
+    uint8_t  value;
+} LabelTrackerEntry;
+
+typedef struct {
+    LabelTrackerEntry *data;
+    int len;
+    int cap;
+} LabelTracker;
+
+static void label_tracker_init(LabelTracker *lt) {
+    lt->data = NULL;
+    lt->len = 0;
+    lt->cap = 0;
+}
+
+static void label_tracker_free(LabelTracker *lt) {
+    free(lt->data);
+    lt->data = NULL;
+    lt->len = 0;
+    lt->cap = 0;
+}
+
+static int label_tracker_find(const LabelTracker *lt, uint16_t label) {
+    for (int i = 0; i < lt->len; i++) {
+        if (lt->data[i].label == label)
+            return i;
+    }
+    return -1;
+}
+
+static bool label_tracker_contains(const LabelTracker *lt, uint16_t label) {
+    return label_tracker_find(lt, label) >= 0;
+}
+
+static void label_tracker_insert(LabelTracker *lt, uint16_t label, uint8_t value) {
+    assert(!label_tracker_contains(lt, label));
+    if (lt->len >= lt->cap) {
+        lt->cap = lt->cap ? lt->cap * 2 : 8;
+        lt->data = realloc(lt->data, lt->cap * sizeof(LabelTrackerEntry));
+    }
+    lt->data[lt->len].label = label;
+    lt->data[lt->len].value = value;
+    lt->len++;
+}
+
+/*
+ * Insert the label if it is not yet tracked, otherwise replace its value.
+ * Convenience that covers both g_hash_table_insert (first time) and
+ * g_hash_table_replace (subsequent updates) used in the original code.
+ */
+static void label_tracker_insert_or_replace(LabelTracker *lt, uint16_t label, uint8_t value) {
+    int idx = label_tracker_find(lt, label);
+    if (idx >= 0) {
+        lt->data[idx].value = value;
+    } else {
+        if (lt->len >= lt->cap) {
+            lt->cap = lt->cap ? lt->cap * 2 : 8;
+            lt->data = realloc(lt->data, lt->cap * sizeof(LabelTrackerEntry));
+        }
+        lt->data[lt->len].label = label;
+        lt->data[lt->len].value = value;
+        lt->len++;
+    }
+}
+
+/* Find the first entry whose value is 0. Returns -1 if none. */
+static int label_tracker_find_zero(const LabelTracker *lt) {
+    for (int i = 0; i < lt->len; i++) {
+        if (lt->data[i].value == 0)
+            return i;
+    }
+    return -1;
+}
+
 UnifiedInstr *clone_instr(const UnifiedInstr *src) {
     size_t sz = sizeof(UnifiedInstr) + src->operand_count * sizeof(Operand);
     UnifiedInstr *dst = malloc(sz);
@@ -1067,63 +1158,74 @@ static inline bool is_instr_end_of_control_flow(const UnifiedInstr *u) {
     return false;
 }
 
-const UnifiedInstr *get_next_missing_label_instr(TcgContext *ctx,
-                                                GHashTable *ht) {
-    GHashTableIter iter;
-    gpointer key, value;
-    g_hash_table_iter_init(&iter, ht);
-    while (g_hash_table_iter_next(&iter, &key, &value)) {
-        if (value == 0) {
-            const UnifiedInstr *u = ctx->instr_head;
-            while (u) {
-                if (u->opc == set_label) {
-                    assert(u->operands[0].kind == OP_LABEL);
-                    if (u->operands[0].label == (uint16_t)(long)key) {
-                        return u;
-                    }
-                }
-                u = u->next;
-            }
-            assert(0);
+/*
+ * Locate the instruction of the first still-unprocessed label (value == 0).
+ * Returns the corresponding set_label instruction from the original list,
+ * or NULL if every label has been processed.
+ */
+static const UnifiedInstr *get_next_missing_label_instr(TcgContext *ctx,
+                                                        const LabelTracker *lt) {
+    int idx = label_tracker_find_zero(lt);
+    if (idx < 0)
+        return NULL;
+    uint16_t label = lt->data[idx].label;
+    for (const UnifiedInstr *u = ctx->instr_head; u; u = u->next) {
+        if (u->opc == set_label) {
+            assert(u->operands[0].kind == OP_LABEL);
+            if (u->operands[0].label == label)
+                return u;
         }
     }
+    assert(0);
     return NULL;
 }
 
-void handle_instr(TcgContext *ctx,
-                  const UnifiedInstr *cur,
-                  FuncInstrList *list,
-                  GHashTable *label_tracker) {
+static void handle_instr(TcgContext *ctx,
+                         const UnifiedInstr *cur,
+                         FuncInstrList *list,
+                         LabelTracker *lt);
+
+static void collect_func_instr_list_for_llvm(TcgContext *ctx,
+                                             const UnifiedInstr *next);
+
+static void handle_instr(TcgContext *ctx,
+                         const UnifiedInstr *cur,
+                         FuncInstrList *list,
+                         LabelTracker *lt) {
     while (cur) {
         UnifiedInstr *copy = clone_instr(cur);
         func_list_append(list, copy);
         if (is_instr_end_of_control_flow(cur)) {
             const UnifiedInstr *label_u;
-            while ((label_u = get_next_missing_label_instr(ctx, label_tracker))) {
-                handle_instr(ctx, label_u, list, label_tracker);
+            bool skip_next = false;
+            while ((label_u = get_next_missing_label_instr(ctx, lt))) {
+                if (label_u == cur->next) {
+                    skip_next = true;
+                }
+                handle_instr(ctx, label_u, list, lt);
             }
-            collect_func_instr_list_for_llvm(ctx, cur->next);
+            if (!skip_next) {
+                collect_func_instr_list_for_llvm(ctx, cur->next);
+            }
             return;
         } else if (cur->opc == br || cur->opc == brcond_i32 || cur->opc == brcond_i64) {
             assert(cur->operands[cur->operand_count - 1].kind == OP_LABEL);
-            if (!g_hash_table_contains(label_tracker, (gconstpointer)(long)cur->operands[cur->operand_count - 1].label)) {
-                g_hash_table_insert(label_tracker, (gpointer)(long)cur->operands[cur->operand_count - 1].label, (gpointer)(long)0);
+            uint16_t lbl = cur->operands[cur->operand_count - 1].label;
+            if (!label_tracker_contains(lt, lbl)) {
+                label_tracker_insert(lt, lbl, 0);
             }
         } else if (cur->opc == set_label) {
             assert(cur->operands[cur->operand_count - 1].kind == OP_LABEL);
-            if (!g_hash_table_contains(label_tracker, (gconstpointer)(long)cur->operands[cur->operand_count - 1].label)) {
-                g_hash_table_insert(label_tracker, (gpointer)(long)cur->operands[cur->operand_count - 1].label, (gpointer)(long)1);
-            } else {
-                g_hash_table_replace(label_tracker, (gpointer)(long)cur->operands[cur->operand_count - 1].label, (gpointer)(long)1);
-            }
+            uint16_t lbl = cur->operands[cur->operand_count - 1].label;
+            label_tracker_insert_or_replace(lt, lbl, 1);
         }
         cur = cur->next;
     }
 }
 
-// Recursively collect LLVM functions
-void collect_func_instr_list_for_llvm(TcgContext *ctx,
-                                    const UnifiedInstr *next) {
+/* Recursively collect LLVM functions */
+static void collect_func_instr_list_for_llvm(TcgContext *ctx,
+                                             const UnifiedInstr *next) {
     if (!next)
         return;
 
@@ -1133,18 +1235,19 @@ void collect_func_instr_list_for_llvm(TcgContext *ctx,
         }
     }
 
-    GHashTable *label_tracker = g_hash_table_new(NULL, NULL);
     FuncInstrList result;
     func_list_init(&result);
-    const UnifiedInstr *cur = next;
-    handle_instr(ctx, cur, &result, label_tracker);
-
     if (ctx->llvm_func_set.num_lists >= ctx->llvm_func_set.capacity) {
         ctx->llvm_func_set.capacity = ctx->llvm_func_set.capacity ? 2 * ctx->llvm_func_set.capacity : 2;
         ctx->llvm_func_set.lists = realloc(ctx->llvm_func_set.lists, ctx->llvm_func_set.capacity * sizeof(FuncInstrList));
     }
-    ctx->llvm_func_set.lists[ctx->llvm_func_set.num_lists++] = result;
-    g_hash_table_destroy(label_tracker);
+    int func_idx = ctx->llvm_func_set.num_lists++;
+    const UnifiedInstr *cur = next;
+    LabelTracker lt;
+    label_tracker_init(&lt);
+    handle_instr(ctx, cur, &result, &lt);
+    label_tracker_free(&lt);
+    ctx->llvm_func_set.lists[func_idx] = result;
 }
 
 void expand_llvm_func(TcgContext *ctx) {

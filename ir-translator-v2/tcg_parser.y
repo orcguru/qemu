@@ -108,30 +108,43 @@ func:
     INTERNAL COLON IMMX COLON instr_list
     {
         /* Expand macro instructions */
+        debug_print_instr($3, ctx, "ORIG");
         build_per_instr_masks_collect_use_def(ctx);
         expand_tmp_slot_preservation(ctx);
+        debug_print_instr($3, ctx, "after expand_tmp_slot_preservation");
         expand_push_ret_addr(ctx);
+        debug_print_instr($3, ctx, "after expand_push_ret_addr");
         expand_ret(ctx);
+        debug_print_instr($3, ctx, "after expand_ret");
         expand_jmp_direct(ctx);
+        debug_print_instr($3, ctx, "after expand_jmp_direct");
         expand_llvm_func(ctx);
+        debug_print_instr($3, ctx, "after expand_llvm_func");
         /* End of function – apply final slot types */
         sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);
-        handle_func($3, ctx->instr_head, 0);
+        handle_func($3, ctx, 0);
         tcg_context_reset(ctx);
     }
     | EXTERNAL COLON IMMX COLON instr_list
     {
         /* Expand macro instructions */
+        debug_print_instr($3, ctx, "ORIG");
         build_per_instr_masks_collect_use_def(ctx);
         expand_tmp_slot_preservation(ctx);
+        debug_print_instr($3, ctx, "after expand_tmp_slot_preservation");
         expand_push_ret_addr(ctx);
+        debug_print_instr($3, ctx, "after expand_push_ret_addr");
         expand_ret(ctx);
+        debug_print_instr($3, ctx, "after expand_ret");
         expand_jmp_direct(ctx);
+        debug_print_instr($3, ctx, "after expand_jmp_direct");
+        expand_llvm_func(ctx);
+        debug_print_instr($3, ctx, "after expand_llvm_func");
         /* End of function – apply final slot types */
         sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);
-        handle_func($3, ctx->instr_head, 1);
+        handle_func($3, ctx, 1);
         tcg_context_reset(ctx);
     }
 ;
