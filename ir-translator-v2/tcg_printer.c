@@ -46,18 +46,18 @@ void print_operand(Operand *op, int is_output) {
     case OP_ATTR:
         printf("attr");
         break;
-    case OP_XMM:
-        if (op->xmm.xmm_offset == 0) {
-            printf("x%d", op->xmm.xmm_idx);
+    case OP_VEC:
+        if (op->vec.offset == 0) {
+            printf("v%d", op->vec.idx);
         } else {
-            printf("x%d:o%d", op->xmm.xmm_idx, op->xmm.xmm_offset);
+            printf("v%d:o%d", op->vec.idx, op->vec.offset);
         }
         break;
     case OP_ENV:
-        if (op->env.env_offset == 0) {
+        if (op->env.offset == 0) {
             printf("env");
         } else {
-            printf("env:0x%x", op->env.env_offset);
+            printf("env:0x%x", op->env.offset);
         }
         break;
     default:

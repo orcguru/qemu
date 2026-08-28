@@ -13,7 +13,7 @@ typedef enum __attribute__((packed)) {
     OP_RELOP,
     OP_ATTR,
     OP_SYMBOL,
-    OP_XMM,
+    OP_VEC,
     OP_ENV,
     OP_NEXT,
     OP_TRAMPOLINE,
@@ -27,14 +27,14 @@ typedef struct __attribute__((packed)) {
 } SlotInfo;
 
 typedef struct __attribute__((packed)) {
-    uint8_t xmm_idx;
-    uint8_t xmm_offset;
+    uint8_t idx;
+    uint8_t offset;
     LLVMType op_type;
     LLVMType stack_type;
-} XmmInfo;
+} VecInfo;
 
 typedef struct __attribute__((packed)) {
-    uint16_t env_offset;
+    uint16_t offset;
     LLVMType op_type;
     LLVMType stack_type;
 } EnvInfo;
@@ -43,7 +43,7 @@ typedef struct __attribute__((packed)) {
     OperandKind kind;
     union {
         SlotInfo   slot;
-        XmmInfo    xmm;
+        VecInfo    vec;
         EnvInfo    env;
         uint64_t   imm;
         uint16_t   label;

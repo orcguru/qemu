@@ -79,7 +79,7 @@ struct TcgContext {
 
     /* Bit array for stack alloca */
     uint32_t xreg_valid;
-    uint32_t xmm_valid;
+    uint32_t vec_valid;
 
     /* TMP slot DEF/USE tracking */
     /*

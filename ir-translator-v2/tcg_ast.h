@@ -7,6 +7,7 @@
 #define LLVMMAXType                 LLVMInt128
 #define XMM_COUNT                   15
 #define XMM_TMP_IDX                 16
+#define MAX_INLINE_VEC_ARG_CNT      4
 
 #define MAX_ADDED_ARGS              6
 #define STACK_INDEX_SHIFT           10
@@ -1551,11 +1552,6 @@ typedef enum __attribute__((packed)) {
     XMM_REG_LIST
     #undef X
 } XMMRegType;
-
-typedef struct {
-    uint16_t xmm_idx    :7;
-    uint16_t xmm_offset :4;
-} XMMReg;
 
 #define LLVM_TYPE_LIST \
     X(LLVMInvalidType) \

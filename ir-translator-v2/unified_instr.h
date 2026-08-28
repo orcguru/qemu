@@ -15,6 +15,7 @@ typedef struct __attribute__((packed)) UnifiedInstr {
         };
         uint16_t helper_index;
     };
+    struct UnifiedInstr *prev;
     struct UnifiedInstr *next;
     uint8_t  operand_count;
     Operand  operands[];

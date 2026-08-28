@@ -12,9 +12,9 @@ static uint16_t get_next_tmp_idx(TcgContext *ctx) {
     return ctx->next_tmp_idx++;
 }
 
-uint64_t get_xmm_offset(uint64_t idx) {
-    assert(idx <= 16);
-    return xmm_offsets[idx];
+uint64_t get_vec_offset(uint64_t vec_idx) {
+    assert(vec_idx <= 32);
+    return (xmm_offsets[vec_idx >> 1] + ((vec_idx & 1) ? 0x10 : 0));
 }
 
 void register_xmm(uint64_t idx, uint64_t offset) {
@@ -26,23 +26,52 @@ void register_xmm_tmp(uint64_t offset) {
     xmm_offsets[XMM_TMP_IDX] = (uint16_t)offset;
 }
 
-XMMReg lookup_xmm(uint64_t offset) {
+VecInfo lookup_vec(uint64_t offset) {
     uint16_t off = (uint16_t)offset;
-    XMMReg x;
-    x.xmm_idx = NON_XMM;
-    x.xmm_offset = 0;
+    VecInfo v;
+    v.idx = NON_XMM;
+    v.offset = 0;
     if (XMM_COUNT > 0 && xmm_offsets[0] <= off && off < (xmm_offsets[XMM_COUNT-1] + 0x20)) {
         uint16_t idx = (off - xmm_offsets[0]) / 0x40;
         uint16_t delta = (off - xmm_offsets[0]) % 0x40;
         if (delta < 0x10) {
-            x.xmm_idx = idx * 2;
-            x.xmm_offset = delta;
+            v.idx = idx * 2;
+            v.offset = delta;
         } else if (delta < 0x20) {
-            x.xmm_idx = idx * 2 + 1;
-            x.xmm_offset = delta - 0x10;
+            v.idx = idx * 2 + 1;
+            v.offset = delta - 0x10;
         }
     }
-    return x;
+    return v;
+}
+
+VecInfo lookup_vec_map(uint64_t offset) {
+    uint16_t off = (uint16_t)offset;
+    VecInfo v;
+    v.idx = NON_XMM;
+    v.offset = 0;
+    if (xmm_offsets[0] <= off && off < (xmm_offsets[XMM_TMP_IDX - 1] + 0x20)) {
+        uint16_t idx = (off - xmm_offsets[0]) / 0x40;
+        uint16_t delta = (off - xmm_offsets[0]) % 0x40;
+        if (delta < 0x10) {
+            v.idx = idx * 2;
+            v.offset = delta;
+        } else if (delta < 0x20) {
+            v.idx = idx * 2 + 1;
+            v.offset = delta - 0x10;
+        }
+    } else if (xmm_offsets[XMM_TMP_IDX] <= off && off < (xmm_offsets[XMM_TMP_IDX] + 0x20)) {
+        uint16_t idx = XMM_TMP_IDX;
+        uint16_t delta = off - xmm_offsets[XMM_TMP_IDX];
+        if (delta < 0x10) {
+            v.idx = idx * 2;
+            v.offset = delta;
+        } else if (delta < 0x20) {
+            v.idx = idx * 2 + 1;
+            v.offset = delta - 0x10;
+        }
+    }
+    return v;
 }
 
 #define TMP_WORD(idx)  ((idx) / 64)
@@ -88,35 +117,6 @@ SlotInfo get_mapped_slot(TcgContext *ctx, SlotType type, uint16_t idx) {
     return ret;
 }
 
-XMMReg lookup_xmm_map(uint64_t offset) {
-    uint16_t off = (uint16_t)offset;
-    XMMReg x;
-    x.xmm_idx = NON_XMM;
-    x.xmm_offset = 0;
-    if (xmm_offsets[0] <= off && off < (xmm_offsets[XMM_TMP_IDX - 1] + 0x20)) {
-        uint16_t idx = (off - xmm_offsets[0]) / 0x40;
-        uint16_t delta = (off - xmm_offsets[0]) % 0x40;
-        if (delta < 0x10) {
-            x.xmm_idx = idx * 2;
-            x.xmm_offset = delta;
-        } else if (delta < 0x20) {
-            x.xmm_idx = idx * 2 + 1;
-            x.xmm_offset = delta - 0x10;
-        }
-    } else if (xmm_offsets[XMM_TMP_IDX] <= off && off < (xmm_offsets[XMM_TMP_IDX] + 0x20)) {
-        uint16_t idx = XMM_TMP_IDX;
-        uint16_t delta = off - xmm_offsets[XMM_TMP_IDX];
-        if (delta < 0x10) {
-            x.xmm_idx = idx * 2;
-            x.xmm_offset = delta;
-        } else if (delta < 0x20) {
-            x.xmm_idx = idx * 2 + 1;
-            x.xmm_offset = delta - 0x10;
-        }
-    }
-    return x;
-}
-
 void free_instr_list(UnifiedInstr *head) {
     while (head) {
         UnifiedInstr *next = head->next;
@@ -145,7 +145,67 @@ void op_list_free(OpList *l) {
     l->len = l->cap = 0;
 }
 
+UnifiedInstr *clone_instr(const UnifiedInstr *src) {
+    size_t sz = sizeof(UnifiedInstr) + src->operand_count * sizeof(Operand);
+    UnifiedInstr *dst = malloc(sz);
+    memcpy(dst, src, sz);
+    dst->prev = NULL;
+    dst->next = NULL;
+    return dst;
+}
+
+/* Insert 'u' right after 'anchor'. If anchor is NULL, prepend at head. */
+static void instr_list_insert_after(UnifiedInstr **head_p, UnifiedInstr **tail_p, UnifiedInstr *anchor, UnifiedInstr *u) {
+    u->prev = anchor;
+    if (!anchor) {
+        /* prepend at head */
+        u->next = *head_p;
+        if (*head_p)
+            (*head_p)->prev = u;
+        *head_p = u;
+        if (!*tail_p)
+            *tail_p = u;
+    } else {
+        u->next = anchor->next;
+        if (anchor->next)
+            anchor->next->prev = u;
+        anchor->next = u;
+        if (anchor == *tail_p)
+            *tail_p = u;
+    }
+}
+
+/* Insert 'u' right before 'anchor'. If anchor is NULL, append at tail. */
+static void instr_list_insert_before(UnifiedInstr **head_p, UnifiedInstr **tail_p, UnifiedInstr *anchor, UnifiedInstr *u) {
+    if (!anchor) {
+        u->prev = *tail_p;
+        u->next = NULL;
+        if (*tail_p) {
+            (*tail_p)->next = u;
+            *tail_p = u;
+        } else {
+            *head_p = u;
+            *tail_p = u;
+        }
+        return;
+    }
+    instr_list_insert_after(head_p, tail_p, anchor->prev, u);
+}
+
+static void instr_list_remove_and_free(UnifiedInstr **head_p, UnifiedInstr **tail_p, UnifiedInstr *u) {
+    if (u->prev)
+        u->prev->next = u->next;
+    else
+        *head_p = u->next;
+    if (u->next)
+        u->next->prev = u->prev;
+    else
+        *tail_p = u->prev;
+    free(u);
+}
+
 void append_instr(TcgContext *ctx, UnifiedInstr *u) {
+    u->prev = ctx->instr_tail;
     u->next = NULL;
     if (ctx->instr_tail) {
         ctx->instr_tail->next = u;
@@ -164,6 +224,7 @@ void func_list_init(FuncInstrList *list) {
 }
 
 void func_list_append(FuncInstrList *list, UnifiedInstr *u) {
+    u->prev = list->tail;
     u->next = NULL;
     if (list->tail) {
         list->tail->next = u;
@@ -233,7 +294,7 @@ void tcg_context_reset(TcgContext *ctx) {
 
     // Reset stack alloca bit array
     ctx->xreg_valid = 0;
-    ctx->xmm_valid = 0;
+    ctx->vec_valid = 0;
 
     free(ctx->def_mask);
     free(ctx->use_mask);
@@ -250,14 +311,14 @@ void tcg_context_reset(TcgContext *ctx) {
 /*
  * Logic to handle alias e.g. add_i64 loc6,env,$0x5e0
  */
-void register_alias(TcgContext *ctx, Operand *s, Operand *xmm_env) {
+void register_alias(TcgContext *ctx, Operand *s, Operand *vec_env) {
     assert(s->kind == OP_SLOT && s->slot.type == SUB_SLOT_TMP);
-    assert(xmm_env->kind == OP_XMM || xmm_env->kind == OP_ENV);
+    assert(vec_env->kind == OP_VEC || vec_env->kind == OP_ENV);
     if (ctx->plen >= ctx->pcap) {
         ctx->pcap = ctx->pcap ? ctx->pcap * 2 : 8;
         ctx->alias_ops_pool = realloc(ctx->alias_ops_pool, ctx->pcap * sizeof(Operand));
     }
-    ctx->alias_ops_pool[ctx->plen] = *xmm_env;
+    ctx->alias_ops_pool[ctx->plen] = *vec_env;
     if (g_hash_table_contains(ctx->alias_map, (gconstpointer)(long)s->slot.idx)) {
         g_hash_table_replace(ctx->alias_map, (gpointer)(long)s->slot.idx, &ctx->alias_ops_pool[ctx->plen]);
     } else {
@@ -324,8 +385,8 @@ void set_operand_type(TcgContext *ctx, Operand *op, LLVMType ty) {
                 g_hash_table_insert(ctx->stack_type_map, (gpointer)(long)op->slot.idx, (gpointer)(long)stack_ty);
             }
         }
-    } else if (op->kind == OP_XMM) {
-        op->xmm.op_type = ty;
+    } else if (op->kind == OP_VEC) {
+        op->vec.op_type = ty;
     } else if (op->kind == OP_ENV) {
         op->env.op_type = ty;
     }
@@ -333,8 +394,8 @@ void set_operand_type(TcgContext *ctx, Operand *op, LLVMType ty) {
 
 void register_stack_alloca(TcgContext *ctx, UnifiedInstr *u) {
     for (int i = 0; i < u->operand_count; ++i) {
-        if (u->operands[i].kind == OP_XMM) {
-            ctx->xmm_valid |= (1 << u->operands[i].xmm.xmm_idx);
+        if (u->operands[i].kind == OP_VEC) {
+            ctx->vec_valid |= (1 << u->operands[i].vec.idx);
         }
         if (u->operands[i].kind == OP_SLOT && u->operands[i].slot.type == SUB_SLOT_XREG) {
             ctx->xreg_valid |= (1 << u->operands[i].slot.idx);
@@ -375,11 +436,11 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
                     set_operand_type(ctx, &u->operands[i], LLVMInt64);
                 }
                 type_lookup_idx += 1;
-            } else if (u->operands[i].kind == OP_XMM) {
-                u->operands[i].xmm.op_type = LLVMVector2xi64;
+            } else if (u->operands[i].kind == OP_VEC) {
+                u->operands[i].vec.op_type = LLVMVector2xi64;
             } else if (u->operands[i].kind == OP_ENV) {
                 assert(xmm_offsets[XMM_TMP_IDX]);
-                if (u->operands[i].env.env_offset == xmm_offsets[XMM_TMP_IDX]) {
+                if (u->operands[i].env.offset == xmm_offsets[XMM_TMP_IDX]) {
                     u->operands[i].env.op_type = LLVMVector2xi64;
                 } else {
                     u->operands[i].env.op_type = LLVMInt64;
@@ -391,7 +452,7 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
     /* Scalar */
     for (int i = 0; i < u->operand_count; ++i) {
         if (u->operands[i].kind != OP_SLOT &&
-            u->operands[i].kind != OP_XMM &&
+            u->operands[i].kind != OP_VEC &&
             u->operands[i].kind != OP_ENV) {
             continue;
         }
@@ -470,8 +531,8 @@ void sanity_check_op_type_solid(TcgContext *ctx) {
             const Operand *op = &u->operands[i];
             if (op->kind == OP_SLOT) {
                 assert(op->slot.op_type);
-            } else if (op->kind == OP_XMM) {
-                assert(op->xmm.op_type);
+            } else if (op->kind == OP_VEC) {
+                assert(op->vec.op_type);
             } else if (op->kind == OP_ENV) {
                 assert(op->env.op_type);
             }       
@@ -492,8 +553,8 @@ void type_map_apply(TcgContext *ctx) {
                     } else {
                         assert(op->slot.stack_type != LLVMInvalidType);
                     }
-                } else if (op->kind == OP_XMM) {
-                    assert(op->xmm.stack_type != LLVMInvalidType);
+                } else if (op->kind == OP_VEC) {
+                    assert(op->vec.stack_type != LLVMInvalidType);
                 }
             }
         }
@@ -539,16 +600,16 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
     } else {
         for (int i = 0; i < nops; ++i) {
             if (ops[i].kind == OP_ENV && (i + 1) < nops && ops[i + 1].kind == OP_IMM) {
-                XMMReg x = lookup_xmm(ops[i + 1].imm);
-                if (x.xmm_idx != NON_XMM) {
-                    u->operands[dst_idx].kind = OP_XMM;
-                    u->operands[dst_idx].xmm.xmm_idx = x.xmm_idx;
-                    u->operands[dst_idx].xmm.xmm_offset = x.xmm_offset;
-                    u->operands[dst_idx].xmm.op_type = LLVMInvalidType;
-                    u->operands[dst_idx].xmm.stack_type = LLVMVector2xi64;
+                VecInfo v = lookup_vec(ops[i + 1].imm);
+                if (v.idx != NON_XMM) {
+                    u->operands[dst_idx].kind = OP_VEC;
+                    u->operands[dst_idx].vec.idx = v.idx;
+                    u->operands[dst_idx].vec.offset = v.offset;
+                    u->operands[dst_idx].vec.op_type = LLVMInvalidType;
+                    u->operands[dst_idx].vec.stack_type = LLVMVector2xi64;
                 } else {
                     u->operands[dst_idx].kind = OP_ENV;
-                    u->operands[dst_idx].env.env_offset = (uint16_t)ops[i + 1].imm;
+                    u->operands[dst_idx].env.offset = (uint16_t)ops[i + 1].imm;
                     u->operands[dst_idx].env.op_type = LLVMInvalidType;
                     u->operands[dst_idx].env.stack_type = LLVMInvalidType;
                 }
@@ -561,29 +622,9 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
         }
     }
     u->operand_count = nops - skip_cnt;
+    u->prev = NULL;
     u->next = NULL;
     return u;
-}
-
-void replace_and_release_macro_by_instr_list(TcgContext *ctx, UnifiedInstr *tgt,
-                                UnifiedInstr *new_head, UnifiedInstr *new_tail) {
-    UnifiedInstr *prev = NULL;
-    UnifiedInstr *u = ctx->instr_head;
-    while (u) {
-        if (u->opc == tgt->opc) {
-            break;
-        }
-        prev = u;
-        u = u->next;
-    }
-    if (!prev) {
-        ctx->instr_head = new_head;
-    } else {
-        prev->next = new_head;
-    }
-    new_tail->next = tgt->next;
-    tgt->next = NULL;
-    free(tgt);
 }
 
 UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
@@ -597,24 +638,24 @@ UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
     return NULL;
 }
 
-#define EMIT_INSTR_LIST(ctx, nh, nt, opc, vs, es, ...)           \
+#define EMIT_INSTR_BEFORE(ctx, hp, tp, u, opc, vs, es, ...)                 \
     do {                                                                    \
         Operand _ops[] = { __VA_ARGS__ };                                   \
         size_t _cnt = sizeof(_ops) / sizeof(_ops[0]);                       \
-        UnifiedInstr *_u = emit_instr(ctx, opc, vs, es, _ops, _cnt);  \
+        UnifiedInstr *_u = emit_instr(ctx, opc, vs, es, _ops, _cnt);        \
         expand_slot_alias(ctx, _u);                                         \
         update_slot_types(ctx, _u);                                         \
-        register_stack_alloca(ctx, _u);                                         \
-        if (!(nh)) (nh) = _u;                                               \
-        if (nt) (nt)->next = _u;                                            \
-        (nt) = _u;                                                          \
+        register_stack_alloca(ctx, _u);                                     \
+        instr_list_insert_before(hp, tp, u, _u);                            \
     } while (0)
 
 #define SLOT_OP(ty, index)  ((Operand){ .kind = OP_SLOT, .slot.type = (ty), .slot.idx = (index) })
+#define VEC_OP(index, off)   ((Operand){ .kind = OP_VEC, .vec.idx = (index), .vec.offset = (off), .vec.stack_type = LLVMVector2xi64 })
+// Use SLOT_OP_EXTRA to copy from existing operand
 #define SLOT_OP_EXTRA(ty, index, op_ty, stack_ty)                           \
             ((Operand){ .kind = OP_SLOT, .slot.type = (ty), .slot.idx = (index), .slot.op_type = (op_ty), .slot.stack_type = (stack_ty) })
 #define IMM_OP(val)         ((Operand){ .kind = OP_IMM,   .imm = (val) })
-#define ENV_OP(off)         ((Operand){ .kind = OP_ENV,   .env.env_offset = (off) })
+#define ENV_OP(off)         ((Operand){ .kind = OP_ENV,   .env.offset = (off) })
 #define LABEL_OP(lbl)       ((Operand){ .kind = OP_LABEL, .label = (lbl) })
 #define RELOP_OP(r)         ((Operand){ .kind = OP_RELOP, .relop = (r) })
 #define SYMBOL_OP(sym)      ((Operand){ .kind = OP_SYMBOL, .symbol = (sym) })
@@ -625,11 +666,10 @@ UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
     }})
 
 void expand_push_ret_addr(TcgContext *ctx) {
-    UnifiedInstr *tgt = get_single_target_opc(ctx, push_ret_addr);
-    if (!tgt) {
+    UnifiedInstr *u = get_single_target_opc(ctx, push_ret_addr);
+    if (!u) {
         return;
     }
-    UnifiedInstr *nh = NULL, *nt = NULL;
     int tmp1 = get_next_tmp_idx(ctx);
     int tmp2 = get_next_tmp_idx(ctx);
     int tmp3 = get_next_tmp_idx(ctx);
@@ -637,73 +677,72 @@ void expand_push_ret_addr(TcgContext *ctx) {
     // - GET pointer to the shadow stack ptr
     // mov_i64 tmp_N1,env
     // add_i64 tmp_N1,tmp_N1,-8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, mov_i64, 0, 0,
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, mov_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         ENV_OP(0));
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0,
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         IMM_OP(-8ULL));
 
     // - LOAD the shadow stack ptr
     // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0,
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - ALLOCATE an entry on the shadow stack
     // add_i64 tmp_N2,tmp_N2,-8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0,
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         IMM_OP(-8ULL));
 
     // - STORE x64_ret_addr into the entry
     // qemu_st_i64 op0,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
-    assert(tgt->operands[0].kind == OP_SLOT);
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, 0, 0,
-        SLOT_OP_EXTRA(tgt->operands[0].slot.type, tgt->operands[0].slot.idx, tgt->operands[0].slot.op_type, tgt->operands[0].slot.stack_type),
+    assert(u->operands[0].kind == OP_SLOT);
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0,
+        SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type, u->operands[0].slot.stack_type),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - ALLOCATE an entry on the shadow stack
     // add_i64 tmp_N2,tmp_N2,-8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0,
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         IMM_OP(-8ULL));
 
     // - GET the address of return
     // func_addr tmp_N3,op2
-    assert(tgt->operands[1].kind == OP_IMM);
-    EMIT_INSTR_LIST(ctx, nh, nt, func_addr, 0, 0,
+    assert(u->operands[1].kind == OP_IMM);
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, func_addr, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp3),
-        IMM_OP(tgt->operands[1].imm));
+        IMM_OP(u->operands[1].imm));
 
     // - STORE the address of return into the entry
     // qemu_st_i64 tmp_N3,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, 0, 0,
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp3),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - UPDATE the shadow stack ptr
     // qemu_st_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, 0, 0,
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         SLOT_OP(SUB_SLOT_TMP, tmp1),
         ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
-    replace_and_release_macro_by_instr_list(ctx, tgt, nh, nt);
+    instr_list_remove_and_free(&ctx->instr_head, &ctx->instr_tail, u);
 }
 
 void expand_ret(TcgContext *ctx) {
-    UnifiedInstr *tgt = get_single_target_opc(ctx, ret);
-    if (!tgt) {
+    UnifiedInstr *u = get_single_target_opc(ctx, ret);
+    if (!u) {
         return;
     }
-    UnifiedInstr *nh = NULL, *nt = NULL;
     int tmp1 = get_next_tmp_idx(ctx);
     int tmp2 = get_next_tmp_idx(ctx);
     int tmp3 = get_next_tmp_idx(ctx);
@@ -711,49 +750,49 @@ void expand_ret(TcgContext *ctx) {
     // - GET pointer to the shadow stack ptr
     // mov_i64 tmp_N1,env
     // add_i64 tmp_N1,tmp_N1,-8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
 
     // - LOAD the shadow stack ptr
     // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - LOAD the address of return
     // qemu_ld_i64 tmp_N3,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - POP the shadow stack
     // add_i64 tmp_N2,tmp_N2,8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
 
     // - LOAD the x64_ret_addr
     // qemu_ld_i64 tmp_N4,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp4), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp4), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - POP the shadow stack
     // add_i64 tmp_N2,tmp_N2,8UL
-    EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
 
     // - UPDATE the shadow stack ptr
     // qemu_st_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
     // - CHECK if lookup is needed
     // brcond_i64 op0,tmp_N4,ne,L0
-    assert(tgt->operands[0].kind == OP_SLOT);
-    EMIT_INSTR_LIST(ctx, nh, nt, brcond_i64, 0, 0, SLOT_OP_EXTRA(tgt->operands[0].slot.type, tgt->operands[0].slot.idx, tgt->operands[0].slot.op_type, tgt->operands[0].slot.stack_type), SLOT_OP(SUB_SLOT_TMP, tmp4), RELOP_OP(ne), LABEL_OP(0));
+    assert(u->operands[0].kind == OP_SLOT);
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, brcond_i64, 0, 0, SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type, u->operands[0].slot.stack_type), SLOT_OP(SUB_SLOT_TMP, tmp4), RELOP_OP(ne), LABEL_OP(0));
 
     // - TAIL call
     // tail_call tmp_N3
-    EMIT_INSTR_LIST(ctx, nh, nt, tail_call, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, tail_call, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3));
 
     // - LOOKUP return address
     // set_label L0
     // call jmp_ind,0x1,0,op0
-    EMIT_INSTR_LIST(ctx, nh, nt, set_label, 0, 0, LABEL_OP(0));
-    EMIT_INSTR_LIST(ctx, nh, nt, call, 0, 0, SYMBOL_OP(helper_jmp_ind), IMM_OP(0x1), IMM_OP(0), SLOT_OP_EXTRA(tgt->operands[0].slot.type, tgt->operands[0].slot.idx, tgt->operands[0].slot.op_type, tgt->operands[0].slot.stack_type));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, set_label, 0, 0, LABEL_OP(0));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, call, 0, 0, SYMBOL_OP(helper_jmp_ind), IMM_OP(0x1), IMM_OP(0), SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type, u->operands[0].slot.stack_type));
 
-    replace_and_release_macro_by_instr_list(ctx, tgt, nh, nt);
+    instr_list_remove_and_free(&ctx->instr_head, &ctx->instr_tail, u);
 }
 
 void expand_jmp_direct(TcgContext *ctx) {
@@ -763,22 +802,22 @@ void expand_jmp_direct(TcgContext *ctx) {
             u = u->next;
             continue;
         }
-        UnifiedInstr *nh = NULL, *nt = NULL;
         int tmp1 = get_next_tmp_idx(ctx);
 
         // - GET the address of return
         // func_addr tmp_N1,op0
         assert(u->operands[0].kind == OP_IMM);
-        EMIT_INSTR_LIST(ctx, nh, nt, func_addr, 0, 0,
+        EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, func_addr, 0, 0,
             SLOT_OP(SUB_SLOT_TMP, tmp1),
             IMM_OP(u->operands[0].imm));
 
         // - TAIL call
         // tail_call tmp_N1
-        EMIT_INSTR_LIST(ctx, nh, nt, tail_call, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1));
+        EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, tail_call, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1));
 
-        replace_and_release_macro_by_instr_list(ctx, u, nh, nt);
-        u = nt->next;
+        UnifiedInstr *next = u->next;
+        instr_list_remove_and_free(&ctx->instr_head, &ctx->instr_tail, u);
+        u = next;
     }
 }
 
@@ -860,33 +899,6 @@ void build_per_instr_masks_collect_use_def(TcgContext *ctx) {
         or_mask(accum, &ctx->use_mask[i * words], words);
     }
     free(accum);
-    /*
-    for (int i = 0; i < n; i++) {
-        printf("Instr %d\n", i);
-        printf("reaching_def: ");
-        uint64_t *ptr = &ctx->reaching_def_exclude_self_def[i * words];
-        for (int j = 0; j < words; ++j) {
-            printf(" 0x%lx", ptr[j]);
-        }
-        printf("\n");
-        printf("forward use: ");
-        ptr = &ctx->forward_use[i * words];
-        for (int j = 0; j < words; ++j) {
-            printf(" 0x%lx", ptr[j]);
-        }
-        printf("\n");
-    }
-    */
-}
-
-void insert_instr(TcgContext *ctx, UnifiedInstr *prev, UnifiedInstr *nh, UnifiedInstr *nt) {
-    if (!prev) {
-        nt->next = ctx->instr_head;
-        ctx->instr_head = nh;
-    } else {
-        nt->next = prev->next;
-        prev->next = nh;
-    }
 }
 
 #define TMP_SLOT_PRESERVE_OFFSET_MAX      (4096 - 32)
@@ -894,11 +906,9 @@ void insert_instr(TcgContext *ctx, UnifiedInstr *prev, UnifiedInstr *nh, Unified
 void expand_tmp_slot_preservation(TcgContext *ctx) {
     uint64_t *buf = calloc(ctx->words_needed, sizeof(uint64_t));
     UnifiedInstr *u = ctx->instr_head;
-    UnifiedInstr *prev = NULL;
     int uidx = 0;
     while (u) {
         if (u->opc != call) {
-            prev = u;
             u = u->next;
             uidx += 1;
             continue;
@@ -914,25 +924,24 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
         // Instructions to backup slot contents
         if (accumulated) {
             uint64_t tmp_slot_preserve_offset = 16;
-            UnifiedInstr *nh = NULL, *nt = NULL;
             int tmp1 = get_next_tmp_idx(ctx);
             int tmp2 = get_next_tmp_idx(ctx);
             int tmp3 = get_next_tmp_idx(ctx);
             // - GET pointer to the shadow stack ptr
             // mov_i64 tmp_N1,env
             // add_i64 tmp_N1,tmp_N1,-8UL
-            EMIT_INSTR_LIST(ctx, nh, nt, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
-            EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
             // - LOAD the shadow stack ptr
             // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-            EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
             for (int i = 0; i < ctx->next_tmp_idx; ++i) {
                 if (test_tmp_bit(buf, i)) {
                     // - CALCULATE negative offset into the shadow stack
                     // sub_i64 tmp_N3, tmp_N2, $tmp_slot_preserve_offset
                     assert(tmp_slot_preserve_offset < TMP_SLOT_PRESERVE_OFFSET_MAX);
-                    EMIT_INSTR_LIST(ctx, nh, nt, sub_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(tmp_slot_preserve_offset));
+                    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, sub_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(tmp_slot_preserve_offset));
                     tmp_slot_preserve_offset += 16;
                     assert(g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)i));
                     LLVMType current_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
@@ -952,7 +961,7 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
                         src_sz += (SRC1B - INVALID_SRCSIZE);
                         // - BACKUP tmp slot
                         // qemu_st_i64 i,tmp_N3,attr:NONATOMIC,ALIGN_16,$src_sz
-                        EMIT_INSTR_LIST(ctx, nh, nt, qemu_st_i64, 0, 0,
+                        EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, qemu_st_i64, 0, 0,
                             SLOT_OP(SUB_SLOT_TMP, i),
                             SLOT_OP(SUB_SLOT_TMP, tmp3),
                             ATTR_STORAGE_OP(NONATOMIC, ALIGN_16, src_sz));
@@ -964,7 +973,7 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
                     case LLVMInt128:
                         // - BACKUP tmp slot
                         // st_vec v128,e8,tmp_i,tmp_N3
-                        EMIT_INSTR_LIST(ctx, nh, nt, st_vec, 128, 8,
+                        EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, st_vec, 128, 8,
                             SLOT_OP(SUB_SLOT_TMP, i),
                             SLOT_OP(SUB_SLOT_TMP, tmp3));
                         break;
@@ -973,30 +982,29 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
                     }
                 }
             }
-            insert_instr(ctx, prev, nh, nt);
         }
         // Instructions to restore slot contents
         if (accumulated) {
+            UnifiedInstr *c_next = c->next;
             uint64_t tmp_slot_preserve_offset = 16;
-            UnifiedInstr *nh = NULL, *nt = NULL;
             int tmp1 = get_next_tmp_idx(ctx);
             int tmp2 = get_next_tmp_idx(ctx);
             int tmp3 = get_next_tmp_idx(ctx);
             // - GET pointer to the shadow stack ptr
             // mov_i64 tmp_N1,env
             // add_i64 tmp_N1,tmp_N1,-8UL
-            EMIT_INSTR_LIST(ctx, nh, nt, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
-            EMIT_INSTR_LIST(ctx, nh, nt, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
             // - LOAD the shadow stack ptr
             // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-            EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
             for (int i = 0; i < ctx->next_tmp_idx; ++i) {
                 if (test_tmp_bit(buf, i)) {
                     // - CALCULATE negative offset into the shadow stack
                     // sub_i64 tmp_N3, tmp_N2, $tmp_slot_preserve_offset
                     assert(tmp_slot_preserve_offset < TMP_SLOT_PRESERVE_OFFSET_MAX);
-                    EMIT_INSTR_LIST(ctx, nh, nt, sub_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(tmp_slot_preserve_offset));
+                    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, sub_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(tmp_slot_preserve_offset));
                     tmp_slot_preserve_offset += 16;
                     assert(g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)i));
                     LLVMType current_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
@@ -1016,7 +1024,7 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
                         src_sz += (SRC1B - INVALID_SRCSIZE);
                         // - RESTORE tmp slot
                         // qemu_ld_i64 i,tmp_N3,attr:NONATOMIC,ALIGN_16,$src_sz
-                        EMIT_INSTR_LIST(ctx, nh, nt, qemu_ld_i64, 0, 0,
+                        EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, qemu_ld_i64, 0, 0,
                             SLOT_OP(SUB_SLOT_TMP, i),
                             SLOT_OP(SUB_SLOT_TMP, tmp3),
                             ATTR_STORAGE_OP(NONATOMIC, ALIGN_16, src_sz));
@@ -1028,7 +1036,7 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
                     case LLVMInt128:
                         // - RESTORE tmp slot
                         // ld_vec v128,e8,tmp_i,tmp_N3
-                        EMIT_INSTR_LIST(ctx, nh, nt, ld_vec, 128, 8,
+                        EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, ld_vec, 128, 8,
                             SLOT_OP(SUB_SLOT_TMP, i),
                             SLOT_OP(SUB_SLOT_TMP, tmp3));
                         break;
@@ -1037,20 +1045,10 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
                     }
                 }
             }
-            insert_instr(ctx, c, nh, nt);
-            prev = nt;
-        }
-        // Setup prev for the next round
-        if (!accumulated) {
-            prev = c;
         }
         uidx += 1;
     }
     free(buf);
-}
-
-void expand_xmm_reuse(TcgContext *ctx) {
-
 }
 
 /*
@@ -1136,14 +1134,6 @@ static int label_tracker_find_zero(const LabelTracker *lt) {
             return i;
     }
     return -1;
-}
-
-UnifiedInstr *clone_instr(const UnifiedInstr *src) {
-    size_t sz = sizeof(UnifiedInstr) + src->operand_count * sizeof(Operand);
-    UnifiedInstr *dst = malloc(sz);
-    memcpy(dst, src, sz);
-    dst->next = NULL;
-    return dst;
 }
 
 #define IS_YMM_HELPER(h)            (h > ymm_helper_begin && h < HELPER_MAX)
@@ -1260,6 +1250,105 @@ void expand_llvm_func(TcgContext *ctx) {
     collect_func_instr_list_for_llvm(ctx, ctx->instr_head);
 }
 
+// FIXME: YMM
+int get_vector_spill_info(TcgContext *ctx,
+                          const UnifiedInstr *u,
+                          Operand *env_vecs,
+                          Operand *spare_vecs,
+                          int cnt) {
+    int rc = 0;
+    for (int i = 0; i < u->operand_count; ++i) {
+        if (u->operands[i].kind == OP_ENV) {
+            VecInfo vinfo = lookup_vec_map(u->operands[i].env.offset);
+            if (vinfo.idx != NON_XMM) {
+                // pcmpistrm implicitly writes to xmm0, skip the first pair of vectors
+                int spare_idx = 2;
+                for (; spare_idx < (XMM_COUNT * 2); spare_idx += 2) {
+                    if ((ctx->vec_valid & (1 << spare_idx)) == 0) {
+                        break;
+                    }
+                }
+                assert(spare_idx < (XMM_COUNT * 2));
+
+                bool dup = false;
+                for (int j = 0; j < rc; ++j) {
+                    if (env_vecs[j].env.offset == u->operands[i].env.offset) {
+                        dup = true;
+                        break;
+                    }
+                }
+                if (!dup) {
+                    env_vecs[rc] = u->operands[i];
+                    spare_vecs[rc].kind = OP_VEC;
+                    spare_vecs[rc].vec.idx = spare_idx;
+                    spare_vecs[rc].vec.offset = 0;
+                    spare_vecs[rc].vec.stack_type = LLVMVector2xi64;
+                    rc += 1;
+                    assert(rc <= cnt);
+                }
+            }
+        }
+    }
+    return rc;
+}
+
+void add_spill_load_vector(TcgContext *ctx,
+                              UnifiedInstr **head_p,
+                              UnifiedInstr **tail_p,
+                              UnifiedInstr *u,
+                              Operand *env_vecs,
+                              Operand *spare_vecs,
+                              int cnt,
+                              bool before_call) {
+    for (int i = 0; i < cnt; ++i) {
+        int tmp1 = get_next_tmp_idx(ctx);
+        // - SPILL
+        // mov_i64 tmp_N1,env
+        // (bc)add_i64 tmp_N1,tmp_N1,get_vec_offset()
+        // (ac)add_i64 tmp_N1,tmp_N1,env_vecs[i]
+        // st_vec v128,e8,spare_vecs[i],tmp_N1
+        EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, mov_i64, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            ENV_OP(0));
+        if (before_call) {
+            EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, add_i64, 0, 0,
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                IMM_OP(get_vec_offset(spare_vecs[i].vec.idx)));
+        } else {
+            EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, add_i64, 0, 0,
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                IMM_OP(env_vecs[i].env.offset));
+        }
+        EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, st_vec, 128, 8,
+            VEC_OP(spare_vecs[i].vec.idx, spare_vecs[i].vec.offset),
+            SLOT_OP(SUB_SLOT_TMP, tmp1));
+        // - LOAD
+        // mov_i64 tmp_N1,env
+        // (bc)add_i64 tmp_N1,tmp_N1,env_vecs[i]
+        // (ac)add_i64 tmp_N1,tmp_N1,get_vec_offset()
+        // ld_vec v128,e8,spare_vecs[i],tmp_N1
+        EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, mov_i64, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            ENV_OP(0));
+        if (before_call) {
+            EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, add_i64, 0, 0,
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                IMM_OP(env_vecs[i].env.offset));
+        } else {
+            EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, add_i64, 0, 0,
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                IMM_OP(get_vec_offset(spare_vecs[i].vec.idx)));
+        }
+        EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, ld_vec, 128, 8,
+            VEC_OP(spare_vecs[i].vec.idx, spare_vecs[i].vec.offset),
+            SLOT_OP(SUB_SLOT_TMP, tmp1));
+    }
+}
+
 void expand_call_inline(TcgContext *ctx) {
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
         for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
@@ -1270,15 +1359,63 @@ void expand_call_inline(TcgContext *ctx) {
                 continue;
             if (!helper_require_exception_path[u->operands[0].symbol])
                 u->opc = call_inline;
+
+            // Need double size for ymm
+            Operand env_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
+            Operand spare_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
+            int spill_cnt = get_vector_spill_info(ctx, u, env_vecs, spare_vecs, (MAX_INLINE_VEC_ARG_CNT * 2));
+
+            // Check if require vector register spill/reload
+            if (!spill_cnt)
+                continue;
+
+            add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail),
+                                     u, env_vecs, spare_vecs, spill_cnt, true /*before call*/);
+
+            // Update operands
+            for (int i = 0; i < u->operand_count; ++i) {
+                if (u->operands[i].kind == OP_ENV) {
+                    for (int j = 0; j < spill_cnt; ++j) {
+                        if (u->operands[i].env.offset == env_vecs[j].env.offset) {
+                            u->operands[i] = spare_vecs[j];
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Add SPILL/RELOAD after the call
+            assert(u->next);
+            add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail),
+                                     u->next, env_vecs, spare_vecs, spill_cnt, false /*before call*/);
         }
     }
 }
 
 int create_trampoline_for_inline_exception(TcgContext *ctx,
-                                           const UnifiedInstr *u) {
+                                           const UnifiedInstr *u,
+                                           const Operand *reload_ops,
+                                           int reload_cnt) {
 
 }
 
+int lookup_next_func_idx(TcgContext *ctx,
+                         const UnifiedInstr *u) {
+    for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
+        if (ctx->llvm_func_set.lists[i].head == u)
+            return i;
+    }
+    assert(0);
+    return -1;
+}
+
+
+
+/*
+ * Create trampoline to handle inline exception path
+ * Insert vector register spill logic in case vector reuse happens before original call
+ * Insert vector register reload logic in case reuse at the beginning of the next
+ */
 void expand_call_inline_exception(TcgContext *ctx) {
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
         for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
@@ -1289,10 +1426,55 @@ void expand_call_inline_exception(TcgContext *ctx) {
                 continue;
             if (!helper_require_exception_path[u->operands[0].symbol])
                 continue;
-            u->opc = call_inline_exception;
+
+            // Need double size for ymm
+            Operand env_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
+            Operand spare_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
+            int spill_cnt = get_vector_spill_info(ctx, u, env_vecs, spare_vecs, (MAX_INLINE_VEC_ARG_CNT * 2));
+
+            // Create trampoline
+            size_t sz = sizeof(UnifiedInstr) + (u->operand_count + 2) * sizeof(Operand);
+            UnifiedInstr *uu = malloc(sz);
+            memcpy(uu, u, sz);
+            uu->prev = NULL;
+            uu->next = NULL;
+            uu->opc = call_inline_exception;
             Operand tf;
             tf.kind = OP_TRAMPOLINE;
-            tf.tfidx = create_trampoline_for_inline_exception(ctx, u);
+            tf.tfidx = create_trampoline_for_inline_exception(ctx, u, &spare_vecs[0], spill_cnt);
+            uu->operands[u->operand_count] = tf;
+            Operand nf;
+            nf.kind = OP_NEXT;
+            nf.nfidx = lookup_next_func_idx(ctx, u);
+            uu->operands[u->operand_count + 1] = nf;
+            instr_list_insert_before(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, uu);
+            instr_list_remove_and_free(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u);
+            u = uu;
+
+            // Check if require vector register spill/reload
+            if (!spill_cnt)
+                continue;
+
+            add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail),
+                                     u, env_vecs, spare_vecs, spill_cnt, true /*before call*/);
+
+            // Update operands
+            for (int i = 0; i < u->operand_count; ++i) {
+                if (u->operands[i].kind == OP_ENV) {
+                    for (int j = 0; j < spill_cnt; ++j) {
+                        if (u->operands[i].env.offset == env_vecs[j].env.offset) {
+                            u->operands[i] = spare_vecs[j];
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Add SPILL/RELOAD to the beginning of the next call
+            UnifiedInstr *next_u = ctx->llvm_func_set.lists[nf.nfidx].head;
+            assert(next_u);
+            add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[nf.nfidx].head), &(ctx->llvm_func_set.lists[nf.nfidx].tail),
+                                     next_u, env_vecs, spare_vecs, spill_cnt, false /*before call*/);
         }
     }
 }

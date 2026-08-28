@@ -10,7 +10,7 @@
 
 void register_xmm(uint64_t idx, uint64_t offset);
 void register_xmm_tmp(uint64_t offset);
-XMMReg lookup_xmm(uint64_t offset);
+VecInfo lookup_vec(uint64_t offset);
 void handle_func(uint64_t off, TcgContext *ctx, int is_external);
 void debug_print_instr(uint64_t off, TcgContext *ctx, const char *msg);
 SlotInfo get_mapped_slot(TcgContext *ctx, SlotType type, uint16_t idx);
@@ -39,7 +39,7 @@ void tcg_context_reset(TcgContext *ctx);
 /*
  * Logic to handle alias e.g. add_i64 loc6,env,$0x5e0
  */
-void register_alias(TcgContext *ctx, Operand *s, Operand *xmm_env);
+void register_alias(TcgContext *ctx, Operand *s, Operand *vec_env);
 void try_unregister_alias(TcgContext *ctx, Operand *op);
 void expand_slot_alias(TcgContext *ctx, UnifiedInstr *u);
 
@@ -57,7 +57,6 @@ void expand_push_ret_addr(TcgContext *ctx);
 void expand_ret(TcgContext *ctx);
 void expand_jmp_direct(TcgContext *ctx);
 void expand_tmp_slot_preservation(TcgContext *ctx);
-void expand_xmm_reuse(TcgContext *ctx);
 void expand_llvm_func(TcgContext *ctx);
 void expand_call_inline(TcgContext *ctx);
 void expand_call_inline_exception(TcgContext *ctx);

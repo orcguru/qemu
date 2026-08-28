@@ -176,7 +176,7 @@ scalar_instr:
         if (u->opc == add_i64 && u->operand_count == 2) {
             register_alias(ctx, &u->operands[0], &u->operands[1]);
             skip_alias_instr = 1;
-        } else if (u->opc == mov_i64 && (u->operands[1].kind == OP_XMM || u->operands[1].kind == OP_ENV)) {
+        } else if (u->opc == mov_i64 && (u->operands[1].kind == OP_VEC || u->operands[1].kind == OP_ENV)) {
             register_alias(ctx, &u->operands[0], &u->operands[1]);
             skip_alias_instr = 1;
         } else if (u->opc == call && u->operands[2].kind == OP_IMM && u->operands[2].imm) {
@@ -333,7 +333,7 @@ env:
     ENV
     {
         $$.kind = OP_ENV;
-        $$.env.env_offset = 0;
+        $$.env.offset = 0;
     }
 ;
 

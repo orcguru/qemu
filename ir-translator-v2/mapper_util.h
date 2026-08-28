@@ -110,41 +110,6 @@ static inline RelopType get_relop_from_any_operand(const UnifiedInstr *u) {
 
 static inline OperandType get_operand_legacy(const UnifiedInstr *u, int idx, uint32_t *is_imm) {
     OperandType ret;
-    *is_imm = 0;
-    ret.s.valid = 0;
-    if (idx >= u->operand_count) {
-        return ret;
-    }
-    const Operand *op = get_operand(u, idx);
-    if (op->kind == OP_IMM) {
-        *is_imm = 1;
-        ret.i = op->imm;
-    } else {
-        *is_imm = 0;
-        switch (op->kind) {
-        case OP_SLOT:
-            ret.s.valid = 1;
-            ret.s.slot_type = op->slot.type;
-            ret.s.slot_idx = op->slot.idx;
-            ret.s.offset = 0;
-            break;
-        case OP_XMM:
-            ret.s.valid = 1;
-            ret.s.slot_type = SUB_SLOT_XMM;
-            ret.s.slot_idx = op->xmm.xmm_idx;
-            ret.s.offset = op->xmm.xmm_offset;
-            break;
-        case OP_ENV:
-            ret.s.valid = 1;
-            ret.s.slot_type = SUB_SLOT_ENV;
-            ret.s.slot_idx = 0;
-            ret.s.offset = op->env.env_offset;
-            break;
-        default:
-            // invalid operand e.g. RELOP,ATTR
-            break;
-        }
-    }
     return ret;
 }
 
