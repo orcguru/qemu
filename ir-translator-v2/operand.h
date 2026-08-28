@@ -15,6 +15,8 @@ typedef enum __attribute__((packed)) {
     OP_SYMBOL,
     OP_XMM,
     OP_ENV,
+    OP_NEXT,
+    OP_TRAMPOLINE,
 } OperandKind;
 
 typedef struct __attribute__((packed)) {
@@ -48,6 +50,10 @@ typedef struct __attribute__((packed)) {
         RelopType  relop;
         AttrSrcInfo attr_info;
         HelperType symbol;
+        // next FuncInstrList index
+        uint16_t   nfidx;
+        // trampoline FuncInstrList index
+        uint16_t   tfidx;
     };
 } Operand;
 

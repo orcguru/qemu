@@ -160,6 +160,7 @@ void func_list_init(FuncInstrList *list) {
     list->head = NULL;
     list->tail = NULL;
     list->count = 0;
+    memset(&list->trampoline_name[0], 0, sizeof(list->trampoline_name));
 }
 
 void func_list_append(FuncInstrList *list, UnifiedInstr *u) {
@@ -1262,11 +1263,36 @@ void expand_llvm_func(TcgContext *ctx) {
 void expand_call_inline(TcgContext *ctx) {
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
         for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
-            if (is_call(u)) {
-                assert(u->operands[0].kind == OP_SYMBOL);
-                if (INLINE_HELPER_ENABLED(u->operands[0].symbol) && !helper_require_exception_path[u->operands[0].symbol])
-                    u->opc = call_inline;
-            }
+            if (!is_call(u))
+                continue;
+            assert(u->operands[0].kind == OP_SYMBOL);
+            if (!INLINE_HELPER_ENABLED(u->operands[0].symbol))
+                continue;
+            if (!helper_require_exception_path[u->operands[0].symbol])
+                u->opc = call_inline;
+        }
+    }
+}
+
+int create_trampoline_for_inline_exception(TcgContext *ctx,
+                                           const UnifiedInstr *u) {
+
+}
+
+void expand_call_inline_exception(TcgContext *ctx) {
+    for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
+        for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
+            if (!is_call(u))
+                continue;
+            assert(u->operands[0].kind == OP_SYMBOL);
+            if (!INLINE_HELPER_ENABLED(u->operands[0].symbol))
+                continue;
+            if (!helper_require_exception_path[u->operands[0].symbol])
+                continue;
+            u->opc = call_inline_exception;
+            Operand tf;
+            tf.kind = OP_TRAMPOLINE;
+            tf.tfidx = create_trampoline_for_inline_exception(ctx, u);
         }
     }
 }

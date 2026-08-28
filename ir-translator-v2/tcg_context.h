@@ -19,6 +19,14 @@ typedef struct FuncInstrList {
     UnifiedInstr *head;
     UnifiedInstr *tail;
     int           count;
+    /*
+     * Function name for trampolines into runtime:
+     * call_inline_exception - helper(max_length:30) + arguments (max_count:4)
+     * call_runtime_wi/wo_next - helper
+     *
+     * Reuse function by names
+     */
+    char          trampoline_name[64];
 } FuncInstrList;
 
 typedef struct FuncListSet {

@@ -60,6 +60,7 @@ void expand_tmp_slot_preservation(TcgContext *ctx);
 void expand_xmm_reuse(TcgContext *ctx);
 void expand_llvm_func(TcgContext *ctx);
 void expand_call_inline(TcgContext *ctx);
+void expand_call_inline_exception(TcgContext *ctx);
 void build_per_instr_masks_collect_use_def(TcgContext *ctx);
 
 static inline bool is_call(const UnifiedInstr *u) {
