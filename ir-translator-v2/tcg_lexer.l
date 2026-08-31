@@ -1,5 +1,6 @@
 %{
 #include "tcg_ast.h"
+#include "i386_cpu.h"
 #include "tcg_parser.tab.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -56,6 +57,16 @@ void reduce_imm_force(char *ptr);
             available -= result;                              \
         }                                                     \
     }
+
+#define SET_XREG(reg)                                          \
+    do {                                                       \
+        HANDLE_COLUMN;                                         \
+        yylval->si.type       = SUB_SLOT_XREG;                 \
+        yylval->si.idx        = (reg);                         \
+        yylval->si.op_type    = env_regs_type[yylval->si.idx]; \
+        yylval->si.stack_type = env_regs_type[yylval->si.idx]; \
+        return SLOT;                                           \
+    } while (0)
 %}
 
 %option nounput noinput noyywrap bison-bridge reentrant yylineno
@@ -1412,26 +1423,26 @@ xsetbv                          xsetbv
 {ds_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = ds_base; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
 {fs_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = fs_base; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
 {gs_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = gs_base; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{rax}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = rax; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{rcx}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = rcx; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{rdx}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = rdx; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{rbx}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = rbx; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{rsp}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = rsp; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{rbp}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = rbp; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{rsi}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = rsi; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{rdi}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = rdi; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{r8}              { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = r8; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{r9}              { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = r9; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{r10}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = r10; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{r11}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = r11; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{r12}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = r12; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{r13}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = r13; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{r14}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = r14; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{r15}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = r15; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{cc_src}          { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = cc_src; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{cc_dst}          { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = cc_dst; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{cc_op}           { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = cc_op; yylval->si.op_type = LLVMInt32; yylval->si.stack_type = LLVMInt32; return SLOT; }
-{rip}             { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_XREG; yylval->si.idx = rip; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
+{rax}             { SET_XREG(rax); }
+{rcx}             { SET_XREG(rcx); }
+{rdx}             { SET_XREG(rdx); }
+{rbx}             { SET_XREG(rbx); }
+{rsp}             { SET_XREG(rsp); }
+{rbp}             { SET_XREG(rbp); }
+{rsi}             { SET_XREG(rsi); }
+{rdi}             { SET_XREG(rdi); }
+{r8}              { SET_XREG(r8); }
+{r9}              { SET_XREG(r9); }
+{r10}             { SET_XREG(r10); }
+{r11}             { SET_XREG(r11); }
+{r12}             { SET_XREG(r12); }
+{r13}             { SET_XREG(r13); }
+{r14}             { SET_XREG(r14); }
+{r15}             { SET_XREG(r15); }
+{cc_src}          { SET_XREG(cc_src); }
+{cc_dst}          { SET_XREG(cc_dst); }
+{cc_op}           { SET_XREG(cc_op); }
+{rip}             { SET_XREG(rip); }
 {eq}              { HANDLE_COLUMN; yylval->r = eq; return RELOP; }
 {ge}              { HANDLE_COLUMN; yylval->r = ge; return RELOP; }
 {gt}              { HANDLE_COLUMN; yylval->r = gt; return RELOP; }
@@ -1445,8 +1456,8 @@ xsetbv                          xsetbv
 {tsteq}           { HANDLE_COLUMN; yylval->r = tsteq; return RELOP; }
 {tstne}           { HANDLE_COLUMN; yylval->r = tstne; return RELOP; }
 {ENV}             { HANDLE_COLUMN; return ENV; }
-{INTERNAL}        { HANDLE_COLUMN; return INTERNAL; }
-{EXTERNAL}        { HANDLE_COLUMN; return EXTERNAL; }
+{INTERNAL}        { HANDLE_COLUMN; yylval->ival = 0; return SCOPE; }
+{EXTERNAL}        { HANDLE_COLUMN; yylval->ival = 1; return SCOPE; }
 {V64}             { HANDLE_COLUMN; yylval->vecspec.vs = 64; return VS_TOKEN; }
 {V128}            { HANDLE_COLUMN; yylval->vecspec.vs = 128; return VS_TOKEN; }
 {E8}              { HANDLE_COLUMN; yylval->vecspec.es = 8; return ES_TOKEN; }

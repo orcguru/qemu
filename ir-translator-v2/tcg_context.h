@@ -21,12 +21,12 @@ typedef struct FuncInstrList {
     int           count;
     /*
      * Function name for trampolines into runtime:
-     * call_inline_exception - helper(max_length:30) + arguments (max_count:4)
+     * call_inline_exception - "trampoline_exception_" + helper(max_length:30) + arguments (max_count:4)
      * call_runtime_wi/wo_next - helper
      *
      * Reuse function by names
      */
-    char          trampoline_name[64];
+    char          trampoline_name[128];
 } FuncInstrList;
 
 typedef struct FuncListSet {
@@ -42,6 +42,8 @@ typedef struct FuncListSet {
  * as well as any other parser‑wide state you may need.
  */
 struct TcgContext {
+    uint64_t hex_offset;
+    uint32_t emit_instr_count;
     /* Head of the linked list of UnifiedInstr for the current function.
        New instructions are prepended (O(1)). When the function block
        ends, handle_func() is called with this pointer. */

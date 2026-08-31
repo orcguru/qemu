@@ -60,6 +60,9 @@ void print_operand(Operand *op, int is_output) {
             printf("env:0x%x", op->env.offset);
         }
         break;
+    case OP_LASTARG:
+        printf("__last_arg__");
+        break;
     default:
         printf("\nCheck kind:%d\n", op->kind);
         assert(0);
@@ -92,10 +95,10 @@ void print_instr(UnifiedInstr *u) {
     printf("\n");
 }
 
-void debug_print_instr(uint64_t off, TcgContext *ctx, const char *msg) {
+void debug_print_instr(TcgContext *ctx, const char *msg) {
 #ifdef DEBUG
     printf("===============================================\n");
-    printf("0x%lx %s:\n", off, msg);
+    printf("0x%lx %s:\n", ctx->hex_offset, msg);
     if (ctx->llvm_func_set.num_lists) {
         for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
             for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
@@ -112,8 +115,8 @@ void debug_print_instr(uint64_t off, TcgContext *ctx, const char *msg) {
 #endif
 }
 
-void handle_func(uint64_t off, TcgContext *ctx, int is_external) {
-    printf("0x%lx %s:\n", off, is_external ? "EXT":"INT");
+void handle_func(TcgContext *ctx, int is_external) {
+    printf("0x%lx %s:\n", ctx->hex_offset, is_external ? "EXT":"INT");
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
         for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
             print_instr(u);

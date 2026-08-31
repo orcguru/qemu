@@ -58,8 +58,8 @@ extern uint8_t instr_buf[64];
 %}
 
 /* Tokens */
-%token          COMMA COLON PLUS ENV INTERNAL EXTERNAL
-%token <ival>   IMM IMMD IMMX LABEL
+%token          COMMA COLON PLUS ENV
+%token <ival>   IMM IMMD IMMX LABEL SCOPE
 %token <opc>    OPCODE CALL
 %token <hlp>    SYMBOL
 %token <r>      RELOP
@@ -105,50 +105,30 @@ func_list:
 ;
 
 func:
-    INTERNAL COLON IMMX COLON instr_list
+    SCOPE COLON IMMX COLON instr_list
     {
         /* Expand macro instructions */
-        debug_print_instr($3, ctx, "ORIG");
+        ctx->hex_offset = $3;
+        debug_print_instr(ctx, "ORIG");
         build_per_instr_masks_collect_use_def(ctx);
         expand_tmp_slot_preservation(ctx);
-        debug_print_instr($3, ctx, "after expand_tmp_slot_preservation");
+        debug_print_instr(ctx, "after expand_tmp_slot_preservation");
         expand_push_ret_addr(ctx);
-        debug_print_instr($3, ctx, "after expand_push_ret_addr");
+        debug_print_instr(ctx, "after expand_push_ret_addr");
         expand_ret(ctx);
-        debug_print_instr($3, ctx, "after expand_ret");
+        debug_print_instr(ctx, "after expand_ret");
         expand_jmp_direct(ctx);
-        debug_print_instr($3, ctx, "after expand_jmp_direct");
+        debug_print_instr(ctx, "after expand_jmp_direct");
         expand_llvm_func(ctx);
-        debug_print_instr($3, ctx, "after expand_llvm_func");
+        debug_print_instr(ctx, "after expand_llvm_func");
         expand_call_inline(ctx);
-        debug_print_instr($3, ctx, "after call_inline");
+        debug_print_instr(ctx, "after call_inline");
+        expand_call_inline_exception(ctx);
+        debug_print_instr(ctx, "after call_inline_exception");
         /* End of function – apply final slot types */
         sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);
-        handle_func($3, ctx, 0);
-        tcg_context_reset(ctx);
-    }
-    | EXTERNAL COLON IMMX COLON instr_list
-    {
-        /* Expand macro instructions */
-        debug_print_instr($3, ctx, "ORIG");
-        build_per_instr_masks_collect_use_def(ctx);
-        expand_tmp_slot_preservation(ctx);
-        debug_print_instr($3, ctx, "after expand_tmp_slot_preservation");
-        expand_push_ret_addr(ctx);
-        debug_print_instr($3, ctx, "after expand_push_ret_addr");
-        expand_ret(ctx);
-        debug_print_instr($3, ctx, "after expand_ret");
-        expand_jmp_direct(ctx);
-        debug_print_instr($3, ctx, "after expand_jmp_direct");
-        expand_llvm_func(ctx);
-        debug_print_instr($3, ctx, "after expand_llvm_func");
-        expand_call_inline(ctx);
-        debug_print_instr($3, ctx, "after call_inline");
-        /* End of function – apply final slot types */
-        sanity_check_op_type_solid(ctx);
-        type_map_apply(ctx);
-        handle_func($3, ctx, 1);
+        handle_func(ctx, $1);
         tcg_context_reset(ctx);
     }
 ;

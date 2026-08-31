@@ -11,8 +11,8 @@
 void register_xmm(uint64_t idx, uint64_t offset);
 void register_xmm_tmp(uint64_t offset);
 VecInfo lookup_vec(uint64_t offset);
-void handle_func(uint64_t off, TcgContext *ctx, int is_external);
-void debug_print_instr(uint64_t off, TcgContext *ctx, const char *msg);
+void handle_func(TcgContext *ctx, int is_external);
+void debug_print_instr(TcgContext *ctx, const char *msg);
 SlotInfo get_mapped_slot(TcgContext *ctx, SlotType type, uint16_t idx);
 
 UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
@@ -63,7 +63,7 @@ void expand_call_inline_exception(TcgContext *ctx);
 void build_per_instr_masks_collect_use_def(TcgContext *ctx);
 
 static inline bool is_call(const UnifiedInstr *u) {
-    if (u->opc == call || (u->opc > __artifical_opc_begin__ && (u->opc == call_inline || u->opc == call_inline_exception || u->opc == call_runtime_wi_next || u->opc == call_runtime_wo_next))) {
+    if (u->opc == call || (u->opc > __artifical_opc_begin__ && (u->opc == call_inline || u->opc == call_inline_exception || u->opc == call_runtime_wi_next || u->opc == call_runtime_wo_next || u->opc == call_native))) {
         return true;
     }
     return false;

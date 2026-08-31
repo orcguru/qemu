@@ -5,7 +5,9 @@
 #include "tcg_ast.h"
 #include "operand_static_types.h"
 #include "mapper_util.h"
+#include "i386_cpu.h"
 
+// FIXME: improve const attribute on all code
 static uint16_t xmm_offsets[17] = {0};
 
 static uint16_t get_next_tmp_idx(TcgContext *ctx) {
@@ -248,6 +250,14 @@ void func_list_free(FuncInstrList *list) {
     list->count = 0;
 }
 
+int get_next_func_list_idx(TcgContext *ctx) {
+    if (ctx->llvm_func_set.num_lists >= ctx->llvm_func_set.capacity) {
+        ctx->llvm_func_set.capacity = ctx->llvm_func_set.capacity ? 2 * ctx->llvm_func_set.capacity : 2;
+        ctx->llvm_func_set.lists = realloc(ctx->llvm_func_set.lists, ctx->llvm_func_set.capacity * sizeof(FuncInstrList));
+    }
+    return ctx->llvm_func_set.num_lists++;
+}
+
 void func_list_set_free(FuncListSet *set) {
     for (int i = 0; i < set->num_lists; i++) {
         func_list_free(&set->lists[i]);
@@ -259,6 +269,8 @@ void func_list_set_free(FuncListSet *set) {
 }
 
 void tcg_context_reset(TcgContext *ctx) {
+    ctx->hex_offset = 0;
+    ctx->emit_instr_count = 0;
     free_instr_list(ctx->instr_head);
     ctx->instr_head = NULL;
     ctx->instr_tail = NULL;
@@ -593,6 +605,7 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
     }
     u->vs = vs;
     u->es = es;
+    u->idx = ctx->emit_instr_count++;
     int skip_cnt = 0;
     int dst_idx = 0;
     if (u->is_helper) {
@@ -649,6 +662,16 @@ UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
         instr_list_insert_before(hp, tp, u, _u);                            \
     } while (0)
 
+#define EMIT_INSTR_APPEND_LIST(ctx, list, opc, vs, es, ...)                 \
+    do {                                                                    \
+        Operand _ops[] = { __VA_ARGS__ };                                   \
+        size_t _cnt = sizeof(_ops) / sizeof(_ops[0]);                       \
+        UnifiedInstr *_u = emit_instr(ctx, opc, vs, es, _ops, _cnt);        \
+        expand_slot_alias(ctx, _u);                                         \
+        update_slot_types(ctx, _u);                                         \
+        func_list_append(list, _u);                                         \
+    } while (0)
+
 #define SLOT_OP(ty, index)  ((Operand){ .kind = OP_SLOT, .slot.type = (ty), .slot.idx = (index) })
 #define VEC_OP(index, off)   ((Operand){ .kind = OP_VEC, .vec.idx = (index), .vec.offset = (off), .vec.stack_type = LLVMVector2xi64 })
 // Use SLOT_OP_EXTRA to copy from existing operand
@@ -659,6 +682,7 @@ UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
 #define LABEL_OP(lbl)       ((Operand){ .kind = OP_LABEL, .label = (lbl) })
 #define RELOP_OP(r)         ((Operand){ .kind = OP_RELOP, .relop = (r) })
 #define SYMBOL_OP(sym)      ((Operand){ .kind = OP_SYMBOL, .symbol = (sym) })
+#define LASTARG_OP()        ((Operand){ .kind = OP_LASTARG })
 #define ATTR_STORAGE_OP(nonatomic, align, sz)                             \
     ((Operand){ .kind = OP_ATTR, .attr_info = {                            \
         .subt = SUB_ATTR_STORAGE,                                          \
@@ -715,11 +739,12 @@ void expand_push_ret_addr(TcgContext *ctx) {
         IMM_OP(-8ULL));
 
     // - GET the address of return
-    // func_addr tmp_N3,op2
+    // func_addr tmp_N3,op2,0
     assert(u->operands[1].kind == OP_IMM);
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, func_addr, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp3),
-        IMM_OP(u->operands[1].imm));
+        IMM_OP(u->operands[1].imm),
+        IMM_OP(0));
 
     // - STORE the address of return into the entry
     // qemu_st_i64 tmp_N3,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
@@ -805,11 +830,12 @@ void expand_jmp_direct(TcgContext *ctx) {
         int tmp1 = get_next_tmp_idx(ctx);
 
         // - GET the address of return
-        // func_addr tmp_N1,op0
+        // func_addr tmp_N1,op0,0
         assert(u->operands[0].kind == OP_IMM);
         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, func_addr, 0, 0,
             SLOT_OP(SUB_SLOT_TMP, tmp1),
-            IMM_OP(u->operands[0].imm));
+            IMM_OP(u->operands[0].imm),
+            IMM_OP(0));
 
         // - TAIL call
         // tail_call tmp_N1
@@ -1233,11 +1259,7 @@ static void collect_func_instr_list_for_llvm(TcgContext *ctx,
 
     FuncInstrList result;
     func_list_init(&result);
-    if (ctx->llvm_func_set.num_lists >= ctx->llvm_func_set.capacity) {
-        ctx->llvm_func_set.capacity = ctx->llvm_func_set.capacity ? 2 * ctx->llvm_func_set.capacity : 2;
-        ctx->llvm_func_set.lists = realloc(ctx->llvm_func_set.lists, ctx->llvm_func_set.capacity * sizeof(FuncInstrList));
-    }
-    int func_idx = ctx->llvm_func_set.num_lists++;
+    int func_idx = get_next_func_list_idx(ctx);
     const UnifiedInstr *cur = next;
     LabelTracker lt;
     label_tracker_init(&lt);
@@ -1296,8 +1318,8 @@ void add_spill_load_vector(TcgContext *ctx,
                               UnifiedInstr **head_p,
                               UnifiedInstr **tail_p,
                               UnifiedInstr *u,
-                              Operand *env_vecs,
-                              Operand *spare_vecs,
+                              const Operand *env_vecs,
+                              const Operand *spare_vecs,
                               int cnt,
                               bool before_call) {
     for (int i = 0; i < cnt; ++i) {
@@ -1352,13 +1374,16 @@ void add_spill_load_vector(TcgContext *ctx,
 void expand_call_inline(TcgContext *ctx) {
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
         for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
-            if (!is_call(u))
+            if (u->opc != call)
                 continue;
             assert(u->operands[0].kind == OP_SYMBOL);
             if (!INLINE_HELPER_ENABLED(u->operands[0].symbol))
                 continue;
-            if (!helper_require_exception_path[u->operands[0].symbol])
-                u->opc = call_inline;
+            if (helper_require_exception_path[u->operands[0].symbol])
+                continue;
+
+            // Update opcode
+            u->opc = call_inline;
 
             // Need double size for ymm
             Operand env_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
@@ -1387,29 +1412,194 @@ void expand_call_inline(TcgContext *ctx) {
             // Add SPILL/RELOAD after the call
             assert(u->next);
             add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail),
-                                     u->next, env_vecs, spare_vecs, spill_cnt, false /*before call*/);
+                                     u->next, env_vecs, spare_vecs, spill_cnt, false /*after call*/);
         }
     }
 }
 
 int create_trampoline_for_inline_exception(TcgContext *ctx,
                                            const UnifiedInstr *u,
-                                           const Operand *reload_ops,
-                                           int reload_cnt) {
+                                           const Operand *env_vecs,
+                                           const Operand *spare_vecs,
+                                           int cnt) {
+    assert(u->opc == call && u->operands[0].kind == OP_SYMBOL);
+    FuncInstrList result;
+    func_list_init(&result);
+    // Setup func name
+    sprintf(&result.trampoline_name[0], "trampoline_exception_%s", helper_str[u->operands[0].symbol]);
+    for (int i = 0; i < u->operand_count; ++i) {
+        if (u->operands[i].kind == OP_VEC) {
+            char vec_name[7] = {0};
+            sprintf(&vec_name[0], "_vec%02x", u->operands[i].vec.idx & 0xff);
+            strcat(&result.trampoline_name[0], &vec_name[0]);
+        } else if (u->operands[i].kind == OP_ENV) {
+            int idx = 0;
+            for (; idx < cnt; ++idx) {
+                if (env_vecs[idx].env.offset == u->operands[i].env.offset) {
+                    break;
+                }
+            }
+            if (idx < cnt) {
+                char vec_name[9] = {0};
+                sprintf(&vec_name[0], "_spill%02x", spare_vecs[idx].vec.idx & 0xff);
+                strcat(&result.trampoline_name[0], &vec_name[0]);
+            }
+        }
+    }
+    int func_idx = get_next_func_list_idx(ctx);
 
+    // Store all GP registers to ENV
+    int tmp1 = get_next_tmp_idx(ctx);
+    // - GET env pointer
+    // mov_i64 tmp_N1,env
+    EMIT_INSTR_APPEND_LIST(ctx, &result, mov_i64, 0, 0,
+        SLOT_OP(SUB_SLOT_TMP, tmp1),
+        ENV_OP(0));
+    for (int r = rax; r < XREG_MAX; ++r) {
+        int tmp2 = get_next_tmp_idx(ctx);
+        uint64_t off = env_regs_offset[r];
+        LLVMType ty = env_regs_type[r];
+        // - CALCULATE offset to CPUArchState field
+        // add_i64 tmp_N2,tmp_N1,offset
+        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp2),
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            IMM_OP(off));
+        if (ty == LLVMInt64) {
+            // qemu_st_i64 r,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i64, 0, 0,
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP(SUB_SLOT_TMP, tmp2),
+                ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+        } else {
+            // qemu_st_i32 r,tmp_N2,attr:NONATOMIC,ALIGN_4,SRC4B
+            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i32, 0, 0,
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP(SUB_SLOT_TMP, tmp2),
+                ATTR_STORAGE_OP(NONATOMIC, ALIGN_4, SRC4B));
+        }
+    }
+
+    // Add SPILL/RELOAD to revert vector reuse at the beginning
+    add_spill_load_vector(ctx, &result.head, &result.tail,
+                          result.head, env_vecs, spare_vecs, cnt, false /*after call*/);
+
+    // Store all Vector registers to ENV
+    for (int i = 0; i < (XMM_COUNT * 2); ++i) {
+        int tmp2 = get_next_tmp_idx(ctx);
+        uint64_t off = get_vec_offset(i);
+        // - CALCULATE offset to CPUArchState field
+        // add_i64 tmp_N2,tmp_N1,offset
+        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp2),
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            IMM_OP(off));
+        EMIT_INSTR_APPEND_LIST(ctx, &result, st_vec, 128, 8,
+            VEC_OP(i, 0),
+            SLOT_OP(SUB_SLOT_TMP, tmp2));
+    }
+
+    // Setup native call arguments
+    UnifiedInstr *nc = clone_instr(u);
+    nc->opc = call_native;
+    for (int i = 0; i < nc->operand_count; ++i) {
+        if (nc->operands[i].kind == OP_VEC) {
+            int tmp2 = get_next_tmp_idx(ctx);
+            uint64_t off = get_vec_offset(nc->operands[i].vec.idx);
+            // - CALCULATE offset to CPUArchState xmm
+            // add_i64 tmp_N2,tmp_N1,offset
+            EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+                SLOT_OP(SUB_SLOT_TMP, tmp2),
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                IMM_OP(off));
+            nc->operands[i].kind = OP_SLOT;
+            nc->operands[i].slot.type = SUB_SLOT_TMP;
+            nc->operands[i].slot.idx = tmp2;
+            nc->operands[i].slot.op_type = LLVMInt64;
+        }
+    }
+
+    // Emit call fixed native helper
+    func_list_append(&result, nc);
+
+    // Load all GP registers from ENV
+    for (int r = rax; r < XREG_MAX; ++r) {
+        int tmp2 = get_next_tmp_idx(ctx);
+        uint64_t off = env_regs_offset[r];
+        LLVMType ty = env_regs_type[r];
+        // - CALCULATE offset to CPUArchState field
+        // add_i64 tmp_N2,tmp_N1,offset
+        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp2),
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            IMM_OP(off));
+        if (ty == LLVMInt64) {
+            // qemu_st_i64 r,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i64, 0, 0,
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP(SUB_SLOT_TMP, tmp2),
+                ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+        } else {
+            // qemu_st_i32 r,tmp_N2,attr:NONATOMIC,ALIGN_4,SRC4B
+            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i32, 0, 0,
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP(SUB_SLOT_TMP, tmp2),
+                ATTR_STORAGE_OP(NONATOMIC, ALIGN_4, SRC4B));
+        }
+    }
+
+    // Load all Vector registers from ENV
+    for (int i = 0; i < (XMM_COUNT * 2); ++i) {
+        int tmp2 = get_next_tmp_idx(ctx);
+        uint64_t off = get_vec_offset(i);
+        // - CALCULATE offset to CPUArchState field
+        // add_i64 tmp_N2,tmp_N1,offset
+        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp2),
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            IMM_OP(off));
+        EMIT_INSTR_APPEND_LIST(ctx, &result, ld_vec, 128, 8,
+            VEC_OP(i, 0),
+            SLOT_OP(SUB_SLOT_TMP, tmp2));
+    }
+
+    // Get the next call from argument (the last argument implicitly is the next call target), and do tail_call
+    assert(is_call(u) && u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
+    if (u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
+        // - TAIL_CALL next,helper_out
+        // tail_call OP_LASTARG,helper_out
+        EMIT_INSTR_APPEND_LIST(ctx, &result, tail_call, 0, 0,
+            LASTARG_OP(),
+            SLOT_OP_EXTRA(u->operands[TCG_CALL_PREFIX_COUNT].slot.type, u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, u->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type));
+    } else {
+        // - TAIL_CALL next
+        // tail_call OP_LASTARG
+        EMIT_INSTR_APPEND_LIST(ctx, &result, tail_call, 0, 0,
+            LASTARG_OP());
+    }
+
+    ctx->llvm_func_set.lists[func_idx] = result;
+    return func_idx;
 }
 
 int lookup_next_func_idx(TcgContext *ctx,
                          const UnifiedInstr *u) {
+    // Lookup the index of the next instruction from instr_head list
+    uint32_t next_idx = -1;
+    for (const UnifiedInstr *ui = ctx->instr_head; ui; ui = ui->next) {
+        if (ui->idx == u->idx && ui->next) {
+            next_idx = ui->next->idx;
+            break;
+        }
+    }
+    assert(next_idx != -1);
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
-        if (ctx->llvm_func_set.lists[i].head == u)
+        if (ctx->llvm_func_set.lists[i].head->idx == next_idx)
             return i;
     }
     assert(0);
     return -1;
 }
-
-
 
 /*
  * Create trampoline to handle inline exception path
@@ -1419,7 +1609,7 @@ int lookup_next_func_idx(TcgContext *ctx,
 void expand_call_inline_exception(TcgContext *ctx) {
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
         for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
-            if (!is_call(u))
+            if (u->opc != call)
                 continue;
             assert(u->operands[0].kind == OP_SYMBOL);
             if (!INLINE_HELPER_ENABLED(u->operands[0].symbol))
@@ -1433,19 +1623,41 @@ void expand_call_inline_exception(TcgContext *ctx) {
             int spill_cnt = get_vector_spill_info(ctx, u, env_vecs, spare_vecs, (MAX_INLINE_VEC_ARG_CNT * 2));
 
             // Create trampoline
+            int tfidx = create_trampoline_for_inline_exception(ctx, u, &env_vecs[0], &spare_vecs[0], spill_cnt);
+            int nfidx = lookup_next_func_idx(ctx, u);
+
+            // - GET the address of trampoline
+            // func_addr tmp_t,hex_offset,tfidx
+            int tmp_t = get_next_tmp_idx(ctx);
+            EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, func_addr, 0, 0,
+                SLOT_OP(SUB_SLOT_TMP, tmp_t),
+                IMM_OP(ctx->hex_offset),
+                IMM_OP(tfidx));
+
+            // - GET the address of next
+            // func_addr tmp_n,hex_offset,nfidx
+            int tmp_n = get_next_tmp_idx(ctx);
+            EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, func_addr, 0, 0,
+                SLOT_OP(SUB_SLOT_TMP, tmp_n),
+                IMM_OP(ctx->hex_offset),
+                IMM_OP(nfidx));
+
             size_t sz = sizeof(UnifiedInstr) + (u->operand_count + 2) * sizeof(Operand);
             UnifiedInstr *uu = malloc(sz);
             memcpy(uu, u, sz);
             uu->prev = NULL;
             uu->next = NULL;
+            uu->operand_count += 2;
             uu->opc = call_inline_exception;
             Operand tf;
-            tf.kind = OP_TRAMPOLINE;
-            tf.tfidx = create_trampoline_for_inline_exception(ctx, u, &spare_vecs[0], spill_cnt);
+            tf.kind = OP_SLOT;
+            tf.slot.type = SUB_SLOT_TMP;
+            tf.slot.idx = tmp_t;
             uu->operands[u->operand_count] = tf;
             Operand nf;
-            nf.kind = OP_NEXT;
-            nf.nfidx = lookup_next_func_idx(ctx, u);
+            nf.kind = OP_SLOT;
+            nf.slot.type = SUB_SLOT_TMP;
+            nf.slot.idx = tmp_n;
             uu->operands[u->operand_count + 1] = nf;
             instr_list_insert_before(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, uu);
             instr_list_remove_and_free(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u);
@@ -1471,10 +1683,10 @@ void expand_call_inline_exception(TcgContext *ctx) {
             }
 
             // Add SPILL/RELOAD to the beginning of the next call
-            UnifiedInstr *next_u = ctx->llvm_func_set.lists[nf.nfidx].head;
+            UnifiedInstr *next_u = ctx->llvm_func_set.lists[nfidx].head;
             assert(next_u);
-            add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[nf.nfidx].head), &(ctx->llvm_func_set.lists[nf.nfidx].tail),
-                                     next_u, env_vecs, spare_vecs, spill_cnt, false /*before call*/);
+            add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[nfidx].head), &(ctx->llvm_func_set.lists[nfidx].tail),
+                                     next_u, env_vecs, spare_vecs, spill_cnt, false /*after call*/);
         }
     }
 }

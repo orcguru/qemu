@@ -24,10 +24,10 @@ endif
 
 all: tcg_mapper tcg_printer
 
-tcg_mapper: tcg_parser.tab.o tcg_lexer.yy.o tcg_mapper.o mapper_util.o helper_lookup.o parser_util.o operand_static_types.o tcg_context.o
+tcg_mapper: tcg_parser.tab.o tcg_lexer.yy.o tcg_mapper.o mapper_util.o helper_lookup.o parser_util.o operand_static_types.o tcg_context.o i386_cpu.o
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
-tcg_printer: tcg_parser.tab.o tcg_lexer.yy.o tcg_printer.o mapper_util.o helper_lookup.o parser_util.o operand_static_types.o tcg_context.o
+tcg_printer: tcg_parser.tab.o tcg_lexer.yy.o tcg_printer.o mapper_util.o helper_lookup.o parser_util.o operand_static_types.o tcg_context.o i386_cpu.o
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
 tcg_parser.tab.o: tcg_parser.tab.c tcg_lexer.yy.h

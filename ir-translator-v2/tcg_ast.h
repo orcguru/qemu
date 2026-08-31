@@ -1394,6 +1394,7 @@ typedef enum __attribute__((packed)) {
     X(call_inline_exception) \
     X(call_runtime_wi_next) \
     X(call_runtime_wo_next) \
+    X(call_native)       \
     X(OPCODE_MAX)
 
 typedef enum __attribute__((packed)) {

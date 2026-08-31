@@ -7,6 +7,8 @@
 
 /* Initialize a TcgContext */
 void tcg_context_init(TcgContext *ctx) {
+    ctx->hex_offset = 0;
+    ctx->emit_instr_count = 0;
     ctx->instr_head = NULL;
     ctx->instr_tail = NULL;
     ctx->llvm_func_set.lists = NULL;
@@ -24,4 +26,13 @@ void tcg_context_init(TcgContext *ctx) {
     ctx->slot_map = g_hash_table_new(NULL, NULL);
     ctx->stack_type_map = g_hash_table_new(NULL, NULL);
     ctx->next_tmp_idx = 0;
+    ctx->next_helper_idx = 0;
+    ctx->xreg_valid = 0;
+    ctx->vec_valid = 0;
+    ctx->def_mask = NULL;
+    ctx->use_mask = NULL;
+    ctx->reaching_def_exclude_self_def = NULL;
+    ctx->forward_use = NULL;
+    ctx->num_instrs = 0;
+    ctx->words_needed = 0;
 }

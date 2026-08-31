@@ -1,0 +1,48 @@
+#include "tcg_ast.h"
+
+const uint64_t env_regs_offset[XREG_MAX] = {
+    [rax] = ENV_OFFSET_rax,
+    [rcx] = ENV_OFFSET_rcx,
+    [rdx] = ENV_OFFSET_rdx,
+    [rbx] = ENV_OFFSET_rbx,
+    [rsp] = ENV_OFFSET_rsp,
+    [rbp] = ENV_OFFSET_rbp,
+    [rsi] = ENV_OFFSET_rsi,
+    [rdi] = ENV_OFFSET_rdi,
+    [r8] = ENV_OFFSET_r8,
+    [r9] = ENV_OFFSET_r9,
+    [r10] = ENV_OFFSET_r10,
+    [r11] = ENV_OFFSET_r11,
+    [r12] = ENV_OFFSET_r12,
+    [r13] = ENV_OFFSET_r13,
+    [r14] = ENV_OFFSET_r14,
+    [r15] = ENV_OFFSET_r15,
+    [cc_src] = ENV_OFFSET_cc_src,
+    [cc_dst] = ENV_OFFSET_cc_dst,
+    [cc_op] = ENV_OFFSET_cc_op,
+    [rip] = ENV_OFFSET_rip,
+};
+
+const uint64_t env_regs_type[XREG_MAX] = {
+    [rax] = LLVMInt64,
+    [rcx] = LLVMInt64,
+    [rdx] = LLVMInt64,
+    [rbx] = LLVMInt64,
+    [rsp] = LLVMInt64,
+    [rbp] = LLVMInt64,
+    [rsi] = LLVMInt64,
+    [rdi] = LLVMInt64,
+    [r8] = LLVMInt64,
+    [r9] = LLVMInt64,
+    [r10] = LLVMInt64,
+    [r11] = LLVMInt64,
+    [r12] = LLVMInt64,
+    [r13] = LLVMInt64,
+    [r14] = LLVMInt64,
+    [r15] = LLVMInt64,
+    [cc_src] = LLVMInt64,
+    [cc_dst] = LLVMInt64,
+    [cc_op] = LLVMInt32,
+    [rip] = LLVMInt64,
+};
+
