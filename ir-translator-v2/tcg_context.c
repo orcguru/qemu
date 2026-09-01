@@ -29,6 +29,7 @@ void tcg_context_init(TcgContext *ctx) {
     ctx->next_helper_idx = 0;
     ctx->xreg_valid = 0;
     ctx->vec_valid = 0;
+    ctx->vec_spare_valid = 0;
     ctx->def_mask = NULL;
     ctx->use_mask = NULL;
     ctx->reaching_def_exclude_self_def = NULL;

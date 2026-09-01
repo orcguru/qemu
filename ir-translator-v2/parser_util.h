@@ -64,7 +64,7 @@ void expand_call_runtime(TcgContext *ctx);
 void build_per_instr_masks_collect_use_def(TcgContext *ctx);
 
 static inline bool is_call(const UnifiedInstr *u) {
-    if (u->opc == call || (u->opc > __artifical_opc_begin__ && (u->opc == call_inline || u->opc == call_inline_exception || u->opc == call_runtime || u->opc == call_native || u->opc == tail_call_native))) {
+    if (u->opc == call || (u->opc > __artifical_opc_begin__ && (u->opc == call_inline || u->opc == call_inline_exception || u->opc == call_native || u->opc == tail_call_native))) {
         return true;
     }
     return false;

@@ -96,6 +96,7 @@ void print_instr(UnifiedInstr *u) {
     printf("\n");
 }
 
+//#define DEBUG
 void debug_print_instr(TcgContext *ctx, const char *msg) {
 #ifdef DEBUG
     printf("===============================================\n");
@@ -117,8 +118,13 @@ void debug_print_instr(TcgContext *ctx, const char *msg) {
 }
 
 void handle_func(TcgContext *ctx, int is_external) {
-    printf("0x%lx %s:\n", ctx->hex_offset, is_external ? "EXT":"INT");
+    printf("FINAL:0x%lx %s:\n", ctx->hex_offset, is_external ? "EXT":"INT");
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
+        if (ctx->llvm_func_set.lists[i].trampoline_name[0]) {
+            printf("FUNC:%s N%d\n", ctx->llvm_func_set.lists[i].trampoline_name, i);
+        } else {
+            printf("FUNC:%lx N%d\n", ctx->hex_offset, i);
+        }
         for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
             print_instr(u);
         }

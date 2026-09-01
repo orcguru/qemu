@@ -156,6 +156,14 @@ UnifiedInstr *clone_instr(const UnifiedInstr *src) {
     return dst;
 }
 
+static int get_first_input_idx_on_call(const UnifiedInstr *u) {
+    assert(u->opc == call && u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
+    if (u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
+        return TCG_CALL_PREFIX_COUNT + 1;
+    }
+    return TCG_CALL_PREFIX_COUNT;
+}
+
 /* Insert 'u' right after 'anchor'. If anchor is NULL, prepend at head. */
 static void instr_list_insert_after(UnifiedInstr **head_p, UnifiedInstr **tail_p, UnifiedInstr *anchor, UnifiedInstr *u) {
     u->prev = anchor;
@@ -219,6 +227,7 @@ void append_instr(TcgContext *ctx, UnifiedInstr *u) {
 }
 
 void func_list_init(FuncInstrList *list) {
+    list->head_uidx = -1;
     list->head = NULL;
     list->tail = NULL;
     list->count = 0;
@@ -307,6 +316,7 @@ void tcg_context_reset(TcgContext *ctx) {
     // Reset stack alloca bit array
     ctx->xreg_valid = 0;
     ctx->vec_valid = 0;
+    ctx->vec_spare_valid = 0;
 
     free(ctx->def_mask);
     free(ctx->use_mask);
@@ -411,6 +421,14 @@ void register_stack_alloca(TcgContext *ctx, UnifiedInstr *u) {
         }
         if (u->operands[i].kind == OP_SLOT && u->operands[i].slot.type == SUB_SLOT_XREG) {
             ctx->xreg_valid |= (1 << u->operands[i].slot.idx);
+        }
+    }
+}
+
+void register_vec_spare_stack_alloca(TcgContext *ctx, UnifiedInstr *u) {
+    for (int i = 0; i < u->operand_count; ++i) {
+        if (u->operands[i].kind == OP_VEC) {
+            ctx->vec_spare_valid |= (1 << u->operands[i].vec.idx);
         }
     }
 }
@@ -605,7 +623,7 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
     }
     u->vs = vs;
     u->es = es;
-    u->idx = ctx->emit_instr_count++;
+    u->uidx = ctx->emit_instr_count++;
     int skip_cnt = 0;
     int dst_idx = 0;
     if (u->is_helper) {
@@ -658,7 +676,7 @@ UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
         UnifiedInstr *_u = emit_instr(ctx, opc, vs, es, _ops, _cnt);        \
         expand_slot_alias(ctx, _u);                                         \
         update_slot_types(ctx, _u);                                         \
-        register_stack_alloca(ctx, _u);                                     \
+        register_vec_spare_stack_alloca(ctx, _u);                           \
         instr_list_insert_before(hp, tp, u, _u);                            \
     } while (0)
 
@@ -1219,14 +1237,10 @@ static void handle_instr(TcgContext *ctx,
         func_list_append(list, copy);
         if (is_instr_end_of_control_flow(cur)) {
             const UnifiedInstr *label_u;
-            bool skip_next = false;
             while ((label_u = get_next_missing_label_instr(ctx, lt))) {
-                if (label_u == cur->next) {
-                    skip_next = true;
-                }
                 handle_instr(ctx, label_u, list, lt);
             }
-            if (!skip_next) {
+            if (cur->opc == call && !helper_runtime_does_not_return[cur->operands[0].symbol]) {
                 collect_func_instr_list_for_llvm(ctx, cur->next);
             }
             return;
@@ -1252,7 +1266,7 @@ static void collect_func_instr_list_for_llvm(TcgContext *ctx,
         return;
 
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
-        if (ctx->llvm_func_set.lists[i].head == next) {
+        if (ctx->llvm_func_set.lists[i].head_uidx == next->uidx) {
             return;
         }
     }
@@ -1261,10 +1275,13 @@ static void collect_func_instr_list_for_llvm(TcgContext *ctx,
     func_list_init(&result);
     int func_idx = get_next_func_list_idx(ctx);
     const UnifiedInstr *cur = next;
+    // Early info for dedup
+    ctx->llvm_func_set.lists[func_idx].head_uidx = cur->uidx;
     LabelTracker lt;
     label_tracker_init(&lt);
     handle_instr(ctx, cur, &result, &lt);
     label_tracker_free(&lt);
+    // LLVM function is setup lazily
     ctx->llvm_func_set.lists[func_idx] = result;
 }
 
@@ -1273,25 +1290,23 @@ void expand_llvm_func(TcgContext *ctx) {
 }
 
 // FIXME: YMM
-int get_vector_spill_info(TcgContext *ctx,
-                          const UnifiedInstr *u,
+int get_vector_spill_info(const UnifiedInstr *u,
                           Operand *env_vecs,
                           Operand *spare_vecs,
                           int cnt) {
     int rc = 0;
+    uint32_t vec_valid = 0;
+    // Collect all vectors being used in current instruction
+    for (int i = 0; i < u->operand_count; ++i) {
+        if (u->operands[i].kind == OP_VEC) {
+            vec_valid |= (1 << u->operands[i].vec.idx);
+        }
+    }
+    // Allocate spare vector for ENV pointers
     for (int i = 0; i < u->operand_count; ++i) {
         if (u->operands[i].kind == OP_ENV) {
             VecInfo vinfo = lookup_vec_map(u->operands[i].env.offset);
             if (vinfo.idx != NON_XMM) {
-                // pcmpistrm implicitly writes to xmm0, skip the first pair of vectors
-                int spare_idx = 2;
-                for (; spare_idx < (XMM_COUNT * 2); spare_idx += 2) {
-                    if ((ctx->vec_valid & (1 << spare_idx)) == 0) {
-                        break;
-                    }
-                }
-                assert(spare_idx < (XMM_COUNT * 2));
-
                 bool dup = false;
                 for (int j = 0; j < rc; ++j) {
                     if (env_vecs[j].env.offset == u->operands[i].env.offset) {
@@ -1299,15 +1314,27 @@ int get_vector_spill_info(TcgContext *ctx,
                         break;
                     }
                 }
-                if (!dup) {
-                    env_vecs[rc] = u->operands[i];
-                    spare_vecs[rc].kind = OP_VEC;
-                    spare_vecs[rc].vec.idx = spare_idx;
-                    spare_vecs[rc].vec.offset = 0;
-                    spare_vecs[rc].vec.stack_type = LLVMVector2xi64;
-                    rc += 1;
-                    assert(rc <= cnt);
+                if (dup)
+                    continue;
+
+                // pcmpistrm implicitly writes to xmm0, skip the first pair of vectors
+                int spare_idx = 2;
+                for (; spare_idx < (XMM_COUNT * 2); spare_idx += 2) {
+                    if ((vec_valid & (1 << spare_idx)) == 0) {
+                        break;
+                    }
                 }
+                assert(spare_idx < (XMM_COUNT * 2));
+                vec_valid |= (1 << spare_idx);
+
+                // Do update mapping info
+                env_vecs[rc] = u->operands[i];
+                spare_vecs[rc].kind = OP_VEC;
+                spare_vecs[rc].vec.idx = spare_idx;
+                spare_vecs[rc].vec.offset = 0;
+                spare_vecs[rc].vec.stack_type = LLVMVector2xi64;
+                rc += 1;
+                assert(rc <= cnt);
             }
         }
     }
@@ -1388,7 +1415,7 @@ void expand_call_inline(TcgContext *ctx) {
             // Need double size for ymm
             Operand env_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
             Operand spare_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
-            int spill_cnt = get_vector_spill_info(ctx, u, env_vecs, spare_vecs, (MAX_INLINE_VEC_ARG_CNT * 2));
+            int spill_cnt = get_vector_spill_info(u, env_vecs, spare_vecs, (MAX_INLINE_VEC_ARG_CNT * 2));
 
             // Check if require vector register spill/reload
             if (!spill_cnt)
@@ -1586,14 +1613,14 @@ int lookup_next_func_idx(TcgContext *ctx,
     // Lookup the index of the next instruction from instr_head list
     uint32_t next_idx = -1;
     for (const UnifiedInstr *ui = ctx->instr_head; ui; ui = ui->next) {
-        if (ui->idx == u->idx && ui->next) {
-            next_idx = ui->next->idx;
+        if (ui->uidx == u->uidx && ui->next) {
+            next_idx = ui->next->uidx;
             break;
         }
     }
     assert(next_idx != -1);
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
-        if (ctx->llvm_func_set.lists[i].head->idx == next_idx)
+        if (ctx->llvm_func_set.lists[i].head->uidx == next_idx)
             return i;
     }
     assert(0);
@@ -1619,7 +1646,7 @@ void expand_call_inline_exception(TcgContext *ctx) {
             // Need double size for ymm
             Operand env_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
             Operand spare_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
-            int spill_cnt = get_vector_spill_info(ctx, u, env_vecs, spare_vecs, (MAX_INLINE_VEC_ARG_CNT * 2));
+            int spill_cnt = get_vector_spill_info(u, env_vecs, spare_vecs, (MAX_INLINE_VEC_ARG_CNT * 2));
 
             // Create trampoline
             int tfidx = create_trampoline_for_inline_exception(ctx, u, &env_vecs[0], &spare_vecs[0], spill_cnt);
@@ -1691,8 +1718,8 @@ void expand_call_inline_exception(TcgContext *ctx) {
 }
 
 int create_trampoline_for_runtime(TcgContext *ctx,
-                                           const UnifiedInstr *u,
-                                           bool will_return_back) {
+                                  const UnifiedInstr *u,
+                                  bool will_return_back) {
     assert(u->opc == call && u->operands[0].kind == OP_SYMBOL);
     FuncInstrList result;
     func_list_init(&result);
@@ -1873,50 +1900,30 @@ void expand_call_runtime(TcgContext *ctx) {
                 additional_op_cnt += 1;
             }
 
-            size_t sz = sizeof(UnifiedInstr) + (u->operand_count + additional_op_cnt) * sizeof(Operand);
+            // Create tail_call instruction
+            int tail_call_operand_count = u->operand_count - get_first_input_idx_on_call(u) + additional_op_cnt;
+            size_t sz = sizeof(UnifiedInstr) + tail_call_operand_count * sizeof(Operand);
             UnifiedInstr *uu = malloc(sz);
-            memcpy(uu, u, sz);
-            uu->prev = NULL;
-            uu->next = NULL;
-            uu->operand_count += additional_op_cnt;
-            uu->opc = call_runtime;
+            memset(uu, 0, sz);
+            uu->opc = tail_call;
+            uu->is_helper = false;
             Operand tf;
             tf.kind = OP_SLOT;
             tf.slot.type = SUB_SLOT_TMP;
             tf.slot.idx = tmp_t;
-            uu->operands[u->operand_count] = tf;
-            if (!helper_runtime_does_not_return[u->operands[0].symbol]) {
-                Operand nf;
-                nf.kind = OP_SLOT;
-                nf.slot.type = SUB_SLOT_TMP;
-                nf.slot.idx = tmp_n;
-                uu->operands[u->operand_count + 1] = nf;
-            }
-            instr_list_insert_before(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, uu);
-            instr_list_remove_and_free(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u);
-            u = uu;
-
-            // In case any operand type is OP_VEC, should change to pointer to its CPUArchState field
-            bool require_update = false;
-            for (int i = 0; i < u->operand_count; ++i) {
-                if (u->operands[i].kind == OP_ENV) {
-                    require_update = true;
-                    break;
-                }
-            }
-            if (!require_update)
-                continue;
-
-            int tmp1 = get_next_tmp_idx(ctx);
-            // - GET env pointer
-            // mov_i64 tmp_N1,env
-            EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, mov_i64, 0, 0,
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                ENV_OP(0));
-
-            for (int i = 0; i < u->operand_count; ++i) {
+            tf.slot.op_type = LLVMInt64;
+            int uu_op_idx = 0;
+            uu->operands[uu_op_idx++] = tf;
+            for (int i = get_first_input_idx_on_call(u); i < u->operand_count; ++i) {
                 if (u->operands[i].kind == OP_VEC) {
+                    int tmp1 = get_next_tmp_idx(ctx);
                     int tmp2 = get_next_tmp_idx(ctx);
+                    // - GET env pointer
+                    // mov_i64 tmp_N1,env
+                    EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, mov_i64, 0, 0,
+                        SLOT_OP(SUB_SLOT_TMP, tmp1),
+                        ENV_OP(0));
+
                     uint64_t off = get_vec_offset(u->operands[i].vec.idx);
                     // - CALCULATE offset to CPUArchState xmm
                     // add_i64 tmp_N2,tmp_N1,offset
@@ -1924,12 +1931,28 @@ void expand_call_runtime(TcgContext *ctx) {
                         SLOT_OP(SUB_SLOT_TMP, tmp2),
                         SLOT_OP(SUB_SLOT_TMP, tmp1),
                         IMM_OP(off));
-                    u->operands[i].kind = OP_SLOT;
-                    u->operands[i].slot.type = SUB_SLOT_TMP;
-                    u->operands[i].slot.idx = tmp2;
-                    u->operands[i].slot.op_type = LLVMInt64;
+                    uu->operands[uu_op_idx].kind = OP_SLOT;
+                    uu->operands[uu_op_idx].slot.type = SUB_SLOT_TMP;
+                    uu->operands[uu_op_idx].slot.idx = tmp2;
+                    uu->operands[uu_op_idx].slot.op_type = LLVMInt64;
+                    uu_op_idx += 1;
+                } else {
+                    uu->operands[uu_op_idx++] = u->operands[i];
                 }
             }
+            if (!helper_runtime_does_not_return[u->operands[0].symbol]) {
+                Operand nf;
+                nf.kind = OP_SLOT;
+                nf.slot.type = SUB_SLOT_TMP;
+                nf.slot.idx = tmp_n;
+                nf.slot.op_type = LLVMInt64;
+                uu->operands[uu_op_idx++] = nf;
+            }
+            assert(uu_op_idx == tail_call_operand_count);
+            uu->operand_count = uu_op_idx;
+            instr_list_insert_before(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, uu);
+            instr_list_remove_and_free(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u);
+            u = uu;
         }
     }
 }

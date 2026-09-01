@@ -262,12 +262,12 @@ typedef enum __attribute__((packed)) {
     X(helper_bndstx64) \
     X(helper_boundl) \
     X(helper_boundw) \
-    X(helper_cc_compute_all) \
-    X(helper_cc_compute_c) \
-    X(helper_cc_compute_nz) \
     X(helper_clts) \
     X(helper_cr4_testbit) \
     X(floatingpoint_inlined_helper_begin) \
+    X(helper_cc_compute_all) \
+    X(helper_cc_compute_c) \
+    X(helper_cc_compute_nz) \
     X(helper_addsd) \
     X(helper_addss) \
     X(helper_cmpeqsd) \
@@ -1393,7 +1393,6 @@ typedef enum __attribute__((packed)) {
     X(tail_call_native)  \
     X(call_inline)       \
     X(call_inline_exception) \
-    X(call_runtime)      \
     X(call_native)       \
     X(OPCODE_MAX)
 

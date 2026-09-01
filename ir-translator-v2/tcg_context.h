@@ -16,6 +16,11 @@ typedef struct TcgContext TcgContext;
 typedef void* yyscan_t;
 
 typedef struct FuncInstrList {
+    /*
+     * head_uidx check against duplicated sub function
+     * during expand_llvm_func while functions are building
+     */
+    uint32_t head_uidx;
     UnifiedInstr *head;
     UnifiedInstr *tail;
     int           count;
@@ -82,6 +87,7 @@ struct TcgContext {
     /* Bit array for stack alloca */
     uint32_t xreg_valid;
     uint32_t vec_valid;
+    uint32_t vec_spare_valid;
 
     /* TMP slot DEF/USE tracking */
     /*
