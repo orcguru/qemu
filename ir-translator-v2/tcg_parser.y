@@ -125,6 +125,8 @@ func:
         debug_print_instr(ctx, "after call_inline");
         expand_call_inline_exception(ctx);
         debug_print_instr(ctx, "after call_inline_exception");
+        expand_call_runtime(ctx);
+        debug_print_instr(ctx, "after call_runtime");
         /* End of function – apply final slot types */
         sanity_check_op_type_solid(ctx);
         type_map_apply(ctx);

@@ -597,7 +597,7 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
     UnifiedInstr *u = malloc(sz);
     memset(u, 0, sz);
     u->opc = opc;
-    if (is_call(u)) {
+    if (u->opc == call) {
         u->is_helper = true;
         u->helper_index = ctx->next_helper_idx++;
     } else {
@@ -849,7 +849,7 @@ void expand_jmp_direct(TcgContext *ctx) {
 
 static int get_def_tmp_indices(UnifiedInstr *u, int *out_idx, int out_cnt) {
     int ret_cnt = 0;
-    if (is_call(u) &&
+    if (u->opc == call &&
         u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM && u->operands[TCG_CALL_OUT_FLAG_IDX].imm &&
         u->operands[TCG_CALL_PREFIX_COUNT].kind == OP_SLOT && u->operands[TCG_CALL_PREFIX_COUNT].slot.type == SUB_SLOT_TMP) {
         out_idx[ret_cnt++] = u->operands[TCG_CALL_PREFIX_COUNT].slot.idx;
@@ -866,7 +866,7 @@ static int get_def_tmp_indices(UnifiedInstr *u, int *out_idx, int out_cnt) {
 static int get_use_tmp_indices(UnifiedInstr *u, int *out_idx, int out_cnt) {
     int ret_cnt = 0;
     int in_idx = 0;
-    if (is_call(u)) {
+    if (u->opc == call) {
         in_idx = TCG_CALL_PREFIX_COUNT;
         if (u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM && u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
             in_idx += 1;
@@ -1170,7 +1170,7 @@ static int label_tracker_find_zero(const LabelTracker *lt) {
 static inline bool is_instr_end_of_control_flow(const UnifiedInstr *u) {
     if (u->opc == tail_call)
         return true;
-    if (is_call(u)) {
+    if (u->opc == call) {
         assert(u->operands[0].kind == OP_SYMBOL);
         if (INLINE_HELPER_ENABLED(u->operands[0].symbol) && !helper_require_exception_path[u->operands[0].symbol])
             return false;
@@ -1564,7 +1564,6 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
     }
 
     // Get the next call from argument (the last argument implicitly is the next call target), and do tail_call
-    assert(is_call(u) && u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
     if (u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
         // - TAIL_CALL next,helper_out
         // tail_call OP_LASTARG,helper_out
@@ -1687,6 +1686,250 @@ void expand_call_inline_exception(TcgContext *ctx) {
             assert(next_u);
             add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[nfidx].head), &(ctx->llvm_func_set.lists[nfidx].tail),
                                      next_u, env_vecs, spare_vecs, spill_cnt, false /*after call*/);
+        }
+    }
+}
+
+int create_trampoline_for_runtime(TcgContext *ctx,
+                                           const UnifiedInstr *u,
+                                           bool will_return_back) {
+    assert(u->opc == call && u->operands[0].kind == OP_SYMBOL);
+    FuncInstrList result;
+    func_list_init(&result);
+    // Setup func name
+    sprintf(&result.trampoline_name[0], "trampoline_%s", helper_str[u->operands[0].symbol]);
+    int func_idx = get_next_func_list_idx(ctx);
+
+    // Store all GP registers to ENV
+    int tmp1 = get_next_tmp_idx(ctx);
+    // - GET env pointer
+    // mov_i64 tmp_N1,env
+    EMIT_INSTR_APPEND_LIST(ctx, &result, mov_i64, 0, 0,
+        SLOT_OP(SUB_SLOT_TMP, tmp1),
+        ENV_OP(0));
+    for (int r = rax; r < XREG_MAX; ++r) {
+        int tmp2 = get_next_tmp_idx(ctx);
+        uint64_t off = env_regs_offset[r];
+        LLVMType ty = env_regs_type[r];
+        // - CALCULATE offset to CPUArchState field
+        // add_i64 tmp_N2,tmp_N1,offset
+        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp2),
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            IMM_OP(off));
+        if (ty == LLVMInt64) {
+            // qemu_st_i64 r,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i64, 0, 0,
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP(SUB_SLOT_TMP, tmp2),
+                ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+        } else {
+            // qemu_st_i32 r,tmp_N2,attr:NONATOMIC,ALIGN_4,SRC4B
+            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i32, 0, 0,
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP(SUB_SLOT_TMP, tmp2),
+                ATTR_STORAGE_OP(NONATOMIC, ALIGN_4, SRC4B));
+        }
+    }
+
+    // Store all Vector registers to ENV
+    for (int i = 0; i < (XMM_COUNT * 2); ++i) {
+        int tmp2 = get_next_tmp_idx(ctx);
+        uint64_t off = get_vec_offset(i);
+        // - CALCULATE offset to CPUArchState field
+        // add_i64 tmp_N2,tmp_N1,offset
+        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp2),
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            IMM_OP(off));
+        EMIT_INSTR_APPEND_LIST(ctx, &result, st_vec, 128, 8,
+            VEC_OP(i, 0),
+            SLOT_OP(SUB_SLOT_TMP, tmp2));
+    }
+
+    // Setup native call arguments
+    UnifiedInstr *nc = clone_instr(u);
+    if (will_return_back) {
+        nc->opc = call_native;
+    } else {
+        nc->opc = tail_call_native;
+    }
+    for (int i = 0; i < nc->operand_count; ++i) {
+        if (nc->operands[i].kind == OP_VEC) {
+            int tmp2 = get_next_tmp_idx(ctx);
+            uint64_t off = get_vec_offset(nc->operands[i].vec.idx);
+            // - CALCULATE offset to CPUArchState xmm
+            // add_i64 tmp_N2,tmp_N1,offset
+            EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+                SLOT_OP(SUB_SLOT_TMP, tmp2),
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                IMM_OP(off));
+            nc->operands[i].kind = OP_SLOT;
+            nc->operands[i].slot.type = SUB_SLOT_TMP;
+            nc->operands[i].slot.idx = tmp2;
+            nc->operands[i].slot.op_type = LLVMInt64;
+        }
+    }
+
+    // Emit call fixed native helper
+    func_list_append(&result, nc);
+
+    if (!will_return_back) {
+        ctx->llvm_func_set.lists[func_idx] = result;
+        return func_idx;
+    }
+
+    // Load all GP registers from ENV
+    for (int r = rax; r < XREG_MAX; ++r) {
+        int tmp2 = get_next_tmp_idx(ctx);
+        uint64_t off = env_regs_offset[r];
+        LLVMType ty = env_regs_type[r];
+        // - CALCULATE offset to CPUArchState field
+        // add_i64 tmp_N2,tmp_N1,offset
+        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp2),
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            IMM_OP(off));
+        if (ty == LLVMInt64) {
+            // qemu_st_i64 r,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i64, 0, 0,
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP(SUB_SLOT_TMP, tmp2),
+                ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+        } else {
+            // qemu_st_i32 r,tmp_N2,attr:NONATOMIC,ALIGN_4,SRC4B
+            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i32, 0, 0,
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP(SUB_SLOT_TMP, tmp2),
+                ATTR_STORAGE_OP(NONATOMIC, ALIGN_4, SRC4B));
+        }
+    }
+
+    // Load all Vector registers from ENV
+    for (int i = 0; i < (XMM_COUNT * 2); ++i) {
+        int tmp2 = get_next_tmp_idx(ctx);
+        uint64_t off = get_vec_offset(i);
+        // - CALCULATE offset to CPUArchState field
+        // add_i64 tmp_N2,tmp_N1,offset
+        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+            SLOT_OP(SUB_SLOT_TMP, tmp2),
+            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            IMM_OP(off));
+        EMIT_INSTR_APPEND_LIST(ctx, &result, ld_vec, 128, 8,
+            VEC_OP(i, 0),
+            SLOT_OP(SUB_SLOT_TMP, tmp2));
+    }
+
+    // Get the next call from argument (the last argument implicitly is the next call target), and do tail_call
+    if (u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
+        // - TAIL_CALL next,helper_out
+        // tail_call OP_LASTARG,helper_out
+        EMIT_INSTR_APPEND_LIST(ctx, &result, tail_call, 0, 0,
+            LASTARG_OP(),
+            SLOT_OP_EXTRA(u->operands[TCG_CALL_PREFIX_COUNT].slot.type, u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, u->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type));
+    } else {
+        // - TAIL_CALL next
+        // tail_call OP_LASTARG
+        EMIT_INSTR_APPEND_LIST(ctx, &result, tail_call, 0, 0,
+            LASTARG_OP());
+    }
+
+    ctx->llvm_func_set.lists[func_idx] = result;
+    return func_idx;
+}
+
+void expand_call_runtime(TcgContext *ctx) {
+    for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
+        for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
+            if (u->opc != call)
+                continue;
+            assert(u->operands[0].kind == OP_SYMBOL);
+            if (INLINE_HELPER_ENABLED(u->operands[0].symbol))
+                continue;
+
+            int additional_op_cnt = 0;
+            // Create trampoline
+            int tfidx = create_trampoline_for_runtime(ctx, u, !helper_runtime_does_not_return[u->operands[0].symbol]);
+            // - GET the address of trampoline
+            // func_addr tmp_t,hex_offset,tfidx
+            int tmp_t = get_next_tmp_idx(ctx);
+            EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, func_addr, 0, 0,
+                SLOT_OP(SUB_SLOT_TMP, tmp_t),
+                IMM_OP(ctx->hex_offset),
+                IMM_OP(tfidx));
+            additional_op_cnt += 1;
+
+            // Next call in case runtime returns
+            int nfidx, tmp_n;
+            if (!helper_runtime_does_not_return[u->operands[0].symbol]) {
+                nfidx = lookup_next_func_idx(ctx, u);
+                // - GET the address of next
+                // func_addr tmp_n,hex_offset,nfidx
+                tmp_n = get_next_tmp_idx(ctx);
+                EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, func_addr, 0, 0,
+                    SLOT_OP(SUB_SLOT_TMP, tmp_n),
+                    IMM_OP(ctx->hex_offset),
+                    IMM_OP(nfidx));
+                additional_op_cnt += 1;
+            }
+
+            size_t sz = sizeof(UnifiedInstr) + (u->operand_count + additional_op_cnt) * sizeof(Operand);
+            UnifiedInstr *uu = malloc(sz);
+            memcpy(uu, u, sz);
+            uu->prev = NULL;
+            uu->next = NULL;
+            uu->operand_count += additional_op_cnt;
+            uu->opc = call_runtime;
+            Operand tf;
+            tf.kind = OP_SLOT;
+            tf.slot.type = SUB_SLOT_TMP;
+            tf.slot.idx = tmp_t;
+            uu->operands[u->operand_count] = tf;
+            if (!helper_runtime_does_not_return[u->operands[0].symbol]) {
+                Operand nf;
+                nf.kind = OP_SLOT;
+                nf.slot.type = SUB_SLOT_TMP;
+                nf.slot.idx = tmp_n;
+                uu->operands[u->operand_count + 1] = nf;
+            }
+            instr_list_insert_before(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, uu);
+            instr_list_remove_and_free(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u);
+            u = uu;
+
+            // In case any operand type is OP_VEC, should change to pointer to its CPUArchState field
+            bool require_update = false;
+            for (int i = 0; i < u->operand_count; ++i) {
+                if (u->operands[i].kind == OP_ENV) {
+                    require_update = true;
+                    break;
+                }
+            }
+            if (!require_update)
+                continue;
+
+            int tmp1 = get_next_tmp_idx(ctx);
+            // - GET env pointer
+            // mov_i64 tmp_N1,env
+            EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, mov_i64, 0, 0,
+                SLOT_OP(SUB_SLOT_TMP, tmp1),
+                ENV_OP(0));
+
+            for (int i = 0; i < u->operand_count; ++i) {
+                if (u->operands[i].kind == OP_VEC) {
+                    int tmp2 = get_next_tmp_idx(ctx);
+                    uint64_t off = get_vec_offset(u->operands[i].vec.idx);
+                    // - CALCULATE offset to CPUArchState xmm
+                    // add_i64 tmp_N2,tmp_N1,offset
+                    EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, add_i64, 0, 0,
+                        SLOT_OP(SUB_SLOT_TMP, tmp2),
+                        SLOT_OP(SUB_SLOT_TMP, tmp1),
+                        IMM_OP(off));
+                    u->operands[i].kind = OP_SLOT;
+                    u->operands[i].slot.type = SUB_SLOT_TMP;
+                    u->operands[i].slot.idx = tmp2;
+                    u->operands[i].slot.op_type = LLVMInt64;
+                }
+            }
         }
     }
 }

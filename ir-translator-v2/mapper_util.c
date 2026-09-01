@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <string.h>
+#include <stdbool.h>
 #include "tcg_ast.h"
 
 const char *opcode_type_str[] = {
@@ -576,6 +577,20 @@ const int helper_require_exception_path[HELPER_MAX] = {
     [helper_idivl_EAX] = 1,
     [helper_idivw_AX] = 1,
     [helper_divsd] = 1,
+};
+
+const bool helper_runtime_does_not_return[HELPER_MAX] = {
+    [helper_syscall] = true,
+    [helper_raise_interrupt] = true,
+    [helper_raise_exception] = true,
+    [helper_jmp_ind] = true,
+    [helper_jumptable] = true,
+    // FIXME: check below helpers
+    [helper_icebp] = true,
+    [helper_iret_ind] = true,
+    [helper_ljmp_protected] = true,
+    [helper_lret_protected] = true,
+    [helper_pause] = true,
 };
 
 const uint64_t xreg_offsets[XREG_MAX] = {

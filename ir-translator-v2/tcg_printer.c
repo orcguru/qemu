@@ -65,6 +65,7 @@ void print_operand(Operand *op, int is_output) {
         break;
     default:
         printf("\nCheck kind:%d\n", op->kind);
+        fflush(NULL);
         assert(0);
     }
 }

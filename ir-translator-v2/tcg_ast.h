@@ -1390,10 +1390,10 @@ typedef enum __attribute__((packed)) {
     X(__artifical_opc_begin__) \
     X(func_addr)         \
     X(tail_call)         \
+    X(tail_call_native)  \
     X(call_inline)       \
     X(call_inline_exception) \
-    X(call_runtime_wi_next) \
-    X(call_runtime_wo_next) \
+    X(call_runtime)      \
     X(call_native)       \
     X(OPCODE_MAX)
 

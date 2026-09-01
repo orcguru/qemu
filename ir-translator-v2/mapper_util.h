@@ -17,6 +17,7 @@ extern const char *xmmreg_str[];
 extern const char *cvector_str[];
 extern const uint8_t opcoc[OPCODE_MAX];
 extern const int helper_require_exception_path[HELPER_MAX];
+extern const bool helper_runtime_does_not_return[HELPER_MAX];
 
 static inline const Operand *get_operand(const UnifiedInstr *u, int idx) {
     assert(idx >= 0 && idx < u->operand_count);
