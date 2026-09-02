@@ -201,8 +201,8 @@ int main(int argc, const char *argv[]) {
             char *end = NULL;
             long val = strtol(argv[i + 1], &end, 0);
             if (*end != '\0' || val < 0 || val > XMM_COUNT) {
-                fprintf(stderr, "Error: invalid value '%s' for -x (expected 0..%d)\n\n",
-                        argv[i + 1]);
+                fprintf(stderr, "Error: invalid value '%s' for -x (expected 3..%d)\n\n",
+                        argv[i + 1], XMM_COUNT);
                 print_usage(argv[0]);
                 return 1;
             }

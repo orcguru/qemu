@@ -121,7 +121,7 @@ typedef enum __attribute__((packed)) {
 } RelopType;
 
 #define HELPER_LIST \
-    X(not_a_helper) /* Used to collect arguments for the fast path tailcall */ \
+    X(not_a_helper) /* catch invalid helper passed through by lexer */ \
     X(helper_aaa) \
     X(helper_aad) \
     X(helper_aam) \

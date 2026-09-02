@@ -604,6 +604,7 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
     int dst_idx = 0;
     if (u->opc == call) {
         memcpy(u->operands, ops, (nops * sizeof(Operand)));
+        assert(u->operands[0].kind == OP_SYMBOL && u->operands[0].symbol != not_a_helper);
     } else {
         for (int i = 0; i < nops; ++i) {
             if (ops[i].kind == OP_ENV && (i + 1) < nops && ops[i + 1].kind == OP_IMM) {

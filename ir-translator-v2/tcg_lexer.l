@@ -83,6 +83,7 @@ LABEL           \$L[0-9]+
 HELPER          [a-z][0-9a-zA-Z_]+
 COMMA           ,
 PLUS            +
+COMMENT         ;[^\n]*
 cc_src2         cc_src2
 es_base         es_base
 cs_base         cs_base
@@ -1660,6 +1661,7 @@ xsetbv                          xsetbv
 ":"               { HANDLE_COLUMN; return COLON; }
 "+"               { HANDLE_COLUMN; return PLUS; }
 \n                { next_column = 1; column = 1; }
+{COMMENT}         ; // Ignore line comment (content after ';' until end of line)
 [ \t]             ; // Ignore whitespace
 %%
 size_t min(size_t a, size_t b) {
