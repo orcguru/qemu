@@ -46,6 +46,9 @@ void print_operand(Operand *op, int is_output) {
     case OP_ATTR:
         printf("attr");
         break;
+    case OP_SYMBOL:
+        printf("%s", helper_str[op->symbol]);
+        break;
     case OP_VEC:
         if (op->vec.offset == 0) {
             printf("v%d", op->vec.idx);

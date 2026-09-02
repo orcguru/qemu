@@ -1721,10 +1721,14 @@ int create_trampoline_for_runtime(TcgContext *ctx,
                                   const UnifiedInstr *u,
                                   bool will_return_back) {
     assert(u->opc == call && u->operands[0].kind == OP_SYMBOL);
+    HelperType h = u->operands[0].symbol;
+    if (h == helper_jmp_ind) {
+        h = helper_jit;
+    }
     FuncInstrList result;
     func_list_init(&result);
     // Setup func name
-    sprintf(&result.trampoline_name[0], "trampoline_%s", helper_str[u->operands[0].symbol]);
+    sprintf(&result.trampoline_name[0], "trampoline_%s", helper_str[h]);
     int func_idx = get_next_func_list_idx(ctx);
 
     // Store all GP registers to ENV
@@ -1780,6 +1784,9 @@ int create_trampoline_for_runtime(TcgContext *ctx,
         nc->opc = call_native;
     } else {
         nc->opc = tail_call_native;
+    }
+    if (u->operands[0].symbol == helper_jmp_ind) {
+        nc->operands[0].symbol = helper_jit;
     }
     for (int i = 0; i < nc->operand_count; ++i) {
         if (nc->operands[i].kind == OP_VEC) {
@@ -1871,12 +1878,13 @@ void expand_call_runtime(TcgContext *ctx) {
             if (u->opc != call)
                 continue;
             assert(u->operands[0].kind == OP_SYMBOL);
-            if (INLINE_HELPER_ENABLED(u->operands[0].symbol))
+            HelperType h = u->operands[0].symbol;
+            if (INLINE_HELPER_ENABLED(h))
                 continue;
 
             int additional_op_cnt = 0;
             // Create trampoline
-            int tfidx = create_trampoline_for_runtime(ctx, u, !helper_runtime_does_not_return[u->operands[0].symbol]);
+            int tfidx = create_trampoline_for_runtime(ctx, u, !helper_runtime_does_not_return[h]);
             // - GET the address of trampoline
             // func_addr tmp_t,hex_offset,tfidx
             int tmp_t = get_next_tmp_idx(ctx);
@@ -1888,7 +1896,7 @@ void expand_call_runtime(TcgContext *ctx) {
 
             // Next call in case runtime returns
             int nfidx, tmp_n;
-            if (!helper_runtime_does_not_return[u->operands[0].symbol]) {
+            if (!helper_runtime_does_not_return[h]) {
                 nfidx = lookup_next_func_idx(ctx, u);
                 // - GET the address of next
                 // func_addr tmp_n,hex_offset,nfidx
@@ -1897,6 +1905,17 @@ void expand_call_runtime(TcgContext *ctx) {
                     SLOT_OP(SUB_SLOT_TMP, tmp_n),
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(nfidx));
+                additional_op_cnt += 1;
+            } else if (h == helper_jmp_ind) {
+                // - GET the address of next
+                // func_addr tmp_n,jmp_ind_callback
+                tmp_n = get_next_tmp_idx(ctx);
+                EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, func_addr, 0, 0,
+                    SLOT_OP(SUB_SLOT_TMP, tmp_n),
+                    SYMBOL_OP(jmp_ind_callback));
+                additional_op_cnt += 1;
+
+                // Need another TMP to hold address of helper_jmp_ind
                 additional_op_cnt += 1;
             }
 
@@ -1907,13 +1926,23 @@ void expand_call_runtime(TcgContext *ctx) {
             memset(uu, 0, sz);
             uu->opc = tail_call;
             uu->is_helper = false;
-            Operand tf;
-            tf.kind = OP_SLOT;
-            tf.slot.type = SUB_SLOT_TMP;
-            tf.slot.idx = tmp_t;
-            tf.slot.op_type = LLVMInt64;
+            Operand tc;
+            tc.kind = OP_SLOT;
+            tc.slot.type = SUB_SLOT_TMP;
+            if (h != helper_jmp_ind) {
+                tc.slot.idx = tmp_t;
+            } else {
+                // - GET the address of helper_jmp_ind
+                // func_addr tmp_n,helper_jmp_ind
+                int tmp_j = get_next_tmp_idx(ctx);
+                EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u, func_addr, 0, 0,
+                    SLOT_OP(SUB_SLOT_TMP, tmp_j),
+                    SYMBOL_OP(helper_jmp_ind));
+                tc.slot.idx = tmp_j;
+            }
+            tc.slot.op_type = LLVMInt64;
             int uu_op_idx = 0;
-            uu->operands[uu_op_idx++] = tf;
+            uu->operands[uu_op_idx++] = tc;
             for (int i = get_first_input_idx_on_call(u); i < u->operand_count; ++i) {
                 if (u->operands[i].kind == OP_VEC) {
                     int tmp1 = get_next_tmp_idx(ctx);
@@ -1940,7 +1969,21 @@ void expand_call_runtime(TcgContext *ctx) {
                     uu->operands[uu_op_idx++] = u->operands[i];
                 }
             }
-            if (!helper_runtime_does_not_return[u->operands[0].symbol]) {
+            if (!helper_runtime_does_not_return[h]) {
+                Operand nf;
+                nf.kind = OP_SLOT;
+                nf.slot.type = SUB_SLOT_TMP;
+                nf.slot.idx = tmp_n;
+                nf.slot.op_type = LLVMInt64;
+                uu->operands[uu_op_idx++] = nf;
+            } else if (h == helper_jmp_ind) {
+                Operand tf;
+                tf.kind = OP_SLOT;
+                tf.slot.type = SUB_SLOT_TMP;
+                tf.slot.idx = tmp_t;
+                tf.slot.op_type = LLVMInt64;
+                uu->operands[uu_op_idx++] = tf;
+
                 Operand nf;
                 nf.kind = OP_SLOT;
                 nf.slot.type = SUB_SLOT_TMP;
