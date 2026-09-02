@@ -17,6 +17,8 @@
 extern char *lineptr;
 extern const char *helper_str[];
 
+static int debug_enabled = 0;
+
 void print_operand(Operand *op, int is_output) {
     switch (op->kind) {
     case OP_SLOT:
@@ -99,9 +101,11 @@ void print_instr(UnifiedInstr *u) {
     printf("\n");
 }
 
-//#define DEBUG
 void debug_print_instr(TcgContext *ctx, const char *msg) {
-#ifdef DEBUG
+    if (!debug_enabled) {
+        return;
+    }
+
     printf("===============================================\n");
     printf("0x%lx %s:\n", ctx->hex_offset, msg);
     if (ctx->llvm_func_set.num_lists) {
@@ -117,7 +121,6 @@ void debug_print_instr(TcgContext *ctx, const char *msg) {
         }
         printf("\n");
     }
-#endif
 }
 
 void handle_func(TcgContext *ctx, int is_external) {
@@ -133,6 +136,27 @@ void handle_func(TcgContext *ctx, int is_external) {
         }
         printf("\n");
     }
+}
+
+void print_usage(const char *progname) {
+    printf("Usage: %s [options] <input.tcg>\n", progname);
+    printf("\n");
+    printf("Parse and print TCG intermediate representation.\n");
+    printf("\n");
+    printf("Options:\n");
+    printf("  -d            Enable debug printing of instruction lists\n");
+    printf("                  (shows intermediate per-function lists when set).\n");
+    printf("                  By default debug output is suppressed.\n");
+    printf("  -h, --help    Show this help message and exit\n");
+    printf("\n");
+    printf("Arguments:\n");
+    printf("  <input.tcg>   Path to the TCG IR text file to parse (required)\n");
+    printf("\n");
+    printf("Examples:\n");
+    printf("  %s code.tir          # normal output only\n", progname);
+    printf("  %s -d code.tir       # enable debug instruction dump\n", progname);
+    printf("  %s -h                # show help\n", progname);
+    printf("\n");
 }
 
 void parse_tcg_instructions(const char *filename) {
@@ -156,6 +180,35 @@ void parse_tcg_instructions(const char *filename) {
 }
 
 int main(int argc, const char *argv[]) {
-    parse_tcg_instructions(argv[1]);
+    const char *input_file = NULL;
+
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "-d") == 0) {
+            debug_enabled = 1;
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            print_usage(argv[0]);
+            return 0;
+        } else if (argv[i][0] == '-') {
+            fprintf(stderr, "Error: unknown option '%s'\n\n", argv[i]);
+            print_usage(argv[0]);
+            return 1;
+        } else {
+            if (input_file) {
+                fprintf(stderr, "Error: multiple input files given ('%s' and '%s')\n\n",
+                        input_file, argv[i]);
+                print_usage(argv[0]);
+                return 1;
+            }
+            input_file = argv[i];
+        }
+    }
+
+    if (!input_file) {
+        fprintf(stderr, "Error: no input file specified\n\n");
+        print_usage(argv[0]);
+        return 1;
+    }
+
+    parse_tcg_instructions(input_file);
     return 0;
 }
