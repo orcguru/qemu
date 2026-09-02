@@ -7,6 +7,8 @@
 #include "mapper_util.h"
 #include "i386_cpu.h"
 
+extern int cfg_xmm_count;
+
 // FIXME: improve const attribute on all code
 static uint16_t xmm_offsets[17] = {0};
 
@@ -33,7 +35,7 @@ VecInfo lookup_vec(uint64_t offset) {
     VecInfo v;
     v.idx = NON_XMM;
     v.offset = 0;
-    if (XMM_COUNT > 0 && xmm_offsets[0] <= off && off < (xmm_offsets[XMM_COUNT-1] + 0x20)) {
+    if (cfg_xmm_count > 0 && xmm_offsets[0] <= off && off < (xmm_offsets[cfg_xmm_count-1] + 0x20)) {
         uint16_t idx = (off - xmm_offsets[0]) / 0x40;
         uint16_t delta = (off - xmm_offsets[0]) % 0x40;
         if (delta < 0x10) {
@@ -1293,12 +1295,12 @@ int get_vector_spill_info(const UnifiedInstr *u,
 
                 // pcmpistrm implicitly writes to xmm0, skip the first pair of vectors
                 int spare_idx = 2;
-                for (; spare_idx < (XMM_COUNT * 2); spare_idx += 2) {
+                for (; spare_idx < (cfg_xmm_count * 2); spare_idx += 2) {
                     if ((vec_valid & (1 << spare_idx)) == 0) {
                         break;
                     }
                 }
-                assert(spare_idx < (XMM_COUNT * 2));
+                assert(spare_idx < (cfg_xmm_count * 2));
                 vec_valid |= (1 << spare_idx);
 
                 // Do update mapping info
@@ -1490,7 +1492,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
                           result.head, env_vecs, spare_vecs, cnt, false /*after call*/);
 
     // Store all Vector registers to ENV
-    for (int i = 0; i < (XMM_COUNT * 2); ++i) {
+    for (int i = 0; i < (cfg_xmm_count * 2); ++i) {
         int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = get_vec_offset(i);
         // - CALCULATE offset to CPUArchState field
@@ -1554,7 +1556,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
     }
 
     // Load all Vector registers from ENV
-    for (int i = 0; i < (XMM_COUNT * 2); ++i) {
+    for (int i = 0; i < (cfg_xmm_count * 2); ++i) {
         int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = get_vec_offset(i);
         // - CALCULATE offset to CPUArchState field
@@ -1744,7 +1746,7 @@ int create_trampoline_for_runtime(TcgContext *ctx,
     }
 
     // Store all Vector registers to ENV
-    for (int i = 0; i < (XMM_COUNT * 2); ++i) {
+    for (int i = 0; i < (cfg_xmm_count * 2); ++i) {
         int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = get_vec_offset(i);
         // - CALCULATE offset to CPUArchState field
@@ -1831,7 +1833,7 @@ int create_trampoline_for_runtime(TcgContext *ctx,
     }
 
     // Load all Vector registers from ENV
-    for (int i = 0; i < (XMM_COUNT * 2); ++i) {
+    for (int i = 0; i < (cfg_xmm_count * 2); ++i) {
         int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = get_vec_offset(i);
         // - CALCULATE offset to CPUArchState field

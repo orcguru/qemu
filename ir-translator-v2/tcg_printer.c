@@ -18,6 +18,7 @@ extern char *lineptr;
 extern const char *helper_str[];
 
 static int debug_enabled = 0;
+int cfg_xmm_count = XMM_COUNT;
 
 void print_operand(Operand *op, int is_output) {
     switch (op->kind) {
@@ -147,15 +148,20 @@ void print_usage(const char *progname) {
     printf("  -d            Enable debug printing of instruction lists\n");
     printf("                  (shows intermediate per-function lists when set).\n");
     printf("                  By default debug output is suppressed.\n");
+    printf("  -x <count>    Override the number of XMM registers (cfg_xmm_count).\n");
+    printf("                  Must be a non-negative integer. Default is %d\n", XMM_COUNT);
+    printf("                  (the value of the XMM_COUNT compile-time macro).\n");
     printf("  -h, --help    Show this help message and exit\n");
     printf("\n");
     printf("Arguments:\n");
     printf("  <input.tcg>   Path to the TCG IR text file to parse (required)\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s code.tir          # normal output only\n", progname);
-    printf("  %s -d code.tir       # enable debug instruction dump\n", progname);
-    printf("  %s -h                # show help\n", progname);
+    printf("  %s code.tir              # normal output only\n", progname);
+    printf("  %s -d code.tir           # enable debug instruction dump\n", progname);
+    printf("  %s -x 16 code.tir        # use 16 XMM registers\n", progname);
+    printf("  %s -x 8 -d code.tir      # combine options\n", progname);
+    printf("  %s -h                    # show help\n", progname);
     printf("\n");
 }
 
@@ -186,6 +192,22 @@ int main(int argc, const char *argv[]) {
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-d") == 0) {
             debug_enabled = 1;
+        } else if (strcmp(argv[i], "-x") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "Error: option '%s' requires an argument\n\n", argv[i]);
+                print_usage(argv[0]);
+                return 1;
+            }
+            char *end = NULL;
+            long val = strtol(argv[i + 1], &end, 0);
+            if (*end != '\0' || val < 0 || val > XMM_COUNT) {
+                fprintf(stderr, "Error: invalid value '%s' for -x (expected 0..%d)\n\n",
+                        argv[i + 1]);
+                print_usage(argv[0]);
+                return 1;
+            }
+            cfg_xmm_count = (int)val;
+            i++;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             return 0;
