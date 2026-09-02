@@ -161,8 +161,6 @@ scalar_instr:
         } else if (u->opc == mov_i64 && (u->operands[1].kind == OP_VEC || u->operands[1].kind == OP_ENV)) {
             register_alias(ctx, &u->operands[0], &u->operands[1]);
             skip_alias_instr = 1;
-        } else if (u->opc == call && u->operands[2].kind == OP_IMM && u->operands[2].imm) {
-            try_unregister_alias(ctx, &u->operands[3]);
         } else if (opcoc[u->opc] > 0) {
             for (int i = 0; i < opcoc[u->opc]; ++i) {
                 try_unregister_alias(ctx, &u->operands[i]);
@@ -213,6 +211,9 @@ call_instr:
         expand_slot_alias(ctx, u);
         update_slot_types(ctx, u);
         register_stack_alloca(ctx, u);
+        if (u->operands[2].kind == OP_IMM && u->operands[2].imm) {
+            try_unregister_alias(ctx, &u->operands[3]);
+        }
         free(merged);
         op_list_free(&$8);
         append_instr(ctx, u);
