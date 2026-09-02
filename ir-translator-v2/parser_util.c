@@ -1609,6 +1609,10 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
             LASTARG_OP());
     }
 
+    // Add SPILL/LOAD to apply vector reuse before the next step
+    add_spill_load_vector(ctx, &result.head, &result.tail,
+                          result.tail, env_vecs, spare_vecs, cnt, true /*before call*/);
+
     ctx->llvm_func_set.lists[func_idx] = result;
     return func_idx;
 }
