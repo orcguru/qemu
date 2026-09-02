@@ -25,7 +25,7 @@ static inline const Operand *get_operand(const UnifiedInstr *u, int idx) {
 }
 
 static inline int helper_defines_output(const UnifiedInstr *u) {
-    assert(u->is_helper);
+    assert(u->opc == call);
     const Operand *op = get_operand(u, 2);
     assert(op->kind == OP_IMM);
     return op->imm;
@@ -52,7 +52,7 @@ static inline OpCodeType get_opcode(const UnifiedInstr *u) {
 }
 
 static inline HelperType get_helper(const UnifiedInstr *u) {
-    assert(u->is_helper);
+    assert(u->opc == call);
     const Operand *op0 = get_operand(u, 0);
     assert(op0->kind == OP_SYMBOL);
     return op0->symbol;

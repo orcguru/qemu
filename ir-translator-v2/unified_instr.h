@@ -7,13 +7,9 @@
 
 typedef struct __attribute__((packed)) UnifiedInstr {
     uint8_t  opc;
-    bool     is_helper;
-    union {
-        struct {
-            uint8_t  vs;
-            uint8_t  es;
-        };
-        uint16_t helper_index;
+    struct {
+        uint8_t  vs;
+        uint8_t  es;
     };
     uint32_t uidx;
     struct UnifiedInstr *prev;

@@ -289,29 +289,9 @@ void tcg_context_reset(TcgContext *ctx) {
 
     // init_alias_map
     ctx->plen = 0;
-    // FIXME: g_hash_table_remove_all ?
-    GHashTableIter iter;
-    gpointer key, value;
-    g_hash_table_iter_init(&iter, ctx->alias_map);
-    while (g_hash_table_iter_next(&iter, &key, &value)) {
-        g_hash_table_iter_remove(&iter);
-    }
-
-    // reset_slot_map
-    g_hash_table_iter_init(&iter, ctx->slot_map);
-    while (g_hash_table_iter_next(&iter, &key, &value)) {
-        g_hash_table_iter_remove(&iter);
-    }
-    ctx->next_tmp_idx = 0;
-
-    // type_map_reset
-    g_hash_table_iter_init(&iter, ctx->stack_type_map);
-    while (g_hash_table_iter_next(&iter, &key, &value)) {
-        g_hash_table_iter_remove(&iter);
-    }
-
-    // Reset the next helper index
-    ctx->next_helper_idx = 0;
+    g_hash_table_remove_all(ctx->alias_map);
+    g_hash_table_remove_all(ctx->slot_map);
+    g_hash_table_remove_all(ctx->stack_type_map);
 
     // Reset stack alloca bit array
     ctx->xreg_valid = 0;
@@ -444,7 +424,7 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
         return;
     }
     /* Call helper */
-    if (u->is_helper) {
+    if (u->opc == call) {
         int first_input_idx = TCG_CALL_PREFIX_COUNT;
         assert(u->operands[0].kind == OP_SYMBOL);
         assert(u->operands[2].kind == OP_IMM);
@@ -615,18 +595,12 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
     UnifiedInstr *u = malloc(sz);
     memset(u, 0, sz);
     u->opc = opc;
-    if (u->opc == call) {
-        u->is_helper = true;
-        u->helper_index = ctx->next_helper_idx++;
-    } else {
-        u->is_helper = false;
-    }
     u->vs = vs;
     u->es = es;
     u->uidx = ctx->emit_instr_count++;
     int skip_cnt = 0;
     int dst_idx = 0;
-    if (u->is_helper) {
+    if (u->opc == call) {
         memcpy(u->operands, ops, (nops * sizeof(Operand)));
     } else {
         for (int i = 0; i < nops; ++i) {
@@ -1424,7 +1398,11 @@ void expand_call_inline(TcgContext *ctx) {
             add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail),
                                      u, env_vecs, spare_vecs, spill_cnt, true /*before call*/);
 
-            // Update operands
+            // Update operands, and remove head ENV
+            if (u->operands[0].kind == OP_ENV && u->operands[0].env.offset == 0) {
+                u->operand_count -= 1;
+                memcpy(&u->operands[0], &u->operands[1], (u->operand_count * sizeof(Operand)));
+            }
             for (int i = 0; i < u->operand_count; ++i) {
                 if (u->operands[i].kind == OP_ENV) {
                     for (int j = 0; j < spill_cnt; ++j) {
@@ -1669,12 +1647,10 @@ void expand_call_inline_exception(TcgContext *ctx) {
                 IMM_OP(nfidx));
 
             size_t sz = sizeof(UnifiedInstr) + (u->operand_count + 2) * sizeof(Operand);
-            UnifiedInstr *uu = malloc(sz);
-            memcpy(uu, u, sz);
-            uu->prev = NULL;
-            uu->next = NULL;
-            uu->operand_count += 2;
+            UnifiedInstr *uu = calloc(1, sz);
             uu->opc = call_inline_exception;
+            uu->operand_count = u->operand_count + 2;
+            memcpy(&uu->operands[0], &u->operands[0], (u->operand_count * sizeof(Operand)));
             Operand tf;
             tf.kind = OP_SLOT;
             tf.slot.type = SUB_SLOT_TMP;
@@ -1696,7 +1672,11 @@ void expand_call_inline_exception(TcgContext *ctx) {
             add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail),
                                      u, env_vecs, spare_vecs, spill_cnt, true /*before call*/);
 
-            // Update operands
+            // Update operands, and remove head ENV
+            if (u->operands[0].kind == OP_ENV && u->operands[0].env.offset == 0) {
+                u->operand_count -= 1;
+                memcpy(&u->operands[0], &u->operands[1], (u->operand_count * sizeof(Operand)));
+            }
             for (int i = 0; i < u->operand_count; ++i) {
                 if (u->operands[i].kind == OP_ENV) {
                     for (int j = 0; j < spill_cnt; ++j) {
@@ -1786,6 +1766,17 @@ int create_trampoline_for_runtime(TcgContext *ctx,
         nc->opc = tail_call_native;
     }
     if (u->operands[0].symbol == helper_jmp_ind) {
+        free(nc);
+        size_t sz = sizeof(UnifiedInstr) + (u->operand_count + 1) * sizeof(Operand);
+        nc = calloc(1, sz);
+        nc->opc = tail_call_native;
+        nc->operand_count = u->operand_count + 1;
+        for (int i = 0; i < TCG_CALL_PREFIX_COUNT; ++i) {
+            nc->operands[i] = u->operands[i];
+        }
+        nc->operands[TCG_CALL_PREFIX_COUNT].kind = OP_ENV;
+        nc->operands[TCG_CALL_PREFIX_COUNT].env.offset = 0;
+        nc->operands[TCG_CALL_PREFIX_COUNT + 1] = u->operands[TCG_CALL_PREFIX_COUNT];
         nc->operands[0].symbol = helper_jit;
     }
     for (int i = 0; i < nc->operand_count; ++i) {
@@ -1925,7 +1916,6 @@ void expand_call_runtime(TcgContext *ctx) {
             UnifiedInstr *uu = malloc(sz);
             memset(uu, 0, sz);
             uu->opc = tail_call;
-            uu->is_helper = false;
             Operand tc;
             tc.kind = OP_SLOT;
             tc.slot.type = SUB_SLOT_TMP;

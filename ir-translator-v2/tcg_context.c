@@ -26,7 +26,6 @@ void tcg_context_init(TcgContext *ctx) {
     ctx->slot_map = g_hash_table_new(NULL, NULL);
     ctx->stack_type_map = g_hash_table_new(NULL, NULL);
     ctx->next_tmp_idx = 0;
-    ctx->next_helper_idx = 0;
     ctx->xreg_valid = 0;
     ctx->vec_valid = 0;
     ctx->vec_spare_valid = 0;
@@ -36,4 +35,11 @@ void tcg_context_init(TcgContext *ctx) {
     ctx->forward_use = NULL;
     ctx->num_instrs = 0;
     ctx->words_needed = 0;
+}
+
+void tcg_context_destroy(TcgContext *ctx) {
+    g_hash_table_destroy(ctx->alias_map);
+    g_hash_table_destroy(ctx->slot_map);
+    g_hash_table_destroy(ctx->stack_type_map);
+    free(ctx->alias_ops_pool);
 }

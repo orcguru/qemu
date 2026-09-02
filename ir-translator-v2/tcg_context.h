@@ -81,9 +81,6 @@ struct TcgContext {
     /* Stack type for slot operand */
     GHashTable *stack_type_map;
 
-    /* Next helper index */
-    uint16_t next_helper_idx;
-
     /* Bit array for stack alloca */
     uint32_t xreg_valid;
     uint32_t vec_valid;
@@ -102,5 +99,6 @@ struct TcgContext {
 };
 
 void tcg_context_init(TcgContext *ctx);
+void tcg_context_destroy(TcgContext *ctx);
 
 #endif /* TCG_CONTEXT_H */

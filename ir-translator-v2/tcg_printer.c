@@ -176,6 +176,7 @@ void parse_tcg_instructions(const char *filename) {
     yylex_destroy(scanner);
     free(lineptr);
     fclose(source_file);
+    tcg_context_destroy(&ctx);
     return;
 }
 
