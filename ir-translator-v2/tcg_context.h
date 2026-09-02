@@ -96,6 +96,7 @@ struct TcgContext {
     uint64_t *use_mask;
     uint64_t *reaching_def_exclude_self_def;
     uint64_t *forward_use;
+    bool *unexpected_branch;
 };
 
 void tcg_context_init(TcgContext *ctx);

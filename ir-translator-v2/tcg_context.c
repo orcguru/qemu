@@ -33,6 +33,7 @@ void tcg_context_init(TcgContext *ctx) {
     ctx->use_mask = NULL;
     ctx->reaching_def_exclude_self_def = NULL;
     ctx->forward_use = NULL;
+    ctx->unexpected_branch = NULL;
     ctx->num_instrs = 0;
     ctx->words_needed = 0;
 }

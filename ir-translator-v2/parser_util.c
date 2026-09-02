@@ -304,10 +304,12 @@ void tcg_context_reset(TcgContext *ctx) {
     free(ctx->use_mask);
     free(ctx->reaching_def_exclude_self_def);
     free(ctx->forward_use);
+    free(ctx->unexpected_branch);
     ctx->def_mask = NULL;
     ctx->use_mask = NULL;
     ctx->reaching_def_exclude_self_def = NULL;
     ctx->forward_use = NULL;
+    ctx->unexpected_branch = NULL;
     ctx->num_instrs = 0;
     ctx->words_needed = 0;
 }
@@ -891,10 +893,26 @@ void build_per_instr_masks_collect_use_def(TcgContext *ctx) {
     ctx->use_mask = calloc(n * words, sizeof(uint64_t));
     ctx->reaching_def_exclude_self_def = calloc(n * words, sizeof(uint64_t));
     ctx->forward_use = calloc(n * words, sizeof(uint64_t));
+    ctx->unexpected_branch = calloc(n, sizeof(bool));
+    GHashTable *label_tracking = g_hash_table_new(NULL, NULL);
 
     int idx = 0;
     u = ctx->instr_head;
     while (u) {
+        if (u->opc == set_label) {
+            assert(u->operands[0].kind == OP_LABEL);
+            uint16_t label = u->operands[0].label;
+            assert(!g_hash_table_contains(label_tracking, (gconstpointer)(long)label));
+            g_hash_table_insert(label_tracking, (gpointer)(long)label, (gpointer)(long)idx);
+        } else if (u->opc == br || u->opc == brcond_i32 || u->opc == brcond_i64) {
+            assert(u->operands[u->operand_count - 1].kind == OP_LABEL);
+            uint16_t label = u->operands[u->operand_count - 1].label;
+            if (g_hash_table_contains(label_tracking, (gconstpointer)(long)label)) {
+                int label_idx = (int)(long)g_hash_table_lookup(label_tracking, (gpointer)(long)label);
+                for (int i = label_idx; i < idx; ++i)
+                    ctx->unexpected_branch[i] = true;
+            }
+        }
         int def_indices[2];
         int def_cnt = get_def_tmp_indices(u, def_indices, sizeof(def_indices)/sizeof(int));
         for (int i = 0; i < def_cnt; i++)
@@ -920,10 +938,16 @@ void build_per_instr_masks_collect_use_def(TcgContext *ctx) {
         or_mask(accum, &ctx->use_mask[i * words], words);
     }
     free(accum);
+    g_hash_table_destroy(label_tracking);
 }
 
 #define TMP_SLOT_PRESERVE_OFFSET_MAX      (4096 - 32)
 
+/*
+ * NOTICE: LLVM IR should store zero into stack alloca to avoid potential
+ * poison value in case unexpected branch confused the dummy reaching-def
+ * analysis
+ */
 void expand_tmp_slot_preservation(TcgContext *ctx) {
     uint64_t *buf = calloc(ctx->words_needed, sizeof(uint64_t));
     UnifiedInstr *u = ctx->instr_head;
@@ -939,7 +963,7 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
 
         uint64_t accumulated = 0;
         for (int i = 0; i < ctx->words_needed; ++i) {
-            buf[i] = ctx->reaching_def_exclude_self_def[uidx * ctx->words_needed + i] & ctx->forward_use[uidx * ctx->words_needed + i];
+            buf[i] = ctx->reaching_def_exclude_self_def[uidx * ctx->words_needed + i] & (ctx->unexpected_branch[uidx] ? -1UL : ctx->forward_use[uidx * ctx->words_needed + i]);
             accumulated |= buf[i];
         }
         // Instructions to backup slot contents
@@ -1223,14 +1247,14 @@ static void handle_instr(TcgContext *ctx,
             return;
         } else if (cur->opc == br || cur->opc == brcond_i32 || cur->opc == brcond_i64) {
             assert(cur->operands[cur->operand_count - 1].kind == OP_LABEL);
-            uint16_t lbl = cur->operands[cur->operand_count - 1].label;
-            if (!label_tracker_contains(lt, lbl)) {
-                label_tracker_insert(lt, lbl, 0);
+            uint16_t label = cur->operands[cur->operand_count - 1].label;
+            if (!label_tracker_contains(lt, label)) {
+                label_tracker_insert(lt, label, 0);
             }
         } else if (cur->opc == set_label) {
             assert(cur->operands[cur->operand_count - 1].kind == OP_LABEL);
-            uint16_t lbl = cur->operands[cur->operand_count - 1].label;
-            label_tracker_insert_or_replace(lt, lbl, 1);
+            uint16_t label = cur->operands[cur->operand_count - 1].label;
+            label_tracker_insert_or_replace(lt, label, 1);
         }
         cur = cur->next;
     }
