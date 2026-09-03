@@ -11,6 +11,7 @@
 void register_xmm(uint64_t idx, uint64_t offset);
 void register_xmm_tmp(uint64_t offset);
 VecInfo lookup_vec(uint64_t offset);
+VecInfo lookup_vec_map(uint64_t offset);
 void handle_func(TcgContext *ctx, int is_external);
 void debug_print_instr(TcgContext *ctx, const char *msg);
 SlotInfo get_mapped_slot(TcgContext *ctx, SlotType type, uint16_t idx);

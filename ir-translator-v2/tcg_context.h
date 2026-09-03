@@ -26,7 +26,7 @@ typedef struct FuncInstrList {
     int           count;
     /*
      * Function name for trampolines into runtime:
-     * call_inline_exception - "trampoline_exception_" + helper(max_length:30) + arguments (max_count:4)
+     * call_inline_exception - "trampoline_exception_" + helper(max_length:30) + arguments (max_count:4*2(for YMM) _V:vector _S:spare)
      * call_runtime_wi/wo_next - helper
      *
      * Reuse function by names

@@ -209,6 +209,40 @@ call_instr:
         free(pre.data);
         UnifiedInstr *u = emit_instr(ctx, $1, 0, 0, merged, total);
         expand_slot_alias(ctx, u);
+        // Create operands for YMM
+        if ($2 > ymm_helper_begin) {
+            size_t sz = sizeof(UnifiedInstr) + 2 * u->operand_count * sizeof(Operand);
+            UnifiedInstr *u_ymm = calloc(1, sz);
+            u_ymm->opc = u->opc;
+            int u_ymm_op_count = 0;
+            for (int i = 0; i < TCG_CALL_PREFIX_COUNT; ++i) {
+                u_ymm->operands[u_ymm_op_count++] = u->operands[i];
+            }
+            for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+                if (u->operands[i].kind == OP_VEC) {
+                    assert(u->operands[i].vec.idx % 2 == 0 && u->operands[i].vec.offset == 0);
+                    u_ymm->operands[u_ymm_op_count++] = u->operands[i];
+                    u_ymm->operands[u_ymm_op_count] = u->operands[i];
+                    u_ymm->operands[u_ymm_op_count].vec.idx += 1;
+                    u_ymm_op_count += 1;
+                    continue;
+                } else if (u->operands[i].kind == OP_ENV) {
+                    VecInfo vinfo = lookup_vec_map(u->operands[i].env.offset);
+                    if (vinfo.idx != NON_XMM) {
+                        assert(vinfo.offset == 0);
+                        u_ymm->operands[u_ymm_op_count++] = u->operands[i];
+                        u_ymm->operands[u_ymm_op_count] = u->operands[i];
+                        u_ymm->operands[u_ymm_op_count].env.offset += 16;
+                        u_ymm_op_count += 1;
+                        continue;
+                    }
+                }
+                u_ymm->operands[u_ymm_op_count++] = u->operands[i];
+            }
+            u_ymm->operand_count = u_ymm_op_count;
+            free(u);
+            u = u_ymm;
+        }
         update_slot_types(ctx, u);
         register_stack_alloca(ctx, u);
         if (u->operands[2].kind == OP_IMM && u->operands[2].imm) {

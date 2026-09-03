@@ -159,7 +159,9 @@ UnifiedInstr *clone_instr(const UnifiedInstr *src) {
 }
 
 static int get_first_input_idx_on_call(const UnifiedInstr *u) {
-    assert(u->opc == call && u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
+    assert(u->operand_count >= TCG_CALL_OUT_FLAG_IDX &&
+           u->operands[0].kind == OP_SYMBOL &&
+           u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
     if (u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
         return TCG_CALL_PREFIX_COUNT + 1;
     }
@@ -596,8 +598,7 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
                                 uint8_t vs, uint8_t es,
                                 Operand *ops, int nops) {
     size_t sz = sizeof(UnifiedInstr) + nops * sizeof(Operand);
-    UnifiedInstr *u = malloc(sz);
-    memset(u, 0, sz);
+    UnifiedInstr *u = calloc(1, sz);
     u->opc = opc;
     u->vs = vs;
     u->es = es;
@@ -1290,11 +1291,12 @@ void expand_llvm_func(TcgContext *ctx) {
     collect_func_instr_list_for_llvm(ctx, ctx->instr_head);
 }
 
-// FIXME: YMM
 int get_vector_spill_info(const UnifiedInstr *u,
                           Operand *env_vecs,
                           Operand *spare_vecs,
                           int cnt) {
+    assert(u->opc == call && u->operands[0].kind == OP_SYMBOL);
+    bool is_ymm = (u->operands[0].symbol > ymm_helper_begin);
     int rc = 0;
     uint32_t vec_valid = 0;
     // Collect all vectors being used in current instruction
@@ -1320,7 +1322,7 @@ int get_vector_spill_info(const UnifiedInstr *u,
 
                 // pcmpistrm implicitly writes to xmm0, skip the first pair of vectors
                 int spare_idx = 2;
-                for (; spare_idx < (cfg_xmm_count * 2); spare_idx += 2) {
+                for (; spare_idx < (cfg_xmm_count * 2); spare_idx += (is_ymm ? 1 : 2)) {
                     if ((vec_valid & (1 << spare_idx)) == 0) {
                         break;
                     }
@@ -1410,13 +1412,23 @@ void expand_call_inline(TcgContext *ctx) {
             if (helper_require_exception_path[u->operands[0].symbol])
                 continue;
 
-            // Update opcode
-            u->opc = call_inline;
-
             // Need double size for ymm
             Operand env_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
             Operand spare_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
             int spill_cnt = get_vector_spill_info(u, env_vecs, spare_vecs, (MAX_INLINE_VEC_ARG_CNT * 2));
+
+            /*
+             * Update call opc and remove head ENV
+             * Inlined helper functions do not need the initial ENV argument,
+             * drop it saves one argument slot
+             */
+            int first_input_idx = get_first_input_idx_on_call(u);
+            u->opc = call_inline;
+            if (u->operands[first_input_idx].kind == OP_ENV && u->operands[first_input_idx].env.offset == 0) {
+                memcpy(&u->operands[first_input_idx], &u->operands[first_input_idx + 1],
+                       ((u->operand_count - (first_input_idx + 1)) * sizeof(Operand)));
+                u->operand_count -= 1;
+            }
 
             // Check if require vector register spill/reload
             if (!spill_cnt)
@@ -1425,11 +1437,6 @@ void expand_call_inline(TcgContext *ctx) {
             add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail),
                                      u, env_vecs, spare_vecs, spill_cnt, true /*before call*/);
 
-            // Update operands, and remove head ENV
-            if (u->operands[0].kind == OP_ENV && u->operands[0].env.offset == 0) {
-                u->operand_count -= 1;
-                memcpy(&u->operands[0], &u->operands[1], (u->operand_count * sizeof(Operand)));
-            }
             for (int i = 0; i < u->operand_count; ++i) {
                 if (u->operands[i].kind == OP_ENV) {
                     for (int j = 0; j < spill_cnt; ++j) {
@@ -1441,7 +1448,6 @@ void expand_call_inline(TcgContext *ctx) {
                 }
             }
 
-            // Add SPILL/RELOAD after the call
             assert(u->next);
             add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail),
                                      u->next, env_vecs, spare_vecs, spill_cnt, false /*after call*/);
@@ -1462,7 +1468,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
     for (int i = 0; i < u->operand_count; ++i) {
         if (u->operands[i].kind == OP_VEC) {
             char vec_name[7] = {0};
-            sprintf(&vec_name[0], "_vec%02x", u->operands[i].vec.idx & 0xff);
+            sprintf(&vec_name[0], "_V%02x", u->operands[i].vec.idx & 0xff);
             strcat(&result.trampoline_name[0], &vec_name[0]);
         } else if (u->operands[i].kind == OP_ENV) {
             int idx = 0;
@@ -1473,7 +1479,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
             }
             if (idx < cnt) {
                 char vec_name[9] = {0};
-                sprintf(&vec_name[0], "_spill%02x", spare_vecs[idx].vec.idx & 0xff);
+                sprintf(&vec_name[0], "_S%02x", spare_vecs[idx].vec.idx & 0xff);
                 strcat(&result.trampoline_name[0], &vec_name[0]);
             }
         }
@@ -1534,6 +1540,14 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
     // Setup native call arguments
     UnifiedInstr *nc = clone_instr(u);
     nc->opc = call_native;
+    // Fold vector operands for YMM
+    int fold_idx = 0;
+    for (int i = 0; i < nc->operand_count; ++i) {
+        if (nc->operands[i].kind == OP_VEC && (nc->operands[i].vec.idx % 2 == 1))
+            continue;
+        nc->operands[fold_idx++] = nc->operands[i];
+    }
+    nc->operand_count = fold_idx;
     for (int i = 0; i < nc->operand_count; ++i) {
         if (nc->operands[i].kind == OP_VEC) {
             int tmp2 = get_next_tmp_idx(ctx);
@@ -1696,6 +1710,18 @@ void expand_call_inline_exception(TcgContext *ctx) {
             instr_list_remove_and_free(&(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail), u);
             u = uu;
 
+            /*
+             * Remove head ENV
+             * Inlined helper functions do not need the initial ENV argument,
+             * drop it saves one argument slot
+             */
+            int first_input_idx = get_first_input_idx_on_call(u);
+            if (u->operands[first_input_idx].kind == OP_ENV && u->operands[first_input_idx].env.offset == 0) {
+                memcpy(&u->operands[first_input_idx], &u->operands[first_input_idx + 1],
+                       ((u->operand_count - (first_input_idx + 1)) * sizeof(Operand)));
+                u->operand_count -= 1;
+            }
+
             // Check if require vector register spill/reload
             if (!spill_cnt)
                 continue;
@@ -1703,11 +1729,6 @@ void expand_call_inline_exception(TcgContext *ctx) {
             add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[i].head), &(ctx->llvm_func_set.lists[i].tail),
                                      u, env_vecs, spare_vecs, spill_cnt, true /*before call*/);
 
-            // Update operands, and remove head ENV
-            if (u->operands[0].kind == OP_ENV && u->operands[0].env.offset == 0) {
-                u->operand_count -= 1;
-                memcpy(&u->operands[0], &u->operands[1], (u->operand_count * sizeof(Operand)));
-            }
             for (int i = 0; i < u->operand_count; ++i) {
                 if (u->operands[i].kind == OP_ENV) {
                     for (int j = 0; j < spill_cnt; ++j) {
@@ -1944,8 +1965,7 @@ void expand_call_runtime(TcgContext *ctx) {
             // Create tail_call instruction
             int tail_call_operand_count = u->operand_count - get_first_input_idx_on_call(u) + additional_op_cnt;
             size_t sz = sizeof(UnifiedInstr) + tail_call_operand_count * sizeof(Operand);
-            UnifiedInstr *uu = malloc(sz);
-            memset(uu, 0, sz);
+            UnifiedInstr *uu = calloc(1, sz);
             uu->opc = tail_call;
             Operand tc;
             tc.kind = OP_SLOT;
