@@ -1153,26 +1153,6 @@ static void label_tracker_insert(LabelTracker *lt, uint16_t label, uint8_t value
     lt->len++;
 }
 
-/*
- * Insert the label if it is not yet tracked, otherwise replace its value.
- * Convenience that covers both g_hash_table_insert (first time) and
- * g_hash_table_replace (subsequent updates) used in the original code.
- */
-static void label_tracker_insert_or_replace(LabelTracker *lt, uint16_t label, uint8_t value) {
-    int idx = label_tracker_find(lt, label);
-    if (idx >= 0) {
-        lt->data[idx].value = value;
-    } else {
-        if (lt->len >= lt->cap) {
-            lt->cap = lt->cap ? lt->cap * 2 : 8;
-            lt->data = realloc(lt->data, lt->cap * sizeof(LabelTrackerEntry));
-        }
-        lt->data[lt->len].label = label;
-        lt->data[lt->len].value = value;
-        lt->len++;
-    }
-}
-
 /* Find the first entry whose value is 0. Returns -1 if none. */
 static int label_tracker_find_zero(const LabelTracker *lt) {
     for (int i = 0; i < lt->len; i++) {
@@ -1222,7 +1202,7 @@ static const UnifiedInstr *get_next_missing_label_instr(TcgContext *ctx,
     return NULL;
 }
 
-static void handle_instr(TcgContext *ctx,
+static void emulate_control_flow(TcgContext *ctx,
                          const UnifiedInstr *cur,
                          FuncInstrList *list,
                          LabelTracker *lt);
@@ -1230,17 +1210,35 @@ static void handle_instr(TcgContext *ctx,
 static void collect_func_instr_list_for_llvm(TcgContext *ctx,
                                              const UnifiedInstr *next);
 
-static void handle_instr(TcgContext *ctx,
+static void emulate_control_flow(TcgContext *ctx,
                          const UnifiedInstr *cur,
                          FuncInstrList *list,
                          LabelTracker *lt) {
     while (cur) {
+        /*
+         * For set_label, it is possible that the label has been emitted
+         * due to fall-through path. In that case, we simply branch to it
+         */
+        if (cur->opc == set_label) {
+            assert(cur->operands[cur->operand_count - 1].kind == OP_LABEL);
+            uint16_t label = cur->operands[cur->operand_count - 1].label;
+            if (label_tracker_contains(lt, label)) {
+                int idx = label_tracker_find(lt, label);
+                if (lt->data[idx].value == 1) {
+                    // Label already exists, add br label
+                    UnifiedInstr *u = clone_instr(cur);
+                    u->opc = br;
+                    func_list_append(list, u);
+                    break;
+                }
+            }
+        }
         UnifiedInstr *copy = clone_instr(cur);
         func_list_append(list, copy);
         if (is_instr_end_of_control_flow(cur)) {
             const UnifiedInstr *label_u;
             while ((label_u = get_next_missing_label_instr(ctx, lt))) {
-                handle_instr(ctx, label_u, list, lt);
+                emulate_control_flow(ctx, label_u, list, lt);
             }
             if (cur->opc == call && !helper_runtime_does_not_return[cur->operands[0].symbol]) {
                 collect_func_instr_list_for_llvm(ctx, cur->next);
@@ -1255,10 +1253,17 @@ static void handle_instr(TcgContext *ctx,
         } else if (cur->opc == set_label) {
             assert(cur->operands[cur->operand_count - 1].kind == OP_LABEL);
             uint16_t label = cur->operands[cur->operand_count - 1].label;
-            label_tracker_insert_or_replace(lt, label, 1);
+            if (label_tracker_contains(lt, label)) {
+                int idx = label_tracker_find(lt, label);
+                assert(lt->data[idx].value == 0);
+                lt->data[idx].value = 1;
+            } else {
+                label_tracker_insert(lt, label, 1);
+            }
         }
         cur = cur->next;
     }
+    return;
 }
 
 /* Recursively collect LLVM functions */
@@ -1281,7 +1286,7 @@ static void collect_func_instr_list_for_llvm(TcgContext *ctx,
     ctx->llvm_func_set.lists[func_idx].head_uidx = cur->uidx;
     LabelTracker lt;
     label_tracker_init(&lt);
-    handle_instr(ctx, cur, &result, &lt);
+    emulate_control_flow(ctx, cur, &result, &lt);
     label_tracker_free(&lt);
     // LLVM function is setup lazily
     ctx->llvm_func_set.lists[func_idx] = result;
