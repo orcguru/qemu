@@ -1545,6 +1545,11 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
     for (int i = 0; i < nc->operand_count; ++i) {
         if (nc->operands[i].kind == OP_VEC && (nc->operands[i].vec.idx % 2 == 1))
             continue;
+        if (nc->operands[i].kind == OP_ENV) {
+            VecInfo vinfo = lookup_vec_map(u->operands[i].env.offset);
+            if (vinfo.idx % 2 == 1)
+                continue;
+        }
         nc->operands[fold_idx++] = nc->operands[i];
     }
     nc->operand_count = fold_idx;
