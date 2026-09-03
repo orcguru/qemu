@@ -1232,6 +1232,12 @@ static void emulate_control_flow(TcgContext *ctx,
                     break;
                 }
             }
+            // If the last instruction is not end of control flow, add br
+            if (list->tail && !is_instr_end_of_control_flow(list->tail)) {
+                UnifiedInstr *u = clone_instr(cur);
+                u->opc = br;
+                func_list_append(list, u);
+            }
         }
         UnifiedInstr *copy = clone_instr(cur);
         func_list_append(list, copy);
