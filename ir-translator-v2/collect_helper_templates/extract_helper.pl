@@ -21,6 +21,7 @@ my %fp_helpers = (
   "helper_divl_EAX" => 1,
   "helper_idivq_EAX" => 1,
   "helper_divw_AX" => 1,
+  "helper_divb_AL" => 1,
   "helper_idivb_AL" => 1,
   "helper_idivl_EAX" => 1,
   "helper_idivw_AX" => 1,

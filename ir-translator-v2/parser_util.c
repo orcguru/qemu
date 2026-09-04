@@ -1162,17 +1162,19 @@ static int label_tracker_find_zero(const LabelTracker *lt) {
     return -1;
 }
 
-#define IS_YMM_HELPER(h)            (h > ymm_helper_begin && h < HELPER_MAX)
-#define IS_XMM_HELPER(h)            (h > xmm_helper_begin && h < ymm_helper_begin)
-#define IS_FLOATINGPOINT_INLINED_HELPER(h)            (h > floatingpoint_inlined_helper_begin && h < floatingpoint_inlined_helper_end)
-#define INLINE_HELPER_ENABLED(h)    (IS_XMM_HELPER(h) || IS_YMM_HELPER(h) || IS_FLOATINGPOINT_INLINED_HELPER(h))
+#define IS_YMM_HELPER(h)            (h > ABOVE_HELPER_IS_YMM)
+#define HELPER_TEMPLATE_ENABLED(h)  (h > ABOVE_HELPER_ENABLED_TEMPLATE)
+#define HELPER_TEMPLATE_NOINLINE(h) (NOINLINE_BEGIN < h && h < NOINLINE_END)
 
 static inline bool is_instr_end_of_control_flow(const UnifiedInstr *u) {
     if (u->opc == tail_call)
         return true;
     if (u->opc == call) {
         assert(u->operands[0].kind == OP_SYMBOL);
-        if (INLINE_HELPER_ENABLED(u->operands[0].symbol) && !helper_require_exception_path[u->operands[0].symbol])
+        HelperType h = u->operands[0].symbol;
+        if (HELPER_TEMPLATE_NOINLINE(h))
+            return true;
+        if (HELPER_TEMPLATE_ENABLED(h) && !helper_require_exception_path[h])
             return false;
         else
             return true;
@@ -1307,7 +1309,7 @@ int get_vector_spill_info(const UnifiedInstr *u,
                           Operand *spare_vecs,
                           int cnt) {
     assert(u->opc == call && u->operands[0].kind == OP_SYMBOL);
-    bool is_ymm = (u->operands[0].symbol > ymm_helper_begin);
+    bool is_ymm = IS_YMM_HELPER(u->operands[0].symbol);
     int rc = 0;
     uint32_t vec_valid = 0;
     // Collect all vectors being used in current instruction
@@ -1412,13 +1414,13 @@ void add_spill_load_vector(TcgContext *ctx,
     }
 }
 
-void expand_call_inline(TcgContext *ctx) {
+void expand_call_template_wo_exception(TcgContext *ctx) {
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
         for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
             if (u->opc != call)
                 continue;
             assert(u->operands[0].kind == OP_SYMBOL);
-            if (!INLINE_HELPER_ENABLED(u->operands[0].symbol))
+            if (!HELPER_TEMPLATE_ENABLED(u->operands[0].symbol))
                 continue;
             if (helper_require_exception_path[u->operands[0].symbol])
                 continue;
@@ -1434,7 +1436,7 @@ void expand_call_inline(TcgContext *ctx) {
              * drop it saves one argument slot
              */
             int first_input_idx = get_first_input_idx_on_call(u);
-            u->opc = call_inline;
+            u->opc = call_template;
             if (u->operands[first_input_idx].kind == OP_ENV && u->operands[first_input_idx].env.offset == 0) {
                 memcpy(&u->operands[first_input_idx], &u->operands[first_input_idx + 1],
                        ((u->operand_count - (first_input_idx + 1)) * sizeof(Operand)));
@@ -1671,13 +1673,13 @@ int lookup_next_func_idx(TcgContext *ctx,
  * Insert vector register spill logic in case vector reuse happens before original call
  * Insert vector register reload logic in case reuse at the beginning of the next
  */
-void expand_call_inline_exception(TcgContext *ctx) {
+void expand_call_template_wi_exception(TcgContext *ctx) {
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
         for (UnifiedInstr *u = ctx->llvm_func_set.lists[i].head; u; u = u->next) {
             if (u->opc != call)
                 continue;
             assert(u->operands[0].kind == OP_SYMBOL);
-            if (!INLINE_HELPER_ENABLED(u->operands[0].symbol))
+            if (!HELPER_TEMPLATE_ENABLED(u->operands[0].symbol))
                 continue;
             if (!helper_require_exception_path[u->operands[0].symbol])
                 continue;
@@ -1709,7 +1711,7 @@ void expand_call_inline_exception(TcgContext *ctx) {
 
             size_t sz = sizeof(UnifiedInstr) + (u->operand_count + 2) * sizeof(Operand);
             UnifiedInstr *uu = calloc(1, sz);
-            uu->opc = call_inline_exception;
+            uu->opc = call_template_exception;
             uu->operand_count = u->operand_count + 2;
             memcpy(&uu->operands[0], &u->operands[0], (u->operand_count * sizeof(Operand)));
             Operand tf;
@@ -1938,7 +1940,7 @@ void expand_call_runtime(TcgContext *ctx) {
                 continue;
             assert(u->operands[0].kind == OP_SYMBOL);
             HelperType h = u->operands[0].symbol;
-            if (INLINE_HELPER_ENABLED(h))
+            if (HELPER_TEMPLATE_ENABLED(h))
                 continue;
 
             int additional_op_cnt = 0;

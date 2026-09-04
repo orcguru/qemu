@@ -121,10 +121,10 @@ func:
         debug_print_instr(ctx, "after expand_jmp_direct");
         expand_llvm_func(ctx);
         debug_print_instr(ctx, "after expand_llvm_func");
-        expand_call_inline(ctx);
-        debug_print_instr(ctx, "after call_inline");
-        expand_call_inline_exception(ctx);
-        debug_print_instr(ctx, "after call_inline_exception");
+        expand_call_template_wo_exception(ctx);
+        debug_print_instr(ctx, "after expand_call_template_wo_exception");
+        expand_call_template_wi_exception(ctx);
+        debug_print_instr(ctx, "after expand_call_template_wi_exception");
         expand_call_runtime(ctx);
         debug_print_instr(ctx, "after call_runtime");
         /* End of function – apply final slot types */
@@ -210,7 +210,7 @@ call_instr:
         UnifiedInstr *u = emit_instr(ctx, $1, 0, 0, merged, total);
         expand_slot_alias(ctx, u);
         // Create operands for YMM
-        if ($2 > ymm_helper_begin) {
+        if ($2 > ABOVE_HELPER_IS_YMM) {
             size_t sz = sizeof(UnifiedInstr) + 2 * u->operand_count * sizeof(Operand);
             UnifiedInstr *u_ymm = calloc(1, sz);
             u_ymm->opc = u->opc;

@@ -264,151 +264,6 @@ typedef enum __attribute__((packed)) {
     X(helper_boundw) \
     X(helper_clts) \
     X(helper_cr4_testbit) \
-    X(floatingpoint_inlined_helper_begin) \
-    X(helper_cc_compute_all) \
-    X(helper_cc_compute_c) \
-    X(helper_cc_compute_nz) \
-    X(helper_addsd) \
-    X(helper_addss) \
-    X(helper_cmpeqsd) \
-    X(helper_cmpeqss) \
-    X(helper_cmpeqssd) \
-    X(helper_cmpeqsss) \
-    X(helper_cmpequsd) \
-    X(helper_cmpequss) \
-    X(helper_cmpequssd) \
-    X(helper_cmpequsss) \
-    X(helper_cmpfalsesd) \
-    X(helper_cmpfalsess) \
-    X(helper_cmpfalsessd) \
-    X(helper_cmpfalsesss) \
-    X(helper_cmpgeqsd) \
-    X(helper_cmpgeqss) \
-    X(helper_cmpgesd) \
-    X(helper_cmpgess) \
-    X(helper_cmpgtqsd) \
-    X(helper_cmpgtqss) \
-    X(helper_cmpgtsd) \
-    X(helper_cmpgtss) \
-    X(helper_cmpleqsd) \
-    X(helper_cmpleqss) \
-    X(helper_cmplesd) \
-    X(helper_cmpless) \
-    X(helper_cmpltqsd) \
-    X(helper_cmpltqss) \
-    X(helper_cmpltsd) \
-    X(helper_cmpltss) \
-    X(helper_cmpneqqsd) \
-    X(helper_cmpneqqss) \
-    X(helper_cmpneqsd) \
-    X(helper_cmpneqss) \
-    X(helper_cmpnequsd) \
-    X(helper_cmpnequss) \
-    X(helper_cmpnequssd) \
-    X(helper_cmpnequsss) \
-    X(helper_cmpngeqsd) \
-    X(helper_cmpngeqss) \
-    X(helper_cmpngesd) \
-    X(helper_cmpngess) \
-    X(helper_cmpngtqsd) \
-    X(helper_cmpngtqss) \
-    X(helper_cmpngtsd) \
-    X(helper_cmpngtss) \
-    X(helper_cmpnleqsd) \
-    X(helper_cmpnleqss) \
-    X(helper_cmpnlesd) \
-    X(helper_cmpnless) \
-    X(helper_cmpnltqsd) \
-    X(helper_cmpnltqss) \
-    X(helper_cmpnltsd) \
-    X(helper_cmpnltss) \
-    X(helper_cmpordsd) \
-    X(helper_cmpordss) \
-    X(helper_cmpordssd) \
-    X(helper_cmpordsss) \
-    X(helper_cmptruesd) \
-    X(helper_cmptruess) \
-    X(helper_cmptruessd) \
-    X(helper_cmptruesss) \
-    X(helper_cmpunordsd) \
-    X(helper_cmpunordss) \
-    X(helper_cmpunordssd) \
-    X(helper_cmpunordsss) \
-    X(helper_comiss) \
-    X(helper_cvtsd2si) \
-    X(helper_cvtsd2sq) \
-    X(helper_cvtsd2ss) \
-    X(helper_cvtsi2sd) \
-    X(helper_cvtsi2ss) \
-    X(helper_cvtsq2ss) \
-    X(helper_cvtss2sd) \
-    X(helper_cvtss2si) \
-    X(helper_cvtss2sq) \
-    X(helper_cvttsd2si) \
-    X(helper_cvttss2si) \
-    X(helper_cvttss2sq) \
-    X(helper_divsd) \
-    X(helper_divss) \
-    X(helper_fma4sd) \
-    X(helper_fma4ss) \
-    X(helper_maxsd) \
-    X(helper_maxss) \
-    X(helper_minsd) \
-    X(helper_minss) \
-    X(helper_mulss) \
-    X(helper_rcpss) \
-    X(helper_rsqrtss) \
-    X(helper_sha1msg1) \
-    X(helper_sha1msg2) \
-    X(helper_sha1nexte) \
-    X(helper_sha1rnds4_f0) \
-    X(helper_sha1rnds4_f1) \
-    X(helper_sha1rnds4_f2) \
-    X(helper_sha1rnds4_f3) \
-    X(helper_sha256msg1) \
-    X(helper_sha256msg2) \
-    X(helper_sha256rnds2) \
-    X(helper_sqrtsd) \
-    X(helper_sqrtss) \
-    X(helper_subsd) \
-    X(helper_subss) \
-    X(helper_ucomiss) \
-    X(helper_divw_AX) \
-    X(helper_idivb_AL) \
-    X(helper_idivl_EAX) \
-    X(helper_idivw_AX) \
-    X(helper_pdep) \
-    X(helper_pext) \
-    X(helper_clrsb_i32) \
-    X(helper_clrsb_i64) \
-    X(helper_clz_i32) \
-    X(helper_clz_i64) \
-    X(helper_ctpop_i32) \
-    X(helper_ctpop_i64) \
-    X(helper_ctz_i32) \
-    X(helper_ctz_i64) \
-    X(helper_div_i32) \
-    X(helper_div_i64) \
-    X(helper_divu_i32) \
-    X(helper_divu_i64) \
-    X(helper_mulsh_i64) \
-    X(helper_muluh_i64) \
-    X(helper_rem_i32) \
-    X(helper_rem_i64) \
-    X(helper_remu_i32) \
-    X(helper_remu_i64) \
-    X(helper_sar_i64) \
-    X(helper_shl_i64) \
-    X(helper_shr_i64) \
-    X(helper_comisd) \
-    X(helper_ucomisd) \
-    X(helper_cvtsq2sd) \
-    X(helper_cvttsd2sq) \
-    X(helper_mulsd) \
-    X(helper_divq_EAX) \
-    X(helper_divl_EAX) \
-    X(helper_idivq_EAX) \
-    X(floatingpoint_inlined_helper_end) \
     X(helper_cpuid) \
     X(helper_crc32) \
     X(helper_cvtpd2pi) \
@@ -419,7 +274,6 @@ typedef enum __attribute__((packed)) {
     X(helper_cvttps2pi) \
     X(helper_daa) \
     X(helper_das) \
-    X(helper_divb_AL) \
     X(helper_emms) \
     X(helper_enter_mmx) \
     X(helper_exit_atomic) \
@@ -783,7 +637,153 @@ typedef enum __attribute__((packed)) {
     X(helper_dump_registers) \
     X(helper_jit) \
     X(jmp_ind_callback) \
-    X(xmm_helper_begin) \
+    X(ABOVE_HELPER_ENABLED_TEMPLATE) \
+    X(NOINLINE_BEGIN) \
+    X(helper_divw_AX) \
+    X(helper_idivb_AL) \
+    X(helper_idivl_EAX) \
+    X(helper_idivw_AX) \
+    X(helper_divb_AL) \
+    X(helper_div_i32) \
+    X(helper_div_i64) \
+    X(helper_divu_i32) \
+    X(helper_divu_i64) \
+    X(helper_divq_EAX) \
+    X(helper_divl_EAX) \
+    X(helper_idivq_EAX) \
+    X(NOINLINE_END) \
+    X(helper_cc_compute_all) \
+    X(helper_cc_compute_c) \
+    X(helper_cc_compute_nz) \
+    X(helper_addsd) \
+    X(helper_addss) \
+    X(helper_cmpeqsd) \
+    X(helper_cmpeqss) \
+    X(helper_cmpeqssd) \
+    X(helper_cmpeqsss) \
+    X(helper_cmpequsd) \
+    X(helper_cmpequss) \
+    X(helper_cmpequssd) \
+    X(helper_cmpequsss) \
+    X(helper_cmpfalsesd) \
+    X(helper_cmpfalsess) \
+    X(helper_cmpfalsessd) \
+    X(helper_cmpfalsesss) \
+    X(helper_cmpgeqsd) \
+    X(helper_cmpgeqss) \
+    X(helper_cmpgesd) \
+    X(helper_cmpgess) \
+    X(helper_cmpgtqsd) \
+    X(helper_cmpgtqss) \
+    X(helper_cmpgtsd) \
+    X(helper_cmpgtss) \
+    X(helper_cmpleqsd) \
+    X(helper_cmpleqss) \
+    X(helper_cmplesd) \
+    X(helper_cmpless) \
+    X(helper_cmpltqsd) \
+    X(helper_cmpltqss) \
+    X(helper_cmpltsd) \
+    X(helper_cmpltss) \
+    X(helper_cmpneqqsd) \
+    X(helper_cmpneqqss) \
+    X(helper_cmpneqsd) \
+    X(helper_cmpneqss) \
+    X(helper_cmpnequsd) \
+    X(helper_cmpnequss) \
+    X(helper_cmpnequssd) \
+    X(helper_cmpnequsss) \
+    X(helper_cmpngeqsd) \
+    X(helper_cmpngeqss) \
+    X(helper_cmpngesd) \
+    X(helper_cmpngess) \
+    X(helper_cmpngtqsd) \
+    X(helper_cmpngtqss) \
+    X(helper_cmpngtsd) \
+    X(helper_cmpngtss) \
+    X(helper_cmpnleqsd) \
+    X(helper_cmpnleqss) \
+    X(helper_cmpnlesd) \
+    X(helper_cmpnless) \
+    X(helper_cmpnltqsd) \
+    X(helper_cmpnltqss) \
+    X(helper_cmpnltsd) \
+    X(helper_cmpnltss) \
+    X(helper_cmpordsd) \
+    X(helper_cmpordss) \
+    X(helper_cmpordssd) \
+    X(helper_cmpordsss) \
+    X(helper_cmptruesd) \
+    X(helper_cmptruess) \
+    X(helper_cmptruessd) \
+    X(helper_cmptruesss) \
+    X(helper_cmpunordsd) \
+    X(helper_cmpunordss) \
+    X(helper_cmpunordssd) \
+    X(helper_cmpunordsss) \
+    X(helper_comiss) \
+    X(helper_cvtsd2si) \
+    X(helper_cvtsd2sq) \
+    X(helper_cvtsd2ss) \
+    X(helper_cvtsi2sd) \
+    X(helper_cvtsi2ss) \
+    X(helper_cvtsq2ss) \
+    X(helper_cvtss2sd) \
+    X(helper_cvtss2si) \
+    X(helper_cvtss2sq) \
+    X(helper_cvttsd2si) \
+    X(helper_cvttss2si) \
+    X(helper_cvttss2sq) \
+    X(helper_divsd) \
+    X(helper_divss) \
+    X(helper_fma4sd) \
+    X(helper_fma4ss) \
+    X(helper_maxsd) \
+    X(helper_maxss) \
+    X(helper_minsd) \
+    X(helper_minss) \
+    X(helper_mulss) \
+    X(helper_rcpss) \
+    X(helper_rsqrtss) \
+    X(helper_sha1msg1) \
+    X(helper_sha1msg2) \
+    X(helper_sha1nexte) \
+    X(helper_sha1rnds4_f0) \
+    X(helper_sha1rnds4_f1) \
+    X(helper_sha1rnds4_f2) \
+    X(helper_sha1rnds4_f3) \
+    X(helper_sha256msg1) \
+    X(helper_sha256msg2) \
+    X(helper_sha256rnds2) \
+    X(helper_sqrtsd) \
+    X(helper_sqrtss) \
+    X(helper_subsd) \
+    X(helper_subss) \
+    X(helper_ucomiss) \
+    X(helper_pdep) \
+    X(helper_pext) \
+    X(helper_clrsb_i32) \
+    X(helper_clrsb_i64) \
+    X(helper_clz_i32) \
+    X(helper_clz_i64) \
+    X(helper_ctpop_i32) \
+    X(helper_ctpop_i64) \
+    X(helper_ctz_i32) \
+    X(helper_ctz_i64) \
+    X(helper_mulsh_i64) \
+    X(helper_muluh_i64) \
+    X(helper_rem_i32) \
+    X(helper_rem_i64) \
+    X(helper_remu_i32) \
+    X(helper_remu_i64) \
+    X(helper_sar_i64) \
+    X(helper_shl_i64) \
+    X(helper_shr_i64) \
+    X(helper_comisd) \
+    X(helper_ucomisd) \
+    X(helper_cvtsq2sd) \
+    X(helper_cvttsd2sq) \
+    X(helper_mulsd) \
     X(helper_addpd_xmm) \
     X(helper_addps_xmm) \
     X(helper_addsubpd_xmm) \
@@ -994,7 +994,7 @@ typedef enum __attribute__((packed)) {
     X(helper_vpsrlvq_xmm) \
     X(helper_vtestpd_xmm) \
     X(helper_vtestps_xmm) \
-    X(ymm_helper_begin) \
+    X(ABOVE_HELPER_IS_YMM) \
     X(helper_addpd_ymm) \
     X(helper_addps_ymm) \
     X(helper_addsubpd_ymm) \
@@ -1391,8 +1391,8 @@ typedef enum __attribute__((packed)) {
     X(func_addr)         \
     X(tail_call)         \
     X(tail_call_native)  \
-    X(call_inline)       \
-    X(call_inline_exception) \
+    X(call_template)     \
+    X(call_template_exception) \
     X(call_native)       \
     X(OPCODE_MAX)
 
