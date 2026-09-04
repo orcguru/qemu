@@ -21,6 +21,9 @@ static int debug_enabled = 0;
 int cfg_xmm_count = XMM_COUNT;
 
 void print_operand(Operand *op, int is_output) {
+    if (is_output) {
+        printf("[");
+    }
     switch (op->kind) {
     case OP_SLOT:
         switch (op->slot.type) {
@@ -74,17 +77,30 @@ void print_operand(Operand *op, int is_output) {
         fflush(NULL);
         assert(0);
     }
+    if (is_output) {
+        printf("]");
+    }
 }
 
 void print_instr(UnifiedInstr *u) {
     printf("%s", opcode_type_str[u->opc]);
-    if (is_call(u)) {
+    if (u->opc == call) {
         printf(" %s,", helper_str[u->operands[0].symbol]);
         for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
             print_operand(&u->operands[i], (u->operands[2].imm && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
             if (i < (u->operand_count - 1)) {
                 printf(",");
             }
+        }
+        printf("\n");
+        return;
+    } else if (u->opc == tail_call_qemuaot || u->opc == tail_call_default ||
+               u->opc == call_qemuaot || u->opc == call_default) {
+        printf(" ");
+        print_operand(&u->operands[0], 0);
+        for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+            printf(",");
+            print_operand(&u->operands[i], (u->operands[2].imm && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
         }
         printf("\n");
         return;
@@ -159,7 +175,7 @@ void print_usage(const char *progname) {
     printf("Examples:\n");
     printf("  %s code.tir              # normal output only\n", progname);
     printf("  %s -d code.tir           # enable debug instruction dump\n", progname);
-    printf("  %s -x 16 code.tir        # use 16 XMM registers\n", progname);
+    printf("  %s -x 15 code.tir        # use 15 XMM registers\n", progname);
     printf("  %s -x 8 -d code.tir      # combine options\n", progname);
     printf("  %s -h                    # show help\n", progname);
     printf("\n");

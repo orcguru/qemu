@@ -1387,13 +1387,12 @@ typedef enum __attribute__((packed)) {
     X(xor_i32)           \
     X(xor_i64)           \
     X(xor_vec)           \
-    X(__artifical_opc_begin__) \
+    X(ABOVE_OPC_IS_ARTIFICIAL) \
     X(func_addr)         \
-    X(tail_call)         \
-    X(tail_call_native)  \
-    X(call_template)     \
-    X(call_template_exception) \
-    X(call_native)       \
+    X(tail_call_qemuaot) \
+    X(tail_call_default) \
+    X(call_qemuaot)      \
+    X(call_default)      \
     X(OPCODE_MAX)
 
 typedef enum __attribute__((packed)) {
