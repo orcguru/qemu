@@ -1454,9 +1454,10 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
             if (u->opc != call)
                 continue;
             assert(u->operands[0].kind == OP_SYMBOL);
-            if (!HELPER_TEMPLATE_ENABLED(u->operands[0].symbol))
+            HelperType h = u->operands[0].symbol;
+            if (!HELPER_TEMPLATE_ENABLED(h))
                 continue;
-            if (helper_require_exception_path[u->operands[0].symbol])
+            if (helper_require_exception_path[h])
                 continue;
 
             // Need double size for ymm
@@ -1464,23 +1465,93 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
             Operand spare_vecs[MAX_INLINE_VEC_ARG_CNT * 2] = {0};
             int spill_cnt = get_vector_spill_info(u, env_vecs, spare_vecs, (MAX_INLINE_VEC_ARG_CNT * 2));
 
+            // - GET the address of helper_template
+            // func_addr tmp_entry,helper,...(OP_VEC)
+            int tmp_entry = get_next_tmp_idx(ctx);
+            UnifiedInstr *entry = clone_instr(u);
+            entry->opc = func_addr;
+            Operand op_entry;
+            op_entry.kind = OP_SLOT;
+            op_entry.slot.type = SUB_SLOT_TMP;
+            op_entry.slot.idx = tmp_entry;
+            op_entry.slot.op_type = LLVMInt64;
+            entry->operands[0] = op_entry;
+            entry->operands[1] = u->operands[0];
+            entry->operand_count = 2;
+            for (int i = 0; i < u->operand_count; ++i) {
+                if (u->operands[i].kind == OP_ENV) {
+                    for (int j = 0; j < spill_cnt; ++j) {
+                        if (u->operands[i].env.offset == env_vecs[j].env.offset) {
+                            entry->operands[entry->operand_count++] = spare_vecs[j];
+                            break;
+                        }
+                    }
+                } else if (u->operands[i].kind == OP_VEC) {
+                    entry->operands[entry->operand_count++] = u->operands[i];
+                }
+            }
+            update_slot_types(ctx, entry);
+            instr_list_insert_before(&(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, entry);
+
             /*
              * Update call opc and remove head ENV
              * Inlined helper functions do not need the initial ENV argument,
              * drop it saves one argument slot
              */
             int first_input_idx = get_first_input_idx_on_call(u);
-            u->opc = call_qemuaot;
             if (u->operands[first_input_idx].kind == OP_ENV && u->operands[first_input_idx].env.offset == 0) {
                 memcpy(&u->operands[first_input_idx], &u->operands[first_input_idx + 1],
                        ((u->operand_count - (first_input_idx + 1)) * sizeof(Operand)));
                 u->operand_count -= 1;
+            }
+            if (!HELPER_TEMPLATE_NOINLINE(h)) {
+                u->operands[0] = op_entry;
+                u->opc = call_qemuaot;
+            } else {
+                int nfidx = lookup_next_func_idx(ctx, u);
+
+                // - GET the address of next
+                // func_addr tmp_n,hex_offset,nfidx
+                int tmp_n = get_next_tmp_idx(ctx);
+                EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
+                    SLOT_OP(SUB_SLOT_TMP, tmp_n),
+                    IMM_OP(ctx->hex_offset),
+                    IMM_OP(nfidx));
+
+                size_t sz = sizeof(UnifiedInstr) + (u->operand_count + 1) * sizeof(Operand);
+                UnifiedInstr *uu = calloc(1, sz);
+                uu->opc = tail_call_qemuaot;
+                memcpy(&uu->operands[0], &u->operands[0], (u->operand_count * sizeof(Operand)));
+                uu->operand_count = u->operand_count;
+                uu->operands[0] = op_entry;
+                Operand nf;
+                nf.kind = OP_SLOT;
+                nf.slot.type = SUB_SLOT_TMP;
+                nf.slot.idx = tmp_n;
+                uu->operands[uu->operand_count++] = nf;
+
+                // Move the output from the call to the beginning of the next step
+                assert(uu->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
+                if (uu->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
+                    int nfidx = lookup_next_func_idx(ctx, u);
+                    EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[nfidx].head), &(ctx->llvm_func_set.lists[nfidx].tail), ctx->llvm_func_set.lists[nfidx].head, mov_i64, 0, 0,
+                        SLOT_OP_EXTRA(uu->operands[TCG_CALL_PREFIX_COUNT].slot.type, uu->operands[TCG_CALL_PREFIX_COUNT].slot.idx, uu->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, uu->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type),
+                        LASTARG_OP());
+                    memcpy(&uu->operands[TCG_CALL_PREFIX_COUNT], &uu->operands[TCG_CALL_PREFIX_COUNT + 1],
+                           (uu->operand_count - TCG_CALL_PREFIX_COUNT - 1) * sizeof(Operand));
+                    uu->operands[TCG_CALL_OUT_FLAG_IDX].imm = 0;
+                    uu->operand_count -= 1;
+                }
+                instr_list_insert_before(&(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, uu);
+                instr_list_remove_and_free(&(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u);
+                u = uu;
             }
 
             // Check if require vector register spill/reload
             if (!spill_cnt)
                 continue;
 
+            assert(!HELPER_TEMPLATE_NOINLINE(h));
             add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail),
                                      u, env_vecs, spare_vecs, spill_cnt, true /*before call*/);
 
