@@ -69,8 +69,12 @@ void print_operand(Operand *op, int is_output) {
             printf("env:0x%x", op->env.offset);
         }
         break;
-    case OP_LASTARG:
-        printf("__last_arg__");
+    case OP_ARG:
+        if (op->argidx == -1) {
+            printf("__last_arg__");
+        } else {
+            printf("arg%d", op->argidx);
+        }
         break;
     default:
         printf("\nCheck kind:%d\n", op->kind);

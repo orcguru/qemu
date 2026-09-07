@@ -15,7 +15,7 @@ typedef enum __attribute__((packed)) {
     OP_SYMBOL,
     OP_VEC,
     OP_ENV,
-    OP_LASTARG,
+    OP_ARG,
 } OperandKind;
 
 typedef struct __attribute__((packed)) {
@@ -49,8 +49,7 @@ typedef struct __attribute__((packed)) {
         RelopType  relop;
         AttrSrcInfo attr_info;
         HelperType symbol;
-        // trampoline/next func_addr
-        uint64_t   faddr;
+        int        argidx;
     };
 } Operand;
 

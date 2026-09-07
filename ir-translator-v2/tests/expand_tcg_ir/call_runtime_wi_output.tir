@@ -17,5 +17,6 @@ XMM15:$0x720
 XMM_t0:$0xb60
 
 EXTERNAL:$0x0:
-call rdrand,$0x0,$1,loc1,env
+add_i64 loc6,env,$0x4a0
+call rdrand,$0x0,$1,loc1,env,loc6,$0x42
 mov_i64 loc2,loc1

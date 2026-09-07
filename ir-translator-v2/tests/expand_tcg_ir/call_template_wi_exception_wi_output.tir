@@ -18,5 +18,5 @@ XMM_t0:$0xb60
 
 EXTERNAL:$0x0:
 add_i64 loc1,env,$0x3a0
-call cvtss2sq,$0x0,$1,loc2,loc1
+call cvtss2sq,$0x0,$1,loc2,env,loc1,$0x42
 mov_i64 loc3,loc2

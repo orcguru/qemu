@@ -108,7 +108,7 @@ SlotInfo get_mapped_slot(TcgContext *ctx, SlotType type, uint16_t idx) {
     SlotInfo ret;
     ret.type = SUB_SLOT_TMP;
     uint16_t key_idx = idx;
-#define TMPT_OFFSET     (1 << 15);
+#define TMPT_OFFSET     (1 << 15)
     if (type == SUB_SLOT_TMPT) {
         key_idx += TMPT_OFFSET;
     }
@@ -689,7 +689,7 @@ UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
 #define LABEL_OP(lbl)       ((Operand){ .kind = OP_LABEL, .label = (lbl) })
 #define RELOP_OP(r)         ((Operand){ .kind = OP_RELOP, .relop = (r) })
 #define SYMBOL_OP(sym)      ((Operand){ .kind = OP_SYMBOL, .symbol = (sym) })
-#define LASTARG_OP()        ((Operand){ .kind = OP_LASTARG })
+#define ARG_OP(pos)         ((Operand){ .kind = OP_ARG,   .argidx = (pos) })
 #define ATTR_STORAGE_OP(nonatomic, align, sz)                             \
     ((Operand){ .kind = OP_ATTR, .attr_info = {                            \
         .subt = SUB_ATTR_STORAGE,                                          \
@@ -1250,7 +1250,8 @@ static void emulate_control_flow(TcgContext *ctx,
                 }
             }
             // If the last instruction is not end of control flow, add br
-            if (list->tail && !is_instr_end_of_control_flow(list->tail)) {
+            if (list->tail && !is_instr_end_of_control_flow(list->tail) &&
+                !(list->tail->opc == br || list->tail->opc == brcond_i64 || list->tail->opc == brcond_i32)) {
                 UnifiedInstr *u = clone_instr(cur);
                 u->opc = br;
                 func_list_append(list, u);
@@ -1536,7 +1537,7 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
                     int nfidx = lookup_next_func_idx(ctx, u);
                     EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[nfidx].head), &(ctx->llvm_func_set.lists[nfidx].tail), ctx->llvm_func_set.lists[nfidx].head, mov_i64, 0, 0,
                         SLOT_OP_EXTRA(uu->operands[TCG_CALL_PREFIX_COUNT].slot.type, uu->operands[TCG_CALL_PREFIX_COUNT].slot.idx, uu->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, uu->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type),
-                        LASTARG_OP());
+                        ARG_OP(-1));
                     memcpy(&uu->operands[TCG_CALL_PREFIX_COUNT], &uu->operands[TCG_CALL_PREFIX_COUNT + 1],
                            (uu->operand_count - TCG_CALL_PREFIX_COUNT - 1) * sizeof(Operand));
                     uu->operands[TCG_CALL_OUT_FLAG_IDX].imm = 0;
@@ -1577,7 +1578,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
                                            const UnifiedInstr *u,
                                            const Operand *env_vecs,
                                            const Operand *spare_vecs,
-                                           int cnt) {
+                                           const int cnt) {
     assert(u->opc == call && u->operands[0].kind == OP_SYMBOL);
     FuncInstrList result;
     func_list_init(&result);
@@ -1585,7 +1586,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
     sprintf(&result.trampoline_name[0], "trampoline_exception_%s", helper_str[u->operands[0].symbol]);
     for (int i = 0; i < u->operand_count; ++i) {
         if (u->operands[i].kind == OP_VEC) {
-            char vec_name[7] = {0};
+            char vec_name[6] = {0};
             sprintf(&vec_name[0], "_V%02x", u->operands[i].vec.idx & 0xff);
             strcat(&result.trampoline_name[0], &vec_name[0]);
         } else if (u->operands[i].kind == OP_ENV) {
@@ -1596,8 +1597,10 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
                 }
             }
             if (idx < cnt) {
-                char vec_name[9] = {0};
-                sprintf(&vec_name[0], "_S%02x", spare_vecs[idx].vec.idx & 0xff);
+                char vec_name[8] = {0};
+                VecInfo vinfo = lookup_vec_map(env_vecs[idx].env.offset);
+                assert(vinfo.idx != NON_XMM);
+                sprintf(&vec_name[0], "_E%02xS%02x", vinfo.idx & 0xff, spare_vecs[idx].vec.idx & 0xff);
                 strcat(&result.trampoline_name[0], &vec_name[0]);
             }
         }
@@ -1671,7 +1674,13 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
         nc->operands[fold_idx++] = nc->operands[i];
     }
     nc->operand_count = fold_idx;
-    for (int i = 0; i < nc->operand_count; ++i) {
+    int arg_idx = 0;
+    for (int i = get_first_input_idx_on_call(u); i < nc->operand_count; ++i) {
+        if (i == get_first_input_idx_on_call(u) && nc->operands[i].kind == OP_ENV &&
+            nc->operands[i].env.offset == 0) {
+            // The initial ENV argument has been dropped in templates
+            continue;
+        }
         if (nc->operands[i].kind == OP_VEC) {
             int tmp2 = get_next_tmp_idx(ctx);
             uint64_t off = get_vec_offset(nc->operands[i].vec.idx);
@@ -1685,6 +1694,32 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
             nc->operands[i].slot.type = SUB_SLOT_TMP;
             nc->operands[i].slot.idx = tmp2;
             nc->operands[i].slot.op_type = LLVMInt64;
+        } else if (nc->operands[i].kind == OP_ENV) {
+            int idx = 0;
+            for (; idx < cnt; ++idx) {
+                if (env_vecs[idx].env.offset == nc->operands[i].env.offset) {
+                    break;
+                }
+            }
+            if (idx < cnt) {
+                int tmp2 = get_next_tmp_idx(ctx);
+                // - CALCULATE offset to CPUArchState xmm
+                // add_i64 tmp_N2,tmp_N1,env.offset
+                EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
+                    SLOT_OP(SUB_SLOT_TMP, tmp2),
+                    SLOT_OP(SUB_SLOT_TMP, tmp1),
+                    IMM_OP(nc->operands[i].env.offset));
+                nc->operands[i].kind = OP_SLOT;
+                nc->operands[i].slot.type = SUB_SLOT_TMP;
+                nc->operands[i].slot.idx = tmp2;
+                nc->operands[i].slot.op_type = LLVMInt64;
+            } else {
+                nc->operands[i].kind = OP_ARG;
+                nc->operands[i].argidx = arg_idx++;
+            }
+        } else {
+            nc->operands[i].kind = OP_ARG;
+            nc->operands[i].argidx = arg_idx++;
         }
     }
 
@@ -1737,7 +1772,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
         // - tail_call_qemuaot next,helper_out
         // tail_call_qemuaot OP_LASTARG,helper_out
         EMIT_INSTR_APPEND_LIST(ctx, &result, tail_call_qemuaot, 0, 0,
-            LASTARG_OP(),
+            ARG_OP(-1),
             IMM_OP(0),
             IMM_OP(0),
             SLOT_OP_EXTRA(u->operands[TCG_CALL_PREFIX_COUNT].slot.type, u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, u->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type));
@@ -1745,7 +1780,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
         // - tail_call_qemuaot next
         // tail_call_qemuaot OP_LASTARG
         EMIT_INSTR_APPEND_LIST(ctx, &result, tail_call_qemuaot, 0, 0,
-            LASTARG_OP(),
+            ARG_OP(-1),
             IMM_OP(0),
             IMM_OP(0));
     }
@@ -1850,7 +1885,7 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
                 int nfidx = lookup_next_func_idx(ctx, u);
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[nfidx].head), &(ctx->llvm_func_set.lists[nfidx].tail), ctx->llvm_func_set.lists[nfidx].head, mov_i64, 0, 0,
                     SLOT_OP_EXTRA(uu->operands[TCG_CALL_PREFIX_COUNT].slot.type, uu->operands[TCG_CALL_PREFIX_COUNT].slot.idx, uu->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, uu->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type),
-                    LASTARG_OP());
+                    ARG_OP(-1));
                 memcpy(&uu->operands[TCG_CALL_PREFIX_COUNT], &uu->operands[TCG_CALL_PREFIX_COUNT + 1],
                        (uu->operand_count - TCG_CALL_PREFIX_COUNT - 1) * sizeof(Operand));
                 uu->operands[TCG_CALL_OUT_FLAG_IDX].imm = 0;
@@ -1979,23 +2014,14 @@ int create_trampoline_for_runtime(TcgContext *ctx,
         }
         nc->operands[TCG_CALL_PREFIX_COUNT].kind = OP_ENV;
         nc->operands[TCG_CALL_PREFIX_COUNT].env.offset = 0;
-        nc->operands[TCG_CALL_PREFIX_COUNT + 1] = u->operands[TCG_CALL_PREFIX_COUNT];
+        nc->operands[TCG_CALL_PREFIX_COUNT + 1].kind = OP_ARG;
+        nc->operands[TCG_CALL_PREFIX_COUNT + 1].argidx = 0;
         nc->operands[0].symbol = helper_jit;
-    }
-    for (int i = 0; i < nc->operand_count; ++i) {
-        if (nc->operands[i].kind == OP_VEC) {
-            int tmp2 = get_next_tmp_idx(ctx);
-            uint64_t off = get_vec_offset(nc->operands[i].vec.idx);
-            // - CALCULATE offset to CPUArchState xmm
-            // add_i64 tmp_N2,tmp_N1,offset
-            EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
-                SLOT_OP(SUB_SLOT_TMP, tmp2),
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                IMM_OP(off));
-            nc->operands[i].kind = OP_SLOT;
-            nc->operands[i].slot.type = SUB_SLOT_TMP;
-            nc->operands[i].slot.idx = tmp2;
-            nc->operands[i].slot.op_type = LLVMInt64;
+    } else {
+        int arg_idx = 0;
+        for (int i = get_first_input_idx_on_call(u); i < nc->operand_count; ++i) {
+            nc->operands[i].kind = OP_ARG;
+            nc->operands[i].argidx = arg_idx++;
         }
     }
 
@@ -2053,7 +2079,7 @@ int create_trampoline_for_runtime(TcgContext *ctx,
         // - tail_call_qemuaot next,helper_out
         // tail_call_qemuaot OP_LASTARG,helper_out
         EMIT_INSTR_APPEND_LIST(ctx, &result, tail_call_qemuaot, 0, 0,
-            LASTARG_OP(),
+            ARG_OP(-1),
             IMM_OP(0),
             IMM_OP(0),
             SLOT_OP_EXTRA(u->operands[TCG_CALL_PREFIX_COUNT].slot.type, u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, u->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type));
@@ -2061,7 +2087,7 @@ int create_trampoline_for_runtime(TcgContext *ctx,
         // - tail_call_qemuaot next
         // tail_call_qemuaot OP_LASTARG
         EMIT_INSTR_APPEND_LIST(ctx, &result, tail_call_qemuaot, 0, 0,
-            LASTARG_OP(),
+            ARG_OP(-1),
             IMM_OP(0),
             IMM_OP(0));
     }
@@ -2180,7 +2206,7 @@ void expand_call_runtime(TcgContext *ctx) {
                 int nfidx = lookup_next_func_idx(ctx, u);
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[nfidx].head), &(ctx->llvm_func_set.lists[nfidx].tail), ctx->llvm_func_set.lists[nfidx].head, mov_i64, 0, 0,
                     SLOT_OP_EXTRA(uu->operands[TCG_CALL_PREFIX_COUNT].slot.type, uu->operands[TCG_CALL_PREFIX_COUNT].slot.idx, uu->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, uu->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type),
-                    LASTARG_OP());
+                    ARG_OP(-1));
                 memcpy(&uu->operands[TCG_CALL_PREFIX_COUNT], &uu->operands[TCG_CALL_PREFIX_COUNT + 1],
                        (uu->operand_count - TCG_CALL_PREFIX_COUNT - 1) * sizeof(Operand));
                 uu->operands[TCG_CALL_OUT_FLAG_IDX].imm = 0;
