@@ -98,11 +98,29 @@ void print_instr(UnifiedInstr *u) {
         }
         printf("\n");
         return;
-    } else if (u->opc == tail_call_qemuaot || u->opc == tail_call_default ||
-               u->opc == call_qemuaot || u->opc == call_default) {
+    } else if (u->opc == tail_call_qemuaot || u->opc == call_qemuaot) {
         printf(" ");
         print_operand(&u->operands[0], 0);
         for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+            if (u->operands[i].kind != OP_VEC) {
+                printf(",");
+                print_operand(&u->operands[i], (u->operands[2].imm && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
+            }
+        }
+        printf(" VEC_ARGS:");
+        for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+            if (u->operands[i].kind == OP_VEC) {
+                print_operand(&u->operands[i], (u->operands[2].imm && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
+                printf(",");
+            }
+        }
+        printf("\n");
+        return;
+    } else if (u->opc == tail_call_default || u->opc == call_default) {
+        printf(" ");
+        print_operand(&u->operands[0], 0);
+        for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+            assert(u->operands[i].kind != OP_VEC);
             printf(",");
             print_operand(&u->operands[i], (u->operands[2].imm && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
         }
