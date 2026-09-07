@@ -4,7 +4,7 @@ mov_i64 [t0],0x42
 func_addr t103,0x0,0x2
 func_addr t104,0x0,0x1
 func_addr t105,helper_idivw_AX
-tail_call_qemuaot t105,t0,t103,t104
+tail_call_qemuaot t105,t0,t103,t104 VEC_ARGS:
 
 FUNC:0 N1
 mov_i64 [t1],0x42
@@ -212,5 +212,5 @@ add_i64 [t101],t2,0x6e0
 ld_vec v128,e8,[v28],t101
 add_i64 [t102],t2,0x6f0
 ld_vec v128,e8,[v29],t102
-tail_call_qemuaot __last_arg__
+tail_call_qemuaot __last_arg__ VEC_ARGS:
 

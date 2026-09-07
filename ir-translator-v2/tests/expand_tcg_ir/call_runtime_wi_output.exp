@@ -4,7 +4,7 @@ func_addr t3,0x0,0x2
 func_addr t105,0x0,0x1
 mov_i64 [t106],env
 add_i64 [t107],t106,0x4a0
-tail_call_qemuaot t3,env,t107,0x42,t105
+tail_call_qemuaot t3,env,t107,0x42,t105 VEC_ARGS:
 
 FUNC:0 N1
 mov_i64 [t1],__last_arg__
@@ -213,5 +213,5 @@ add_i64 [t103],t4,0x6e0
 ld_vec v128,e8,[v28],t103
 add_i64 [t104],t4,0x6f0
 ld_vec v128,e8,[v29],t104
-tail_call_qemuaot __last_arg__,t1
+tail_call_qemuaot __last_arg__,t1 VEC_ARGS:
 

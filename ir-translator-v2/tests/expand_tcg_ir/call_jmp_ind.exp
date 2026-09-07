@@ -3,7 +3,7 @@ FUNC:55aa N0
 func_addr t0,helper_jmp_ind
 func_addr t1,jmp_ind_callback
 func_addr t2,0x55aa,0x1
-tail_call_qemuaot t0,rip,t2,t1
+tail_call_qemuaot t0,rip,t2,t1 VEC_ARGS:
 
 FUNC:trampoline_helper_jit N1
 mov_i64 [t3],env

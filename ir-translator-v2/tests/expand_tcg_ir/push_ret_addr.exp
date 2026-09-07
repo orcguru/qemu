@@ -1,0 +1,17 @@
+FINAL:0x0 EXT:
+FUNC:0 N0
+add_i64 [t0],rip,0xa
+add_i64 [t1],rsp,0xfffffffffffffff8
+mov_i64 [t2],t1
+qemu_st_i64 t0,t2,attr,0x2
+mov_i64 [rsp],t1
+mov_i64 [t3],env
+add_i64 [t3],t3,0xfffffffffffffff8
+qemu_ld_i64 [t4],t3,attr
+add_i64 [t4],t4,0xfffffffffffffff8
+qemu_st_i64 t0,t4,attr
+add_i64 [t4],t4,0xfffffffffffffff8
+func_addr t5,0x88a,0x0
+qemu_st_i64 t5,t4,attr
+qemu_st_i64 t4,t3,attr
+

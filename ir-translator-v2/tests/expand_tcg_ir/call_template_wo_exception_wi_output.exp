@@ -1,0 +1,8 @@
+FINAL:0x0 EXT:
+FUNC:0 N0
+mov_i64 [t0],0x42
+mov_i64 [t1],0x24
+func_addr t4,helper_shl_i64
+call_qemuaot t4,[t2],t0,t1 VEC_ARGS:
+mov_i64 [t3],t2
+
