@@ -1,0 +1,90 @@
+XMM0:$0x360
+XMM1:$0x3a0
+XMM2:$0x3e0
+XMM3:$0x420
+XMM4:$0x460
+XMM5:$0x4a0
+XMM6:$0x4e0
+XMM7:$0x520
+XMM8:$0x560
+XMM9:$0x5a0
+XMM10:$0x5e0
+XMM11:$0x620
+XMM12:$0x660
+XMM13:$0x6a0
+XMM14:$0x6e0
+XMM15:$0x720
+XMM_t0:$0xb60
+
+EXTERNAL:$0x0:
+mov_i64 loc2,$0x10
+add_i64 loc2,loc2,fs_base
+qemu_ld_i64 loc0,loc2,noat+un+leq,2
+mov_i64 rax,loc0
+add_i64 loc2,rax,$0x318
+mov_i64 loc0,loc2
+mov_i64 rdi,loc0
+add_i64 loc2,rax,$0x310
+mov_i64 loc0,$0x0
+qemu_st_i64 loc0,loc2,noat+un+leq,2
+add_i64 loc2,rax,$0x508
+mov_i64 loc0,$0x0
+qemu_st_i64 loc0,loc2,noat+un+leq,2
+mov_i64 loc0,rdi
+mov_i64 loc1,$0xfffffffffffffff8
+and_i64 loc0,loc0,loc1
+mov_i64 rdi,loc0
+mov_i64 cc_dst,loc0
+discard cc_src
+discard cc_src2
+discard cc_op
+mov_i64 loc0,rax
+mov_i64 loc1,rdi
+mov_i64 loc5,loc0
+sub_i64 loc0,loc0,loc1
+extract_i64 rax,loc0,$0x0,$0x20
+mov_i64 cc_dst,loc0
+mov_i64 cc_src,loc1
+add_i64 loc2,rax,$0x510
+mov_i64 loc0,loc2
+extract_i64 rcx,loc0,$0x0,$0x20
+mov_i64 loc0,rsi
+mov_i64 rax,loc0
+extract_i64 loc0,rcx,$0x0,$0x20
+mov_i64 loc1,$0x3
+mov_i64 loc14,$0x3
+add_i64 loc15,loc14,$0xffffffffffffffff
+shr_i64 loc15,loc0,loc15
+shr_i64 loc0,loc0,loc14
+extract_i64 rcx,loc0,$0x0,$0x20
+mov_i64 cc_dst,loc0
+mov_i64 cc_src,loc15
+discard loc5
+mov_i64 loc0,rax
+ld32s_i64 loc17,env,$0xac
+shl_i64 loc17,loc17,$0x3
+mov_i32 cc_op,$0x2a
+brcond_i64 rcx,$0xffffffffffffffff,tsteq,$L0
+add_i64 loc18,rcx,$0xffffffffffffffff
+brcond_i64 loc18,$0xffffffffffffffff,tsteq,$L2
+set_label $L1
+mov_i64 loc2,rdi
+qemu_st_i64 loc0,loc2,noat+un+leq,2
+add_i64 rdi,rdi,loc17
+mov_i64 rcx,loc18
+add_i64 loc18,loc18,$0xffffffffffffffff
+brcond_i64 loc18,$0xffff,tstne,$L1
+brcond_i64 loc18,$0xffffffffffffffff,tsteq,$L0
+ld_i64 loc21,env,$0x88
+or_i64 loc21,loc21,$0x10000
+st_i64 loc21,env,$0x88
+add_i64 rip,rip,$0x38
+jmp_direct $0xa8d77
+set_label $L0
+mov_i64 loc2,rdi
+qemu_st_i64 loc0,loc2,noat+un+leq,2
+add_i64 rdi,rdi,loc17
+mov_i64 rcx,loc18
+set_label $L2
+add_i64 rip,rip,$0x3b
+jmp_direct $0xa8d7a

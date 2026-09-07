@@ -1,0 +1,73 @@
+; -x 3
+XMM0:$0x360
+XMM1:$0x3a0
+XMM2:$0x3e0
+XMM3:$0x420
+XMM4:$0x460
+XMM5:$0x4a0
+XMM6:$0x4e0
+XMM7:$0x520
+XMM8:$0x560
+XMM9:$0x5a0
+XMM10:$0x5e0
+XMM11:$0x620
+XMM12:$0x660
+XMM13:$0x6a0
+XMM14:$0x6e0
+XMM15:$0x720
+XMM_t0:$0xb60
+
+EXTERNAL:$0x0:
+add_i64 loc6,env,$0x4a0
+add_i64 loc8,env,$0x4a0
+add_i64 loc9,env,$0x360
+call punpckhbw_xmm,$0x0,$0,env,loc6,loc8,loc9
+mov_vec v128,e8,tmp11,v128$0x0
+st_vec v128,e8,tmp11,env,$0x4b0
+add_i64 loc2,rip,$0x8426a
+qemu_ld_i64 loc3,loc2,noat+al8+leq,2
+add_i64 loc15,env,$0x520
+st_i64 $0x0,loc15,$0x8
+st_i64 loc3,loc15,$0x0
+mov_vec v128,e8,tmp17,v128$0x0
+st_vec v128,e8,tmp17,env,$0x530
+ld_vec v128,e8,tmp18,env,$0x4a0
+ld_vec v128,e8,tmp19,env,$0x420
+andc_vec v128,e8,tmp20,tmp18,tmp19
+st_vec v128,e8,tmp20,env,$0x360
+mov_vec v128,e8,tmp21,v128$0x0
+st_vec v128,e8,tmp21,env,$0x370
+ld_vec v128,e8,tmp22,env,$0x420
+ld_vec v128,e8,tmp23,env,$0x3e0
+and_vec v128,e8,tmp24,tmp22,tmp23
+st_vec v128,e8,tmp24,env,$0x420
+mov_vec v128,e8,tmp25,v128$0x0
+st_vec v128,e8,tmp25,env,$0x430
+ld_vec v128,e8,tmp26,env,$0x360
+ld_vec v128,e8,tmp27,env,$0x420
+or_vec v128,e8,tmp28,tmp26,tmp27
+st_vec v128,e8,tmp28,env,$0x360
+mov_vec v128,e8,tmp29,v128$0x0
+st_vec v128,e8,tmp29,env,$0x370
+add_i64 loc2,rip,$0x84572
+qemu_ld2_i128 loc31,loc32,loc2,noat+al8+leo,2
+st_i64 loc31,env,$0xb60
+st_i64 loc32,env,$0xb68
+ld_vec v128,e8,tmp33,env,$0x360
+ld_vec v128,e8,tmp34,env,$0xb60
+and_vec v128,e8,tmp35,tmp33,tmp34
+st_vec v128,e8,tmp35,env,$0x3a0
+mov_vec v128,e8,tmp36,v128$0x0
+st_vec v128,e8,tmp36,env,$0x3b0
+add_i64 loc37,env,$0x520
+add_i64 loc38,env,$0x3a0
+call punpckhbw_xmm,$0x0,$0,env,loc37,loc38
+discard cc_dst
+discard cc_src2
+mov_i64 loc0,$0x24
+brcond_i64 cc_src,$0x41,tstne,$L0
+add_i64 rip,rip,$0x26
+jmp_direct $0x26634
+set_label $L0
+add_i64 rip,rip,$0x4a
+jmp_direct $0x26658
