@@ -16,7 +16,7 @@ void handle_func(TcgContext *ctx, int is_external);
 void debug_print_instr(TcgContext *ctx, const char *msg);
 SlotInfo get_mapped_slot(TcgContext *ctx, SlotType type, uint16_t idx);
 
-UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
+UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
                                 uint8_t vs, uint8_t es,
                                 Operand *ops, int nops);
 void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src);

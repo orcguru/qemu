@@ -118,6 +118,7 @@ SlotInfo get_mapped_slot(TcgContext *ctx, SlotType type, uint16_t idx) {
         ret.idx = get_next_tmp_idx(ctx);
         g_hash_table_insert(ctx->slot_map, (gpointer)(long)key_idx, (gpointer)(long)ret.idx);
     }
+#undef TMPT_OFFSET
     return ret;
 }
 
@@ -145,8 +146,7 @@ void op_list_add(OpList *l, Operand op) {
 
 void op_list_free(OpList *l) {
     free(l->data);
-    l->data = NULL;
-    l->len = l->cap = 0;
+    op_list_init(l);
 }
 
 UnifiedInstr *clone_instr(const UnifiedInstr *src) {
@@ -218,15 +218,7 @@ static void instr_list_remove_and_free(UnifiedInstr **head_p, UnifiedInstr **tai
 }
 
 void append_instr(TcgContext *ctx, UnifiedInstr *u) {
-    u->prev = ctx->instr_tail;
-    u->next = NULL;
-    if (ctx->instr_tail) {
-        ctx->instr_tail->next = u;
-        ctx->instr_tail = u;
-    } else {
-        ctx->instr_head = u;
-        ctx->instr_tail = u;
-    }
+    instr_list_insert_before(&ctx->instr_head, &ctx->instr_tail, NULL, u);
 }
 
 void func_list_init(FuncInstrList *list) {
@@ -238,25 +230,12 @@ void func_list_init(FuncInstrList *list) {
 }
 
 void func_list_append(FuncInstrList *list, UnifiedInstr *u) {
-    u->prev = list->tail;
-    u->next = NULL;
-    if (list->tail) {
-        list->tail->next = u;
-        list->tail = u;
-    } else {
-        list->head = u;
-        list->tail = u;
-    }
+    instr_list_insert_before(&list->head, &list->tail, NULL, u);
     list->count++;
 }
 
 void func_list_free(FuncInstrList *list) {
-    UnifiedInstr *cur = list->head;
-    while (cur) {
-        UnifiedInstr *next = cur->next;
-        free(cur);
-        cur = next;
-    }
+    free_instr_list(list->head);
     list->head = NULL;
     list->tail = NULL;
     list->count = 0;
@@ -359,7 +338,7 @@ void expand_slot_alias(TcgContext *ctx, UnifiedInstr *u) {
 LLVMType vec_op_type(uint8_t vs, uint8_t es) {
     if (vs == 64) {
         switch (es) {
-        case 8: return LLVMVector8xi8;
+        case 8:  return LLVMVector8xi8;
         case 16: return LLVMVector4xi16;
         case 32: return LLVMVector2xi32;
         case 64: return LLVMVector1xi64;
@@ -368,7 +347,7 @@ LLVMType vec_op_type(uint8_t vs, uint8_t es) {
     }
     if (vs == 128) {
         switch (es) {
-        case 8: return LLVMVector16xi8;
+        case 8:  return LLVMVector16xi8;
         case 16: return LLVMVector8xi16;
         case 32: return LLVMVector4xi32;
         case 64: return LLVMVector2xi64;
@@ -376,6 +355,16 @@ LLVMType vec_op_type(uint8_t vs, uint8_t es) {
         }
     }
     return LLVMInvalidType;
+}
+
+static LLVMType storage_size_to_type(SrcSizeType sz) {
+    switch (sz) {
+    case SRC1B: return LLVMInt8;
+    case SRC2B: return LLVMInt16;
+    case SRC4B: return LLVMInt32;
+    case SRC8B: return LLVMInt64;
+    default:    return LLVMInvalidType;
+    }
 }
 
 void set_operand_type(TcgContext *ctx, Operand *op, LLVMType ty) {
@@ -489,30 +478,15 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
                 set_operand_type(ctx, &u->operands[i], opciosz[u->opc][1]);
             } else {
                 // Memory-bits
-                if (opciosz[u->opc][0] == LLVMInvalidType) {
+                LLVMType ty = opciosz[u->opc][0];
+                if (ty == LLVMInvalidType) {
                     const AttrSrcInfo *attr = get_attribute_from_instr(u);
-                    assert(attr);
-                    assert(attr->subt == SUB_ATTR_STORAGE);
+                    assert(attr && attr->subt == SUB_ATTR_STORAGE);
                     assert(attr->p.storage.size != INVALID_SRCSIZE);
-                    switch (attr->p.storage.size) {
-                    case SRC1B:
-                        set_operand_type(ctx, &u->operands[i], LLVMInt8);
-                        break;
-                    case SRC2B:
-                        set_operand_type(ctx, &u->operands[i], LLVMInt16);
-                        break;
-                    case SRC4B:
-                        set_operand_type(ctx, &u->operands[i], LLVMInt32);
-                        break;
-                    case SRC8B:
-                        set_operand_type(ctx, &u->operands[i], LLVMInt64);
-                        break;
-                    default:
-                        assert(0);
-                    }
-                } else {
-                    set_operand_type(ctx, &u->operands[i], opciosz[u->opc][0]);
+                    ty = storage_size_to_type(attr->p.storage.size);
                 }
+                assert(ty != LLVMInvalidType);
+                set_operand_type(ctx, &u->operands[i], ty);
             }
         } else {
             if (i < opcoc[u->opc]) {
@@ -520,30 +494,15 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
                 set_operand_type(ctx, &u->operands[i], opciosz[u->opc][1]);
             } else {
                 // Input-bits
-                if (opciosz[u->opc][0] == LLVMInvalidType) {
+                LLVMType ty = opciosz[u->opc][0];
+                if (ty == LLVMInvalidType) {
                     const AttrSrcInfo *attr = get_attribute_from_instr(u);
-                    assert(attr);
-                    assert(attr->subt == SUB_ATTR_STORAGE);
+                    assert(attr && attr->subt == SUB_ATTR_STORAGE);
                     assert(attr->p.storage.size != INVALID_SRCSIZE);
-                    switch (attr->p.storage.size) {
-                    case SRC1B:
-                        set_operand_type(ctx, &u->operands[i], LLVMInt8);
-                        break;
-                    case SRC2B:
-                        set_operand_type(ctx, &u->operands[i], LLVMInt16);
-                        break;
-                    case SRC4B:
-                        set_operand_type(ctx, &u->operands[i], LLVMInt32);
-                        break;
-                    case SRC8B:
-                        set_operand_type(ctx, &u->operands[i], LLVMInt64);
-                        break;
-                    default:
-                        assert(0);
-                    }
-                } else {
-                    set_operand_type(ctx, &u->operands[i], opciosz[u->opc][0]);
+                    ty = storage_size_to_type(attr->p.storage.size);
                 }
+                assert(ty != LLVMInvalidType);
+                set_operand_type(ctx, &u->operands[i], ty);
             }
         }
     }
@@ -603,21 +562,22 @@ void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src) {
     }
 }
 
-UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
+/* Build a new UnifiedInstr from operands (handles OP_ENV+OP_IMM -> OP_VEC/OP_ENV conversion) */
+UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
                                 uint8_t vs, uint8_t es,
                                 Operand *ops, int nops) {
-    size_t sz = sizeof(UnifiedInstr) + nops * sizeof(Operand);
-    UnifiedInstr *u = calloc(1, sz);
+    UnifiedInstr *u = calloc(1, sizeof(UnifiedInstr) + (size_t)nops * sizeof(Operand));
     u->opc = opc;
     u->vs = vs;
     u->es = es;
     u->uidx = ctx->emit_instr_count++;
     int skip_cnt = 0;
     int dst_idx = 0;
-    if (u->opc == call) {
-        memcpy(u->operands, ops, (nops * sizeof(Operand)));
-        assert(u->operands[0].kind == OP_SYMBOL && u->operands[0].symbol != not_a_helper);
-    } else {
+    if (u->opc != call) {
+        /*
+         * For arithmetic operations, ENV is acting as a base pointer into
+         * the meta space in case an immediate value is followed
+         */
         for (int i = 0; i < nops; ++i) {
             if (ops[i].kind == OP_ENV && (i + 1) < nops && ops[i + 1].kind == OP_IMM) {
                 VecInfo v = lookup_vec(ops[i + 1].imm);
@@ -640,6 +600,12 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
             }
             dst_idx += 1;
         }
+    } else {
+        /*
+         * For calls, ENV + IMM should not be folded
+         */
+        memcpy(u->operands, ops, (nops * sizeof(Operand)));
+        assert(u->operands[0].kind == OP_SYMBOL && u->operands[0].symbol != not_a_helper);
     }
     u->operand_count = nops - skip_cnt;
     u->prev = NULL;
@@ -648,12 +614,9 @@ UnifiedInstr *emit_instr(TcgContext *ctx, uint8_t opc,
 }
 
 UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
-    UnifiedInstr *u = ctx->instr_head;
-    while (u) {
-        if (u->opc == opc) {
+    for (UnifiedInstr *u = ctx->instr_head; u; u = u->next) {
+        if (u->opc == opc)
             return u;
-        }
-        u = u->next;
     }
     return NULL;
 }
@@ -662,7 +625,7 @@ UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
     do {                                                                    \
         Operand _ops[] = { __VA_ARGS__ };                                   \
         size_t _cnt = sizeof(_ops) / sizeof(_ops[0]);                       \
-        UnifiedInstr *_u = emit_instr(ctx, opc, vs, es, _ops, _cnt);        \
+        UnifiedInstr *_u = new_instr(ctx, opc, vs, es, _ops, _cnt);         \
         expand_slot_alias(ctx, _u);                                         \
         update_slot_types(ctx, _u);                                         \
         register_vec_spare_stack_alloca(ctx, _u);                           \
@@ -673,7 +636,7 @@ UnifiedInstr *get_single_target_opc(TcgContext *ctx, OpCodeType opc) {
     do {                                                                    \
         Operand _ops[] = { __VA_ARGS__ };                                   \
         size_t _cnt = sizeof(_ops) / sizeof(_ops[0]);                       \
-        UnifiedInstr *_u = emit_instr(ctx, opc, vs, es, _ops, _cnt);        \
+        UnifiedInstr *_u = new_instr(ctx, opc, vs, es, _ops, _cnt);         \
         expand_slot_alias(ctx, _u);                                         \
         update_slot_types(ctx, _u);                                         \
         func_list_append(list, _u);                                         \
@@ -880,10 +843,7 @@ static int get_use_tmp_indices(UnifiedInstr *u, int *out_idx, int out_cnt) {
     int ret_cnt = 0;
     int in_idx = 0;
     if (u->opc == call) {
-        in_idx = TCG_CALL_PREFIX_COUNT;
-        if (u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM && u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
-            in_idx += 1;
-        }
+        in_idx = get_first_input_idx_on_call(u);
     } else {
         in_idx = opcoc[u->opc];
     }
