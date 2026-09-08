@@ -102,4 +102,8 @@ struct TcgContext {
 void tcg_context_init(TcgContext *ctx);
 void tcg_context_destroy(TcgContext *ctx);
 
+static inline uint16_t get_next_tmp_idx(TcgContext *ctx) {
+    return ctx->next_tmp_idx++;
+}
+
 #endif /* TCG_CONTEXT_H */

@@ -20,11 +20,12 @@
 #include "unified_instr.h"
 #include "tcg_ast.h"
 #include "tcg_context.h"
-#include "parser_util.h"
+#include "util.h"
+#include "expander.h"
 
 #ifndef YYSTYPE
 #define YYSTYPE union YYSTYPE
-#include "tcg_lexer.yy.h"
+#include "lexer.yy.h"
 #endif
 %}
 
@@ -50,6 +51,11 @@
 #include "tcg_context.h"
 #include "mapper_util.h"
 
+void op_list_init(OpList *l);
+void op_list_add(OpList *l, Operand op);
+void op_list_free(OpList *l);
+void append_instr(TcgContext *ctx, UnifiedInstr *u);
+void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src);
 void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s);
 extern int column;
 extern char *lineptr;
@@ -227,7 +233,7 @@ call_instr:
                     u_ymm_op_count += 1;
                     continue;
                 } else if (u->operands[i].kind == OP_ENV) {
-                    VecInfo vinfo = lookup_vec_map(u->operands[i].env.offset);
+                    VecInfo vinfo = lookup_vector(u->operands[i].env.offset, false);
                     if (vinfo.idx != NON_XMM) {
                         assert(vinfo.offset == 0);
                         u_ymm->operands[u_ymm_op_count++] = u->operands[i];
@@ -261,7 +267,7 @@ slot_op:
     {
         $$.kind = OP_SLOT;
         if ($1.type == SUB_SLOT_TMPL || $1.type == SUB_SLOT_TMPT) {
-            $$.slot = get_mapped_slot(ctx, $1.type, $1.idx);
+            $$.slot = get_slot_for(ctx, $1.type, $1.idx);
         } else {
             $$.slot = $1;
         }
@@ -389,6 +395,46 @@ operand:
 %%
 
 /* ---- Helper functions ---- */
+void op_list_init(OpList *l) {
+    l->data = NULL;
+    l->len = 0;
+    l->cap = 0;
+}
+
+void op_list_add(OpList *l, Operand op) {
+    if (l->len >= l->cap) {
+        l->cap = l->cap ? l->cap * 2 : 8;
+        l->data = realloc(l->data, l->cap * sizeof(Operand));
+    }
+    l->data[l->len++] = op;
+}
+
+void op_list_free(OpList *l) {
+    free(l->data);
+    op_list_init(l);
+}
+
+void append_instr(TcgContext *ctx, UnifiedInstr *u) {
+    instr_list_insert_before(&ctx->instr_head, &ctx->instr_tail, NULL, u);
+}
+
+void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src) {
+    if (src.subt == SUB_ATTR_STORAGE) {
+        if (src.p.storage.atomic)
+            dest->p.storage.atomic = src.p.storage.atomic;
+        if (src.p.storage.alignment)
+            dest->p.storage.alignment = src.p.storage.alignment;
+        if (src.p.storage.ext)
+            dest->p.storage.ext = src.p.storage.ext;
+        if (src.p.storage.size)
+            dest->p.storage.size = src.p.storage.size;
+        dest->subt = SUB_ATTR_STORAGE;
+    } else if (src.subt == SUB_ATTR_SWAP) {
+        dest->p.swap |= src.p.swap;
+        dest->subt = SUB_ATTR_SWAP;
+    }
+}
+
 void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s) {
     int line = yyget_lineno(scanner);
     fprintf(stderr, "error: %s in line %d, column %d\n", s, line, column);

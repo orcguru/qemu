@@ -13,8 +13,7 @@
 #define STACK_INDEX_SHIFT           10
 #define TCG_CALL_OUT_FLAG_IDX       2
 #define TCG_CALL_PREFIX_COUNT       3
-// FIXME: test small value
-#define DEFAULT_ALIAS_OPS_POOL_SIZE 2
+#define DEFAULT_ALIAS_OPS_POOL_SIZE 6
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;

@@ -1,7 +1,7 @@
 %{
 #include "tcg_ast.h"
 #include "i386_cpu.h"
-#include "tcg_parser.tab.h"
+#include "parser.tab.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>

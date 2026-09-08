@@ -9,10 +9,10 @@
 #include <sys/stat.h>
 #include "tcg_ast.h"
 #include "tcg_context.h"
-#include "tcg_parser.tab.h"
-#include "tcg_lexer.yy.h"
+#include "parser.tab.h"
+#include "lexer.yy.h"
 #include "mapper_util.h"
-#include "parser_util.h"
+#include "util.h"
 
 extern char *lineptr;
 extern const char *helper_str[];
