@@ -508,10 +508,18 @@ UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
     return u;
 }
 
-UnifiedInstr *clone_instr(const UnifiedInstr *src) {
-    size_t sz = sizeof(UnifiedInstr) + src->operand_count * sizeof(Operand);
+UnifiedInstr *clone_instr_optional_operands(const UnifiedInstr *src, int additional_count, ...) {
+    size_t sz = sizeof(UnifiedInstr) + (src->operand_count + additional_count) * sizeof(Operand);
     UnifiedInstr *dst = malloc(sz);
-    memcpy(dst, src, sz);
+    memcpy(dst, src, sizeof(UnifiedInstr));
+    memcpy(&dst->operands[0], &src->operands[0], src->operand_count * sizeof(Operand));
+    dst->operand_count = src->operand_count;
+    va_list args;
+    va_start(args, additional_count);
+    for (int i = 0; i < additional_count; i++) {
+        dst->operands[dst->operand_count++] = va_arg(args, Operand);
+    }
+    va_end(args);
     dst->prev = NULL;
     dst->next = NULL;
     return dst;

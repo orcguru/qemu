@@ -1,6 +1,9 @@
 FINAL:0x0 EXT:
 FUNC:0 N0
 func_addr t4,helper_pmulhw_xmm,v20,v20,v22
-call_qemuaot t4 VEC_ARGS:v20,v20,v22,
+func_addr t5,0x0,0x1
+tail_call_qemuaot t4,t5 VEC_ARGS:v20,v20,v22,
+
+FUNC:0 N1
 mov_i64 [t3],rsp
 

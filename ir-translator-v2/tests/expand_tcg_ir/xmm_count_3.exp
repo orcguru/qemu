@@ -1,19 +1,22 @@
 FINAL:0x0 EXT:
 FUNC:0 N0
 func_addr t31,helper_punpckhbw_xmm,v2,v2,v0
-mov_i64 [t32],env
-add_i64 [t32],t32,0x3a0
-st_vec v128,e8,v2,t32
-mov_i64 [t32],env
-add_i64 [t32],t32,0x4a0
-ld_vec v128,e8,[v2],t32
-call_qemuaot t31 VEC_ARGS:v2,v2,v0,
-mov_i64 [t33],env
-add_i64 [t33],t33,0x4a0
-st_vec v128,e8,v2,t33
+func_addr t32,0x0,0x1
 mov_i64 [t33],env
 add_i64 [t33],t33,0x3a0
+st_vec v128,e8,v2,t33
+mov_i64 [t33],env
+add_i64 [t33],t33,0x4a0
 ld_vec v128,e8,[v2],t33
+tail_call_qemuaot t31,t32 VEC_ARGS:v2,v2,v0,
+
+FUNC:0 N1
+mov_i64 [t34],env
+add_i64 [t34],t34,0x4a0
+st_vec v128,e8,v2,t34
+mov_i64 [t34],env
+add_i64 [t34],t34,0x3a0
+ld_vec v128,e8,[v2],t34
 mov_vec v128,e8,[t3],0x0
 st_vec v128,e8,t3,env:0x4b0
 add_i64 [t4],rip,0x8426a
@@ -50,22 +53,25 @@ and_vec v128,e8,[t24],t22,t23
 st_vec v128,e8,t24,v2
 mov_vec v128,e8,[t25],0x0
 st_vec v128,e8,t25,v3
-func_addr t34,helper_punpckhbw_xmm,v4,v2
-mov_i64 [t35],env
-add_i64 [t35],t35,0x3e0
-st_vec v128,e8,v4,t35
-mov_i64 [t35],env
-add_i64 [t35],t35,0x520
-ld_vec v128,e8,[v4],t35
-call_qemuaot t34 VEC_ARGS:v4,v2,
-mov_i64 [t36],env
-add_i64 [t36],t36,0x520
-st_vec v128,e8,v4,t36
-mov_i64 [t36],env
-add_i64 [t36],t36,0x3e0
-ld_vec v128,e8,[v4],t36
+func_addr t35,helper_punpckhbw_xmm,v4,v2
+func_addr t36,0x0,0x2
+mov_i64 [t37],env
+add_i64 [t37],t37,0x3e0
+st_vec v128,e8,v4,t37
+mov_i64 [t37],env
+add_i64 [t37],t37,0x520
+ld_vec v128,e8,[v4],t37
+tail_call_qemuaot t35,t36 VEC_ARGS:v4,v2,
+
+FUNC:0 N2
+mov_i64 [t38],env
+add_i64 [t38],t38,0x520
+st_vec v128,e8,v4,t38
+mov_i64 [t38],env
+add_i64 [t38],t38,0x3e0
+ld_vec v128,e8,[v4],t38
 discard cc_dst
-discard cc_src2
+discard cc_src2(env)
 mov_i64 [t28],0x24
 brcond_i64 cc_src,0x41,tstne,L0
 add_i64 [rip],rip,0x26

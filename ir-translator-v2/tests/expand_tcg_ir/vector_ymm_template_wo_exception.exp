@@ -1,7 +1,10 @@
 FINAL:0x0 EXT:
 FUNC:0 N0
 func_addr t5,helper_punpcklqdq_ymm,v10,v11,v10,v11
-call_qemuaot t5 VEC_ARGS:v10,v11,v10,v11,
+func_addr t6,0x0,0x1
+tail_call_qemuaot t5,t6 VEC_ARGS:v10,v11,v10,v11,
+
+FUNC:0 N1
 mov_i64 [t2],0x42
 ld_vec v128,e8,[t4],v2
 

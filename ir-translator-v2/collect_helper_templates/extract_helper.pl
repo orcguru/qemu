@@ -11,6 +11,7 @@ if ($#ARGV < 1) {
   exit 1;
 }
 
+#FIXME: get fp_helpers/noinline_helpers definitions from tcg_ast.h
 my %fp_helpers = (
   "helper_comisd" => 1,
   "helper_ucomisd" => 1,
@@ -156,6 +157,21 @@ my %fp_helpers = (
   "helper_cc_compute_all" => 1,
   "helper_cc_compute_c" => 1,
   "helper_cc_compute_nz" => 1,
+);
+
+my %noinline_helpers = (
+  "helper_divw_AX" => 1,
+  "helper_idivb_AL" => 1,
+  "helper_idivl_EAX" => 1,
+  "helper_idivw_AX" => 1,
+  "helper_divb_AL" => 1,
+  "helper_div_i32" => 1,
+  "helper_div_i64" => 1,
+  "helper_divu_i32" => 1,
+  "helper_divu_i64" => 1,
+  "helper_divq_EAX" => 1,
+  "helper_divl_EAX" => 1,
+  "helper_idivq_EAX" => 1,
 );
 
 my $arch_info = `uname -m`;
@@ -1603,7 +1619,7 @@ sub parse_func_head
   }
   my $head_copy = $head;
   if (not $head_copy =~ /__attribute__\(\(always_inline\)\)/) {
-    if ($func->{'NAME'} =~ /^helper_/ and $func->{'NAME'} =~ /div/) {
+    if (exists $noinline_helpers{$func->{'NAME'}}) {
       $head_copy = "__attribute__((noinline,weak)) ".$head_copy;
     } else {
       $head_copy = "__attribute__((always_inline,weak)) ".$head_copy;

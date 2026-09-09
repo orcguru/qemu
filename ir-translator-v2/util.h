@@ -31,7 +31,7 @@ void type_map_apply(const TcgContext *ctx);
 void instr_list_insert_before(UnifiedInstr **head_p, UnifiedInstr **tail_p, UnifiedInstr *anchor, UnifiedInstr *u);
 void instr_list_insert_after(UnifiedInstr **head_p, UnifiedInstr **tail_p, UnifiedInstr *anchor, UnifiedInstr *u);
 void instr_list_remove_and_free(UnifiedInstr **head_p, UnifiedInstr **tail_p, UnifiedInstr *u);
-UnifiedInstr *clone_instr(const UnifiedInstr *src);
+UnifiedInstr *clone_instr_optional_operands(const UnifiedInstr *src, int additional_count, ...);
 void func_list_append(FuncInstrList *list, UnifiedInstr *u);
 void func_list_init(FuncInstrList *list);
 int get_next_func_list_idx(TcgContext *ctx);

@@ -1,19 +1,22 @@
 FINAL:0x0 EXT:
 FUNC:0 N0
 func_addr t6,helper_punpcklqdq_xmm,v10,v10,v2
-mov_i64 [t7],env
-add_i64 [t7],t7,0x3a0
-st_vec v128,e8,v2,t7
-mov_i64 [t7],env
-add_i64 [t7],t7,0xb60
-ld_vec v128,e8,[v2],t7
-call_qemuaot t6 VEC_ARGS:v10,v10,v2,
-mov_i64 [t8],env
-add_i64 [t8],t8,0xb60
-st_vec v128,e8,v2,t8
+func_addr t7,0x0,0x1
 mov_i64 [t8],env
 add_i64 [t8],t8,0x3a0
+st_vec v128,e8,v2,t8
+mov_i64 [t8],env
+add_i64 [t8],t8,0xb60
 ld_vec v128,e8,[v2],t8
+tail_call_qemuaot t6,t7 VEC_ARGS:v10,v10,v2,
+
+FUNC:0 N1
+mov_i64 [t9],env
+add_i64 [t9],t9,0xb60
+st_vec v128,e8,v2,t9
+mov_i64 [t9],env
+add_i64 [t9],t9,0x3a0
+ld_vec v128,e8,[v2],t9
 mov_i64 [t3],0x42
 ld_vec v128,e8,[t5],v2
 

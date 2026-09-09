@@ -28,7 +28,7 @@ void print_operand(Operand *op, int is_output) {
     case OP_SLOT:
         switch (op->slot.type) {
         case SUB_SLOT_ENVVAR:
-            printf("%s", envvar_type_str[op->slot.idx]);
+            printf("%s(env)", envvar_type_str[op->slot.idx]);
             break;
         case SUB_SLOT_XREG:
             printf("%s", xreg_type_str[op->slot.idx]);

@@ -10,7 +10,10 @@ qemu_st_i64 t0,t10,attr
 sub_i64 [t10],t9,0x20
 qemu_st_i64 t1,t10,attr
 func_addr t26,helper_punpckhbw_xmm,v10,v10,v0
-call_qemuaot t26 VEC_ARGS:v10,v10,v0,
+func_addr t27,0x0,0x1
+tail_call_qemuaot t26,t27 VEC_ARGS:v10,v10,v0,
+
+FUNC:0 N1
 mov_i64 [t11],env
 add_i64 [t11],t11,0xfffffffffffffff8
 qemu_ld_i64 [t12],t11,attr
@@ -21,9 +24,12 @@ qemu_ld_i64 [t1],t13,attr
 mov_i64 [t5],t0
 mov_i64 [t6],t1
 mov_i64 [t0],0x0
-func_addr t27,helper_movmskps_xmm
-call_qemuaot t27,[t0],t7 VEC_ARGS:
-br L0
+func_addr t28,helper_movmskps_xmm
+func_addr t29,0x0,0x2
+tail_call_qemuaot t28,t7,t29 VEC_ARGS:
+
+FUNC:0 N2
+mov_i64 [t0],__last_arg__
 set_label L0
 mov_i64 [t5],t0
 mov_i64 [t0],0x0
@@ -38,8 +44,12 @@ sub_i64 [t16],t15,0x30
 qemu_st_i64 t5,t16,attr
 sub_i64 [t16],t15,0x40
 qemu_st_i64 t6,t16,attr
-func_addr t28,helper_movmskps_xmm
-call_qemuaot t28,[t3],t7 VEC_ARGS:
+func_addr t30,helper_movmskps_xmm
+func_addr t31,0x0,0x3
+tail_call_qemuaot t30,t7,t31 VEC_ARGS:
+
+FUNC:0 N3
+mov_i64 [t3],__last_arg__
 mov_i64 [t17],env
 add_i64 [t17],t17,0xfffffffffffffff8
 qemu_ld_i64 [t18],t17,attr
@@ -63,8 +73,12 @@ sub_i64 [t22],t21,0x30
 qemu_st_i64 t5,t22,attr
 sub_i64 [t22],t21,0x40
 qemu_st_i64 t6,t22,attr
-func_addr t29,helper_movmskps_xmm
-call_qemuaot t29,[t3],t7 VEC_ARGS:
+func_addr t32,helper_movmskps_xmm
+func_addr t33,0x0,0x4
+tail_call_qemuaot t32,t7,t33 VEC_ARGS:
+
+FUNC:0 N4
+mov_i64 [t3],__last_arg__
 mov_i64 [t23],env
 add_i64 [t23],t23,0xfffffffffffffff8
 qemu_ld_i64 [t24],t23,attr

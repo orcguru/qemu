@@ -637,7 +637,10 @@ typedef enum __attribute__((packed)) {
     X(helper_jit) \
     X(jmp_ind_callback) \
     X(ABOVE_HELPER_ENABLED_TEMPLATE) \
-    X(NOINLINE_BEGIN) \
+    X(NOSPLIT_BEGIN)  \
+    X(helper_cc_compute_all) \
+    X(helper_cc_compute_c) \
+    X(NOSPLIT_END)  \
     X(helper_divw_AX) \
     X(helper_idivb_AL) \
     X(helper_idivl_EAX) \
@@ -650,9 +653,6 @@ typedef enum __attribute__((packed)) {
     X(helper_divq_EAX) \
     X(helper_divl_EAX) \
     X(helper_idivq_EAX) \
-    X(NOINLINE_END) \
-    X(helper_cc_compute_all) \
-    X(helper_cc_compute_c) \
     X(helper_cc_compute_nz) \
     X(helper_addsd) \
     X(helper_addss) \

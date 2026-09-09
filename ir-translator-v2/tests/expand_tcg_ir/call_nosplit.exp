@@ -1,0 +1,6 @@
+FINAL:0x0 EXT:
+FUNC:0 N0
+func_addr t2,helper_cc_compute_c
+call_qemuaot t2,[t0],cc_dst,cc_src,cc_src2(env),cc_op VEC_ARGS:
+mov_i64 [t1],t0
+

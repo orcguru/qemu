@@ -553,7 +553,7 @@ static int label_tracker_find_zero(const LabelTracker *lt) {
 
 #define IS_YMM_HELPER(h)            (h > ABOVE_HELPER_IS_YMM)
 #define HELPER_TEMPLATE_ENABLED(h)  (h > ABOVE_HELPER_ENABLED_TEMPLATE)
-#define HELPER_TEMPLATE_NOINLINE(h) (NOINLINE_BEGIN < h && h < NOINLINE_END)
+#define HELPER_TEMPLATE_ENABLED_NOSPLIT(h) (NOSPLIT_BEGIN < h && h < NOSPLIT_END)
 
 static inline bool is_instr_end_of_control_flow(const UnifiedInstr *u) {
     if (u->opc == tail_call_qemuaot)
@@ -561,9 +561,7 @@ static inline bool is_instr_end_of_control_flow(const UnifiedInstr *u) {
     if (u->opc == call) {
         assert(u->operands[0].kind == OP_SYMBOL);
         HelperType h = u->operands[0].symbol;
-        if (HELPER_TEMPLATE_NOINLINE(h))
-            return true;
-        if (HELPER_TEMPLATE_ENABLED(h) && !helper_require_exception_path[h])
+        if (HELPER_TEMPLATE_ENABLED_NOSPLIT(h))
             return false;
         else
             return true;
@@ -612,7 +610,7 @@ static void emulate_control_flow(TcgContext *ctx,
                 int idx = label_tracker_find(lt, label);
                 if (lt->data[idx].value == 1) {
                     // Label already exists, add br label
-                    UnifiedInstr *u = clone_instr(cur);
+                    UnifiedInstr *u = clone_instr_optional_operands(cur, 0);
                     u->opc = br;
                     func_list_append(list, u);
                     break;
@@ -621,12 +619,12 @@ static void emulate_control_flow(TcgContext *ctx,
             // If the last instruction is not end of control flow, add br
             if (list->tail && !is_instr_end_of_control_flow(list->tail) &&
                 !(list->tail->opc == br || list->tail->opc == brcond_i64 || list->tail->opc == brcond_i32)) {
-                UnifiedInstr *u = clone_instr(cur);
+                UnifiedInstr *u = clone_instr_optional_operands(cur, 0);
                 u->opc = br;
                 func_list_append(list, u);
             }
         }
-        UnifiedInstr *copy = clone_instr(cur);
+        UnifiedInstr *copy = clone_instr_optional_operands(cur, 0);
         func_list_append(list, copy);
         if (is_instr_end_of_control_flow(cur)) {
             const UnifiedInstr *label_u;
@@ -693,9 +691,9 @@ int lookup_next_func_idx(const TcgContext *ctx,
                          const UnifiedInstr *u) {
     // Lookup the index of the next instruction from instr_head list
     uint32_t next_idx = -1;
-    for (const UnifiedInstr *ui = ctx->instr_head; ui; ui = ui->next) {
-        if (ui->uidx == u->uidx && ui->next) {
-            next_idx = ui->next->uidx;
+    for (const UnifiedInstr *i = ctx->instr_head; i; i = i->next) {
+        if (i->uidx == u->uidx && i->next) {
+            next_idx = i->next->uidx;
             break;
         }
     }
@@ -838,7 +836,7 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
             // - GET the address of helper_template
             // func_addr tmp_entry,helper,...(OP_VEC)
             int tmp_entry = get_next_tmp_idx(ctx);
-            UnifiedInstr *entry = clone_instr(u);
+            UnifiedInstr *entry = clone_instr_optional_operands(u, 0);
             entry->opc = func_addr;
             Operand op_entry;
             op_entry.kind = OP_SLOT;
@@ -874,7 +872,7 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
                        ((u->operand_count - (first_input_idx + 1)) * sizeof(Operand)));
                 u->operand_count -= 1;
             }
-            if (!HELPER_TEMPLATE_NOINLINE(h)) {
+            if (HELPER_TEMPLATE_ENABLED_NOSPLIT(h)) {
                 u->operands[0] = op_entry;
                 u->opc = call_qemuaot;
             } else {
@@ -888,17 +886,13 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(nfidx));
 
-                size_t sz = sizeof(UnifiedInstr) + (u->operand_count + 1) * sizeof(Operand);
-                UnifiedInstr *uu = calloc(1, sz);
-                uu->opc = tail_call_qemuaot;
-                memcpy(&uu->operands[0], &u->operands[0], (u->operand_count * sizeof(Operand)));
-                uu->operand_count = u->operand_count;
-                uu->operands[0] = op_entry;
                 Operand nf;
                 nf.kind = OP_SLOT;
                 nf.slot.type = SUB_SLOT_TMP;
                 nf.slot.idx = tmp_n;
-                uu->operands[uu->operand_count++] = nf;
+                UnifiedInstr *uu = clone_instr_optional_operands(u, 1, nf);
+                uu->opc = tail_call_qemuaot;
+                uu->operands[0] = op_entry;
 
                 // Move the output from the call to the beginning of the next step
                 assert(uu->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
@@ -921,7 +915,6 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
             if (!spill_cnt)
                 continue;
 
-            assert(!HELPER_TEMPLATE_NOINLINE(h));
             add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail),
                                      u, env_vecs, spare_vecs, spill_cnt, true /*before call*/);
 
@@ -936,9 +929,17 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
                 }
             }
 
-            assert(u->next);
-            add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail),
-                                     u->next, env_vecs, spare_vecs, spill_cnt, false /*after call*/);
+            if (u->next) {
+                add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail),
+                                         u->next, env_vecs, spare_vecs, spill_cnt, false /*after call*/);
+            } else {
+                // Add SPILL/RELOAD to the beginning of the next call
+                int nfidx = lookup_next_func_idx(ctx, u);
+                UnifiedInstr *next_u = ctx->llvm_func_set.lists[nfidx].head;
+                assert(next_u);
+                add_spill_load_vector(ctx, &(ctx->llvm_func_set.lists[nfidx].head), &(ctx->llvm_func_set.lists[nfidx].tail),
+                                      next_u, env_vecs, spare_vecs, spill_cnt, false /*after call*/);
+            }
         }
     }
 }
@@ -1028,7 +1029,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
     }
 
     // Setup native call arguments
-    UnifiedInstr *nc = clone_instr(u);
+    UnifiedInstr *nc = clone_instr_optional_operands(u, 0);
     nc->opc = call_default;
     // Fold vector operands for YMM
     int fold_idx = 0;
@@ -1206,7 +1207,7 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
             // - GET the address of helper_template
             // func_addr tmp_entry,helper,...(OP_VEC)
             int tmp_entry = get_next_tmp_idx(ctx);
-            UnifiedInstr *entry = clone_instr(u);
+            UnifiedInstr *entry = clone_instr_optional_operands(u, 0);
             entry->opc = func_addr;
             Operand op_entry;
             op_entry.kind = OP_SLOT;
@@ -1231,22 +1232,17 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
             update_slot_types(ctx, entry);
             instr_list_insert_before(&(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, entry);
 
-            size_t sz = sizeof(UnifiedInstr) + (u->operand_count + 2) * sizeof(Operand);
-            UnifiedInstr *uu = calloc(1, sz);
-            uu->opc = tail_call_qemuaot;
-            memcpy(&uu->operands[0], &u->operands[0], (u->operand_count * sizeof(Operand)));
-            uu->operand_count = u->operand_count;
-            uu->operands[0] = op_entry;
             Operand tf;
             tf.kind = OP_SLOT;
             tf.slot.type = SUB_SLOT_TMP;
             tf.slot.idx = tmp_t;
-            uu->operands[uu->operand_count++] = tf;
             Operand nf;
             nf.kind = OP_SLOT;
             nf.slot.type = SUB_SLOT_TMP;
             nf.slot.idx = tmp_n;
-            uu->operands[uu->operand_count++] = nf;
+            UnifiedInstr *uu = clone_instr_optional_operands(u, 2, tf, nf);
+            uu->opc = tail_call_qemuaot;
+            uu->operands[0] = op_entry;
 
             // Move the output from the call to the beginning of the next step
             assert(uu->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
@@ -1366,7 +1362,7 @@ int create_trampoline_for_runtime(TcgContext *ctx,
     }
 
     // Setup native call arguments
-    UnifiedInstr *nc = clone_instr(u);
+    UnifiedInstr *nc = clone_instr_optional_operands(u, 0);
     if (will_return_back) {
         nc->opc = call_default;
     } else {

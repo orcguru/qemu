@@ -1,7 +1,7 @@
 FINAL:0x0 EXT:
 FUNC:0 N0
 mov_i64 [t0],0x10
-add_i64 [t0],t0,fs_base
+add_i64 [t0],t0,fs_base(env)
 qemu_ld_i64 [t1],t0,attr,0x2
 mov_i64 [rax],t1
 add_i64 [t0],rax,0x318
@@ -19,7 +19,7 @@ and_i64 [t1],t1,t2
 mov_i64 [rdi],t1
 mov_i64 [cc_dst],t1
 discard cc_src
-discard cc_src2
+discard cc_src2(env)
 discard cc_op
 mov_i64 [t1],rax
 mov_i64 [t2],rdi

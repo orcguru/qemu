@@ -9,6 +9,10 @@ mov_i64 [t1],0x24
 st_i64 0x0,t0,0x8
 st_i64 0x10,t1,0x8
 func_addr t2,helper_movmskps_xmm,v14
-call_qemuaot t2,[t0] VEC_ARGS:v14,
+func_addr t3,0x0,0x1
+tail_call_qemuaot t2,t3 VEC_ARGS:v14,
+
+FUNC:0 N1
+mov_i64 [t0],__last_arg__
 st_i64 0x0,t0,0x8
 

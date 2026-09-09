@@ -1,7 +1,10 @@
 FINAL:0x0 EXT:
 FUNC:0 N0
 func_addr t31,helper_punpckhbw_xmm,v10,v10,v0
-call_qemuaot t31 VEC_ARGS:v10,v10,v0,
+func_addr t32,0x0,0x1
+tail_call_qemuaot t31,t32 VEC_ARGS:v10,v10,v0,
+
+FUNC:0 N1
 mov_vec v128,e8,[t3],0x0
 st_vec v128,e8,t3,v11
 add_i64 [t4],rip,0x8426a
@@ -38,10 +41,13 @@ and_vec v128,e8,[t24],t22,t23
 st_vec v128,e8,t24,v2
 mov_vec v128,e8,[t25],0x0
 st_vec v128,e8,t25,v3
-func_addr t32,helper_punpckhbw_xmm,v14,v2
-call_qemuaot t32 VEC_ARGS:v14,v2,
+func_addr t33,helper_punpckhbw_xmm,v14,v2
+func_addr t34,0x0,0x2
+tail_call_qemuaot t33,t34 VEC_ARGS:v14,v2,
+
+FUNC:0 N2
 discard cc_dst
-discard cc_src2
+discard cc_src2(env)
 mov_i64 [t28],0x24
 brcond_i64 cc_src,0x41,tstne,L0
 add_i64 [rip],rip,0x26

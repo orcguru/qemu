@@ -73,7 +73,7 @@ test:
 			';'*) extra=$${fline#';'} ;; \
 		esac; \
 		echo "==> $$tir $$extra"; \
-		$(TCG_PRINTER) $$extra "$$tir" > "$$out"; \
+		$(TCG_PRINTER) $$extra "$$tir" > "$$out" 2>&1; \
 		if [ -f "$$exp" ]; then \
 			if diff -u "$$exp" "$$out"; then \
 				echo "PASS: $$tir"; \
