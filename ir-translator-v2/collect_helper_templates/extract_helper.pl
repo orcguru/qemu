@@ -251,7 +251,7 @@ my %env_xmmregs_idx_map = (
   "15" => "xmm15"
 );
 
-my $path = "$ARGV[0].helper_floatingpoint";
+my $path = "$ARGV[0].helper_templates";
 my $file_size = -s $ARGV[0];
 open FDIN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
 my $bytes;

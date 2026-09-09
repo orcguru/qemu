@@ -96,6 +96,7 @@ helper_lookup.c: helpers.gperf
 # ============================================================================
 # QEMU TCG preprocessing targets
 # ============================================================================
+HELPER_TMPL_DIR  := collect_helper_templates
 
 # --- Common entry-point recipe (parameterized via PREPROCESSED_OBJ / BUILD_LOG) -
 
@@ -107,6 +108,7 @@ endef
 qemu-preprocess: check-qemu-top $(QEMU_BUILD)/Makefile copy-fpu-files prepend-softfloat capture-command-fpu preprocess-extract-fpu
 	@echo "==================================================================="
 	@echo "Preprocessed file ready: $(QEMU_BUILD)/$(PREPROCESSED_OBJ_FPU).E"
+	cp $(QEMU_BUILD)/$(PREPROCESSED_OBJ_FPU).E $(HELPER_TMPL_DIR)/
 	@echo "==================================================================="
 
 # Convenience entry point: accel/tcg/tcg-runtime.c
@@ -114,6 +116,7 @@ qemu-preprocess: check-qemu-top $(QEMU_BUILD)/Makefile copy-fpu-files prepend-so
 qemu-preprocess-tcg-runtime: check-qemu-top $(QEMU_BUILD)/Makefile capture-command-tcg-runtime preprocess-extract-tcg-runtime
 	@echo "==================================================================="
 	@echo "Preprocessed file ready: $(QEMU_BUILD)/$(PREPROCESSED_OBJ_TCG_RT).E"
+	cp $(QEMU_BUILD)/$(PREPROCESSED_OBJ_TCG_RT).E $(HELPER_TMPL_DIR)/
 	@echo "==================================================================="
 
 # Convenience entry point: target/i386/tcg/cc_helper.c
@@ -121,6 +124,7 @@ qemu-preprocess-tcg-runtime: check-qemu-top $(QEMU_BUILD)/Makefile capture-comma
 qemu-preprocess-cc-helper: check-qemu-top $(QEMU_BUILD)/Makefile capture-command-cc-helper preprocess-extract-cc-helper
 	@echo "==================================================================="
 	@echo "Preprocessed file ready: $(QEMU_BUILD)/$(PREPROCESSED_OBJ_CC_HELPER).E"
+	cp $(QEMU_BUILD)/$(PREPROCESSED_OBJ_CC_HELPER).E $(HELPER_TMPL_DIR)/
 	@echo "==================================================================="
 
 # Convenience entry point: target/i386/tcg/int_helper.c
@@ -128,6 +132,7 @@ qemu-preprocess-cc-helper: check-qemu-top $(QEMU_BUILD)/Makefile capture-command
 qemu-preprocess-int-helper: check-qemu-top $(QEMU_BUILD)/Makefile capture-command-int-helper preprocess-extract-int-helper
 	@echo "==================================================================="
 	@echo "Preprocessed file ready: $(QEMU_BUILD)/$(PREPROCESSED_OBJ_INT_HELPER).E"
+	cp $(QEMU_BUILD)/$(PREPROCESSED_OBJ_INT_HELPER).E $(HELPER_TMPL_DIR)/
 	@echo "==================================================================="
 
 # --- 1. sanity check ---------------------------------------------------------
@@ -301,6 +306,79 @@ capture-command: capture-command-fpu
 preprocess-extract: preprocess-extract-fpu
 
 # ============================================================================
+# helper_templates: post-process every previously generated preprocessed file
+#
+# Pipeline (run in order, after one or more `qemu-preprocess*` runs):
+#   1. ensure ANTLR jar is present (download if missing)
+#   2. build the small Java extractor if its class is missing
+#   3. for each preprocessed file already in collect_helper_templates/:
+#        java Parse <file> > <file>.out 2> <file>.err
+#        extract_helper.pl <file> <file>.out
+#      (this creates a <file>.helper_templates/ folder per input)
+#   4. copy everything out of every *.helper_templates/ folder into helper_templates/
+#
+# ANTLR is only needed to turn the preprocessed source into parseable form;
+# the helper-template extraction itself is driven by extract_helper.pl.
+# ============================================================================
+
+HELPER_TMPL_PARSER := $(HELPER_TMPL_DIR)/parser
+ANTLR_JAR        := $(HELPER_TMPL_PARSER)/antlr-4.9.3-complete.jar
+ANTLR_PARSE_CLASS := $(HELPER_TMPL_PARSER)/LoadCPP.class
+EXTRACTOR        := $(HELPER_TMPL_DIR)/extract_helper.pl
+HELPER_TMPL_OUT  := helper_templates
+PP_GLOB          := $(wildcard $(HELPER_TMPL_DIR)/*.o.E)
+HT_DIRS          := $(patsubst %.o.E,%.o.E.helper_templates,$(PP_GLOB))
+
+# Step 1: download ANTLR jar (idempotent)
+$(ANTLR_JAR):
+	@mkdir -p "$(HELPER_TMPL_PARSER)"
+	@if [ -f "$(ANTLR_JAR)" ]; then \
+		echo "ANTLR jar already present: $(ANTLR_JAR)"; \
+	else \
+		echo "Downloading ANTLR complete jar ..."; \
+		curl -fSL -o "$(ANTLR_JAR)" \
+			https://www.antlr.org/download/antlr-4.9.3-complete.jar \
+			&& echo "Downloaded $(ANTLR_JAR) ($$(wc -c < $(ANTLR_JAR)) bytes)"; \
+	fi
+
+# Step 2: build the Java extractor (LoadCPP.class) if missing
+$(ANTLR_PARSE_CLASS): $(ANTLR_JAR)
+	@echo "Building Java extractor ($(ANTLR_PARSE_CLASS)) from *.g4 ..."
+	@cd "$(HELPER_TMPL_PARSER)" && \
+		java -jar "../../$(ANTLR_JAR)" *.g4 && \
+		javac -cp ".:../../$(ANTLR_JAR)" *.java && \
+		echo "Java extractor built."
+
+# Step 3 + 4: process every preprocessed file, then merge folders into helper_templates/
+# Driven by the shell: per-file java parse + extract_helper.pl, then copy-up.
+templates: $(ANTLR_PARSE_CLASS) $(HELPER_TMPL_OUT)
+	@if [ -z "$(PP_GLOB)" ]; then \
+		echo "WARNING: no preprocessed files found under $(HELPER_TMPL_DIR)/"; \
+		echo "Run a qemu-preprocess* target first to generate .E files."; \
+	else \
+		echo "Processing $(words $(PP_GLOB)) preprocessed file(s):"; \
+		for pp in $(PP_GLOB); do \
+			out="$${pp}.out"; \
+			err="$${pp}.err"; \
+			echo "  - parse: $$pp"; \
+			java -cp "$(HELPER_TMPL_PARSER):$(ANTLR_JAR)" LoadCPP "$$pp" > "$$out" 2> "$$err"; \
+			echo "  - extract: $$pp"; \
+			perl "$(EXTRACTOR)" "$$pp" "$$out"; \
+		done; \
+		echo "Copying all *.helper_templates/ folders into $(HELPER_TMPL_OUT)/ ..."; \
+		rm -rf "$(HELPER_TMPL_OUT)"; mkdir -p "$(HELPER_TMPL_OUT)"; \
+		shopt -s dotglob nullglob; \
+		for d in $(HT_DIRS); do \
+			[ -d "$$d" ] || continue; \
+			cp -f "$$d"/* "$(HELPER_TMPL_OUT)/" 2>/dev/null || true; \
+		done; \
+		echo "Done. helper_templates ready in $(HELPER_TMPL_OUT)/."; \
+	fi
+
+$(HELPER_TMPL_OUT):
+	@mkdir -p "$(HELPER_TMPL_OUT)"
+
+# ============================================================================
 # Clean: undo ALL previous changes to QEMU source + remove intermediate files
 # ============================================================================
 clean: clean-qemu-source clean-local
@@ -325,7 +403,8 @@ clean-qemu-source:
 
 # Remove local build artifacts (original Makefile clean)
 clean-local:
-	rm -f *.o parser.tab.* lexer.yy.* tcg_mapper tcg_printer helper_lookup.c tests/expand_tcg_ir/*.out
+	rm -f *.o parser.tab.* lexer.yy.* tcg_mapper tcg_printer helper_lookup.c tests/expand_tcg_ir/*.out collect_helper_templates/*.E collect_helper_templates/*.E.out collect_helper_templates/*.E.err helper_templates/*
+	rm -rf collect_helper_templates/*.o.E.helper_templates
 
 # Alias preserved from original Makefile
 clean-all: clean
@@ -374,6 +453,7 @@ test:
 .PHONY: all test clean clean-all clean-local clean-qemu-source \
 	qemu-preprocess qemu-preprocess-tcg-runtime \
 	qemu-preprocess-cc-helper qemu-preprocess-int-helper \
+	templates \
 	check-qemu-top copy-fpu-files prepend-softfloat \
 	capture-command capture-command-fpu capture-command-tcg-runtime \
 	capture-command-cc-helper capture-command-int-helper \
