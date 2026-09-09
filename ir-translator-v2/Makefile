@@ -13,8 +13,8 @@ ifeq ($(ARCH_HOST), aarch64)
 else ifeq ($(ARCH_HOST), riscv64)
 	CFLAGS += -I/usr/lib/riscv64-linux-gnu/glib-2.0/include
 endif
-LDFLAGS := $(shell $(LLVM_PATH)/bin/llvm-config --ldflags --libs all | tr -d '\n')
-LDFLAGS += -lffi -lz -lstdc++ -lm -ltinfo -lzstd -lglib-2.0
+LLVM_LDFLAGS := $(shell $(LLVM_PATH)/bin/llvm-config --ldflags --libs all 2>/dev/null | tr -d '\n')
+LDFLAGS := $(LLVM_LDFLAGS) -lffi -lz -lstdc++ -lm -ltinfo -lzstd -lglib-2.0
 ifeq ($(ARCH_HOST), aarch64)
 	LDFLAGS += -L/usr/lib64
 else ifeq ($(ARCH_HOST), riscv64)
@@ -32,27 +32,36 @@ endif
 #   QEMU_CC    - C compiler to use (default: clang)
 #   QEMU_TARGET_LIST - target list (default: x86_64-linux-user)
 #
-# Example:
-#   make qemu-preprocess QEMU_TOP=/home/felix/Github/qemu-runtime
+# Examples:
+#   make qemu-preprocess QEMU_TOP=/home/felix/Github/qemu          # fpu_helper.c
+#   make qemu-preprocess-tcg-runtime QEMU_TOP=/home/felix/Github/qemu
 # ============================================================================
 
 QEMU_BUILD ?= $(QEMU_TOP)/build
 QEMU_CC ?= clang
 QEMU_TARGET_LIST ?= x86_64-linux-user
 
+# ---------- fpu_helper.c (target i386) --------------------------------------
 QEMU_FPU_DIR := $(QEMU_TOP)/fpu
 QEMU_TCG_DIR := $(QEMU_TOP)/target/i386/tcg
 QEMU_FPU_HELPER := $(QEMU_TCG_DIR)/fpu_helper.c
 
-# Files we create / modify (used by clean to undo everything)
-COPIED_INC_FILES := $(wildcard $(QEMU_FPU_DIR)/*.inc)
-COPIED_INCS := $(foreach f,$(notdir $(COPIED_INC_FILES)),$(QEMU_TCG_DIR)//$f)
+# Files we create / modify (used by clean to undo everything).
+# Evaluated at recipe time (not parse time) so QEMU_TOP set on the command
+# line is honored, and we never match QEMU's own .inc files.
+define COPIED_INCS
+$(foreach f,$(notdir $(wildcard $(QEMU_FPU_DIR)/*.inc)),$(QEMU_TCG_DIR)/$f)
+endef
 
 # Marker file recording that fpu_helper.c was prepended (for clean restoration)
 SOFTFLOAT_MARKER := $(QEMU_TCG_DIR)/.softfloat_prepended
 
-# Final preprocessed output (relative to QEMU_BUILD)
-PREPROCESSED_OBJ := libqemu-$(QEMU_TARGET_LIST).a.p/target_i386_tcg_fpu_helper.c.o
+# Per-target object paths (relative to QEMU_BUILD)
+PREPROCESSED_OBJ_FPU    := libqemu-$(QEMU_TARGET_LIST).a.p/target_i386_tcg_fpu_helper.c.o
+PREPROCESSED_OBJ_TCG_RT := libuser.a.p/accel_tcg_tcg-runtime.c.o
+
+# Default (backward-compatible) preprocessed output
+PREPROCESSED_OBJ := $(PREPROCESSED_OBJ_FPU)
 PREPROCESSED_OUT := $(QEMU_BUILD)/$(PREPROCESSED_OBJ).E
 
 # Build-log captured from V=1 (contains the full clang command line)
@@ -86,10 +95,23 @@ helper_lookup.c: helpers.gperf
 # QEMU TCG preprocessing targets
 # ============================================================================
 
-# Convenience entry point
-qemu-preprocess: check-qemu-top $(QEMU_BUILD)/Makefile copy-fpu-files prepend-softfloat capture-command preprocess-extract
+# --- Common entry-point recipe (parameterized via PREPROCESSED_OBJ / BUILD_LOG) -
+
+define QEMU_PREPROCESS_DEPS
+check-qemu-top $(QEMU_BUILD)/Makefile copy-fpu-files prepend-softfloat capture-command preprocess-extract
+endef
+
+# Convenience entry point: fpu_helper.c
+qemu-preprocess: check-qemu-top $(QEMU_BUILD)/Makefile copy-fpu-files prepend-softfloat capture-command-fpu preprocess-extract-fpu
 	@echo "==================================================================="
-	@echo "Preprocessed file ready: $(PREPROCESSED_OUT)"
+	@echo "Preprocessed file ready: $(QEMU_BUILD)/$(PREPROCESSED_OBJ_FPU).E"
+	@echo "==================================================================="
+
+# Convenience entry point: accel/tcg/tcg-runtime.c
+# No .inc files copied, no source modification required.
+qemu-preprocess-tcg-runtime: check-qemu-top $(QEMU_BUILD)/Makefile capture-command-tcg-runtime preprocess-extract-tcg-runtime
+	@echo "==================================================================="
+	@echo "Preprocessed file ready: $(QEMU_BUILD)/$(PREPROCESSED_OBJ_TCG_RT).E"
 	@echo "==================================================================="
 
 # --- 1. sanity check ---------------------------------------------------------
@@ -112,23 +134,26 @@ check-qemu-top:
 		echo "ERROR: target file '$(QEMU_FPU_HELPER)' not found."; \
 		exit 1; \
 	fi
+	@if [ ! -f "$(QEMU_TOP)/accel/tcg/tcg-runtime.c" ]; then \
+		echo "ERROR: target file '$(QEMU_TOP)/accel/tcg/tcg-runtime.c' not found."; \
+		exit 1; \
+	fi
 
 # --- 2. copy fpu/*.inc into target/i386/tcg/ --------------------------------
+# (Only used by the fpu_helper.c target.)
 
-copy-fpu-files: $(COPIED_INCS)
-
-$(QEMU_TCG_DIR)/%.inc: $(QEMU_FPU_DIR)/%.inc | $(QEMU_TCG_DIR)
-	cp -f $< $@
-	@echo "copied: $< -> $@"
-
-$(QEMU_TCG_DIR):
+copy-fpu-files:
 	@mkdir -p $(QEMU_TCG_DIR)
+	@for inc in $(call COPIED_INCS); do \
+		base=$${inc##*/}; \
+		cp -f "$(QEMU_FPU_DIR)/$$base" "$$inc"; \
+		echo "copied: $(QEMU_FPU_DIR)/$$base -> $$inc"; \
+	done
 
 # --- 3. prepend fpu/softfloat.c to fpu_helper.c ------------------------------
+# (Only used by the fpu_helper.c target.)
 
-prepend-softfloat: $(SOFTFLOAT_MARKER)
-
-$(SOFTFLOAT_MARKER): $(QEMU_FPU_HELPER) $(QEMU_FPU_DIR)/softfloat.c
+prepend-softfloat:
 	@if [ -f "$(SOFTFLOAT_MARKER)" ]; then \
 		echo "softfloat.c already prepended (marker exists): $(SOFTFLOAT_MARKER)"; \
 	else \
@@ -139,7 +164,7 @@ $(SOFTFLOAT_MARKER): $(QEMU_FPU_HELPER) $(QEMU_FPU_DIR)/softfloat.c
 		echo "done (original saved as fpu_helper.c.orig)."; \
 	fi
 
-# --- 4. configure + capture the compile command ------------------------------
+# --- 4. configure (shared) --------------------------------------------------
 
 $(QEMU_BUILD)/Makefile:
 	@echo "Creating build directory: $(QEMU_BUILD)"
@@ -152,34 +177,41 @@ $(QEMU_BUILD)/Makefile:
 			--enable-plugins \
 			--cc=$(QEMU_CC)
 
-# Run the requested object build with V=1 and capture ALL output (stdout+stderr)
-capture-command: $(QEMU_BUILD)/Makefile
-	@echo "Building $(PREPROCESSED_OBJ) with V=1, logging to $(BUILD_LOG)"
-	@cd $(QEMU_BUILD) && \
-		( make V=1 ./$(PREPROCESSED_OBJ) 2>&1 || true ) | tee $(BUILD_LOG)
+# --- 4b. capture the compile command (per target) ----------------------------
 
-# The build log is the (side-effect) output of the capture-command step above.
-$(BUILD_LOG): capture-command
+BUILD_LOG_FPU    := $(QEMU_BUILD)/fpu_helper_build.log
+BUILD_LOG_TCG_RT := $(QEMU_BUILD)/tcg_runtime_build.log
+
+capture-command-fpu: $(QEMU_BUILD)/Makefile
+	@echo "Building $(PREPROCESSED_OBJ_FPU) with V=1, logging to $(BUILD_LOG_FPU)"
+	@cd $(QEMU_BUILD) && \
+		( make V=1 ./$(PREPROCESSED_OBJ_FPU) 2>&1 || true ) | tee $(BUILD_LOG_FPU)
+
+capture-command-tcg-runtime: $(QEMU_BUILD)/Makefile
+	@echo "Building $(PREPROCESSED_OBJ_TCG_RT) with V=1, logging to $(BUILD_LOG_TCG_RT)"
+	@cd $(QEMU_BUILD) && \
+		( make V=1 ./$(PREPROCESSED_OBJ_TCG_RT) 2>&1 || true ) | tee $(BUILD_LOG_TCG_RT)
 
 # --- 5. transform the captured command:  -c  ->  -E  -------------------------
 #     and run it to produce the preprocessed .E file
-
-# Helper script (rendered into the build dir) that:
+#
+# Parameterized via PREPROCESS_OBJ (object path) and PREPROCESS_LOG (build log).
+# Steps:
 #   1. finds the last clang compile line in the build log,
 #   2. strips any leading "[NN/NN]" ninja-style progress prefix,
 #   3. rewrites " -o XXX.o -c " -> " -o XXX.o.E -E ",
 #   4. runs the resulting command from the build directory.
-#
-# Defined as a variable so we can `eval` it with one shell invocation (avoids
-# make recursively invoking /bin/sh for every line).
-define PREPROCESS_SCRIPT
+
+# Base (private) script template. Instantiated per target by setting
+# _PP_OBJ and _PP_LOG before calling eval.
+define _PREPROCESS_SCRIPT
 set -e; \
-echo "Extracting clang command from $(BUILD_LOG)"; \
-raw=$$(grep -E '\bclang\b' "$(BUILD_LOG)" | grep -E -- '-c[[:space:]]+\S+\.c(\s|$$)' | tail -n 1); \
+echo "Extracting clang command from $(_PP_LOG)"; \
+raw=$$(grep -E '\bclang\b' "$(_PP_LOG)" | grep -E -- '-c[[:space:]]+\S+\.c(\s|$$)' | tail -n 1); \
 if [ -z "$$raw" ]; then \
-	echo "ERROR: no clang compile command found in $(BUILD_LOG)"; \
+	echo "ERROR: no clang compile command found in $(_PP_LOG)"; \
 	echo "----- last 40 lines of build log -----"; \
-	tail -n 40 "$(BUILD_LOG)"; \
+	tail -n 40 "$(_PP_LOG)"; \
 	exit 1; \
 fi; \
 echo "Raw line from log:"; \
@@ -195,28 +227,43 @@ if [ "$$cmd" = "$$modified" ]; then \
 	exit 1; \
 fi; \
 eval "$$modified"; \
-if [ -f "$(PREPROCESSED_OBJ).E" ]; then \
-	echo "SUCCESS: preprocessed file -> $(PREPROCESSED_OUT)"; \
+if [ -f "$(_PP_OBJ).E" ]; then \
+	echo "SUCCESS: preprocessed file -> $(QEMU_BUILD)/$(_PP_OBJ).E"; \
 else \
-	echo "ERROR: expected output $(PREPROCESSED_OBJ).E was not produced."; \
+	echo "ERROR: expected output $(_PP_OBJ).E was not produced."; \
 	exit 1; \
 fi
 endef
-export PREPROCESS_SCRIPT
 
-preprocess-extract: $(BUILD_LOG)
-	cd $(QEMU_BUILD) && eval "$$PREPROCESS_SCRIPT"
+# fpu_helper.c
+preprocess-extract-fpu: capture-command-fpu
+	$(eval _PP_OBJ := $(PREPROCESSED_OBJ_FPU))
+	$(eval _PP_LOG := $(BUILD_LOG_FPU))
+	cd $(QEMU_BUILD) && $(_PREPROCESS_SCRIPT)
+
+# tcg-runtime.c
+preprocess-extract-tcg-runtime: capture-command-tcg-runtime
+	$(eval _PP_OBJ := $(PREPROCESSED_OBJ_TCG_RT))
+	$(eval _PP_LOG := $(BUILD_LOG_TCG_RT))
+	cd $(QEMU_BUILD) && $(_PREPROCESS_SCRIPT)
+
+# Backward-compatible generic targets (default to fpu_helper.c)
+$(BUILD_LOG): capture-command-fpu
+capture-command: capture-command-fpu
+preprocess-extract: preprocess-extract-fpu
 
 # ============================================================================
 # Clean: undo ALL previous changes to QEMU source + remove intermediate files
 # ============================================================================
 clean: clean-qemu-source clean-local
 
-# Remove everything we added to the QEMU source tree
+# Remove everything we added to the QEMU source tree.
+# IMPORTANT: only remove the .inc files that *we* copied (COPIED_INCS), never
+# QEMU's own .inc files that happen to live in the same directory.
 clean-qemu-source:
 	@if [ -n "$(QEMU_TOP)" ] && [ -d "$(QEMU_TOP)" ]; then \
 		echo "Undoing QEMU source modifications in $(QEMU_TOP) ..."; \
-		rm -f $(COPIED_INCS); \
+		rm -f $(call COPIED_INCS); \
 		rm -f $(SOFTFLOAT_MARKER); \
 		if [ -f "$(QEMU_FPU_HELPER).orig" ]; then \
 			echo "Restoring original $(QEMU_FPU_HELPER)"; \
@@ -277,5 +324,7 @@ test:
 	exit $$rc
 
 .PHONY: all test clean clean-all clean-local clean-qemu-source \
-	qemu-preprocess check-qemu-top copy-fpu-files prepend-softfloat \
-	capture-command preprocess-extract
+	qemu-preprocess qemu-preprocess-tcg-runtime \
+	check-qemu-top copy-fpu-files prepend-softfloat \
+	capture-command capture-command-fpu capture-command-tcg-runtime \
+	preprocess-extract preprocess-extract-fpu preprocess-extract-tcg-runtime
