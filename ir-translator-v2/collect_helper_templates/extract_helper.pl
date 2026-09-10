@@ -58,12 +58,24 @@ my %VecCodeToCType = (
   "VecL" => "v4uint",
   "VecW" => "v8ushort",
   "VecB" => "v16uchar",
+  "VecQ_YMM" => "v4ulong",
+  "VecL_YMM" => "v8uint",
+  "VecW_YMM" => "v16ushort",
+  "VecB_YMM" => "v32uchar",
 );
 my %VecSymbolToCType = (
   "_q_ZMMReg" => "v2ulong",
   "_l_ZMMReg" => "v4uint",
   "_w_ZMMReg" => "v8ushort",
   "_b_ZMMReg" => "v16uchar",
+  "_q_ZMMReg_YMM" => "v4ulong",
+  "_l_ZMMReg_YMM" => "v8uint",
+  "_w_ZMMReg_YMM" => "v16ushort",
+  "_b_ZMMReg_YMM" => "v32uchar",
+);
+my %DefaultVectorCType = (
+  "" => "v2ulong",
+  "_YMM" => "v4ulong",
 );
 my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
 my %qemuaot_gp_params_map = (
@@ -218,6 +230,10 @@ while (<FD>) {
     my $func_name = &GetText($nameStart, $nameStop);
     $func_name = &extract_func_name($func_name);
     $info{'NAME'} = $func_name;
+    $info{'YMM_FLAG'} = "";
+    if ($func_name =~ /_ymm$/) {
+      $info{'YMM_FLAG'} = "_YMM";
+    }
     $info{'HELPER_INTERFACE'} = 0;
     $info{'RETURN_TYPE'} = $func_return_type;
     if (exists $template_helpers{$info{'NAME'}}) {
@@ -560,10 +576,8 @@ while (<FD>) {
     my $stop = $f2[1];
     my ($func_idx, $func_ptr) = &lookup($start, \%func_lookup);
     if ($func_idx != -1) {
+      # This case only applies on helper_aeskeygenassist_xmm
       my %info = ();
-      if ($func_ptr->{'NAME'} =~ /^helper_/ and $func_ptr->{'NAME'} =~ /_xmm$/) {
-        next;
-      }
       $info{'START'} = $start;
       my $current_pos = $stop + 1;
       while (&IsValidSymbolStart($file_content[$current_pos]) == 0) {
@@ -968,9 +982,18 @@ while (<FD>) {
         die "" if $file_content[$stop+1] ne "[";
         my ($array_idx, $array_idx_start, $array_idx_stop) = &GetContentWithArrayBound($stop+2);
         die "" if $file_content[$array_idx_stop+1] ne "]";
+        my $assignment_idx = $start;
+        while ($file_content[$assignment_idx] ne "=") {
+          $assignment_idx = $assignment_idx - 1;
+        }
+        my $expr = "";
+        foreach my $i (($assignment_idx+2) .. ($start-2-1)) {
+          $expr = $expr.$file_content[$i];
+        }
         my %info = ();
-        $info{'START'} = $start-2;
+        $info{'START'} = $assignment_idx+2;
         $info{'STOP'} = $array_idx_stop+1;
+        $info{'IDX'} = $array_idx;                                                                                                         $info{'EXPR'} = $expr;
         if (not exists $func_ptr->{'VECX'}) {
           my %vecx_info = ();
           $func_ptr->{'VECX'} = \%vecx_info;
@@ -1222,6 +1245,11 @@ typedef unsigned short __attribute__((__vector_size__(16))) v8ushort;
 typedef unsigned char __attribute__((__vector_size__(16))) v16uchar;
 typedef unsigned int __attribute__((__vector_size__(16))) v4uint;
 typedef unsigned long __attribute__((__vector_size__(16))) v2ulong;
+
+typedef unsigned short __attribute__((__vector_size__(32))) v16ushort;
+typedef unsigned char __attribute__((__vector_size__(32))) v32uchar;
+typedef unsigned int __attribute__((__vector_size__(32))) v8uint;
+typedef unsigned long __attribute__((__vector_size__(32))) v4ulong;
 
 EOF
   my %foreign_types = ();
@@ -1695,7 +1723,12 @@ sub gen_replicated_func
     if ($funcs{$target_func}->{'HELPER_INTERFACE'}) {
       foreach my $vec_idx (0..$#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
         my $arg_entry = $funcs{$target_func}->{'VECTOR_ARGS'}->[$vec_idx];
-        $current_func = $current_func."#define $arg_entry->{'VAR_NAME'} VEC$vec_idx\n";
+        if ($funcs{$target_func}->{'YMM_FLAG'} eq "_YMM") {
+          $current_func = $current_func."#define $arg_entry->{'VAR_NAME'}x VEC${vec_idx}X\n";
+          $current_func = $current_func."#define $arg_entry->{'VAR_NAME'}y VEC${vec_idx}Y\n";
+        } else {
+          $current_func = $current_func."#define $arg_entry->{'VAR_NAME'} VEC$vec_idx\n";
+        }
       }
     }
     my %empty = ();
@@ -1711,7 +1744,12 @@ sub gen_replicated_func
     if ($funcs{$target_func}->{'HELPER_INTERFACE'}) {
       foreach my $vec_idx (0..$#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
         my $arg_entry = $funcs{$target_func}->{'VECTOR_ARGS'}->[$vec_idx];
-        $current_func = $current_func."#undef $arg_entry->{'VAR_NAME'}\n";
+        if ($funcs{$target_func}->{'YMM_FLAG'} eq "_YMM") {
+          $current_func = $current_func."#undef $arg_entry->{'VAR_NAME'}x\n";
+          $current_func = $current_func."#undef $arg_entry->{'VAR_NAME'}y\n";
+        } else {
+          $current_func = $current_func."#undef $arg_entry->{'VAR_NAME'}\n";
+        }
       }
     }
     $new_func = $new_func.$current_func;
@@ -1768,7 +1806,12 @@ sub gen_replicated_func
       if ($funcs{$target_func}->{'HELPER_INTERFACE'}) {
         foreach my $vec_idx (0..$#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
           my $arg_entry = $funcs{$target_func}->{'VECTOR_ARGS'}->[$vec_idx];
-          $current_func = $current_func."#define $arg_entry->{'VAR_NAME'} VEC$vec_idx\n";
+          if ($funcs{$target_func}->{'YMM_FLAG'} eq "_YMM") {
+            $current_func = $current_func."#define $arg_entry->{'VAR_NAME'}x VEC${vec_idx}X\n";
+            $current_func = $current_func."#define $arg_entry->{'VAR_NAME'}y VEC${vec_idx}Y\n";
+          } else {
+            $current_func = $current_func."#define $arg_entry->{'VAR_NAME'} VEC$vec_idx\n";
+          }
         }
       }
       if ($target_func eq $exception_exit) {
@@ -1784,7 +1827,12 @@ sub gen_replicated_func
       if ($funcs{$target_func}->{'HELPER_INTERFACE'}) {
         foreach my $vec_idx (0..$#{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
           my $arg_entry = $funcs{$target_func}->{'VECTOR_ARGS'}->[$vec_idx];
-          $current_func = $current_func."#undef $arg_entry->{'VAR_NAME'}\n";
+          if ($funcs{$target_func}->{'YMM_FLAG'} eq "_YMM") {
+            $current_func = $current_func."#undef $arg_entry->{'VAR_NAME'}x\n";
+            $current_func = $current_func."#undef $arg_entry->{'VAR_NAME'}y\n";
+          } else {
+            $current_func = $current_func."#undef $arg_entry->{'VAR_NAME'}\n";
+          }
         }
       }
       $new_func = $new_func."\n";
@@ -1809,6 +1857,7 @@ sub gen_restore_info
   }
   foreach my $bk (keys %backups) {
     if ($bk =~ /^xmm/) {
+      # This case only appears in helper_pcmpestrm_xmm/helper_pcmpistrm_xmm
       $restore_info{"backup_$bk"} = $bk;
     } else {
       die "$bk" if (not exists $qemuaot_gp_params_map{$bk});
@@ -1824,7 +1873,12 @@ sub gen_restore_info
   }
   if (exists $funcs{$target_func}->{'IS_FOREIGN'}) {
     foreach my $v (@{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
-      $restore_info{"backup_$v->{'VAR_NAME'}"} = $v->{'VAR_NAME'};
+      if ($funcs{$target_func}->{'YMM_FLAG'} eq "_YMM") {
+        $restore_info{"backup_$v->{'VAR_NAME'}x"} = "$v->{'VAR_NAME'}x";
+        $restore_info{"backup_$v->{'VAR_NAME'}y"} = "$v->{'VAR_NAME'}y";
+      } else {
+        $restore_info{"backup_$v->{'VAR_NAME'}"} = $v->{'VAR_NAME'};
+      }
     }
   }
   $funcs{$target_func}->{'RESTORE_INFO'} = \%restore_info;
@@ -1834,7 +1888,6 @@ sub add_context_backup
 {
   my ($new_func_body, $target_func, $order_to_func) = @_;
   my %backups = ();
-  my %restore_info = ();
   my $need_env = 0;
   foreach my $ok (keys %{$order_to_func}) {
     foreach my $bv (keys %{$funcs{$order_to_func->{$ok}}->{'ENVVAR_AND_VECTORS'}}) {
@@ -1858,8 +1911,8 @@ sub add_context_backup
   }
   foreach my $bk (keys %backups) {
     if ($bk =~ /^xmm/) {
+      # This case only appears in helper_pcmpestrm_xmm/helper_pcmpistrm_xmm
       $backup_vars = $backup_vars."v2ulong backup_$bk = $bk;\n";
-      $restore_info{"backup_$bk"} = $bk;
     } else {
       die "$bk" if (not exists $qemuaot_gp_params_map{$bk});
       my $var_name = $bk;
@@ -1877,13 +1930,16 @@ sub add_context_backup
         die "";
       }
       $backup_vars = $backup_vars."$type_info backup_$var_name = $bk;\n";
-      $restore_info{"backup_$var_name"} = $bk;
     }
   }
   if (exists $funcs{$target_func}->{'IS_FOREIGN'}) {
     foreach my $v (@{$funcs{$target_func}->{'VECTOR_ARGS'}}) {
-      $backup_vars = $backup_vars."v2ulong backup_$v->{'VAR_NAME'} = $v->{'VAR_NAME'};\n";
-      $restore_info{"backup_$v->{'VAR_NAME'}"} = $v->{'VAR_NAME'};
+      if ($funcs{$target_func}->{'YMM_FLAG'} eq "_YMM") {
+        $backup_vars = $backup_vars."v2ulong backup_$v->{'VAR_NAME'}x = $v->{'VAR_NAME'}x;\n";
+        $backup_vars = $backup_vars."v2ulong backup_$v->{'VAR_NAME'}y = $v->{'VAR_NAME'}y;\n";
+      } else {
+        $backup_vars = $backup_vars."v2ulong backup_$v->{'VAR_NAME'} = $v->{'VAR_NAME'};\n";
+      }
     }
   }
   foreach my $si (@{$funcs{$target_func}->{'SCALAR_ARGS'}}) {
@@ -1897,6 +1953,24 @@ sub add_context_backup
 sub get_func_body
 {
   my ($func_ptr, $pi, $md, $exception_exit, $fc) = @_;
+
+  my $prolog = "";
+  my $epilog = "";
+  if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
+    foreach my $vec_idx (0..$#{$func_ptr->{'VECTOR_ARGS'}}) {
+      my $arg_entry = $func_ptr->{'VECTOR_ARGS'}->[$vec_idx];
+      $prolog = $prolog."v4ulong $arg_entry->{'VAR_NAME'};\n";
+      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[0] = $arg_entry->{'VAR_NAME'}x[0];\n";
+      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[1] = $arg_entry->{'VAR_NAME'}x[1];\n";
+      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[2] = $arg_entry->{'VAR_NAME'}y[0];\n";
+      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[3] = $arg_entry->{'VAR_NAME'}y[1];\n";
+      $epilog = "$arg_entry->{'VAR_NAME'}x[0] = $arg_entry->{'VAR_NAME'}"."[0];\n".$epilog;
+      $epilog = "$arg_entry->{'VAR_NAME'}x[1] = $arg_entry->{'VAR_NAME'}"."[1];\n".$epilog;
+      $epilog = "$arg_entry->{'VAR_NAME'}y[0] = $arg_entry->{'VAR_NAME'}"."[2];\n".$epilog;
+      $epilog = "$arg_entry->{'VAR_NAME'}y[1] = $arg_entry->{'VAR_NAME'}"."[3];\n".$epilog;
+    }
+  }
+
   my %events = ();
   foreach my $e (keys %{$func_ptr->{'CALLS'}}) {
     $events{$e} = 1;
@@ -2011,16 +2085,17 @@ END
     } elsif (exists $func_ptr->{'VEC'}->{$e}) {
       if ($func_ptr->{'VEC'}->{$e}->{'FROM_PARAM'}) {
         if ($func_ptr->{'HELPER_INTERFACE'}) {
-          $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}})$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$e}->{'VAR'}]->{'VAR_NAME'})";
+          $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}.$func_ptr->{'YMM_FLAG'}})$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$e}->{'VAR'}]->{'VAR_NAME'})";
         } else {
-          $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}})(*$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$e}->{'VAR'}]->{'VAR_NAME'}))";
+          $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}.$func_ptr->{'YMM_FLAG'}})(*$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$e}->{'VAR'}]->{'VAR_NAME'}))";
         }
         $current_pos = $func_ptr->{'VEC'}->{$e}->{'STOP'} + 1;
       } else {
-        $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}})$func_ptr->{'VEC'}->{$e}->{'VAR'})";
+        $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$e}->{'TYPE'}.$func_ptr->{'YMM_FLAG'}})$func_ptr->{'VEC'}->{$e}->{'VAR'})";
         $current_pos = $func_ptr->{'VEC'}->{$e}->{'STOP'} + 1;
       }
     } elsif (exists $func_ptr->{'VEC_VAR'}->{$e}) {
+      # This case only applies on helper_aeskeygenassist_xmm
       my $entry = $func_ptr->{'VEC_VAR'}->{$e};
       if ($func_ptr->{'HELPER_INTERFACE'}) {
         $body = $body."v2ulong ".$entry->{'SYM'}." = ".$func_ptr->{'VECTOR_ARGS'}->[$entry->{'VEC_ARG_IDX'}]->{'VAR_NAME'};
@@ -2058,7 +2133,7 @@ END
         $current_pos = $vec_entry->{'STOP'} + 1;
       } else {
         $body = $body."{\n";
-        $body = $body."$VecCodeToCType{$vec_entry->{'TYPE'}} vec_assign_tmp = ($VecCodeToCType{$vec_entry->{'TYPE'}})$vec_var;\n";
+        $body = $body."$VecCodeToCType{$vec_entry->{'TYPE'}.$func_ptr->{'YMM_FLAG'}} vec_assign_tmp = ($VecCodeToCType{$vec_entry->{'TYPE'}.$func_ptr->{'YMM_FLAG'}})$vec_var;\n";
         $body = $body."vec_assign_tmp[".$vec_entry->{'DEF_SYM_INFO'}->[$#{$vec_entry->{'DEF_SYM_INFO'}}]->{'ARRAY_IDX'}."] ";
         my $sub_head = $func_ptr->{'VEC_ASSIGN'}->{$e}->{'ASSIGN_POS'};
         my $sub_current = $sub_head;
@@ -2099,9 +2174,9 @@ END
             my $sub_str = &GetText($sub_head, ($sub_current-1));
             $body = $body.$sub_str;
             if ($func_ptr->{'VEC'}->{$sub_current}->{'FROM_PARAM'}) {
-              $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$sub_current}->{'TYPE'}})$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$sub_current}->{'VAR'}]->{'VAR_NAME'})";
+              $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$sub_current}->{'TYPE'}.$func_ptr->{'YMM_FLAG'}})$func_ptr->{'VECTOR_ARGS'}->[$func_ptr->{'VEC'}->{$sub_current}->{'VAR'}]->{'VAR_NAME'})";
             } else {
-              $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$sub_current}->{'TYPE'}})$func_ptr->{'VEC'}->{$sub_current}->{'VAR'})";
+              $body = $body."(($VecCodeToCType{$func_ptr->{'VEC'}->{$sub_current}->{'TYPE'}.$func_ptr->{'YMM_FLAG'}})$func_ptr->{'VEC'}->{$sub_current}->{'VAR'})";
             }
             $sub_head = $func_ptr->{'VEC'}->{$sub_current}->{'STOP'} + 1;
             $sub_current = $sub_head;
@@ -2111,11 +2186,14 @@ END
         }
         my $sub_str = &GetText($sub_head, $sub_current);
         $body = $body.$sub_str;
-        $body = $body."\n$vec_var = (v2ulong)vec_assign_tmp;\n";
+        $body = $body."\n$vec_var = (".$DefaultVectorCType{$func_ptr->{'YMM_FLAG'}}.")vec_assign_tmp;\n";
         $body = $body."}\n";
         $current_pos = $sub_current + 1;
       }
     } elsif (exists $func_ptr->{'VECX'}->{$e}) {
+      if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
+        $body = $body."($func_ptr->{'VECX'}->{$e}->{'IDX'} == 0 ? ($func_ptr->{'VECX'}->{$e}->{'EXPR'}x) : ($func_ptr->{'VECX'}->{$e}->{'EXPR'}y))";
+      }
       $current_pos = $func_ptr->{'VECX'}->{$e}->{'STOP'} + 1;
     } elsif (exists $func_ptr->{'RETURNS'}->{$e}) {
       my $ret_info = $func_ptr->{'RETURNS'}->{$e};
@@ -2154,12 +2232,19 @@ END
           my $exp = &get_exception_path($func_ptr, $exception_exit);
           $body = $body.$exp;
           if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_VOID") {
+            if ($epilog ne "") {
+              $body = $body."{\n$epilog\n";
+            }
             $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
             foreach my $p (@qemuaot_gp_params) {
               $body = $body."$p, ";
             }
             $body =~ s/,\s+$/ /;
-            $body = $body.$qemuaot_vec_invoke.");\n}\n";
+            $body = $body.$qemuaot_vec_invoke.");\n";
+            if ($epilog ne "") {
+              $body = $body."}\n";
+            }
+            $body = $body."}\n";
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
           } else {
             my $expr;
@@ -2168,38 +2253,68 @@ END
             } else {
               $expr = &GetText($func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
             }
+            if ($epilog ne "") {
+              $body = $body."{\n$epilog\n";
+            }
             $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
             foreach my $p (@qemuaot_gp_params) {
               $body = $body."$p, ";
             }
             $body =~ s/,\s+$/ /;
-            $body = $body.$qemuaot_vec_invoke.", $expr);\n}\n";
+            $body = $body.$qemuaot_vec_invoke.", $expr);\n";
+            if ($epilog ne "") {
+              $body = $body."}\n";
+            }
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'} + 2;
           }
         } else {
           if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_VOID") {
             if (exists $nosplit_helpers{$func_ptr->{'NAME'}}) {
+              if ($epilog ne "") {
+                $body = $body."{\n$epilog\n";
+              }
               $body = $body."return;\n";
+              if ($epilog ne "") {
+                $body = $body."}\n";
+              }
             } else {
+              if ($epilog ne "") {
+                $body = $body."{\n$epilog\n";
+              }
               $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
               foreach my $p (@qemuaot_gp_params) {
                 $body = $body."$p, ";
               }
               $body =~ s/,\s+$/ /;
               $body = $body.$qemuaot_vec_invoke.");\n";
+              if ($epilog ne "") {
+                $body = $body."}\n";
+              }
             }
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
           } else {
             my $expr = &GetText($func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
             if (exists $nosplit_helpers{$func_ptr->{'NAME'}}) {
+              if ($epilog ne "") {
+                $body = $body."{\n$epilog\n";
+              }
               $body = $body."return $expr;\n";
+              if ($epilog ne "") {
+                $body = $body."}\n";
+              }
             } else {
+              if ($epilog ne "") {
+                $body = $body."{\n$epilog\n";
+              }
               $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
               foreach my $p (@qemuaot_gp_params) {
                 $body = $body."$p, ";
               }
               $body =~ s/,\s+$/ /;
               $body = $body.$qemuaot_vec_invoke.", $expr);\n";
+              if ($epilog ne "") {
+                $body = $body."}\n";
+              }
             }
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'} + 2;
           }
@@ -2219,13 +2334,22 @@ END
       $exp_logic = &get_exception_path($func_ptr, $exception_exit);
     }
     my $normal_logic = "";
+    if ($epilog ne "") {
+      $normal_logic = $normal_logic."{\n$epilog\n";
+    }
     $normal_logic = $normal_logic."return ((FUNC_NORMAL_RET)normal_return)(";
     foreach my $p (@qemuaot_gp_params) {
       $normal_logic = $normal_logic."$p, ";
     }
     $normal_logic =~ s/,\s+$/ /;
     $normal_logic = $normal_logic.$qemuaot_vec_invoke.");\n";
+    if ($epilog ne "") {
+      $normal_logic = $normal_logic."}\n";
+    }
     $body =~ s/\}$/\n$exp_logic$normal_logic\}/;
+  }
+  if ($prolog ne "") {
+    $body =~ s/^\{/\{\n$prolog/;
   }
   return $body;
 }
@@ -2372,9 +2496,9 @@ sub update_vector_inside_single_param
       my $vec_entry = $caller_ptr->{'VEC'}->{$pos};
 
       if ($vec_entry->{'FROM_PARAM'}) {
-        $str = $str."(($VecCodeToCType{$vec_entry->{'TYPE'}})$caller_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'})";
+        $str = $str."(($VecCodeToCType{$vec_entry->{'TYPE'}.$caller_ptr->{'YMM_FLAG'}})$caller_ptr->{'VECTOR_ARGS'}->[$vec_entry->{'VAR'}]->{'VAR_NAME'})";
       } else {
-        $str = $str."(($VecCodeToCType{$vec_entry->{'TYPE'}})$vec_entry->{'VAR'})";
+        $str = $str."(($VecCodeToCType{$vec_entry->{'TYPE'}.$caller_ptr->{'YMM_FLAG'}})$vec_entry->{'VAR'})";
       }
       $last_dump = $vec_entry->{'STOP'} + 1;
     }
@@ -2404,15 +2528,12 @@ sub collect_func_args
       if ($sk =~ /^env\-\>/) {
         next;
       }
-      if ($sk =~ /^xmm/) {
-        $args = $args.", v2ulong *".$sk."_ptr";
-      } else {
-        die "" if not exists $qemuaot_gp_params_map{$sk};
-        $args = $args.", $qemuaot_gp_params_map{$sk} *".$sk."_ptr";
-      }
+      die "" if not exists $qemuaot_gp_params_map{$sk};
+      $args = $args.", $qemuaot_gp_params_map{$sk} *".$sk."_ptr";
     }
   }
   if ($func_ptr->{'HELPER_INTERFACE'} == 0) {
+    # Only applies to pcmp_ilen/pcmp_val/pcmpxstrx for helper_pcmpestri_xmm/helper_pcmpestrm_xmm/helper_pcmpistri_xmm
     foreach my $i (@{$func_ptr->{'VECTOR_ARGS'}}) {
       $args = $args.", v2ulong *".$i->{'VAR_NAME'};
     }
@@ -2669,10 +2790,10 @@ sub replace_env_var
     die "" if not exists $env_xmmregs_idx_map{$xmm_idx};
     die "" if $entry->{'DEF_SYM_INFO'}->[1]->{'IS_ARRAY'} == 0;
     my $vec_sym = $entry->{'DEF_SYM_INFO'}->[1]->{'SYM'};
-    die "" if not exists $VecSymbolToCType{$vec_sym};
+    die "" if not exists $VecSymbolToCType{$vec_sym.$func_ptr->{'YMM_FLAG'}};
     my $vec_idx = $entry->{'DEF_SYM_INFO'}->[1]->{'ARRAY_IDX'};
     if ($func_ptr->{'HELPER_INTERFACE'}) {
-      $new_var = "(($VecSymbolToCType{$vec_sym})$env_xmmregs_idx_map{$xmm_idx})[$vec_idx]";
+      $new_var = "(($VecSymbolToCType{$vec_sym.$func_ptr->{'YMM_FLAG'}})$env_xmmregs_idx_map{$xmm_idx})[$vec_idx]";
     } else {
       die "";
     }
