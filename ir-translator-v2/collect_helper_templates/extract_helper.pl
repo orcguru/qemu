@@ -7,172 +7,49 @@ use IO::Select;
 use Cwd 'abs_path';
 
 if ($#ARGV < 1) {
-  print "Usage: ./script <antlr-in> <antlr-out>\n";
+  print "Usage: ./script <tcg_ast.h> <antlr-in> <antlr-out>\n";
   exit 1;
 }
 
-#FIXME: get fp_helpers/noinline_helpers definitions from tcg_ast.h
-my %fp_helpers = (
-  "helper_comisd" => 1,
-  "helper_ucomisd" => 1,
-  "helper_cvtsq2sd" => 1,
-  "helper_cvttsd2sq" => 1,
-  "helper_mulsd" => 1,
-  "helper_divq_EAX" => 1,
-  "helper_divl_EAX" => 1,
-  "helper_idivq_EAX" => 1,
-  "helper_divw_AX" => 1,
-  "helper_divb_AL" => 1,
-  "helper_idivb_AL" => 1,
-  "helper_idivl_EAX" => 1,
-  "helper_idivw_AX" => 1,
-  "helper_divsd" => 1,
-  "helper_divss" => 1,
-  "helper_div_i32" => 1,
-  "helper_div_i64" => 1,
-  "helper_divu_i32" => 1,
-  "helper_divu_i64" => 1,
-  "helper_addsd" => 1,
-  "helper_addss" => 1,
-  "helper_cmpeqsd" => 1,
-  "helper_cmpeqss" => 1,
-  "helper_cmpeqssd" => 1,
-  "helper_cmpeqsss" => 1,
-  "helper_cmpequsd" => 1,
-  "helper_cmpequss" => 1,
-  "helper_cmpequssd" => 1,
-  "helper_cmpequsss" => 1,
-  "helper_cmpfalsesd" => 1,
-  "helper_cmpfalsess" => 1,
-  "helper_cmpfalsessd" => 1,
-  "helper_cmpfalsesss" => 1,
-  "helper_cmpgeqsd" => 1,
-  "helper_cmpgeqss" => 1,
-  "helper_cmpgesd" => 1,
-  "helper_cmpgess" => 1,
-  "helper_cmpgtqsd" => 1,
-  "helper_cmpgtqss" => 1,
-  "helper_cmpgtsd" => 1,
-  "helper_cmpgtss" => 1,
-  "helper_cmpleqsd" => 1,
-  "helper_cmpleqss" => 1,
-  "helper_cmplesd" => 1,
-  "helper_cmpless" => 1,
-  "helper_cmpltqsd" => 1,
-  "helper_cmpltqss" => 1,
-  "helper_cmpltsd" => 1,
-  "helper_cmpltss" => 1,
-  "helper_cmpneqqsd" => 1,
-  "helper_cmpneqqss" => 1,
-  "helper_cmpneqsd" => 1,
-  "helper_cmpneqss" => 1,
-  "helper_cmpnequsd" => 1,
-  "helper_cmpnequss" => 1,
-  "helper_cmpnequssd" => 1,
-  "helper_cmpnequsss" => 1,
-  "helper_cmpngeqsd" => 1,
-  "helper_cmpngeqss" => 1,
-  "helper_cmpngesd" => 1,
-  "helper_cmpngess" => 1,
-  "helper_cmpngtqsd" => 1,
-  "helper_cmpngtqss" => 1,
-  "helper_cmpngtsd" => 1,
-  "helper_cmpngtss" => 1,
-  "helper_cmpnleqsd" => 1,
-  "helper_cmpnleqss" => 1,
-  "helper_cmpnlesd" => 1,
-  "helper_cmpnless" => 1,
-  "helper_cmpnltqsd" => 1,
-  "helper_cmpnltqss" => 1,
-  "helper_cmpnltsd" => 1,
-  "helper_cmpnltss" => 1,
-  "helper_cmpordsd" => 1,
-  "helper_cmpordss" => 1,
-  "helper_cmpordssd" => 1,
-  "helper_cmpordsss" => 1,
-  "helper_cmptruesd" => 1,
-  "helper_cmptruess" => 1,
-  "helper_cmptruessd" => 1,
-  "helper_cmptruesss" => 1,
-  "helper_cmpunordsd" => 1,
-  "helper_cmpunordss" => 1,
-  "helper_cmpunordssd" => 1,
-  "helper_cmpunordsss" => 1,
-  "helper_comiss" => 1,
-  "helper_cvtsd2si" => 1,
-  "helper_cvtsd2sq" => 1,
-  "helper_cvtsd2ss" => 1,
-  "helper_cvtsi2sd" => 1,
-  "helper_cvtsi2ss" => 1,
-  "helper_cvtsq2ss" => 1,
-  "helper_cvtss2sd" => 1,
-  "helper_cvtss2si" => 1,
-  "helper_cvtss2sq" => 1,
-  "helper_cvttsd2si" => 1,
-  "helper_cvttss2si" => 1,
-  "helper_cvttss2sq" => 1,
-  "helper_fma4sd" => 1,
-  "helper_fma4ss" => 1,
-  "helper_maxsd" => 1,
-  "helper_maxss" => 1,
-  "helper_minsd" => 1,
-  "helper_minss" => 1,
-  "helper_mulss" => 1,
-  "helper_rcpss" => 1,
-  "helper_rsqrtss" => 1,
-  "helper_sha1msg1" => 1,
-  "helper_sha1msg2" => 1,
-  "helper_sha1nexte" => 1,
-  "helper_sha1rnds4_f0" => 1,
-  "helper_sha1rnds4_f1" => 1,
-  "helper_sha1rnds4_f2" => 1,
-  "helper_sha1rnds4_f3" => 1,
-  "helper_sha256msg1" => 1,
-  "helper_sha256msg2" => 1,
-  "helper_sha256rnds2" => 1,
-  "helper_sqrtsd" => 1,
-  "helper_sqrtss" => 1,
-  "helper_subsd" => 1,
-  "helper_subss" => 1,
-  "helper_ucomiss" => 1,
-  "helper_pdep" => 1,
-  "helper_pext" => 1,
-  "helper_clrsb_i32" => 1,
-  "helper_clrsb_i64" => 1,
-  "helper_clz_i32" => 1,
-  "helper_clz_i64" => 1,
-  "helper_ctpop_i32" => 1,
-  "helper_ctpop_i64" => 1,
-  "helper_ctz_i32" => 1,
-  "helper_ctz_i64" => 1,
-  "helper_mulsh_i64" => 1,
-  "helper_muluh_i64" => 1,
-  "helper_rem_i32" => 1,
-  "helper_rem_i64" => 1,
-  "helper_remu_i32" => 1,
-  "helper_remu_i64" => 1,
-  "helper_sar_i64" => 1,
-  "helper_shl_i64" => 1,
-  "helper_shr_i64" => 1,
-  "helper_cc_compute_all" => 1,
-  "helper_cc_compute_c" => 1,
-  "helper_cc_compute_nz" => 1,
-);
-
-my %noinline_helpers = (
-  "helper_divw_AX" => 1,
-  "helper_idivb_AL" => 1,
-  "helper_idivl_EAX" => 1,
-  "helper_idivw_AX" => 1,
-  "helper_divb_AL" => 1,
-  "helper_div_i32" => 1,
-  "helper_div_i64" => 1,
-  "helper_divu_i32" => 1,
-  "helper_divu_i64" => 1,
-  "helper_divq_EAX" => 1,
-  "helper_divl_EAX" => 1,
-  "helper_idivq_EAX" => 1,
-);
+my %template_helpers = ();
+my %noinline_helpers = ();
+my %nosplit_helpers = ();
+open IN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
+my $template_enable = 0;
+my $noinline_enable = 0;
+my $nosplit_enable = 0;
+while (<IN>) {
+  my $line = $_;
+  chomp($line);
+  if ($line =~ /ABOVE_HELPER_ENABLED_TEMPLATE/) {
+    $template_enable = 1;
+    next;
+  } elsif ($line =~ /NOINLINE_BEGIN/) {
+    $noinline_enable = 1;
+    next;
+  } elsif ($line =~ /NOINLINE_END/) {
+    $noinline_enable = 0;
+    next;
+  } elsif ($line =~ /NOSPLIT_BEGIN/) {
+    $nosplit_enable = 1;
+    next;
+  } elsif ($line =~ /NOSPLIT_END/) {
+    $nosplit_enable = 0;
+    next;
+  } elsif ($line =~ /HELPER_MAX/) {
+    last;
+  }
+  if ($template_enable and $line =~ /X\((\w+)\)/) {
+    $template_helpers{$1} = 1;
+  }
+  if ($noinline_enable and $line =~ /X\((\w+)\)/) {
+    $noinline_helpers{$1} = 1;
+  }
+  if ($nosplit_enable and $line =~ /X\((\w+)\)/) {
+    $nosplit_helpers{$1} = 1;
+  }
+}
+close IN;
 
 my $arch_info = `uname -m`;
 chomp($arch_info);
@@ -251,13 +128,13 @@ my %env_xmmregs_idx_map = (
   "15" => "xmm15"
 );
 
-my $path = "$ARGV[0].helper_templates";
-my $file_size = -s $ARGV[0];
-open FDIN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
+my $path = "$ARGV[1].helper_templates";
+my $file_size = -s $ARGV[1];
+open FDIN, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
 my $bytes;
 my $br = read FDIN, $bytes, $file_size;
 if ($br != $file_size) {
-  die "Failed to read $ARGV[0]\n";
+  die "Failed to read $ARGV[1]\n";
 }
 close FDIN;
 my $str = unpack "a*", $bytes;
@@ -280,7 +157,7 @@ my %func_lookup = ();
 my %func_lookup_map = ();
 $func_lookup{'MAP'} = \%func_lookup_map;
 my $global_func_idx = 0;
-open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
+open FD, "< $ARGV[2]" or die "Cannot open $ARGV[2] for read!\n";
 while (<FD>) {
   my $line = $_;
   chomp($line);
@@ -343,7 +220,7 @@ while (<FD>) {
     $info{'NAME'} = $func_name;
     $info{'HELPER_INTERFACE'} = 0;
     $info{'RETURN_TYPE'} = $func_return_type;
-    if (exists $fp_helpers{$info{'NAME'}}) {
+    if (exists $template_helpers{$info{'NAME'}}) {
       $info{'HELPER_INTERFACE'} = 1;
     }
     $info{'FUNC_FULL'} = &GetText($bodyStart, $bodyStop);
@@ -371,7 +248,7 @@ my @sorted_func_addr = sort {$a <=> $b} sort keys %{$func_lookup{'MAP'}};
 $func_lookup{'SORTED_ADDR'} = \@sorted_func_addr;
 
 # Collect background info (-function)
-open FDIN, "< $ARGV[0]" or die "Cannot open $ARGV[0] for read!\n";
+open FDIN, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
 my $current_pos = 0;
 my $blank_info = "";
 foreach my $a (@{$func_lookup{'SORTED_ADDR'}}) {
@@ -379,7 +256,7 @@ foreach my $a (@{$func_lookup{'SORTED_ADDR'}}) {
   $blank_info = $blank_info."\n".$txt;
   $current_pos = $func_lookup{'MAP'}->{$a}->{'FULL_STOP'} + 1;
 }
-my $total_size = -s $ARGV[0];
+my $total_size = -s $ARGV[1];
 my $txt = &GetText($current_pos, ($total_size - 1));
 $blank_info = $blank_info."\n".$txt;
 
@@ -388,7 +265,7 @@ my %callsite_lookup = ();
 my %callsite_lookup_map = ();
 $callsite_lookup{'MAP'} = \%callsite_lookup_map;
 my $prev_generic_func = "";
-open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
+open FD, "< $ARGV[2]" or die "Cannot open $ARGV[2] for read!\n";
 while (<FD>) {
   my $line = $_;
   chomp($line);
@@ -601,11 +478,11 @@ foreach my $line (@blank_lines) {
   }
 }
 
-# Mark functions by fp_helpers
+# Mark functions by template_helpers
 my %covered_funcs = ();
 my %workset = ();
 foreach my $f (keys %funcs) {
-  if (exists $fp_helpers{$f}) {
+  if (exists $template_helpers{$f}) {
     $workset{$f} = 1;
     $covered_funcs{$f} = 1;
   }
@@ -643,7 +520,7 @@ foreach my $f (keys %covered_funcs) {
   $funcs{$f}->{'ENV_TYPE'} = $env_type;
   $funcs{$f}->{'128'} = $ret128_info;
   $funcs{$f}->{'FUNC_TYPE'} = $func_type;
-  if (exists $fp_helpers{$funcs{$f}->{'NAME'}} and $funcs{$f}->{'FUNC_TYPE'} ne "void") {
+  if ((not exists $nosplit_helpers{$funcs{$f}->{'NAME'}}) and exists $template_helpers{$funcs{$f}->{'NAME'}} and $funcs{$f}->{'FUNC_TYPE'} ne "void") {
     $funcs{$f}->{'HEAD'} =~ s/$funcs{$f}->{'FUNC_TYPE'}\s+/void /;
   }
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
@@ -671,7 +548,7 @@ foreach my $f (keys %foreign_funcs) {
 }
 
 # Collect VecType info(ZMMReg), to detect tmp vector variable and do the patch.
-open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
+open FD, "< $ARGV[2]" or die "Cannot open $ARGV[2] for read!\n";
 while (<FD>) {
   my $line = $_;
   chomp($line);
@@ -759,7 +636,7 @@ close FD;
 my %env_lookup = ();
 my %env_lookup_map = ();
 $env_lookup{'MAP'} = \%env_lookup_map;
-open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
+open FD, "< $ARGV[2]" or die "Cannot open $ARGV[2] for read!\n";
 while (<FD>) {
   my $line = $_;
   chomp($line);
@@ -943,7 +820,7 @@ my @sorted_env_addr = sort {$a <=> $b} sort keys %{$env_lookup{'MAP'}};
 $env_lookup{'SORTED_ADDR'} = \@sorted_env_addr;
 
 # Handle Vec* info
-open FD, "< $ARGV[1]" or die "Cannot open $ARGV[1] for read!\n";
+open FD, "< $ARGV[2]" or die "Cannot open $ARGV[2] for read!\n";
 while (<FD>) {
   my $line = $_;
   chomp($line);
@@ -1106,7 +983,7 @@ while (<FD>) {
 close FD;
 
 foreach my $f (keys %funcs) {
-  if (not exists $fp_helpers{$f}) {
+  if (not exists $template_helpers{$f}) {
     next;
   }
   my $has_foreign_call = 0;
@@ -1589,7 +1466,7 @@ sub parse_func_head
 {
   my ($func) = @_;
   my $env_type = "NA";
-  my $str = &GetText($func->{'FULL_START'}, $func->{'NAME_STOP'}, $ARGV[0]);
+  my $str = &GetText($func->{'FULL_START'}, $func->{'NAME_STOP'}, $ARGV[1]);
   $str = &mov_tail_attribute_to_head($str);
   my @chars = split(//, $str);
   my $idx = $#chars;
@@ -1612,7 +1489,7 @@ sub parse_func_head
   $func_type_info = &remove_attribute($func_type_info);
   $func_type_info =~ s/^\s*//;
   my $func_type = "NA";
-  if (exists $fp_helpers{$func->{'NAME'}}) {
+  if (exists $template_helpers{$func->{'NAME'}}) {
     my @type_fields = split(/\s+/, $func_type_info);
     my @sub_type_fields = @type_fields[0..($#type_fields-1)];
     $func_type = join(" ", @sub_type_fields);
@@ -1631,7 +1508,7 @@ sub parse_func_head
   }
   $head_copy =~ s/__attribute__\(\(target\(\"\+crypto\"\)\)\)//g;
   $head_copy =~ s/__attribute__\s*\(\s*\(\s*noinline\s*\)\s*\)//g;
-  if (not exists $fp_helpers{$func->{'NAME'}}) {
+  if (not exists $template_helpers{$func->{'NAME'}}) {
     if ($head_copy =~ /static\s+/) {
       $head_copy =~ s/static\s+//;
     }
@@ -2301,21 +2178,29 @@ END
           }
         } else {
           if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_VOID") {
-            $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
-            foreach my $p (@qemuaot_gp_params) {
-              $body = $body."$p, ";
+            if (exists $nosplit_helpers{$func_ptr->{'NAME'}}) {
+              $body = $body."return;\n";
+            } else {
+              $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
+              foreach my $p (@qemuaot_gp_params) {
+                $body = $body."$p, ";
+              }
+              $body =~ s/,\s+$/ /;
+              $body = $body.$qemuaot_vec_invoke.");\n";
             }
-            $body =~ s/,\s+$/ /;
-            $body = $body.$qemuaot_vec_invoke.");\n";
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'RETURN_STOP'} + 2;
           } else {
             my $expr = &GetText($func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'});
-            $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
-            foreach my $p (@qemuaot_gp_params) {
-              $body = $body."$p, ";
+            if (exists $nosplit_helpers{$func_ptr->{'NAME'}}) {
+              $body = $body."return $expr;\n";
+            } else {
+              $body = $body."return ((FUNC_NORMAL_RET)normal_return)(";
+              foreach my $p (@qemuaot_gp_params) {
+                $body = $body."$p, ";
+              }
+              $body =~ s/,\s+$/ /;
+              $body = $body.$qemuaot_vec_invoke.", $expr);\n";
             }
-            $body =~ s/,\s+$/ /;
-            $body = $body.$qemuaot_vec_invoke.", $expr);\n";
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'} + 2;
           }
         }
@@ -2328,7 +2213,7 @@ END
   }
   my $txt = &GetText($current_pos, $func_ptr->{'BODY_STOP'});
   $body = $body.$txt;
-  if ($func_ptr->{'HELPER_INTERFACE'} and $func_ptr->{'FUNC_TYPE'} eq "void") {
+  if ((not exists $nosplit_helpers{$func_ptr->{'NAME'}}) and $func_ptr->{'HELPER_INTERFACE'} and $func_ptr->{'FUNC_TYPE'} eq "void") {
     my $exp_logic = "";
     if (exists $func_ptr->{'IS_FOREIGN'}) {
       $exp_logic = &get_exception_path($func_ptr, $exception_exit);
@@ -2412,9 +2297,9 @@ sub update_func_call
   my $sub_call_idx = 0;
   foreach my $idx (0 .. $#{$call_info->{'SCALAR_CALL_ARGS'}}) {
     my $arg = $call_info->{'SCALAR_CALL_ARGS'}->[$idx];
-    if ($arg =~ /\(/ and (not $arg =~ /^(\-|sizeof)?\(/)) {
+    if ($arg =~ /\(/ and ($arg =~ /\w\(/) and (not $arg =~ /^(\-|sizeof)?\(/)) {
       die "" if not $arg =~ /\)/;
-      die "$caller_ptr->{'NAME'} $callee_ptr->{'NAME'}" if not exists $sorted_sub_calls[$sub_call_idx];
+      die "$caller_ptr->{'NAME'}:$call_pos $callee_ptr->{'NAME'} $idx:$arg:$sub_call_idx" if not exists $sorted_sub_calls[$sub_call_idx];
       my $sub_call_info = $caller_ptr->{'CALLS'}->{$sorted_sub_calls[$sub_call_idx]};
       if (exists $funcs{$sub_call_info->{'CALL_TARGET'}}) {
         my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info, $fc);

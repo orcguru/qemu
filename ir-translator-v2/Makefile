@@ -325,6 +325,7 @@ HELPER_TMPL_PARSER := $(HELPER_TMPL_DIR)/parser
 ANTLR_JAR        := $(HELPER_TMPL_PARSER)/antlr-4.9.3-complete.jar
 ANTLR_PARSE_CLASS := $(HELPER_TMPL_PARSER)/LoadCPP.class
 EXTRACTOR        := $(HELPER_TMPL_DIR)/extract_helper.pl
+HELPER_DEF       := tcg_ast.h
 HELPER_TMPL_OUT  := helper_templates
 PP_GLOB          := $(wildcard $(HELPER_TMPL_DIR)/*.o.E)
 HT_DIRS          := $(patsubst %.o.E,%.o.E.helper_templates,$(PP_GLOB))
@@ -363,7 +364,7 @@ templates: $(ANTLR_PARSE_CLASS) $(HELPER_TMPL_OUT)
 			echo "  - parse: $$pp"; \
 			java -cp "$(HELPER_TMPL_PARSER):$(ANTLR_JAR)" LoadCPP "$$pp" > "$$out" 2> "$$err"; \
 			echo "  - extract: $$pp"; \
-			perl "$(EXTRACTOR)" "$$pp" "$$out"; \
+			perl "$(EXTRACTOR)" "$(HELPER_DEF)" "$$pp" "$$out"; \
 		done; \
 		echo "Copying all *.helper_templates/ folders into $(HELPER_TMPL_OUT)/ ..."; \
 		rm -rf "$(HELPER_TMPL_OUT)"; mkdir -p "$(HELPER_TMPL_OUT)"; \
