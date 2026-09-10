@@ -98,12 +98,6 @@ helper_lookup.c: helpers.gperf
 # ============================================================================
 HELPER_TMPL_DIR  := collect_helper_templates
 
-# --- Common entry-point recipe (parameterized via PREPROCESSED_OBJ / BUILD_LOG) -
-
-define QEMU_PREPROCESS_DEPS
-check-qemu-top $(QEMU_BUILD)/Makefile copy-fpu-files prepend-softfloat capture-command preprocess-extract
-endef
-
 # Convenience entry point: fpu_helper.c
 qemu-preprocess: check-qemu-top $(QEMU_BUILD)/Makefile copy-fpu-files prepend-softfloat capture-command-fpu preprocess-extract-fpu
 	@echo "==================================================================="
@@ -159,11 +153,11 @@ check-qemu-top:
 		echo "ERROR: target file '$(QEMU_TOP)/accel/tcg/tcg-runtime.c' not found."; \
 		exit 1; \
 	fi
-	if [ ! -f "$(QEMU_TCG_DIR)/cc_helper.c" ]; then \
+	@if [ ! -f "$(QEMU_TCG_DIR)/cc_helper.c" ]; then \
 		echo "ERROR: target file '$(QEMU_TCG_DIR)/cc_helper.c' not found."; \
 		exit 1; \
 	fi
-	if [ ! -f "$(QEMU_TCG_DIR)/int_helper.c" ]; then \
+	@if [ ! -f "$(QEMU_TCG_DIR)/int_helper.c" ]; then \
 		echo "ERROR: target file '$(QEMU_TCG_DIR)/int_helper.c' not found."; \
 		exit 1; \
 	fi
@@ -233,15 +227,29 @@ capture-command-int-helper: $(QEMU_BUILD)/Makefile
 	@cd $(QEMU_BUILD) && \
 		( make V=1 ./$(PREPROCESSED_OBJ_INT_HELPER) 2>&1 || true ) | tee $(BUILD_LOG_INT)
 
-# --- 5. transform the captured command:  -c  ->  -E  -------------------------
-#     and run it to produce the preprocessed .E file
+# --- 5. transform the captured command into a clean -E preprocessing command
 #
-# Parameterized via PREPROCESS_OBJ (object path) and PREPROCESS_LOG (build log).
-# Steps:
-#   1. finds the last clang compile line in the build log,
-#   2. strips any leading "[NN/NN]" ninja-style progress prefix,
-#   3. rewrites " -o XXX.o -c " -> " -o XXX.o.E -E ",
-#   4. runs the resulting command from the build directory.
+# The original build line ends with something like:
+#     -o PATH/foo.c.o -c PATH/foo.c
+# (possibly with a leading "[NN/NN]" ninja progress prefix).
+#
+# We want a *pure* preprocessor invocation:
+#     -o PATH/foo.c.o.E -E PATH/foo.c
+#
+# IMPORTANT: -E and -c are mutually exclusive. clang errors out with
+#   "argument unused during compilation: '-c'"
+# when both are present. So we must end up with exactly one "-E" and
+# NO "-c". The rewrite is intentionally idempotent, so it also handles
+# a log line that was already partially rewritten (e.g. "-o ...o.E -E -c").
+#
+# Three sed expressions, applied in order:
+#   1.  -c           -> -E           (pristine case)
+#   2.  -E -E        -> -E           (collapse the broken case)
+#   3.  -o PATH/.c.o[.E] -> -o PATH/.c.o.E  (rename the output; the leading
+#       space before "-o" ensures we only touch the real compile output, not
+#       unrelated flags like -MQ / -MF whose values also end in .c.o)
+#
+# Then run the resulting command from the build directory.
 
 # Base (private) script template. Instantiated per target by setting
 # _PP_OBJ and _PP_LOG before calling eval.
@@ -260,11 +268,15 @@ echo "$$raw"; \
 cmd=$$(echo "$$raw" | sed -E 's#^[[:space:]]*\[[0-9]+/[0-9]+\][[:space:]]*##'); \
 echo "Command (prefix stripped):"; \
 echo "$$cmd"; \
-modified=$$(echo "$$cmd" | sed -E 's#(-o[[:space:]]+[^[:space:]]+\.o)([[:space:]]*-c[[:space:]]+)#\1.E -E\2#; s#(-c[[:space:]]+[^[:space:]]+\.c)([[:space:]]+-o[[:space:]]+[^[:space:]]+\.o)#\1 -o \2#'); \
+echo "$$cmd" > /tmp/cmd_before.txt; \
+modified=$$(echo "$$cmd" | sed -E \
+	-e 's#(^| )-c( |$$)#\1-E\2#g' \
+	-e 's#(^| )-E -E( |$$)#\1-E\2#g' \
+	-e 's#( -o[[:space:]]+[^[:space:]]*)\.c\.o(\.E)?([[:space:]])#\1.c.o.E\3#g'); \
 echo "Modified command:"; \
 echo "$$modified"; \
 if [ "$$cmd" = "$$modified" ]; then \
-	echo "ERROR: -o XXX.o -c rewrite did not match; command left unchanged."; \
+	echo "ERROR: -c -> -E rewrite did not match; command left unchanged."; \
 	exit 1; \
 fi; \
 eval "$$modified"; \
