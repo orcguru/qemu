@@ -982,6 +982,9 @@ while (<FD>) {
         die "" if $file_content[$stop+1] ne "[";
         my ($array_idx, $array_idx_start, $array_idx_stop) = &GetContentWithArrayBound($stop+2);
         die "" if $file_content[$array_idx_stop+1] ne "]";
+        my %info = ();
+        $info{'START'} = $start-2;
+        $info{'STOP'} = $array_idx_stop+1;
         my $assignment_idx = $start;
         while ($file_content[$assignment_idx] ne "=") {
           $assignment_idx = $assignment_idx - 1;
@@ -990,10 +993,9 @@ while (<FD>) {
         foreach my $i (($assignment_idx+2) .. ($start-2-1)) {
           $expr = $expr.$file_content[$i];
         }
-        my %info = ();
-        $info{'START'} = $assignment_idx+2;
-        $info{'STOP'} = $array_idx_stop+1;
-        $info{'IDX'} = $array_idx;                                                                                                         $info{'EXPR'} = $expr;
+        $info{'YMM_START'} = $assignment_idx+2;
+        $info{'YMM_IDX'} = $array_idx;
+        $info{'YMM_EXPR'} = $expr;
         if (not exists $func_ptr->{'VECX'}) {
           my %vecx_info = ();
           $func_ptr->{'VECX'} = \%vecx_info;
@@ -1222,12 +1224,12 @@ foreach my $f (keys %funcs) {
   }
 
   # Update REG references
-  foreach my $sf (keys %defined_func) {
+  foreach my $sf (sort {$a cmp $b} keys %defined_func) {
     &add_reg_references_on_execution_path($sf, \%defined_func);
   }
 
   # Standalone references to cc_src/cc_op/REG need pass through all intermediate function calls
-  foreach my $sf (keys %defined_func) {
+  foreach my $sf (sort {$a cmp $b} keys %defined_func) {
     &populate_additional_arguments_on_execution_path($sf, \%defined_func);
   }
 
@@ -1756,7 +1758,7 @@ sub gen_replicated_func
     $new_func = $new_func."\n";
   } else {
     my %pi_info = ();
-    foreach my $pi (keys %{$func_replicate_info->{$target_func}}) {
+    foreach my $pi (sort {$a cmp $b} keys %{$func_replicate_info->{$target_func}}) {
       my @input_arg_vec_idx = ();
       $pi_info{$pi} = \@input_arg_vec_idx;
       if ($pi eq "ROOT") {
@@ -1909,7 +1911,7 @@ sub add_context_backup
       $backup_vars = $backup_vars."asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
     }
   }
-  foreach my $bk (keys %backups) {
+  foreach my $bk (sort {$a cmp $b} keys %backups) {
     if ($bk =~ /^xmm/) {
       # This case only appears in helper_pcmpestrm_xmm/helper_pcmpistrm_xmm
       $backup_vars = $backup_vars."v2ulong backup_$bk = $bk;\n";
@@ -1988,7 +1990,13 @@ sub get_func_body
     $events{$e} = 1;
   }
   foreach my $e (keys %{$func_ptr->{'VECX'}}) {
-    $events{$e} = 1;
+    if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
+      $events{$func_ptr->{'VECX'}->{$e}->{'YMM_START'}} = 1;
+      # Dirty hack to add this event for later check
+      $func_ptr->{'VECX'}->{$func_ptr->{'VECX'}->{$e}->{'YMM_START'}} = $func_ptr->{'VECX'}->{$e};
+    } else {
+      $events{$func_ptr->{'VECX'}->{$e}->{'START'}} = 1;
+    }
   }
   foreach my $e (keys %{$func_ptr->{'RETURNS'}}) {
     if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_EXPR") {
@@ -2192,7 +2200,7 @@ END
       }
     } elsif (exists $func_ptr->{'VECX'}->{$e}) {
       if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
-        $body = $body."($func_ptr->{'VECX'}->{$e}->{'IDX'} == 0 ? ($func_ptr->{'VECX'}->{$e}->{'EXPR'}x) : ($func_ptr->{'VECX'}->{$e}->{'EXPR'}y))";
+        $body = $body."($func_ptr->{'VECX'}->{$e}->{'YMM_IDX'} == 0 ? ($func_ptr->{'VECX'}->{$e}->{'YMM_EXPR'}x) : ($func_ptr->{'VECX'}->{$e}->{'YMM_EXPR'}y))";
       }
       $current_pos = $func_ptr->{'VECX'}->{$e}->{'STOP'} + 1;
     } elsif (exists $func_ptr->{'RETURNS'}->{$e}) {
@@ -2359,7 +2367,7 @@ sub get_exception_path
   my ($func_ptr, $exception_exit) = @_;
   my $body = "";
   $body = $body."if (trigger_exception) {\n";
-  foreach my $rk (keys %{$func_ptr->{'RESTORE_INFO'}}) {
+  foreach my $rk (sort {$a cmp $b} keys %{$func_ptr->{'RESTORE_INFO'}}) {
     $body = $body."  $func_ptr->{'RESTORE_INFO'}->{$rk} = $rk;\n";
   }
   $body = $body."  return ((FUNC_EXCEPTION_RET)exception_return)(";
@@ -2805,7 +2813,7 @@ sub add_reg_references_on_execution_path
 {
   my ($target_func, $func_replicate_info) = @_;
   my %macro_def = ();
-  foreach my $pi (keys %{$func_replicate_info->{$target_func}}) {
+  foreach my $pi (sort {$a cmp $b} keys %{$func_replicate_info->{$target_func}}) {
     foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
       my $scalar_idx = &get_scalar_arg_idx($funcs{$target_func}, $var);
       die "" if $scalar_idx == -1;
