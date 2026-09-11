@@ -61,6 +61,7 @@ PREPROCESSED_OBJ_FPU       := libqemu-$(QEMU_TARGET_LIST).a.p/target_i386_tcg_fp
 PREPROCESSED_OBJ_TCG_RT    := libuser.a.p/accel_tcg_tcg-runtime.c.o
 PREPROCESSED_OBJ_CC_HELPER := libqemu-$(QEMU_TARGET_LIST).a.p/target_i386_tcg_cc_helper.c.o
 PREPROCESSED_OBJ_INT_HELPER := libqemu-$(QEMU_TARGET_LIST).a.p/target_i386_tcg_int_helper.c.o
+PREPROCESSED_OBJ_USER_EXEC  := libuser.a.p/accel_tcg_user-exec.c.o
 
 # Default (backward-compatible) preprocessed output
 PREPROCESSED_OBJ := $(PREPROCESSED_OBJ_FPU)
@@ -129,6 +130,14 @@ qemu-preprocess-int-helper: check-qemu-top $(QEMU_BUILD)/Makefile capture-comman
 	cp $(QEMU_BUILD)/$(PREPROCESSED_OBJ_INT_HELPER).E $(HELPER_TMPL_DIR)/
 	@echo "==================================================================="
 
+# Convenience entry point: accel/tcg/user-exec.c
+# No .inc files copied, no source modification required.
+qemu-preprocess-user-exec: check-qemu-top $(QEMU_BUILD)/Makefile capture-command-user-exec preprocess-extract-user-exec
+	@echo "==================================================================="
+	@echo "Preprocessed file ready: $(QEMU_BUILD)/$(PREPROCESSED_OBJ_USER_EXEC).E"
+	cp $(QEMU_BUILD)/$(PREPROCESSED_OBJ_USER_EXEC).E $(HELPER_TMPL_DIR)/
+	@echo "==================================================================="
+
 # --- 1. sanity check ---------------------------------------------------------
 
 check-qemu-top:
@@ -159,6 +168,10 @@ check-qemu-top:
 	fi
 	@if [ ! -f "$(QEMU_TCG_DIR)/int_helper.c" ]; then \
 		echo "ERROR: target file '$(QEMU_TCG_DIR)/int_helper.c' not found."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(QEMU_TOP)/accel/tcg/user-exec.c" ]; then \
+		echo "ERROR: target file '$(QEMU_TOP)/accel/tcg/user-exec.c' not found."; \
 		exit 1; \
 	fi
 
@@ -206,6 +219,7 @@ BUILD_LOG_FPU       := $(QEMU_BUILD)/fpu_helper_build.log
 BUILD_LOG_TCG_RT    := $(QEMU_BUILD)/tcg_runtime_build.log
 BUILD_LOG_CC        := $(QEMU_BUILD)/cc_helper_build.log
 BUILD_LOG_INT       := $(QEMU_BUILD)/int_helper_build.log
+BUILD_LOG_USER_EXEC  := $(QEMU_BUILD)/user_exec_build.log
 
 capture-command-fpu: $(QEMU_BUILD)/Makefile
 	@echo "Building $(PREPROCESSED_OBJ_FPU) with V=1, logging to $(BUILD_LOG_FPU)"
@@ -226,6 +240,11 @@ capture-command-int-helper: $(QEMU_BUILD)/Makefile
 	@echo "Building $(PREPROCESSED_OBJ_INT_HELPER) with V=1, logging to $(BUILD_LOG_INT)"
 	@cd $(QEMU_BUILD) && \
 		( make V=1 ./$(PREPROCESSED_OBJ_INT_HELPER) 2>&1 || true ) | tee $(BUILD_LOG_INT)
+
+capture-command-user-exec: $(QEMU_BUILD)/Makefile
+	@echo "Building $(PREPROCESSED_OBJ_USER_EXEC) with V=1, logging to $(BUILD_LOG_USER_EXEC)"
+	@cd $(QEMU_BUILD) && \
+		( make V=1 ./$(PREPROCESSED_OBJ_USER_EXEC) 2>&1 || true ) | tee $(BUILD_LOG_USER_EXEC)
 
 # --- 5. transform the captured command into a clean -E preprocessing command
 #
@@ -310,6 +329,12 @@ preprocess-extract-cc-helper: capture-command-cc-helper
 preprocess-extract-int-helper: capture-command-int-helper
 	$(eval _PP_OBJ := $(PREPROCESSED_OBJ_INT_HELPER))
 	$(eval _PP_LOG := $(BUILD_LOG_INT))
+	cd $(QEMU_BUILD) && $(_PREPROCESS_SCRIPT)
+
+# user-exec.c
+preprocess-extract-user-exec: capture-command-user-exec
+	$(eval _PP_OBJ := $(PREPROCESSED_OBJ_USER_EXEC))
+	$(eval _PP_LOG := $(BUILD_LOG_USER_EXEC))
 	cd $(QEMU_BUILD) && $(_PREPROCESS_SCRIPT)
 
 # Backward-compatible generic targets (default to fpu_helper.c)
@@ -466,9 +491,12 @@ test:
 .PHONY: all test clean clean-all clean-local clean-qemu-source \
 	qemu-preprocess qemu-preprocess-tcg-runtime \
 	qemu-preprocess-cc-helper qemu-preprocess-int-helper \
+	qemu-preprocess-user-exec \
 	templates \
 	check-qemu-top copy-fpu-files prepend-softfloat \
 	capture-command capture-command-fpu capture-command-tcg-runtime \
 	capture-command-cc-helper capture-command-int-helper \
+	capture-command-user-exec \
 	preprocess-extract preprocess-extract-fpu preprocess-extract-tcg-runtime \
-	preprocess-extract-cc-helper preprocess-extract-int-helper
+	preprocess-extract-cc-helper preprocess-extract-int-helper \
+	preprocess-extract-user-exec

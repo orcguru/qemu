@@ -22,10 +22,7 @@ StringLiteral:
 	|'"' Schar* '"' Whitespace* '"' Schar* '"' Whitespace* '"' Schar* '"'
 	|'"' Schar* '"' Whitespace* '"' Schar* '"' Whitespace* '"' Schar* '"' Whitespace* '"' Schar* '"'
 	|'"' Schar* '"' Whitespace* '"' Schar* '"' Whitespace* '"' Schar* '"' Whitespace* '"' Schar* '"' Whitespace* '"' Schar* '"'
-	|'"' Schar* '"' Whitespace* '\n' Whitespace* '"' Schar* '"'
-	|'"' Schar* '"' Whitespace* '\n' Whitespace* '"' Schar* '"' '\n' Whitespace* '"' Schar* '"'
-	|'"' Schar* '"' Whitespace* '\n' Whitespace* '"' Schar* '"' '\n' Whitespace* '"' Schar* '"' '\n' Whitespace* '"' Schar* '"'
-	|'"' Schar* '"' Whitespace* '\n' Whitespace* '"' Schar* '"' '\n' Whitespace* '"' Schar* '"' '\n' Whitespace* '"' Schar* '"' '\n' Whitespace* '"' Schar* '"')
+	|'"' Schar* '"' Whitespace* ('\n' Whitespace* '"' Schar* '"')+)
         | Encodingprefix? 'R' Rawstring2;
 
 BooleanLiteral: False_ | True_;
