@@ -1302,12 +1302,12 @@ foreach my $f (keys %funcs) {
   }
 
   # Update REG references
-  foreach my $sf (keys %defined_func) {
+  foreach my $sf (sort {$a cmp $b} keys %defined_func) {
     &add_reg_references_on_execution_path($sf, \%defined_func);
   }
 
   # Standalone references to cc_src/cc_op/REG need pass through all intermediate function calls
-  foreach my $sf (keys %defined_func) {
+  foreach my $sf (sort {$a cmp $b} keys %defined_func) {
     &populate_additional_arguments_on_execution_path($sf, \%defined_func);
   }
 
@@ -1821,7 +1821,7 @@ sub gen_replicated_func
     $new_func = $new_func."\n";
   } else {
     my %pi_info = ();
-    foreach my $pi (keys %{$func_replicate_info->{$target_func}}) {
+    foreach my $pi (sort {$a cmp $b} keys %{$func_replicate_info->{$target_func}}) {
       my @input_arg_vec_idx = ();
       $pi_info{$pi} = \@input_arg_vec_idx;
       if ($pi eq "ROOT") {
@@ -1959,7 +1959,7 @@ sub add_context_backup
       $backup_vars = $backup_vars."asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
     }
   }
-  foreach my $bk (keys %backups) {
+  foreach my $bk (sort {$a cmp $b} keys %backups) {
     if ($bk =~ /^xmm/) {
       $backup_vars = $backup_vars."v2ulong backup_$bk = $bk;\n";
       $restore_info{"backup_$bk"} = $bk;
@@ -2330,7 +2330,7 @@ sub get_exception_path
   my ($func_ptr, $exception_exit) = @_;
   my $body = "";
   $body = $body."if (trigger_exception) {\n";
-  foreach my $rk (keys %{$func_ptr->{'RESTORE_INFO'}}) {
+  foreach my $rk (sort {$a cmp $b} keys %{$func_ptr->{'RESTORE_INFO'}}) {
     $body = $body."  $func_ptr->{'RESTORE_INFO'}->{$rk} = $rk;\n";
   }
   $body = $body."  return ((FUNC_EXCEPTION_RET)exception_return)(";
@@ -2779,7 +2779,7 @@ sub add_reg_references_on_execution_path
 {
   my ($target_func, $func_replicate_info) = @_;
   my %macro_def = ();
-  foreach my $pi (keys %{$func_replicate_info->{$target_func}}) {
+  foreach my $pi (sort {$a cmp $b} keys %{$func_replicate_info->{$target_func}}) {
     foreach my $var (@{$funcs{$target_func}->{'EXPAND_FACTORS'}}) {
       my $scalar_idx = &get_scalar_arg_idx($funcs{$target_func}, $var);
       die "" if $scalar_idx == -1;
