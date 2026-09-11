@@ -415,6 +415,8 @@ typedef enum __attribute__((packed)) {
     X(helper_ltr) \
     X(helper_maskmov_mmx) \
     X(helper_memset) \
+    X(helper_atomic_cmpxchgo_be) \
+    X(helper_atomic_cmpxchgo_le) \
     X(helper_nonatomic_cmpxchgo) \
     X(helper_packssdw_mmx) \
     X(helper_packsswb_mmx) \
@@ -545,8 +547,6 @@ typedef enum __attribute__((packed)) {
     X(helper_atomic_cmpxchgb) \
     X(helper_atomic_cmpxchgl_be) \
     X(helper_atomic_cmpxchgl_le) \
-    X(helper_atomic_cmpxchgo_be) \
-    X(helper_atomic_cmpxchgo_le) \
     X(helper_atomic_cmpxchgq_be) \
     X(helper_atomic_cmpxchgq_le) \
     X(helper_atomic_cmpxchgw_be) \

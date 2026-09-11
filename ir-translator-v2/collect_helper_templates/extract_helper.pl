@@ -1,10 +1,15 @@
 #!/usr/bin/perl
+# FIXME: copyright
 use strict;
 use warnings;
 use IO::Handle;
 use File::Basename;
 use IO::Select;
 use Cwd 'abs_path';
+
+# Some dirty hacks this script applies:
+# 1. All invocations of atomic_trace_rmw_post() has been removed
+# 2. untagged_addr has been manually redirected to its arch callback
 
 if ($#ARGV < 1) {
   print "Usage: ./script <tcg_ast.h> <antlr-in> <antlr-out>\n";
@@ -2051,7 +2056,12 @@ END
     }
     if (exists $func_ptr->{'CALLS'}->{$e}) {
       my $call_target = $func_ptr->{'CALLS'}->{$e}->{'CALL_TARGET'};
-      if (not exists $funcs{$call_target}) {
+      # Hack to remove atomic_trace_rmw_post
+      if ($call_target eq "atomic_trace_rmw_post") {
+        # Add void to cancel tail semi-colon
+        $body = $body."void";
+        $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
+      } elsif (not exists $funcs{$call_target}) {
         if (&FuncNameIsForeign($call_target)) {
           # Skip if the call target is a function pointer parameter of the current function
           my $is_param = 0;
@@ -2223,7 +2233,9 @@ END
                 if (exists $funcs{$func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'}} and $call_target_name eq "") {
                   $call_target_name = $func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'};
                 }
-                if (exists $funcs{$func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'}}->{'IS_FOREIGN'}) {
+                # Notice I do need to assert the existance of $funcs{xxx} before assert $funcs{xxx}->{yyy}
+                # otherwise there could be strange bug!
+                if (exists $funcs{$func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'}} and exists $funcs{$func_ptr->{'CALLS'}->{$c}->{'CALL_TARGET'}}->{'IS_FOREIGN'}) {
                   $got_is_foreign_call = 1;
                   last;
                 }
@@ -2393,6 +2405,7 @@ sub get_exception_path
 sub update_func_call
 {
   my ($caller_ptr, $call_pos, $callee_ptr, $path_info, $fc) = @_;
+  die "" if not exists $caller_ptr->{'CALLS'}->{$call_pos};
   my $call_info = $caller_ptr->{'CALLS'}->{$call_pos};
   my $str = "";
   if ($callee_ptr->{'DO_EXPAND'}) {
