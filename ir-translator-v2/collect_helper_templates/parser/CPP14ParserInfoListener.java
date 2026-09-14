@@ -39,13 +39,25 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterIdExpression(CPP14Parser.IdExpressionContext ctx) { }
+	@Override public void enterUqi(CPP14Parser.UqiContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitIdExpression(CPP14Parser.IdExpressionContext ctx) { }
+	@Override public void exitUqi(CPP14Parser.UqiContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterQi(CPP14Parser.QiContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitQi(CPP14Parser.QiContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -1225,6 +1237,39 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
                 }
               }
             }
+          } else if (ctx.declSpecifierSeq() != null && ctx.initDeclaratorList() != null && ctx.Asm() == null) {
+            if (ctx.declSpecifierSeq().declSpecifier(0) != null && ctx.declSpecifierSeq().declSpecifier(0) instanceof CPP14Parser.DsTypeContext) {
+              CPP14Parser.DsTypeContext dsTypeCtx = (CPP14Parser.DsTypeContext)ctx.declSpecifierSeq().declSpecifier(0);
+              if (dsTypeCtx.typeSpecifier() != null && dsTypeCtx.typeSpecifier() instanceof CPP14Parser.TsTrailingContext) {
+                CPP14Parser.TsTrailingContext ttc = (CPP14Parser.TsTrailingContext)dsTypeCtx.typeSpecifier();
+                if (ttc.trailingTypeSpecifier() != null && ttc.trailingTypeSpecifier() instanceof CPP14Parser.TtsSimpleTypeContext) {
+                  CPP14Parser.TtsSimpleTypeContext tts = (CPP14Parser.TtsSimpleTypeContext)ttc.trailingTypeSpecifier();
+                  if (tts.simpleTypeSpecifier() != null && tts.simpleTypeSpecifier() instanceof CPP14Parser.StTypeNameContext) {
+                    CPP14Parser.StTypeNameContext stc = (CPP14Parser.StTypeNameContext)tts.simpleTypeSpecifier();
+                    if (stc.nestedNameSpecifier() == null && stc.theTypeName() != null && stc.theTypeName() instanceof CPP14Parser.TnClassContext) {
+                      CPP14Parser.TnClassContext tnc = (CPP14Parser.TnClassContext)stc.theTypeName();
+                      if (tnc.className() != null && tnc.className() instanceof CPP14Parser.ClassNameIDContext) {
+                        if (ctx.initDeclaratorList().initDeclarator(1) == null && ctx.initDeclaratorList().initDeclarator(0).Asm() == null && ctx.initDeclaratorList().initDeclarator(0).initializer() == null && ctx.initDeclaratorList().initDeclarator(0).declarator() != null && ctx.initDeclaratorList().initDeclarator(0).declarator() instanceof CPP14Parser.PdContext) {
+                          CPP14Parser.PdContext pdc = (CPP14Parser.PdContext)ctx.initDeclaratorList().initDeclarator(0).declarator();
+                          if (pdc.pointerDeclarator() != null && pdc.pointerDeclarator().pointerOperator(0) == null && pdc.pointerDeclarator().noPointerDeclarator() != null && pdc.pointerDeclarator().noPointerDeclarator() instanceof CPP14Parser.Npd3Context) {
+                            CPP14Parser.Npd3Context npd3c = (CPP14Parser.Npd3Context)pdc.pointerDeclarator().noPointerDeclarator();
+                            if (npd3c.pointerDeclarator() != null && npd3c.pointerDeclarator().pointerOperator(0) == null && npd3c.pointerDeclarator().noPointerDeclarator() instanceof CPP14Parser.Npd1Context) {
+                              CPP14Parser.Npd1Context npd1c = (CPP14Parser.Npd1Context)npd3c.pointerDeclarator().noPointerDeclarator();
+                              if (npd1c.attributeSpecifierSeq() == null && npd1c.declaratorid().Ellipsis() == null && npd1c.declaratorid().idExpression() instanceof CPP14Parser.UqiContext) {
+                                CPP14Parser.UqiContext uqc = (CPP14Parser.UqiContext)npd1c.declaratorid().idExpression();
+                                if (uqc.unqualifiedId() instanceof CPP14Parser.UID1Context) {
+                                  System.out.println("<FUNCTION_CALL3>$$NAME_BEGIN:" + Integer.toString(stc.getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(stc.getStart().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(npd3c.LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(npd3c.RightParen().getSymbol().getStopIndex()));
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
 	/**
@@ -1280,13 +1325,73 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterDeclSpecifier(CPP14Parser.DeclSpecifierContext ctx) { }
+	@Override public void enterDs1(CPP14Parser.Ds1Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitDeclSpecifier(CPP14Parser.DeclSpecifierContext ctx) { }
+	@Override public void exitDs1(CPP14Parser.Ds1Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterDsType(CPP14Parser.DsTypeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitDsType(CPP14Parser.DsTypeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterDs3(CPP14Parser.Ds3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitDs3(CPP14Parser.Ds3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterDs4(CPP14Parser.Ds4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitDs4(CPP14Parser.Ds4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterDs5(CPP14Parser.Ds5Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitDs5(CPP14Parser.Ds5Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterDs6(CPP14Parser.Ds6Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitDs6(CPP14Parser.Ds6Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -1340,25 +1445,97 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterTypeSpecifier(CPP14Parser.TypeSpecifierContext ctx) { }
+	@Override public void enterTsTrailing(CPP14Parser.TsTrailingContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitTypeSpecifier(CPP14Parser.TypeSpecifierContext ctx) { }
+	@Override public void exitTsTrailing(CPP14Parser.TsTrailingContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterTrailingTypeSpecifier(CPP14Parser.TrailingTypeSpecifierContext ctx) { }
+	@Override public void enterTs2(CPP14Parser.Ts2Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitTrailingTypeSpecifier(CPP14Parser.TrailingTypeSpecifierContext ctx) { }
+	@Override public void exitTs2(CPP14Parser.Ts2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTs3(CPP14Parser.Ts3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTs3(CPP14Parser.Ts3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTs4(CPP14Parser.Ts4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTs4(CPP14Parser.Ts4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTtsSimpleType(CPP14Parser.TtsSimpleTypeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTtsSimpleType(CPP14Parser.TtsSimpleTypeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTts2(CPP14Parser.Tts2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTts2(CPP14Parser.Tts2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTts3(CPP14Parser.Tts3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTts3(CPP14Parser.Tts3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTts4(CPP14Parser.Tts4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTts4(CPP14Parser.Tts4Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -1412,25 +1589,241 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterSimpleTypeSpecifier(CPP14Parser.SimpleTypeSpecifierContext ctx) { }
+	@Override public void enterStTypeName(CPP14Parser.StTypeNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitSimpleTypeSpecifier(CPP14Parser.SimpleTypeSpecifierContext ctx) { }
+	@Override public void exitStTypeName(CPP14Parser.StTypeNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterTheTypeName(CPP14Parser.TheTypeNameContext ctx) { }
+	@Override public void enterSt2(CPP14Parser.St2Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitTheTypeName(CPP14Parser.TheTypeNameContext ctx) { }
+	@Override public void exitSt2(CPP14Parser.St2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt3(CPP14Parser.St3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt3(CPP14Parser.St3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt4(CPP14Parser.St4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt4(CPP14Parser.St4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt5(CPP14Parser.St5Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt5(CPP14Parser.St5Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt6(CPP14Parser.St6Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt6(CPP14Parser.St6Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt7(CPP14Parser.St7Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt7(CPP14Parser.St7Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt8(CPP14Parser.St8Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt8(CPP14Parser.St8Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt9(CPP14Parser.St9Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt9(CPP14Parser.St9Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt10(CPP14Parser.St10Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt10(CPP14Parser.St10Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt11(CPP14Parser.St11Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt11(CPP14Parser.St11Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt12(CPP14Parser.St12Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt12(CPP14Parser.St12Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt13(CPP14Parser.St13Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt13(CPP14Parser.St13Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt14(CPP14Parser.St14Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt14(CPP14Parser.St14Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSt15(CPP14Parser.St15Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSt15(CPP14Parser.St15Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTnClass(CPP14Parser.TnClassContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTnClass(CPP14Parser.TnClassContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTn2(CPP14Parser.Tn2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTn2(CPP14Parser.Tn2Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTn3(CPP14Parser.Tn3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTn3(CPP14Parser.Tn3Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTn4(CPP14Parser.Tn4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTn4(CPP14Parser.Tn4Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTn5(CPP14Parser.Tn5Context ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTn5(CPP14Parser.Tn5Context ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -1820,13 +2213,25 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterDeclarator(CPP14Parser.DeclaratorContext ctx) { }
+	@Override public void enterPd(CPP14Parser.PdContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitDeclarator(CPP14Parser.DeclaratorContext ctx) { }
+	@Override public void exitPd(CPP14Parser.PdContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterNpt(CPP14Parser.NptContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitNpt(CPP14Parser.NptContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

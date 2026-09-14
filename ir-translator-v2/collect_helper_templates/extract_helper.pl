@@ -172,6 +172,7 @@ my @file_content = split(//, $str);
 my %funcs = ();
 my %func_lookup = ();
 my %func_lookup_map = ();
+my %function_def_at_name_start = ();
 $func_lookup{'MAP'} = \%func_lookup_map;
 my $global_func_idx = 0;
 open FD, "< $ARGV[2]" or die "Cannot open $ARGV[2] for read!\n";
@@ -217,6 +218,9 @@ while (<FD>) {
     my %info = ();
     $info{'NAME_START'} = $nameStart;
     $info{'NAME_STOP'} = $nameStop;
+    foreach my $i ($nameStart .. $nameStop) {
+      $function_def_at_name_start{$i} = 1;
+    }
     $info{'BODY_START'} = $bodyStart;
     $info{'BODY_STOP'} = $bodyStop;
     $info{'FULL_START'} = $fullStart;
@@ -290,7 +294,7 @@ open FD, "< $ARGV[2]" or die "Cannot open $ARGV[2] for read!\n";
 while (<FD>) {
   my $line = $_;
   chomp($line);
-  if ($line =~ /^<FUNCTION_CALL2?>/) {
+  if ($line =~ /^<FUNCTION_CALL(2|3)?>/) {
     my @fields = split(/\$\$/, $line);
     my %info = ();
     my @f1 = split(/:/, $fields[1]);
@@ -299,6 +303,9 @@ while (<FD>) {
     my @f4 = split(/:/, $fields[4]);
     $info{'TYPE'} = "CALL";
     $info{'NAME_START'} = $f1[1];
+    if (exists $function_def_at_name_start{$info{'NAME_START'}}) {
+      next;
+    }
     $info{'NAME_STOP'} = $f2[1];
     $info{'PAREN_START'} = $f3[1];
     $info{'PAREN_STOP'} = $f4[1];

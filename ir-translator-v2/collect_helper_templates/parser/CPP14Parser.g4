@@ -36,7 +36,10 @@ primaryExpression:
 	| lambdaExpression
         | LeftParen compoundStatement RightParen;
 
-idExpression: unqualifiedId | qualifiedId;
+idExpression:
+        unqualifiedId       # uqi
+        | qualifiedId       # qi
+        ;
 
 unqualifiedId:
 	Identifier                                                      # UID1
@@ -352,12 +355,12 @@ emptyDeclaration: Semi;
 attributeDeclaration: attributeSpecifierSeq Semi;
 
 declSpecifier:
-	storageClassSpecifier
-	| typeSpecifier
-	| functionSpecifier
-	| Friend
-	| Extension? Typedef
-	| Constexpr
+	storageClassSpecifier       # ds1
+	| typeSpecifier             # dsType
+	| functionSpecifier         # ds3
+	| Friend                    # ds4
+	| Extension? Typedef        # ds5
+	| Constexpr                 # ds6
         ;
 	
 declSpecifierSeq: (declSpecifier (Inline | Inline2)? attributeSpecifierSeq?)+? attributeSpecifierSeq?;
@@ -374,16 +377,18 @@ functionSpecifier: (Inline | Inline2) | Virtual | Explicit;
 typedefName: Identifier;
 
 typeSpecifier:
-	trailingTypeSpecifier
-	| classSpecifier
-	| enumSpecifier
-        | Typeof LeftParen (initializerClause | declSpecifierSeq pointerOperator?) RightParen;
+	trailingTypeSpecifier       # tsTrailing
+	| classSpecifier            # ts2
+	| enumSpecifier             # ts3
+        | Typeof LeftParen (initializerClause | declSpecifierSeq pointerOperator?) RightParen   # ts4
+        ;
 
 trailingTypeSpecifier:
-	simpleTypeSpecifier
-	| elaboratedTypeSpecifier
-	| typeNameSpecifier
-	| cvQualifier;
+	simpleTypeSpecifier         # ttsSimpleType
+	| elaboratedTypeSpecifier   # tts2
+	| typeNameSpecifier         # tts3
+	| cvQualifier               # tts4
+        ;
 
 typeSpecifierSeq: typeSpecifier+ attributeSpecifierSeq?;
 
@@ -399,28 +404,30 @@ simpleTypeSignednessModifier:
 	| Signed;
 
 simpleTypeSpecifier:
-	nestedNameSpecifier? theTypeName
-	| nestedNameSpecifier Template simpleTemplateId
-	| simpleTypeSignednessModifier
-	| simpleTypeSignednessModifier? simpleTypeLengthModifier+
-	| simpleTypeSignednessModifier? Char
-	| simpleTypeSignednessModifier? Char16
-	| simpleTypeSignednessModifier? Char32
-	| simpleTypeSignednessModifier? Wchar
-	| Bool
-	| simpleTypeSignednessModifier? simpleTypeLengthModifier* Int
-	| Float
-	| simpleTypeLengthModifier? Double
-	| Void
-	| Auto
-	| decltypeSpecifier;
+	nestedNameSpecifier? theTypeName                                    # stTypeName
+	| nestedNameSpecifier Template simpleTemplateId                     # st2
+	| simpleTypeSignednessModifier                                      # st3
+	| simpleTypeSignednessModifier? simpleTypeLengthModifier+           # st4
+	| simpleTypeSignednessModifier? Char                                # st5
+	| simpleTypeSignednessModifier? Char16                              # st6
+	| simpleTypeSignednessModifier? Char32                              # st7
+	| simpleTypeSignednessModifier? Wchar                               # st8
+	| Bool                                                              # st9
+	| simpleTypeSignednessModifier? simpleTypeLengthModifier* Int       # st10
+	| Float                                                             # st11
+	| simpleTypeLengthModifier? Double                                  # st12
+	| Void                                                              # st13
+	| Auto                                                              # st14
+	| decltypeSpecifier                                                 # st15
+        ;
 
 theTypeName:
-	className
-	| enumName
-	| typedefName
-	| simpleTemplateId
-        | decltypeSpecifier;
+	className                   # tnClass
+	| enumName                  # tn2
+	| typedefName               # tn3
+	| simpleTemplateId          # tn4
+        | decltypeSpecifier         # tn5
+        ;
 
 decltypeSpecifier:
 	(Decltype | Decltype2) LeftParen (expression | Auto) RightParen;
@@ -532,8 +539,9 @@ initDeclaratorList: initDeclarator (Comma initDeclarator)*;
 initDeclarator: declarator (Asm Volatile? LeftParen StringLiteral RightParen)? initializer?;
 
 declarator:
-	pointerDeclarator
-	| noPointerDeclarator parametersAndQualifiers trailingReturnType;
+	pointerDeclarator                                                   # pd
+	| noPointerDeclarator parametersAndQualifiers trailingReturnType    # npt
+        ;
 
 pointerDeclarator: (pointerOperator Restrict? Const? attributeSpecifierSeq?)* noPointerDeclarator;
 
