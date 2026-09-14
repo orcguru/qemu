@@ -294,7 +294,7 @@ open FD, "< $ARGV[2]" or die "Cannot open $ARGV[2] for read!\n";
 while (<FD>) {
   my $line = $_;
   chomp($line);
-  if ($line =~ /^<FUNCTION_CALL(2|3)?>/) {
+  if ($line =~ /^<FUNCTION_CALL[0-9]*>/) {
     my @fields = split(/\$\$/, $line);
     my %info = ();
     my @f1 = split(/:/, $fields[1]);

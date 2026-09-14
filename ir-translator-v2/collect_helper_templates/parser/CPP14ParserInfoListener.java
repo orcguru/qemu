@@ -595,7 +595,7 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitFuncCall(CPP14Parser.FuncCallContext ctx) {
-          System.out.println("<FUNCTION_CALL>$$NAME_BEGIN:" + Integer.toString(ctx.postfixExpression().getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(ctx.postfixExpression().getStart().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(ctx.LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(ctx.RightParen().getSymbol().getStopIndex()));
+          System.out.println("<FUNCTION_CALL1>$$NAME_BEGIN:" + Integer.toString(ctx.postfixExpression().getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(ctx.postfixExpression().getStop().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(ctx.LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(ctx.RightParen().getSymbol().getStopIndex()));
         }
 	/**
 	 * {@inheritDoc}
@@ -1233,7 +1233,7 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
             if (ctx.initDeclaratorList().initDeclarator(1) == null) {
               if (ctx.initDeclaratorList().initDeclarator(0).Asm() == null && ctx.initDeclaratorList().initDeclarator(0).initializer() != null) {
                 if (ctx.initDeclaratorList().initDeclarator(0).initializer().expressionList() != null) {
-                  System.out.println("<FUNCTION_CALL2>$$NAME_BEGIN:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).declarator().getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).declarator().getStart().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).initializer().LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).initializer().RightParen().getSymbol().getStopIndex()));
+                  System.out.println("<FUNCTION_CALL2>$$NAME_BEGIN:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).declarator().getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).declarator().getStop().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).initializer().LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(ctx.initDeclaratorList().initDeclarator(0).initializer().RightParen().getSymbol().getStopIndex()));
                 }
               }
             }
@@ -1258,7 +1258,7 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
                               if (npd1c.attributeSpecifierSeq() == null && npd1c.declaratorid().Ellipsis() == null && npd1c.declaratorid().idExpression() instanceof CPP14Parser.UqiContext) {
                                 CPP14Parser.UqiContext uqc = (CPP14Parser.UqiContext)npd1c.declaratorid().idExpression();
                                 if (uqc.unqualifiedId() instanceof CPP14Parser.UID1Context) {
-                                  System.out.println("<FUNCTION_CALL3>$$NAME_BEGIN:" + Integer.toString(stc.getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(stc.getStart().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(npd3c.LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(npd3c.RightParen().getSymbol().getStopIndex()));
+                                  System.out.println("<FUNCTION_CALL3>$$NAME_BEGIN:" + Integer.toString(stc.getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(stc.getStop().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(npd3c.LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(npd3c.RightParen().getSymbol().getStopIndex()));
                                 }
                               }
                             }
@@ -2271,7 +2271,7 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
           if (ctx.noPointerDeclarator() != null && ctx.noPointerDeclarator() instanceof CPP14Parser.Npd1Context) {
             CPP14Parser.Npd1Context npd1ctx = (CPP14Parser.Npd1Context)ctx.noPointerDeclarator();
             if (npd1ctx.attributeSpecifierSeq() == null) {
-              System.out.println("<FUNCTION_CALL>$$NAME_BEGIN:" + Integer.toString(npd1ctx.declaratorid().getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(npd1ctx.declaratorid().getStart().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(ctx.parametersAndQualifiers().LeftParen(0).getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(ctx.parametersAndQualifiers().RightParen(0).getSymbol().getStopIndex()));
+              System.out.println("<FUNCTION_CALL4>$$NAME_BEGIN:" + Integer.toString(npd1ctx.declaratorid().getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(npd1ctx.declaratorid().getStop().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(ctx.parametersAndQualifiers().LeftParen(0).getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(ctx.parametersAndQualifiers().RightParen(0).getSymbol().getStopIndex()));
             }
           }
         }
