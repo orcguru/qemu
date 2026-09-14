@@ -63,6 +63,20 @@ PREPROCESSED_OBJ_CC_HELPER := libqemu-$(QEMU_TARGET_LIST).a.p/target_i386_tcg_cc
 PREPROCESSED_OBJ_INT_HELPER := libqemu-$(QEMU_TARGET_LIST).a.p/target_i386_tcg_int_helper.c.o
 PREPROCESSED_OBJ_USER_EXEC  := libuser.a.p/accel_tcg_user-exec.c.o
 
+# user-exec.c target (accel/tcg) ----------------------------------------------
+QEMU_USER_EXEC := $(QEMU_TOP)/accel/tcg/user-exec.c
+# For qemu-preprocess-user-exec, depending on the host arch we prepend either
+# target/arm/cpu.c (aarch64) or target/riscv/cpu.c (riscv64) to user-exec.c.
+# The chosen source file is resolved at recipe time (not parse time) so the
+# correct one is picked even if the Makefile is parsed on a different machine.
+ifeq ($(ARCH_HOST), aarch64)
+	QEMU_USER_EXEC_CPU_SRC := $(QEMU_TOP)/target/arm/cpu.c
+else ifeq ($(ARCH_HOST), riscv64)
+	QEMU_USER_EXEC_CPU_SRC := $(QEMU_TOP)/target/riscv/cpu.c
+endif
+# Marker recording that user-exec.c was prepended (for clean restoration)
+USER_EXEC_MARKER := $(QEMU_USER_EXEC).cpu_prepended
+
 # Default (backward-compatible) preprocessed output
 PREPROCESSED_OBJ := $(PREPROCESSED_OBJ_FPU)
 PREPROCESSED_OUT := $(QEMU_BUILD)/$(PREPROCESSED_OBJ).E
@@ -131,8 +145,9 @@ qemu-preprocess-int-helper: check-qemu-top $(QEMU_BUILD)/Makefile capture-comman
 	@echo "==================================================================="
 
 # Convenience entry point: accel/tcg/user-exec.c
-# No .inc files copied, no source modification required.
-qemu-preprocess-user-exec: check-qemu-top $(QEMU_BUILD)/Makefile capture-command-user-exec preprocess-extract-user-exec
+# Before capturing the build command, prepends the matching target cpu.c
+# (target/arm/cpu.c on aarch64, target/riscv/cpu.c on riscv64) to user-exec.c.
+qemu-preprocess-user-exec: check-qemu-top $(QEMU_BUILD)/Makefile prepend-user-exec-cpu capture-command-user-exec preprocess-extract-user-exec
 	@echo "==================================================================="
 	@echo "Preprocessed file ready: $(QEMU_BUILD)/$(PREPROCESSED_OBJ_USER_EXEC).E"
 	cp $(QEMU_BUILD)/$(PREPROCESSED_OBJ_USER_EXEC).E $(HELPER_TMPL_DIR)/
@@ -174,6 +189,13 @@ check-qemu-top:
 		echo "ERROR: target file '$(QEMU_TOP)/accel/tcg/user-exec.c' not found."; \
 		exit 1; \
 	fi
+	@if [ -z "$(QEMU_USER_EXEC_CPU_SRC)" ]; then \
+		echo "WARNING: unknown host arch '$(ARCH_HOST)' for user-exec.c;"; \
+		echo "no cpu.c source will be prepended. Proceeding without modification."; \
+	elif [ ! -f "$(QEMU_USER_EXEC_CPU_SRC)" ]; then \
+		echo "ERROR: cpu source '$(QEMU_USER_EXEC_CPU_SRC)' not found."; \
+		exit 1; \
+	fi
 
 # --- 2. copy fpu/*.inc into target/i386/tcg/ --------------------------------
 # (Only used by the fpu_helper.c target.)
@@ -198,6 +220,26 @@ prepend-softfloat:
 		cat $(QEMU_FPU_DIR)/softfloat.c $(QEMU_FPU_HELPER).orig > $(QEMU_FPU_HELPER); \
 		touch $(SOFTFLOAT_MARKER); \
 		echo "done (original saved as fpu_helper.c.orig)."; \
+	fi
+
+# --- 3b. prepend the matching target cpu.c to accel/tcg/user-exec.c ----------
+# (Only used by the qemu-preprocess-user-exec target.)
+#
+# On aarch64 hosts we prepend target/arm/cpu.c; on riscv64 hosts we prepend
+# target/riscv/cpu.c. The original user-exec.c is saved as user-exec.c.orig so
+# it can be restored verbatim by `make clean`.
+prepend-user-exec-cpu:
+	@if [ -f "$(USER_EXEC_MARKER)" ]; then \
+		echo "cpu.c already prepended to user-exec.c (marker exists): $(USER_EXEC_MARKER)"; \
+	elif [ -z "$(QEMU_USER_EXEC_CPU_SRC)" ]; then \
+		echo "WARNING: unknown host arch '$(ARCH_HOST)' for user-exec.c;"; \
+		echo "no cpu.c source to prepend. Proceeding without modification."; \
+	else \
+		echo "Prepending $(QEMU_USER_EXEC_CPU_SRC) to $(QEMU_USER_EXEC) ..."; \
+		cp -f $(QEMU_USER_EXEC) $(QEMU_USER_EXEC).orig; \
+		cat $(QEMU_USER_EXEC_CPU_SRC) $(QEMU_USER_EXEC).orig > $(QEMU_USER_EXEC); \
+		touch $(USER_EXEC_MARKER); \
+		echo "done (original saved as user-exec.c.orig)."; \
 	fi
 
 # --- 4. configure (shared) --------------------------------------------------
@@ -433,6 +475,11 @@ clean-qemu-source:
 			echo "Restoring original $(QEMU_FPU_HELPER)"; \
 			mv -f $(QEMU_FPU_HELPER).orig $(QEMU_FPU_HELPER); \
 		fi; \
+		if [ -f "$(QEMU_USER_EXEC).orig" ]; then \
+			echo "Restoring original $(QEMU_USER_EXEC)"; \
+			mv -f $(QEMU_USER_EXEC).orig $(QEMU_USER_EXEC); \
+		fi; \
+		rm -f $(USER_EXEC_MARKER); \
 		rm -rf $(QEMU_BUILD); \
 		echo "QEMU source restored and build directory removed."; \
 	else \
@@ -493,7 +540,7 @@ test:
 	qemu-preprocess-cc-helper qemu-preprocess-int-helper \
 	qemu-preprocess-user-exec \
 	templates \
-	check-qemu-top copy-fpu-files prepend-softfloat \
+	check-qemu-top copy-fpu-files prepend-softfloat prepend-user-exec-cpu \
 	capture-command capture-command-fpu capture-command-tcg-runtime \
 	capture-command-cc-helper capture-command-int-helper \
 	capture-command-user-exec \
