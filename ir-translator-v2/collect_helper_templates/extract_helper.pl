@@ -471,6 +471,10 @@ foreach my $line (@blank_lines) {
           $l =~ s/\s+$//;
           $l = &remove_attribute($l);
           if ($l =~ /\(/) {
+            if ($l =~ /^[^\(]+\s+\(\*(\w+)\)\(/) {
+              my $func_ptr = $1;
+              $l =~ s/\(\*$func_ptr\)/${func_ptr}_FUNCPTR/;
+            }
             my @fields = split(/\(/, $l);
             my @sub_fields = split(/\s+/, $fields[0]);
             if (@sub_fields > 1) {
@@ -570,7 +574,7 @@ foreach my $f (keys %covered_funcs) {
 }
 
 foreach my $f (keys %foreign_funcs) {
-  if (not exists $func_type_input{$f}) {
+  if (&get_func_return_type($f) eq "") {
     print "$f type not detected\n";
   }
 }
@@ -1085,7 +1089,7 @@ foreach my $f (keys %funcs) {
         }
       }
       if (!$is_param) {
-        $foreign_calls{$call_target} = $func_type_input{$call_target};
+        $foreign_calls{$call_target} = &get_func_return_type($call_target);
       }
     }
   }
@@ -1227,7 +1231,7 @@ foreach my $f (keys %funcs) {
             }
           }
           if (!$is_param) {
-            $foreign_calls{$call_target} = $func_type_input{$call_target};
+            $foreign_calls{$call_target} = &get_func_return_type($call_target);
           }
         }
       }
@@ -1351,7 +1355,7 @@ EOF
   }
   close IN;
   foreach my $ff (keys %foreign_calls) {
-    die "$ff" if $check_body =~ /([^a-zA-Z_0-9])${ff}([^a-zA-Z_0-9])/;
+    die "$ff" if $check_body =~ /([^a-zA-Z_0-9])${ff}([^a-zA-Z_0-9\)])/;
   }
 }
 
@@ -2769,6 +2773,8 @@ sub FuncNameIsForeign
     return 0;
   } elsif ($func_name =~ /^__builtin_/ or $func_name =~ /^__atomic/) {
     return 0;
+  } elsif ($func_name eq '(uintptr_t)') {
+    return 0;
   } else {
     return 1;
   }
@@ -2924,4 +2930,16 @@ sub filter_blank_info {
     $cleaned .= $line . "\n";
   }
   return $cleaned;
+}
+
+sub get_func_return_type
+{
+  my ($f) = @_;
+  if ($f =~ /\-\>(\w+)$/) {
+    $f = $1."_FUNCPTR";
+  }
+  if (exists $func_type_input{$f}) {
+    return $func_type_input{$f};
+  }
+  return "";
 }
