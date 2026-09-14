@@ -9,7 +9,6 @@ use Cwd 'abs_path';
 
 # Some dirty hacks this script applies:
 # 1. All invocations of atomic_trace_rmw_post() has been removed
-# 2. untagged_addr has been manually redirected to its arch callback
 
 if ($#ARGV < 1) {
   print "Usage: ./script <tcg_ast.h> <antlr-in> <antlr-out>\n";
