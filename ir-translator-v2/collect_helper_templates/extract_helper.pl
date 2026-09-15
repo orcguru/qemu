@@ -315,7 +315,7 @@ while (<FD>) {
       next;
     }
     $info{'CALL_TARGET'} = &GetText($info{'NAME_START'}, $info{'NAME_STOP'});
-    if ($info{'CALL_TARGET'} eq '_Generic') {
+    if ($info{'CALL_TARGET'} =~ /^_Generic/) {
         my $generic_call = &GetText($info{'PAREN_START'}, $info{'PAREN_STOP'});
         if ($generic_call =~ /:/) {
           $generic_call =~ s/^\(//;
@@ -406,6 +406,12 @@ while (<FD>) {
             }
           }
         } else {
+          # For statements like below, there are two entries of parser output
+          # _Generic((&p), FloatParts64 *: parts64_float_to_float, FloatParts128 *: parts128_float_to_float)(&p, s);
+          # parser =>
+          # <FUNCTION_CALL1>$$NAME_BEGIN:145$$NAME_END:152$$PAREN_BEGIN:153$$PAREN_END:240
+          # <FUNCTION_CALL1>$$NAME_BEGIN:145$$NAME_END:240$$PAREN_BEGIN:241$$PAREN_END:247
+          # Update CALL_TARGET on the second entry
           if ($prev_generic_func eq "") {
             next;
           }
@@ -573,6 +579,9 @@ foreach my $f (keys %covered_funcs) {
 }
 
 foreach my $f (keys %foreign_funcs) {
+  if ($f =~ /^_Generic\((.*)\)$/) {
+    next;
+  }
   if (&get_func_return_type($f) eq "") {
     print "$f type not detected\n";
   }
@@ -617,7 +626,7 @@ while (<FD>) {
       }
       ($sym, $sym_start, $sym_stop) = &GetSymbol(\@file_content, $current_pos, 0);
       my $vec_arg_idx = &get_vec_arg_idx($func_ptr, $sym);
-      die "" if $vec_arg_idx == -1;
+      die "$func_ptr->{'NAME'} $sym" if $vec_arg_idx == -1;
       die "" if $file_content[$sym_stop+1] ne ";";
       $info{'VEC_ARG_IDX'} = $vec_arg_idx;
       $info{'STOP'} = $sym_stop;
@@ -715,7 +724,7 @@ while (<FD>) {
           my ($call_idx, $call_ptr) = &lookup($start, \%callsite_lookup);
           if ($call_idx == -1) {
             $func_ptr->{'DO_DEFINE_ENV'} = 1;
-            die "" if $func_ptr->{'ENV_TYPE'} eq "NA";
+            die "$func_ptr->{'NAME'}" if $func_ptr->{'ENV_TYPE'} eq "NA";
             # Copy from x25
             #print "standalone ENV inside $func_ptr->{'NAME'}\n";
             die "" if ($file_content[$start-1] eq "." or $file_content[$start-1] eq ">");
@@ -1510,7 +1519,7 @@ sub GetContentWithArrayBound
 sub parse_func_head
 {
   my ($func) = @_;
-  my $env_type = "NA";
+  my $env_type = "unsigned long";
   my $str = &GetText($func->{'FULL_START'}, $func->{'NAME_STOP'}, $ARGV[1]);
   $str = &mov_tail_attribute_to_head($str);
   my @chars = split(//, $str);
@@ -2028,7 +2037,7 @@ sub get_func_body
   my $body = "";
   if (exists $func_ptr->{'DO_DEFINE_ENV'} and $func_ptr->{'NAME'} ne $exception_exit) {
     $body = "{\n";
-    $body = $body."   $func_ptr->{'ENV_TYPE'}env;\n";
+    $body = $body."   $func_ptr->{'ENV_TYPE'} env;\n";
     if ($arch_info eq "riscv64") {
       $body = $body."   asm volatile (\"mv %0, x25\" : \"=r\" (env) : :);\n";
     } else {
@@ -2773,6 +2782,8 @@ sub FuncNameIsForeign
   } elsif ($func_name =~ /^__builtin_/ or $func_name =~ /^__atomic/) {
     return 0;
   } elsif ($func_name eq '(uintptr_t)') {
+    return 0;
+  } elsif ($func_name =~ /^\(u?int(64|32|16|8)_t\)$/) {
     return 0;
   } else {
     return 1;

@@ -361,6 +361,7 @@ preprocess-extract: preprocess-extract-fpu
 HELPER_TMPL_PARSER := $(HELPER_TMPL_DIR)/parser
 ANTLR_JAR        := $(HELPER_TMPL_PARSER)/antlr-4.9.3-complete.jar
 ANTLR_PARSE_CLASS := $(HELPER_TMPL_PARSER)/LoadCPP.class
+HACKER           := $(HELPER_TMPL_DIR)/hack_helper_retaddr.pl
 EXTRACTOR        := $(HELPER_TMPL_DIR)/extract_helper.pl
 HELPER_DEF       := tcg_ast.h
 HELPER_TMPL_OUT  := helper_templates
@@ -399,6 +400,7 @@ templates: $(ANTLR_PARSE_CLASS) $(HELPER_TMPL_OUT)
 			out="$${pp}.out"; \
 			err="$${pp}.err"; \
 			echo "  - parse: $$pp"; \
+			perl "$(HACKER)" "$$pp"; \
 			java -cp "$(HELPER_TMPL_PARSER):$(ANTLR_JAR)" LoadCPP "$$pp" > "$$out" 2> "$$err"; \
 			echo "  - extract: $$pp"; \
 			perl "$(EXTRACTOR)" "$(HELPER_DEF)" "$$pp" "$$out"; \

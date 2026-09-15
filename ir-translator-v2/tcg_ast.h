@@ -136,7 +136,6 @@ typedef enum __attribute__((packed)) {
     X(helper_clts) \
     X(helper_cr4_testbit) \
     X(helper_cpuid) \
-    X(helper_crc32) \
     X(helper_cvtpd2pi) \
     X(helper_cvtpi2pd) \
     X(helper_cvtpi2ps) \
@@ -148,8 +147,6 @@ typedef enum __attribute__((packed)) {
     X(helper_emms) \
     X(helper_enter_mmx) \
     X(helper_exit_atomic) \
-    X(helper_extrq_i) \
-    X(helper_extrq_r) \
     X(helper_f2xm1) \
     X(helper_fabs_ST0) \
     X(helper_fadd_ST0_FT0) \
@@ -396,8 +393,6 @@ typedef enum __attribute__((packed)) {
     X(helper_gvec_xor) \
     X(helper_gvec_xors) \
     X(helper_icebp) \
-    X(helper_insertq_i) \
-    X(helper_insertq_r) \
     X(helper_into) \
     X(helper_iret_protected) \
     X(helper_iret_real) \
@@ -503,7 +498,6 @@ typedef enum __attribute__((packed)) {
     X(helper_xsaveopt) \
     X(helper_xsetbv) \
     X(helper_jmp_ind) \
-    X(helper_jumptable) \
     X(helper_iret_ind) \
     X(helper_dump_load) \
     X(helper_dump_store) \
@@ -530,6 +524,11 @@ typedef enum __attribute__((packed)) {
     X(helper_idivq_EAX) \
     X(NOINLINE_END) \
     X(helper_cc_compute_nz) \
+    X(helper_crc32) \
+    X(helper_extrq_i) \
+    X(helper_extrq_r) \
+    X(helper_insertq_i) \
+    X(helper_insertq_r) \
     X(helper_atomic_add_fetchb) \
     X(helper_atomic_add_fetchl_be) \
     X(helper_atomic_add_fetchl_le) \

@@ -345,6 +345,9 @@ const LLVMType helper_collapse_xmm_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_sar_i64] = {LLVMInt64, LLVMInt64},
     [helper_shl_i64] = {LLVMInt64, LLVMInt64},
     [helper_shr_i64] = {LLVMInt64, LLVMInt64},
+    [helper_crc32] = {LLVMInt32, LLVMInt64, LLVMInt32},
+    [helper_extrq_i] = {LLVMInt32, LLVMInt32},
+    [helper_insertq_i] = {LLVMInt32, LLVMInt32},
 };
 
 // Collected by qemu-runtime
