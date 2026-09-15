@@ -2583,7 +2583,7 @@ sub collect_func_args
   #}
   if ($func_ptr->{'HELPER_INTERFACE'}) {
     if (exists $func_ptr->{'IS_FOREIGN'}) {
-      $args = $args.", unsigned long normal_return, unsigned long exception_return";
+      $args = $args.", unsigned long exception_return, unsigned long normal_return";
     } else {
       $args = $args.", unsigned long normal_return";
     }
