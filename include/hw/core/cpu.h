@@ -380,7 +380,7 @@ typedef struct __attribute__((packed)) InstrExecCountersGroup2 {
 } InstrExecCountersGroup2;
 
 typedef struct __attribute__((packed)) PackedShadowStackInfo {
-    uint64_t pad;
+    uint64_t helper_retaddr;
     uint64_t shadow_stack_pointer_upper_bound;
     uint64_t shadow_stack_pointer_lower_bound;
     uint64_t shadow_stack_pointer;
