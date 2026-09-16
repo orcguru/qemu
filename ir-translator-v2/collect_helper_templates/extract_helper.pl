@@ -2106,6 +2106,7 @@ END
             } else {
               $body = $body."($type_name)(*trigger_exception_ptr = 1)";
             }
+            print "Exception due to: $call_target\n";
             $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
           }
         } else {
@@ -2204,6 +2205,7 @@ END
                 } else {
                     $body = $body."($fc->{$foreign_call})(*trigger_exception_ptr = 1)";
                 }
+                print "Exception due to: $foreign_call\n";
             }
             $sub_head = $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'} + 1;
             $sub_current = $sub_head;
@@ -2489,6 +2491,7 @@ sub update_func_call
             } else {
                 $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(*trigger_exception_ptr = 1)";
             }
+            print "Exception due to: $sub_call_info->{'CALL_TARGET'}\n";
             $call_list = $call_list.", ".$sub_call_txt;
         }
       } else {

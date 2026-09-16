@@ -403,7 +403,7 @@ templates: $(ANTLR_PARSE_CLASS) $(HELPER_TMPL_OUT)
 			perl "$(HACKER)" "$$pp"; \
 			java -cp "$(HELPER_TMPL_PARSER):$(ANTLR_JAR)" LoadCPP "$$pp" > "$$out" 2> "$$err"; \
 			echo "  - extract: $$pp"; \
-			perl "$(EXTRACTOR)" "$(HELPER_DEF)" "$$pp" "$$out"; \
+			perl "$(EXTRACTOR)" "$(HELPER_DEF)" "$$pp" "$$out" >> extract.log 2>&1; \
 		done; \
 		echo "Copying all *.helper_templates/ folders into $(HELPER_TMPL_OUT)/ ..."; \
 		rm -rf "$(HELPER_TMPL_OUT)"; mkdir -p "$(HELPER_TMPL_OUT)"; \
