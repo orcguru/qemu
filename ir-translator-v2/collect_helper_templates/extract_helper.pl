@@ -2134,7 +2134,7 @@ END
             } else {
               $body = $body."($type_name)(*trigger_exception_ptr = 1)";
             }
-            print "Exception due to: $call_target\n";
+            print "Exception due to: $call_target - $exception_exit\n";
             $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
           }
         } else {
@@ -2144,7 +2144,7 @@ END
         if ($funcs{$call_target}->{'128'}->{'RETURN128'} ne "") {
           $body = $body."($funcs{$call_target}->{'128'}->{'RETURN128'})";
         }
-        my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi, $fc);
+        my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi, $fc, $exception_exit);
         $body = $body.$call_txt;
         $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
       }
@@ -2207,7 +2207,7 @@ END
           if (exists $func_ptr->{'CALLS'}->{$sub_current} and exists $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}) {
             my $sub_str = &GetText($sub_head, ($sub_current-1));
             $body = $body.$sub_str;
-            my $func_call_str = &update_func_call($func_ptr, $sub_current, $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}, $pi, $fc);
+            my $func_call_str = &update_func_call($func_ptr, $sub_current, $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}, $pi, $fc, $exception_exit);
             $body = $body.$func_call_str;
             $sub_head = $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'} + 1;
             $sub_current = $sub_head;
@@ -2233,7 +2233,7 @@ END
                 } else {
                     $body = $body."($fc->{$foreign_call})(*trigger_exception_ptr = 1)";
                 }
-                print "Exception due to: $foreign_call\n";
+                print "Exception due to: $foreign_call - $exception_exit\n";
             }
             $sub_head = $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'} + 1;
             $sub_current = $sub_head;
@@ -2293,7 +2293,7 @@ END
             if ($got_is_foreign_call) {
               $body = $body."$func_ptr->{'RETURN_TYPE'} RET = ";
               my %empty = ();
-              my $func_call_str = &update_func_call($func_ptr, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $funcs{$call_target_name}, "", \%empty);
+              my $func_call_str = &update_func_call($func_ptr, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $funcs{$call_target_name}, "", \%empty, $exception_exit);
               $body = $body.$func_call_str.";\n";
               $standalone_expr_for_ret = 1;
             }
@@ -2454,7 +2454,7 @@ sub get_exception_path
 
 sub update_func_call
 {
-  my ($caller_ptr, $call_pos, $callee_ptr, $path_info, $fc) = @_;
+  my ($caller_ptr, $call_pos, $callee_ptr, $path_info, $fc, $exception_exit) = @_;
   die "" if not exists $caller_ptr->{'CALLS'}->{$call_pos};
   my $call_info = $caller_ptr->{'CALLS'}->{$call_pos};
   my $str = "";
@@ -2497,7 +2497,7 @@ sub update_func_call
       die "$caller_ptr->{'NAME'}:$call_pos $callee_ptr->{'NAME'} $idx:$arg:$sub_call_idx" if not exists $sorted_sub_calls[$sub_call_idx];
       my $sub_call_info = $caller_ptr->{'CALLS'}->{$sorted_sub_calls[$sub_call_idx]};
       if (exists $funcs{$sub_call_info->{'CALL_TARGET'}}) {
-        my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info, $fc);
+        my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info, $fc, $exception_exit);
         $call_list = $call_list.", ".$sub_call_txt;
       } elsif (&FuncNameIsForeign($sub_call_info->{'CALL_TARGET'})) {
         # Skip if the call target is a function pointer parameter of the caller
@@ -2519,7 +2519,7 @@ sub update_func_call
             } else {
                 $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(*trigger_exception_ptr = 1)";
             }
-            print "Exception due to: $sub_call_info->{'CALL_TARGET'}\n";
+            print "Exception due to: $sub_call_info->{'CALL_TARGET'} - $exception_exit\n";
             $call_list = $call_list.", ".$sub_call_txt;
         }
       } else {
