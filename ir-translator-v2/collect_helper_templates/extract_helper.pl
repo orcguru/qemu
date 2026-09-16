@@ -1052,52 +1052,62 @@ foreach my $f (keys %funcs) {
   my %trace_parent_call_loc = ();
   foreach my $e (keys %{$funcs{$f}->{'CALLS'}}) {
     my $call_target = $funcs{$f}->{'CALLS'}->{$e}->{'CALL_TARGET'};
-    if (exists $funcs{$call_target}) {
-      if (not exists $trace_parent_call_loc{$call_target}) {
-        my @arr = ();
-        $trace_parent_call_loc{$call_target} = \@arr;
+    my @check_func_list = ();
+    push @check_func_list, $call_target;
+    # Add functions as parameter
+    foreach my $a (@{$funcs{$f}->{'CALLS'}->{$e}->{'CALL_ARGUMENTS'}}) {
+      if (exists $funcs{$a}) {
+        push @check_func_list, $a;
       }
-      my %tr_info = ();
-      $tr_info{'PARENT'} = $f;
-      $tr_info{'LOC'} = $e;
-      push @{$trace_parent_call_loc{$call_target}}, \%tr_info;
-      if (not exists $defined_func{$call_target}) {
-        push @sub_call_stack, $call_target;
-        my %p_info = ();
-        $defined_func{$call_target} = \%p_info;
-        if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
-          $has_foreign_call = 1;
+    }
+    foreach my $call_target (@check_func_list) {
+      if (exists $funcs{$call_target}) {
+        if (not exists $trace_parent_call_loc{$call_target}) {
+          my @arr = ();
+          $trace_parent_call_loc{$call_target} = \@arr;
         }
-      }
-      foreach my $pi (keys %{$defined_func{$f}}) {
-        my $current_pi = $pi."_".$f."_loc$e";
-        my @label_info = ();
-        foreach my $elem (@{$defined_func{$f}->{$pi}}) {
-          push @label_info, $elem;
-        }
-        my %entry_info = ();
-        $entry_info{'FUNC'} = $f;
-        $entry_info{'LOC'} = $e;
-        push @label_info, \%entry_info;
-        $defined_func{$call_target}->{$current_pi} = \@label_info;
-        # FIXME: simplify duplicated mark actions
-        if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
-          foreach my $i (@label_info) {
-            $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+        my %tr_info = ();
+        $tr_info{'PARENT'} = $f;
+        $tr_info{'LOC'} = $e;
+        push @{$trace_parent_call_loc{$call_target}}, \%tr_info;
+        if (not exists $defined_func{$call_target}) {
+          push @sub_call_stack, $call_target;
+          my %p_info = ();
+          $defined_func{$call_target} = \%p_info;
+          if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
+            $has_foreign_call = 1;
           }
         }
-      }
-    } elsif (&FuncNameIsForeign($call_target)) {
-      # Skip if the call target is a function pointer parameter of the current function
-      my $is_param = 0;
-      foreach my $arg (@{$funcs{$f}->{'SCALAR_ARGS'}}) {
-        if ($arg->{'VAR_NAME'} eq $call_target) {
-          $is_param = 1;
-          last;
+        foreach my $pi (keys %{$defined_func{$f}}) {
+          my $current_pi = $pi."_".$f."_loc$e";
+          my @label_info = ();
+          foreach my $elem (@{$defined_func{$f}->{$pi}}) {
+            push @label_info, $elem;
+          }
+          my %entry_info = ();
+          $entry_info{'FUNC'} = $f;
+          $entry_info{'LOC'} = $e;
+          push @label_info, \%entry_info;
+          $defined_func{$call_target}->{$current_pi} = \@label_info;
+          # FIXME: simplify duplicated mark actions
+          if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
+            foreach my $i (@label_info) {
+              $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+            }
+          }
         }
-      }
-      if (!$is_param) {
-        $foreign_calls{$call_target} = &get_func_return_type($call_target);
+      } elsif (&FuncNameIsForeign($call_target)) {
+        # Skip if the call target is a function pointer parameter of the current function
+        my $is_param = 0;
+        foreach my $arg (@{$funcs{$f}->{'SCALAR_ARGS'}}) {
+          if ($arg->{'VAR_NAME'} eq $call_target) {
+            $is_param = 1;
+            last;
+          }
+        }
+        if (!$is_param) {
+          $foreign_calls{$call_target} = &get_func_return_type($call_target);
+        }
       }
     }
   }
@@ -1105,7 +1115,9 @@ foreach my $f (keys %funcs) {
     my @new_call_stack = ();
     foreach my $c (@sub_call_stack) {
       foreach my $e (keys %{$funcs{$c}->{'CALLS'}}) {
+        my @check_func_list = ();
         my $call_target = $funcs{$c}->{'CALLS'}->{$e}->{'CALL_TARGET'};
+        push @check_func_list, $call_target;
         if (not exists $trace_parent_call_loc{$call_target}) {
           my @arr = ();
           $trace_parent_call_loc{$call_target} = \@arr;
@@ -1114,132 +1126,148 @@ foreach my $f (keys %funcs) {
         $tr_info{'PARENT'} = $c;
         $tr_info{'LOC'} = $e;
         push @{$trace_parent_call_loc{$call_target}}, \%tr_info;
-        if (exists $funcs{$call_target}) {
-          if (not exists $defined_func{$call_target}) {
-            push @new_call_stack, $call_target;
-            my %p_info = ();
-            $defined_func{$call_target} = \%p_info;
-            if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
-              $has_foreign_call = 1;
+        # Add functions as parameter
+        foreach my $call_target (@{$funcs{$c}->{'CALLS'}->{$e}->{'CALL_ARGUMENTS'}}) {
+          if (exists $funcs{$call_target}) {
+            if (not exists $trace_parent_call_loc{$call_target}) {
+              my @arr = ();
+              $trace_parent_call_loc{$call_target} = \@arr;
             }
+            my %tr_info = ();
+            $tr_info{'PARENT'} = $c;
+            $tr_info{'LOC'} = $e;
+            push @{$trace_parent_call_loc{$call_target}}, \%tr_info;
+            push @check_func_list, $call_target;
           }
-          foreach my $pi (keys %{$defined_func{$c}}) {
-            my $current_pi = $pi."_".$c."_loc$e";
-            my @label_info = ();
-            foreach my $elem (@{$defined_func{$c}->{$pi}}) {
-              push @label_info, $elem;
-            }
-            my %entry_info = ();
-            $entry_info{'FUNC'} = $c;
-            $entry_info{'LOC'} = $e;
-            push @label_info, \%entry_info;
-            $defined_func{$call_target}->{$current_pi} = \@label_info;
-            # FIXME: simplify duplicated mark actions
-            if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
-              foreach my $i (@label_info) {
-                $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+        }
+        foreach my $call_target (@check_func_list) {
+          if (exists $funcs{$call_target}) {
+            if (not exists $defined_func{$call_target}) {
+              push @new_call_stack, $call_target;
+              my %p_info = ();
+              $defined_func{$call_target} = \%p_info;
+              if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
+                $has_foreign_call = 1;
               }
             }
-          }
-        } elsif (&FuncNameIsForeign($call_target)) {
-          # Skip if the call target is a function pointer parameter of the caller ($c)
-          my $is_param = 0;
-          if (exists $funcs{$c}) {
-            foreach my $idx (0 .. $#{$funcs{$c}->{'SCALAR_ARGS'}}) {
-              my $arg = $funcs{$c}->{'SCALAR_ARGS'}->[$idx];
-              if ($arg->{'VAR_NAME'} eq $call_target) {
-                $is_param = 1;
-                foreach my $pi (keys %{$defined_func{$c}}) {
-                  my $parent_func = $defined_func{$c}->{$pi}->[$#{$defined_func{$c}->{$pi}}]->{'FUNC'};
-                  my $parent_call_loc = $defined_func{$c}->{$pi}->[$#{$defined_func{$c}->{$pi}}]->{'LOC'};
-                  my $real_target = $funcs{$parent_func}->{'CALLS'}->{$parent_call_loc}->{'CALL_ARGUMENTS'}->[$idx];
-                  if (not exists $funcs{$real_target}) {
-                    my @trace_real_target = ();
-                    my %info = ();
-                    $info{'P'} = $parent_func;
-                    $info{'PCL'} = $parent_call_loc;
-                    $info{'RT'} = $real_target;
-                    push @trace_real_target, \%info;
-                    while (@trace_real_target > 0) {
-                      my $entry = pop @trace_real_target;
-                      die "" if (not exists $trace_parent_call_loc{$entry->{'P'}});
-                      foreach my $tr_info (@{$trace_parent_call_loc{$entry->{'P'}}}) {
-                        die "" if (not exists $funcs{$tr_info->{'PARENT'}}->{'CALLS'}->{$tr_info->{'LOC'}});
-                        my $scan_func = $funcs{$tr_info->{'PARENT'}}->{'CALLS'}->{$tr_info->{'LOC'}}->{'CALL_TARGET'};
-                        die "" if (not exists $funcs{$scan_func});
-                        foreach my $idx2 (0 .. $#{$funcs{$scan_func}->{'SCALAR_ARGS'}}) {
-                          my $arg = $funcs{$scan_func}->{'SCALAR_ARGS'}->[$idx2];
-                          if ($arg->{'VAR_NAME'} eq $entry->{'RT'}) {
-                            $real_target = $funcs{$tr_info->{'PARENT'}}->{'CALLS'}->{$tr_info->{'LOC'}}->{'CALL_ARGUMENTS'}->[$idx2];
-                            if (not exists $funcs{$real_target}) {
-                              my %info = ();
-                              $info{'P'} = $tr_info->{'PARENT'};
-                              $info{'PCL'} = $tr_info->{'LOC'};
-                              $info{'RT'} = $real_target;
-                              push @trace_real_target, \%info;
-                            } else {
-                              if (not exists $defined_func{$real_target}) {
-                                push @new_call_stack, $real_target;
-                                my %p_info = ();
-                                $defined_func{$real_target} = \%p_info;
-                                if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
-                                  $has_foreign_call = 1;
+            foreach my $pi (keys %{$defined_func{$c}}) {
+              my $current_pi = $pi."_".$c."_loc$e";
+              my @label_info = ();
+              foreach my $elem (@{$defined_func{$c}->{$pi}}) {
+                push @label_info, $elem;
+              }
+              my %entry_info = ();
+              $entry_info{'FUNC'} = $c;
+              $entry_info{'LOC'} = $e;
+              push @label_info, \%entry_info;
+              $defined_func{$call_target}->{$current_pi} = \@label_info;
+              # FIXME: simplify duplicated mark actions
+              if (exists $funcs{$call_target}->{'IS_FOREIGN'}) {
+                foreach my $i (@label_info) {
+                  $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+                }
+              }
+            }
+          } elsif (&FuncNameIsForeign($call_target)) {
+            # Skip if the call target is a function pointer parameter of the caller ($c)
+            my $is_param = 0;
+            if (exists $funcs{$c}) {
+              foreach my $idx (0 .. $#{$funcs{$c}->{'SCALAR_ARGS'}}) {
+                my $arg = $funcs{$c}->{'SCALAR_ARGS'}->[$idx];
+                if ($arg->{'VAR_NAME'} eq $call_target) {
+                  $is_param = 1;
+                  foreach my $pi (keys %{$defined_func{$c}}) {
+                    my $parent_func = $defined_func{$c}->{$pi}->[$#{$defined_func{$c}->{$pi}}]->{'FUNC'};
+                    my $parent_call_loc = $defined_func{$c}->{$pi}->[$#{$defined_func{$c}->{$pi}}]->{'LOC'};
+                    my $real_target = $funcs{$parent_func}->{'CALLS'}->{$parent_call_loc}->{'CALL_ARGUMENTS'}->[$idx];
+                    if (not exists $funcs{$real_target}) {
+                      my @trace_real_target = ();
+                      my %info = ();
+                      $info{'P'} = $parent_func;
+                      $info{'PCL'} = $parent_call_loc;
+                      $info{'RT'} = $real_target;
+                      push @trace_real_target, \%info;
+                      while (@trace_real_target > 0) {
+                        my $entry = pop @trace_real_target;
+                        die "" if (not exists $trace_parent_call_loc{$entry->{'P'}});
+                        foreach my $tr_info (@{$trace_parent_call_loc{$entry->{'P'}}}) {
+                          die "" if (not exists $funcs{$tr_info->{'PARENT'}}->{'CALLS'}->{$tr_info->{'LOC'}});
+                          my $scan_func = $funcs{$tr_info->{'PARENT'}}->{'CALLS'}->{$tr_info->{'LOC'}}->{'CALL_TARGET'};
+                          die "" if (not exists $funcs{$scan_func});
+                          foreach my $idx2 (0 .. $#{$funcs{$scan_func}->{'SCALAR_ARGS'}}) {
+                            my $arg = $funcs{$scan_func}->{'SCALAR_ARGS'}->[$idx2];
+                            if ($arg->{'VAR_NAME'} eq $entry->{'RT'}) {
+                              $real_target = $funcs{$tr_info->{'PARENT'}}->{'CALLS'}->{$tr_info->{'LOC'}}->{'CALL_ARGUMENTS'}->[$idx2];
+                              if (not exists $funcs{$real_target}) {
+                                my %info = ();
+                                $info{'P'} = $tr_info->{'PARENT'};
+                                $info{'PCL'} = $tr_info->{'LOC'};
+                                $info{'RT'} = $real_target;
+                                push @trace_real_target, \%info;
+                              } else {
+                                if (not exists $defined_func{$real_target}) {
+                                  push @new_call_stack, $real_target;
+                                  my %p_info = ();
+                                  $defined_func{$real_target} = \%p_info;
+                                  if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
+                                    $has_foreign_call = 1;
+                                  }
                                 }
-                              }
-                              my $current_pi = $pi."_".$c."_loc$e";
-                              my @label_info = ();
-                              foreach my $elem (@{$defined_func{$c}->{$pi}}) {
-                                push @label_info, $elem;
-                              }
-                              my %entry_info = ();
-                              $entry_info{'FUNC'} = $c;
-                              $entry_info{'LOC'} = $e;
-                              push @label_info, \%entry_info;
-                              $defined_func{$real_target}->{$current_pi} = \@label_info;
-                              # FIXME: simplify duplicated mark actions
-                              if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
-                                foreach my $i (@label_info) {
-                                  $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+                                my $current_pi = $pi."_".$c."_loc$e";
+                                my @label_info = ();
+                                foreach my $elem (@{$defined_func{$c}->{$pi}}) {
+                                  push @label_info, $elem;
+                                }
+                                my %entry_info = ();
+                                $entry_info{'FUNC'} = $c;
+                                $entry_info{'LOC'} = $e;
+                                push @label_info, \%entry_info;
+                                $defined_func{$real_target}->{$current_pi} = \@label_info;
+                                # FIXME: simplify duplicated mark actions
+                                if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
+                                  foreach my $i (@label_info) {
+                                    $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+                                  }
                                 }
                               }
                             }
                           }
                         }
                       }
-                    }
-                  } else {
-                    if (not exists $defined_func{$real_target}) {
-                      push @new_call_stack, $real_target;
-                      my %p_info = ();
-                      $defined_func{$real_target} = \%p_info;
-                      if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
-                        $has_foreign_call = 1;
+                    } else {
+                      if (not exists $defined_func{$real_target}) {
+                        push @new_call_stack, $real_target;
+                        my %p_info = ();
+                        $defined_func{$real_target} = \%p_info;
+                        if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
+                          $has_foreign_call = 1;
+                        }
                       }
-                    }
-                    my $current_pi = $pi."_".$c."_loc$e";
-                    my @label_info = ();
-                    foreach my $elem (@{$defined_func{$c}->{$pi}}) {
-                      push @label_info, $elem;
-                    }
-                    my %entry_info = ();
-                    $entry_info{'FUNC'} = $c;
-                    $entry_info{'LOC'} = $e;
-                    push @label_info, \%entry_info;
-                    $defined_func{$real_target}->{$current_pi} = \@label_info;
-                    # FIXME: simplify duplicated mark actions
-                    if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
-                      foreach my $i (@label_info) {
-                        $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+                      my $current_pi = $pi."_".$c."_loc$e";
+                      my @label_info = ();
+                      foreach my $elem (@{$defined_func{$c}->{$pi}}) {
+                        push @label_info, $elem;
+                      }
+                      my %entry_info = ();
+                      $entry_info{'FUNC'} = $c;
+                      $entry_info{'LOC'} = $e;
+                      push @label_info, \%entry_info;
+                      $defined_func{$real_target}->{$current_pi} = \@label_info;
+                      # FIXME: simplify duplicated mark actions
+                      if (exists $funcs{$real_target}->{'IS_FOREIGN'}) {
+                        foreach my $i (@label_info) {
+                          $funcs{$i->{'FUNC'}}->{'IS_FOREIGN'} = 1;
+                        }
                       }
                     }
                   }
+                  last;
                 }
-                last;
               }
             }
-          }
-          if (!$is_param) {
-            $foreign_calls{$call_target} = &get_func_return_type($call_target);
+            if (!$is_param) {
+              $foreign_calls{$call_target} = &get_func_return_type($call_target);
+            }
           }
         }
       }
