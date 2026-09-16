@@ -2304,6 +2304,7 @@ END
             if ($epilog ne "") {
               $body = $body."}\n";
             }
+            $body = $body."}\n";
             $current_pos = $func_ptr->{'RETURNS'}->{$e}->{'EXPR_STOP'} + 2;
           }
         } else {
