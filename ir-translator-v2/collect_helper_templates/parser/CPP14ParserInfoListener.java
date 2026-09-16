@@ -2502,7 +2502,43 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitParameterDeclaration(CPP14Parser.ParameterDeclarationContext ctx) { }
+	@Override public void exitParameterDeclaration(CPP14Parser.ParameterDeclarationContext ctx) {
+          if (ctx.attributeSpecifierSeq() == null && ctx.declSpecifierSeq() != null && ctx.declarator() != null && ctx.initializerClause() == null) {
+            if (ctx.declSpecifierSeq().declSpecifier(0) != null && ctx.declSpecifierSeq().declSpecifier(0) instanceof CPP14Parser.DsTypeContext) {
+              CPP14Parser.DsTypeContext dsTypeCtx = (CPP14Parser.DsTypeContext)ctx.declSpecifierSeq().declSpecifier(0);
+              if (dsTypeCtx.typeSpecifier() != null && dsTypeCtx.typeSpecifier() instanceof CPP14Parser.TsTrailingContext) {
+                CPP14Parser.TsTrailingContext ttc = (CPP14Parser.TsTrailingContext)dsTypeCtx.typeSpecifier();
+                if (ttc.trailingTypeSpecifier() != null && ttc.trailingTypeSpecifier() instanceof CPP14Parser.TtsSimpleTypeContext) {
+                  CPP14Parser.TtsSimpleTypeContext tts = (CPP14Parser.TtsSimpleTypeContext)ttc.trailingTypeSpecifier();
+                  if (tts.simpleTypeSpecifier() != null && tts.simpleTypeSpecifier() instanceof CPP14Parser.StTypeNameContext) {
+                    CPP14Parser.StTypeNameContext stc = (CPP14Parser.StTypeNameContext)tts.simpleTypeSpecifier();
+                    if (stc.nestedNameSpecifier() == null && stc.theTypeName() != null && stc.theTypeName() instanceof CPP14Parser.TnClassContext) {
+                      CPP14Parser.TnClassContext tnc = (CPP14Parser.TnClassContext)stc.theTypeName();
+                      if (tnc.className() != null && tnc.className() instanceof CPP14Parser.ClassNameIDContext) {
+
+                        if (ctx.declarator() instanceof CPP14Parser.PdContext) {
+                          CPP14Parser.PdContext pdc = (CPP14Parser.PdContext)ctx.declarator();
+                          if (pdc.pointerDeclarator() != null && pdc.pointerDeclarator().pointerOperator(0) == null && pdc.pointerDeclarator().noPointerDeclarator() != null && pdc.pointerDeclarator().noPointerDeclarator() instanceof CPP14Parser.Npd3Context) {
+                            CPP14Parser.Npd3Context npd3c = (CPP14Parser.Npd3Context)pdc.pointerDeclarator().noPointerDeclarator();
+                            if (npd3c.pointerDeclarator() != null && npd3c.pointerDeclarator().pointerOperator(0) == null && npd3c.pointerDeclarator().noPointerDeclarator() instanceof CPP14Parser.Npd1Context) {
+                              CPP14Parser.Npd1Context npd1c = (CPP14Parser.Npd1Context)npd3c.pointerDeclarator().noPointerDeclarator();
+                              if (npd1c.attributeSpecifierSeq() == null && npd1c.declaratorid().Ellipsis() == null && npd1c.declaratorid().idExpression() instanceof CPP14Parser.UqiContext) {
+                                CPP14Parser.UqiContext uqc = (CPP14Parser.UqiContext)npd1c.declaratorid().idExpression();
+                                if (uqc.unqualifiedId() instanceof CPP14Parser.UID1Context || uqc.unqualifiedId() instanceof CPP14Parser.UIDEnvContext) {
+                                  System.out.println("<FUNCTION_CALL5>$$NAME_BEGIN:" + Integer.toString(stc.getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(stc.getStop().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(npd3c.LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(npd3c.RightParen().getSymbol().getStopIndex()));
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
 	/**
 	 * {@inheritDoc}
 	 *

@@ -309,9 +309,24 @@ endef
 
 # fpu_helper.c
 preprocess-extract-fpu: capture-command-fpu
-	$(eval _PP_OBJ := $(PREPROCESSED_OBJ_FPU))
-	$(eval _PP_LOG := $(BUILD_LOG_FPU))
-	cd $(QEMU_BUILD) && $(_PREPROCESS_SCRIPT)
+	@cd $(QEMU_BUILD) && \
+		_PP_LOG='$(BUILD_LOG_FPU)' _PP_OBJ='$(PREPROCESSED_OBJ_FPU)' \
+		QEMU_TOP='$(QEMU_TOP)' QEMU_BUILD='$(QEMU_BUILD)' \
+		sh -c 'set -e; \
+echo "Extracting clang command from $$_PP_LOG"; \
+raw=$$(grep -E "\bclang\b" "$$_PP_LOG" | grep -E -- "-c[[:space:]]+\S+\.c(\s|$$)" | tail -n 1); \
+[ -z "$$raw" ] && { echo "ERROR: no clang command found"; tail -n 40 "$$_PP_LOG"; exit 1; }; \
+cmd=$$(echo "$$raw" | sed -E "s#^[[:space:]]*\[[0-9]+/[0-9]+\][[:space:]]*##"); \
+echo "$$cmd" > /tmp/cmd_before.txt; \
+modified=$$(echo "$$cmd" | sed -E \
+  -e "s#(^| )-c( |$$)#\1-E\2#g" \
+  -e "s#(^| )-E -E( |$$)#\1-E\2#g" \
+  -e "s#( -o[[:space:]]+[^[:space:]]*)\.c\.o(\.E)?([[:space:]])#\1.c.o.E\3#g" \
+  -e "s#(-Ilib(qemu-[^[:space:]]+|user)\.a\.p)([[:space:]])#\1\2 -I$$QEMU_TOP/accel/tcg #g"); \
+echo "$$modified" > /tmp/cmd_after.txt; \
+[ "$$cmd" = "$$modified" ] && { echo "ERROR: rewrite did not match"; exit 1; }; \
+eval "$$modified"; \
+[ -f "$$_PP_OBJ.E" ] && echo "SUCCESS: $$QEMU_BUILD/$$_PP_OBJ.E" || { echo "ERROR: .E not produced"; exit 1; }'
 
 # tcg-runtime.c
 preprocess-extract-tcg-runtime: capture-command-tcg-runtime
