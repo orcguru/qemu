@@ -195,7 +195,7 @@ prepend-softfloat:
 	else \
 		echo "Prepending $(QEMU_FPU_DIR)/softfloat.c to $(QEMU_FPU_HELPER) ..."; \
 		cp -f $(QEMU_FPU_HELPER) $(QEMU_FPU_HELPER).orig; \
-		cat $(QEMU_FPU_DIR)/softfloat.c $(QEMU_FPU_HELPER).orig > $(QEMU_FPU_HELPER); \
+		cat $(QEMU_TOP)/accel/tcg/user-exec.c $(QEMU_FPU_DIR)/softfloat.c $(QEMU_FPU_HELPER).orig > $(QEMU_FPU_HELPER); \
 		touch $(SOFTFLOAT_MARKER); \
 		echo "done (original saved as fpu_helper.c.orig)."; \
 	fi
