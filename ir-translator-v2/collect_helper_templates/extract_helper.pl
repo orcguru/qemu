@@ -294,16 +294,21 @@ while (<FD>) {
   my $line = $_;
   chomp($line);
   if ($line =~ /^<FUNCTION_CALL[0-9]*>/) {
-    my @fields = split(/\$\$/, $line);
+    my @fc_fields = split(/\$\$/, $line);
     my %info = ();
-    my @f1 = split(/:/, $fields[1]);
-    my @f2 = split(/:/, $fields[2]);
-    my @f3 = split(/:/, $fields[3]);
-    my @f4 = split(/:/, $fields[4]);
+    my @f1 = split(/:/, $fc_fields[1]);
+    my @f2 = split(/:/, $fc_fields[2]);
+    my @f3 = split(/:/, $fc_fields[3]);
+    my @f4 = split(/:/, $fc_fields[4]);
     $info{'TYPE'} = "CALL";
     $info{'NAME_START'} = $f1[1];
     if (exists $function_def_at_name_start{$info{'NAME_START'}}) {
       next;
+    }
+    my @comma_list = ();
+    foreach my $i (5 .. $#fc_fields) {
+      my @misc = split(/:/, $fc_fields[$i]);
+      push @comma_list, $misc[1];
     }
     $info{'NAME_STOP'} = $f2[1];
     $info{'PAREN_START'} = $f3[1];
@@ -418,10 +423,23 @@ while (<FD>) {
           $info{'CALL_TARGET'} = $prev_generic_func;
         }
     }
-    my $str = &GetText($info{'PAREN_START'} + 1, $info{'PAREN_STOP'} - 1);
-    my ($args, $ranges) = &ExtractCallArguments($str, $info{'PAREN_START'} + 1, $info{'PAREN_STOP'} - 1);
-    $info{'CALL_ARGUMENTS'} = $args;
-    $info{'CALL_ARGUMENT_RANGES'} = $ranges;
+    my $pos_start = $info{'PAREN_START'};
+    push @comma_list, $info{'PAREN_STOP'};
+    my @ca = ();
+    $info{'CALL_ARGUMENTS'} = \@ca;
+    my @car = ();
+    $info{'CALL_ARGUMENT_RANGES'} = \@car;
+    foreach my $pos_stop (@comma_list) {
+      my $argument_str = &GetText($pos_start + 1, $pos_stop - 1);
+      $argument_str =~ s/^\s*//;
+      $argument_str =~ s/\s*$//;
+      push @ca, $argument_str;
+      my %ca_info = ();
+      $ca_info{'START'} = $pos_start + 1;
+      $ca_info{'STOP'} = $pos_stop - 1;
+      push @car, \%ca_info;
+      $pos_start = $pos_stop;
+    }
     my ($func_idx, $ptr) = &lookup($info{'NAME_START'}, \%func_lookup);
     if ($func_idx != -1) {
       $info{'PARENT'} = $ptr->{'NAME'};
@@ -438,7 +456,7 @@ while (<FD>) {
         if (!$is_param) {
           $info{'IS_FOREIGN'} = 1;
           $funcs{$ptr->{'NAME'}}->{'IS_FOREIGN'} = 1;
-          foreach my $a (@{$args}) {
+          foreach my $a (@ca) {
             if ($a =~ /^\s*env\s*$/) {
               $ptr->{'DO_DEFINE_ENV'} = 1;
             }
@@ -696,7 +714,7 @@ foreach my $f (keys %funcs) {
     my @caller_arg_vectors = ();
     foreach my $v (@vectors) {
       my $caller_idx = &get_vec_arg_idx($caller, $v);
-      die "Check $caller->{'NAME'} vector call $callee->{'NAME'}\n" if ($caller_idx == -1);
+      die "Check $caller->{'NAME'} vector call $callee->{'NAME'} $v\n" if ($caller_idx == -1);
       push @caller_arg_vectors, $caller_idx;
     }
     $i->{'CALLER_ARG_VECTORS'} = \@caller_arg_vectors;
@@ -1409,7 +1427,7 @@ EOF
       # Since compiler requires that __attribute__((cleanup)) target function should take exactly one argument,
       # the trigger_exception hack is not working
       print "PLEASE MANUALLY INSPECT AND CHECK $func_name\n";
-      $new_func = "static inline void __attribute__((qemuaot)) __attribute__((always_inline,weak)) $func_name(void *unused)\n{}\n\n";
+      $new_func = "static inline void __attribute__((qemuaot)) __attribute__((always_inline)) $func_name(void *unused)\n{}\n\n";
     } else {
       $new_func = &gen_replicated_func($func_name, \%defined_func, $f, \%foreign_calls, \%order_to_func);
     }
@@ -2701,145 +2719,6 @@ sub collect_func_args
   }
   $args =~ s/^,\s+//;
   return $args;
-}
-
-# There could be function call within arguments
-sub ExtractCallArguments
-{
-  my ($input, $start_idx, $stop_idx) = @_;
-  my @output = ();
-  my @comma_split_fields = split(/,/, $input);
-  my @size_cnt = ();
-  foreach my $csf (@comma_split_fields) {
-    my @sub_fields = split(//, $csf);
-    my $cnt = @sub_fields;
-    push @size_cnt, $cnt;
-  }
-  my @range = ();
-  my $range_start = $start_idx;
-  my $comma_cnt = 0;
-  my $comma_start = 0;
-  $input =~ s/\n/ /g;
-  $input =~ s/^\s*//;
-  $input =~ s/\s*$//;
-  my @chars = split(//, $input);
-  my $idx = 0;
-  while ($idx <= $#chars) {
-    my $start_idx = $idx;
-    while (&IsValidSymbolStart($chars[$idx]) == 0) {
-      $idx = $idx + 1;
-      if ($idx > $#chars) {
-        last;
-      }
-    }
-    if ($idx > $#chars) {
-      my @elems = @chars[$start_idx..$#chars];
-      my $elem = join("", @elems);
-      $elem =~ s/^\s+//;
-      $elem =~ s/\s+$//;
-      push @output, $elem;
-      my %r_info = ();
-      $r_info{'START'} = $range_start;
-      $r_info{'STOP'} = $stop_idx;
-      push @range, \%r_info;
-      last;
-    }
-    my ($sym, $sym_start, $sym_stop) = &GetSymbol(\@chars, $idx, 0);
-    $idx = $sym_stop + 1;
-    if ($idx > $#chars) {
-      my @elems = @chars[$start_idx..$#chars];
-      my $elem = join("", @elems);
-      $elem =~ s/^\s+//;
-      $elem =~ s/\s+$//;
-      push @output, $elem;
-      my %r_info = ();
-      $r_info{'START'} = $range_start;
-      $r_info{'STOP'} = $stop_idx;
-      push @range, \%r_info;
-      last;
-    }
-    while (1) {
-      while ($chars[$idx] ne "(" and $chars[$idx] ne "{" and $chars[$idx] ne ",") {
-        $idx = $idx + 1;
-        if ($idx > $#chars) {
-          last;
-        }
-      }
-      if ($idx > $#chars) {
-        my @elems = @chars[$start_idx..$#chars];
-        my $elem = join("", @elems);
-        $elem =~ s/^\s+//;
-        $elem =~ s/\s+$//;
-        push @output, $elem;
-        my %r_info = ();
-        $r_info{'START'} = $range_start;
-        $r_info{'STOP'} = $stop_idx;
-        push @range, \%r_info;
-        last;
-      }
-      if ($chars[$idx] eq "(") {
-        my $cnt = 1;
-        while ($cnt != 0) {
-          $idx = $idx + 1;
-          die "" if ($idx > $#chars);
-          if ($chars[$idx] eq "(") {
-            $cnt = $cnt + 1;
-          } elsif ($chars[$idx] eq ")") {
-            $cnt = $cnt - 1;
-          } elsif ($chars[$idx] eq ",") {
-            $comma_cnt = $comma_cnt + 1;
-          }
-        }
-      } elsif ($chars[$idx] eq "{") {
-        my $cnt = 1;
-        while ($cnt != 0) {
-          $idx = $idx + 1;
-          die "" if ($idx > $#chars);
-          if ($chars[$idx] eq "{") {
-            $cnt = $cnt + 1;
-          } elsif ($chars[$idx] eq "}") {
-            $cnt = $cnt - 1;
-          } elsif ($chars[$idx] eq ",") {
-            $comma_cnt = $comma_cnt + 1;
-          }
-        }
-      } elsif ($chars[$idx] eq ",") {
-        my @elems = @chars[$start_idx..($idx-1)];
-        my $elem = join("", @elems);
-        $elem =~ s/^\s+//;
-        $elem =~ s/\s+$//;
-        push @output, $elem;
-        my %r_info = ();
-        $r_info{'START'} = $range_start;
-        my $total_size_cnt = 0;
-        foreach my $cc ($comma_start..$comma_cnt) {
-          $total_size_cnt = $total_size_cnt + $size_cnt[$cc];
-        }
-        $total_size_cnt = $total_size_cnt + ($comma_cnt - $comma_start);
-        $r_info{'STOP'} = $range_start + $total_size_cnt - 1;
-        push @range, \%r_info;
-        $comma_start = $comma_cnt + 1;
-        $range_start = $r_info{'STOP'} + 2;
-        last;
-      } else {
-        die "";
-      }
-    }
-    if ($idx > $#chars) {
-      last;
-    }
-    if ($chars[$idx] eq ",") {
-      $comma_cnt = $comma_cnt + 1;
-      $idx = $idx + 1;
-    }
-    while ($idx <= $#chars and $chars[$idx] =~ /\s/) {
-      $idx = $idx + 1;
-    }
-    if ($idx > $#chars) {
-      last;
-    }
-  }
-  return (\@output, \@range);
 }
 
 sub IsValidSymbolStart
