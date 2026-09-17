@@ -2322,7 +2322,7 @@ sub get_statements
       if ($func_ptr->{'128'}->{'RETURN128'} ne "") {
         die "" if $func_ptr->{'HELPER_INTERFACE'};
         my $sub_str = &GetText($e, $ret_info->{'EXPR_START'}-1);
-        $body = $body.$sub_str."(v2ulong)";
+        $body = $body.$sub_str."(v2ulong)(__uint128_t)";
         $current_pos = $ret_info->{'EXPR_START'};
       } elsif ($func_ptr->{'HELPER_INTERFACE'}) {
         if (exists $func_ptr->{'IS_FOREIGN'}) {
