@@ -1257,7 +1257,7 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
                               CPP14Parser.Npd1Context npd1c = (CPP14Parser.Npd1Context)npd3c.pointerDeclarator().noPointerDeclarator();
                               if (npd1c.attributeSpecifierSeq() == null && npd1c.declaratorid().Ellipsis() == null && npd1c.declaratorid().idExpression() instanceof CPP14Parser.UqiContext) {
                                 CPP14Parser.UqiContext uqc = (CPP14Parser.UqiContext)npd1c.declaratorid().idExpression();
-                                if (uqc.unqualifiedId() instanceof CPP14Parser.UID1Context) {
+                                if (uqc.unqualifiedId() instanceof CPP14Parser.UID1Context || uqc.unqualifiedId() instanceof CPP14Parser.UIDEnvContext) {
                                   System.out.println("<FUNCTION_CALL3>$$NAME_BEGIN:" + Integer.toString(stc.getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(stc.getStop().getStopIndex()) + "$$PAREN_BEGIN:" + Integer.toString(npd3c.LeftParen().getSymbol().getStartIndex()) + "$$PAREN_END:" + Integer.toString(npd3c.RightParen().getSymbol().getStopIndex()));
                                 }
                               }
@@ -2135,7 +2135,11 @@ public class CPP14ParserInfoListener implements CPP14ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitAttribute(CPP14Parser.AttributeContext ctx) { }
+	@Override public void exitAttribute(CPP14Parser.AttributeContext ctx) {
+          if (ctx.Identifier().getSymbol().getText().equals("cleanup") && ctx.attributeArgumentClause() != null && ctx.attributeArgumentClause().balancedTokenSeq() != null) {
+            System.out.println("<ATTRIBUTE_CLEANUP>$$NAME_BEGIN:" + Integer.toString(ctx.attributeArgumentClause().balancedTokenSeq().getStart().getStartIndex()) + "$$NAME_END:" + Integer.toString(ctx.attributeArgumentClause().balancedTokenSeq().getStop().getStopIndex()));
+          }
+        }
 	/**
 	 * {@inheritDoc}
 	 *

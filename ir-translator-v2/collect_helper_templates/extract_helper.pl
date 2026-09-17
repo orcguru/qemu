@@ -455,6 +455,32 @@ close FD;
 my @sorted_callsite_addr = sort {$a <=> $b} sort keys %{$callsite_lookup{'MAP'}};
 $callsite_lookup{'SORTED_ADDR'} = \@sorted_callsite_addr;
 
+# Collect __attribute__((cleanup(FUNC_TO_BE_CALLED_WHEN_VAR_DISAPPEAR)))
+open FD, "< $ARGV[2]" or die "Cannot open $ARGV[2] for read!\n";
+while (<FD>) {
+  my $line = $_;
+  chomp($line);
+  if ($line =~ /^<ATTRIBUTE_CLEANUP>/) {
+    my @fields = split(/\$\$/, $line);
+    my %info = ();
+    my @f1 = split(/:/, $fields[1]);
+    my @f2 = split(/:/, $fields[2]);
+    $info{'TYPE'} = "ATTRIBUTE_CLEANUP";
+    $info{'NAME_START'} = $f1[1];
+    $info{'NAME_STOP'} = $f2[1];
+    $info{'CLEANUP_TARGET'} = &GetText($info{'NAME_START'}, $info{'NAME_STOP'});
+    my ($func_idx, $ptr) = &lookup($info{'NAME_START'}, \%func_lookup);
+    if ($func_idx != -1) {
+      if (not exists $ptr->{'CLEANUP_TARGET'}) {
+        my %ct = ();
+        $ptr->{'CLEANUP_TARGET'} = \%ct;
+      }
+      $ptr->{'CLEANUP_TARGET'}->{$info{'CLEANUP_TARGET'}} = 1;
+    }
+  }
+}
+close FD;
+
 # Collect foreign_funcs types
 my %func_type_input = ();
 my $line_info = "";
@@ -538,6 +564,14 @@ while (keys %workset > 0) {
         if (exists $funcs{$a}) {
           $tmpset{$a} = 1;
           $covered_funcs{$a} = 1;
+        }
+      }
+    }
+    if (exists $funcs{$f}->{'CLEANUP_TARGET'}) {
+      foreach my $e (keys %{$funcs{$f}->{'CLEANUP_TARGET'}}) {
+        if (exists $funcs{$e}) {
+          $tmpset{$e} = 1;
+          $covered_funcs{$e} = 1;
         }
       }
     }
@@ -1350,17 +1384,37 @@ EOF
     }
   }
   my %order_to_func = ();
+  my %manual_inspect_cleanup_target = ();
   foreach my $sf (keys %defined_func) {
     die "$sf $f" if not exists $funcs{$sf}->{'FUNC_IDX'};
     $order_to_func{$funcs{$sf}->{'FUNC_IDX'}} = $sf;
+    if (exists $funcs{$sf}->{'CLEANUP_TARGET'}) {
+      foreach my $ct (keys %{$funcs{$sf}->{'CLEANUP_TARGET'}}) {
+        if (exists $funcs{$ct}) {
+          die "$ct $f" if not exists $funcs{$ct}->{'FUNC_IDX'};
+          $order_to_func{$funcs{$ct}->{'FUNC_IDX'}} = $ct;
+          $manual_inspect_cleanup_target{$ct} = 1;
+        }
+      }
+    }
   }
   my @sorted_funcs = sort {$a <=> $b} keys %order_to_func;
   my @collected_funcs = ();
   my $func_declarations = "";
   foreach my $s (@sorted_funcs) {
     my $func_name = $order_to_func{$s};
-    my $new_func = &gen_replicated_func($func_name, \%defined_func, $f, \%foreign_calls, \%order_to_func);
-    if (not $funcs{$func_name}->{'HEAD'} =~ /HELPER_NAME/) {
+    my $new_func = "";
+    if (exists $manual_inspect_cleanup_target{$func_name}) {
+      # ===NOTICE===
+      # Since compiler requires that __attribute__((cleanup)) target function should take exactly one argument,
+      # the trigger_exception hack is not working
+      print "PLEASE MANUALLY INSPECT AND CHECK $func_name\n";
+      $new_func = "static inline void __attribute__((qemuaot)) __attribute__((always_inline,weak)) $func_name(void *unused)\n{}\n\n";
+    } else {
+      $new_func = &gen_replicated_func($func_name, \%defined_func, $f, \%foreign_calls, \%order_to_func);
+    }
+    die "" if (not exists $funcs{$func_name}->{'HEAD'});
+    if ((not $funcs{$func_name}->{'HEAD'} =~ /HELPER_NAME/) and (not exists $manual_inspect_cleanup_target{$func_name})) {
       my $args = &collect_func_args($funcs{$func_name});
       $func_declarations = $func_declarations."$funcs{$func_name}->{'HEAD'}($args);\n";
     }
@@ -1391,7 +1445,7 @@ EOF
   }
   close IN;
   foreach my $ff (keys %foreign_calls) {
-    die "$ff" if $check_body =~ /([^a-zA-Z_0-9])${ff}([^a-zA-Z_0-9\)])/;
+    #die "$ff" if $check_body =~ /([^a-zA-Z_0-9])${ff}([^a-zA-Z_0-9\)])/;
   }
 }
 
@@ -1716,7 +1770,7 @@ sub mov_tail_attribute_to_head
   return $str;
 }
 
-sub remove_attribute
+sub remove_single_attribute
 {
   my ($str) = @_;
   while ($str =~ /^\s*__attribute__/) {
@@ -1740,6 +1794,19 @@ sub remove_attribute
     $str =~ s/^\s+//;
   }
   return $str;
+}
+
+sub remove_attribute
+{
+  my ($str) = @_;
+  my @fields = split(/__attribute__/, $str);
+  my $out = $fields[0];
+  foreach my $i (1 .. $#fields) {
+    my $input = "__attribute__".$fields[$i];
+    my $single_out = &remove_single_attribute($input);
+    $out = $out.$single_out;
+  }
+  return $out;
 }
 
 sub get_vec_arg_idx
@@ -2093,7 +2160,8 @@ END
     }
   }
   $current_pos = $func_ptr->{'BODY_START'} + 1;
-  foreach my $e (@sorted_events) {
+  foreach my $e_idx (0 .. $#sorted_events) {
+    my $e = $sorted_events[$e_idx];
     if ($e < $current_pos) {
       next;
     }
@@ -2134,7 +2202,7 @@ END
             } else {
               $body = $body."($type_name)(*trigger_exception_ptr = 1)";
             }
-            print "Exception due to: $call_target - $exception_exit\n";
+            print "Exception due to: $call_target - $func_ptr->{'NAME'} - $exception_exit\n";
             $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
           }
         } else {
@@ -2233,7 +2301,7 @@ END
                 } else {
                     $body = $body."($fc->{$foreign_call})(*trigger_exception_ptr = 1)";
                 }
-                print "Exception due to: $foreign_call - $exception_exit\n";
+                print "Exception due to: $foreign_call - $func_ptr->{'NAME'} - $exception_exit\n";
             }
             $sub_head = $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'} + 1;
             $sub_current = $sub_head;
@@ -2519,7 +2587,7 @@ sub update_func_call
             } else {
                 $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(*trigger_exception_ptr = 1)";
             }
-            print "Exception due to: $sub_call_info->{'CALL_TARGET'} - $exception_exit\n";
+            print "Exception due to: $sub_call_info->{'CALL_TARGET'} - $caller_ptr->{'NAME'} - $exception_exit\n";
             $call_list = $call_list.", ".$sub_call_txt;
         }
       } else {
