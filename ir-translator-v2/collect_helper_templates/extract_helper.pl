@@ -1463,7 +1463,7 @@ EOF
   }
   close IN;
   foreach my $ff (keys %foreign_calls) {
-    #die "$ff" if $check_body =~ /([^a-zA-Z_0-9])${ff}([^a-zA-Z_0-9\)])/;
+    die "DIE $ff" if $check_body =~ /([^a-zA-Z_0-9])${ff}([^a-zA-Z_0-9\)])/;
   }
 }
 
@@ -2089,95 +2089,64 @@ sub add_context_backup
   return $new_func_body;
 }
 
-sub get_func_body
+sub get_statements
 {
-  my ($func_ptr, $pi, $md, $exception_exit, $fc) = @_;
-
-  my $prolog = "";
-  my $epilog = "";
-  if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
-    foreach my $vec_idx (0..$#{$func_ptr->{'VECTOR_ARGS'}}) {
-      my $arg_entry = $func_ptr->{'VECTOR_ARGS'}->[$vec_idx];
-      $prolog = $prolog."v4ulong $arg_entry->{'VAR_NAME'};\n";
-      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[0] = $arg_entry->{'VAR_NAME'}x[0];\n";
-      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[1] = $arg_entry->{'VAR_NAME'}x[1];\n";
-      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[2] = $arg_entry->{'VAR_NAME'}y[0];\n";
-      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[3] = $arg_entry->{'VAR_NAME'}y[1];\n";
-      $epilog = "$arg_entry->{'VAR_NAME'}x[0] = $arg_entry->{'VAR_NAME'}"."[0];\n".$epilog;
-      $epilog = "$arg_entry->{'VAR_NAME'}x[1] = $arg_entry->{'VAR_NAME'}"."[1];\n".$epilog;
-      $epilog = "$arg_entry->{'VAR_NAME'}y[0] = $arg_entry->{'VAR_NAME'}"."[2];\n".$epilog;
-      $epilog = "$arg_entry->{'VAR_NAME'}y[1] = $arg_entry->{'VAR_NAME'}"."[3];\n".$epilog;
-    }
-  }
+  my ($func_ptr, $begin, $end, $epilog, $pi, $md, $exception_exit, $fc) = @_;
 
   my %events = ();
   foreach my $e (keys %{$func_ptr->{'CALLS'}}) {
-    $events{$e} = 1;
+    if ($e >= $begin and $e < $end) {
+      $events{$e} = 1;
+    }
   }
   foreach my $e (keys %{$func_ptr->{'VEC'}}) {
-    $events{$e} = 1;
+    if ($e >= $begin and $e < $end) {
+      $events{$e} = 1;
+    }
   }
   foreach my $e (keys %{$func_ptr->{'VEC_VAR'}}) {
-    $events{$e} = 1;
+    if ($e >= $begin and $e < $end) {
+      $events{$e} = 1;
+    }
   }
   foreach my $e (keys %{$func_ptr->{'ENV'}}) {
-    $events{$e} = 1;
+    if ($e >= $begin and $e < $end) {
+      $events{$e} = 1;
+    }
   }
   foreach my $e (keys %{$func_ptr->{'VEC_ASSIGN'}}) {
-    $events{$e} = 1;
+    if ($e >= $begin and $e < $end) {
+      $events{$e} = 1;
+    }
   }
   foreach my $e (keys %{$func_ptr->{'VECX'}}) {
-    if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
-      $events{$func_ptr->{'VECX'}->{$e}->{'YMM_START'}} = 1;
-      # Dirty hack to add this event for later check
-      $func_ptr->{'VECX'}->{$func_ptr->{'VECX'}->{$e}->{'YMM_START'}} = $func_ptr->{'VECX'}->{$e};
-    } else {
-      $events{$func_ptr->{'VECX'}->{$e}->{'START'}} = 1;
+    if ($e >= $begin and $e < $end) {
+      if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
+        $events{$func_ptr->{'VECX'}->{$e}->{'YMM_START'}} = 1;
+        # Dirty hack to add this event for later check
+        $func_ptr->{'VECX'}->{$func_ptr->{'VECX'}->{$e}->{'YMM_START'}} = $func_ptr->{'VECX'}->{$e};
+      } else {
+        $events{$func_ptr->{'VECX'}->{$e}->{'START'}} = 1;
+      }
     }
   }
   foreach my $e (keys %{$func_ptr->{'RETURNS'}}) {
-    if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_EXPR") {
-      $events{$e} = 1;
+    if ($e >= $begin and $e < $end) {
+      if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_EXPR") {
+        $events{$e} = 1;
+      }
     }
   }
   if ($func_ptr->{'HELPER_INTERFACE'}) {
     foreach my $e (keys %{$func_ptr->{'RETURNS'}}) {
-      $events{$e} = 1;
+      if ($e >= $begin and $e < $end) {
+        $events{$e} = 1;
+      }
     }
   }
   my @sorted_events = sort {$a <=> $b} keys %events;
-  my $current_pos;
+  my $current_pos = $begin;
   my $body = "";
-  if (exists $func_ptr->{'DO_DEFINE_ENV'} and $func_ptr->{'NAME'} ne $exception_exit) {
-    $body = "{\n";
-    $body = $body."   $func_ptr->{'ENV_TYPE'} env;\n";
-    if ($arch_info eq "riscv64") {
-      $body = $body."   asm volatile (\"mv %0, x25\" : \"=r\" (env) : :);\n";
-    } else {
-      $body = $body."   asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
-    }
-  } else {
-    $body = "{\n";
-    if ($func_ptr->{'HELPER_INTERFACE'}) {
-      my $counter_def = <<~'END';
-#ifdef HELPER_COUNTERS
-#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
-    unsigned long env_val;
-    asm volatile ("mov %0, x25" : "=r" (env_val) : :);
-    unsigned long *helper1_cnt_ptr = (unsigned long *)(env_val - 88);
-    *helper1_cnt_ptr += 1;
-#elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
-    unsigned long env_val;
-    asm volatile ("mv %0, x25" : "=r" (env_val) : :);
-    unsigned long *helper1_cnt_ptr = (unsigned long *)(env_val - 88);
-    *helper1_cnt_ptr += 1;
-#endif
-#endif
-END
-      $body = $body.$counter_def;
-    }
-  }
-  $current_pos = $func_ptr->{'BODY_START'} + 1;
   foreach my $e_idx (0 .. $#sorted_events) {
     my $e = $sorted_events[$e_idx];
     if ($e < $current_pos) {
@@ -2230,7 +2199,7 @@ END
         if ($funcs{$call_target}->{'128'}->{'RETURN128'} ne "") {
           $body = $body."($funcs{$call_target}->{'128'}->{'RETURN128'})";
         }
-        my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi, $fc, $exception_exit);
+        my $call_txt = &update_func_call($func_ptr, $e, $funcs{$call_target}, $pi, $fc, $exception_exit, $md, $epilog);
         $body = $body.$call_txt;
         $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
       }
@@ -2293,7 +2262,7 @@ END
           if (exists $func_ptr->{'CALLS'}->{$sub_current} and exists $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}) {
             my $sub_str = &GetText($sub_head, ($sub_current-1));
             $body = $body.$sub_str;
-            my $func_call_str = &update_func_call($func_ptr, $sub_current, $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}, $pi, $fc, $exception_exit);
+            my $func_call_str = &update_func_call($func_ptr, $sub_current, $funcs{$func_ptr->{'CALLS'}->{$sub_current}->{'CALL_TARGET'}}, $pi, $fc, $exception_exit, $md, $epilog);
             $body = $body.$func_call_str;
             $sub_head = $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'} + 1;
             $sub_current = $sub_head;
@@ -2379,7 +2348,7 @@ END
             if ($got_is_foreign_call) {
               $body = $body."$func_ptr->{'RETURN_TYPE'} RET = ";
               my %empty = ();
-              my $func_call_str = &update_func_call($func_ptr, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $funcs{$call_target_name}, "", \%empty, $exception_exit);
+              my $func_call_str = &update_func_call($func_ptr, $func_ptr->{'RETURNS'}->{$e}->{'EXPR_START'}, $funcs{$call_target_name}, "", \%empty, $exception_exit, $md, $epilog);
               $body = $body.$func_call_str.";\n";
               $standalone_expr_for_ret = 1;
             }
@@ -2482,8 +2451,101 @@ END
       die "";
     }
   }
-  my $txt = &GetText($current_pos, $func_ptr->{'BODY_STOP'});
+  my $txt = &GetText($current_pos, $end);
   $body = $body.$txt;
+  return $body;
+}
+
+sub get_func_body
+{
+  my ($func_ptr, $pi, $md, $exception_exit, $fc) = @_;
+
+  my $prolog = "";
+  my $epilog = "";
+  if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
+    foreach my $vec_idx (0..$#{$func_ptr->{'VECTOR_ARGS'}}) {
+      my $arg_entry = $func_ptr->{'VECTOR_ARGS'}->[$vec_idx];
+      $prolog = $prolog."v4ulong $arg_entry->{'VAR_NAME'};\n";
+      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[0] = $arg_entry->{'VAR_NAME'}x[0];\n";
+      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[1] = $arg_entry->{'VAR_NAME'}x[1];\n";
+      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[2] = $arg_entry->{'VAR_NAME'}y[0];\n";
+      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[3] = $arg_entry->{'VAR_NAME'}y[1];\n";
+      $epilog = "$arg_entry->{'VAR_NAME'}x[0] = $arg_entry->{'VAR_NAME'}"."[0];\n".$epilog;
+      $epilog = "$arg_entry->{'VAR_NAME'}x[1] = $arg_entry->{'VAR_NAME'}"."[1];\n".$epilog;
+      $epilog = "$arg_entry->{'VAR_NAME'}y[0] = $arg_entry->{'VAR_NAME'}"."[2];\n".$epilog;
+      $epilog = "$arg_entry->{'VAR_NAME'}y[1] = $arg_entry->{'VAR_NAME'}"."[3];\n".$epilog;
+    }
+  }
+
+  my %events = ();
+  foreach my $e (keys %{$func_ptr->{'CALLS'}}) {
+    $events{$e} = 1;
+  }
+  foreach my $e (keys %{$func_ptr->{'VEC'}}) {
+    $events{$e} = 1;
+  }
+  foreach my $e (keys %{$func_ptr->{'VEC_VAR'}}) {
+    $events{$e} = 1;
+  }
+  foreach my $e (keys %{$func_ptr->{'ENV'}}) {
+    $events{$e} = 1;
+  }
+  foreach my $e (keys %{$func_ptr->{'VEC_ASSIGN'}}) {
+    $events{$e} = 1;
+  }
+  foreach my $e (keys %{$func_ptr->{'VECX'}}) {
+    if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
+      $events{$func_ptr->{'VECX'}->{$e}->{'YMM_START'}} = 1;
+      # Dirty hack to add this event for later check
+      $func_ptr->{'VECX'}->{$func_ptr->{'VECX'}->{$e}->{'YMM_START'}} = $func_ptr->{'VECX'}->{$e};
+    } else {
+      $events{$func_ptr->{'VECX'}->{$e}->{'START'}} = 1;
+    }
+  }
+  foreach my $e (keys %{$func_ptr->{'RETURNS'}}) {
+    if ($func_ptr->{'RETURNS'}->{$e}->{'TYPE'} eq "RETURN_EXPR") {
+      $events{$e} = 1;
+    }
+  }
+  if ($func_ptr->{'HELPER_INTERFACE'}) {
+    foreach my $e (keys %{$func_ptr->{'RETURNS'}}) {
+      $events{$e} = 1;
+    }
+  }
+  my @sorted_events = sort {$a <=> $b} keys %events;
+  my $current_pos;
+  my $body = "";
+  if (exists $func_ptr->{'DO_DEFINE_ENV'} and $func_ptr->{'NAME'} ne $exception_exit) {
+    $body = "{\n";
+    $body = $body."   $func_ptr->{'ENV_TYPE'} env;\n";
+    if ($arch_info eq "riscv64") {
+      $body = $body."   asm volatile (\"mv %0, x25\" : \"=r\" (env) : :);\n";
+    } else {
+      $body = $body."   asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
+    }
+  } else {
+    $body = "{\n";
+    if ($func_ptr->{'HELPER_INTERFACE'}) {
+      my $counter_def = <<~'END';
+#ifdef HELPER_COUNTERS
+#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
+    unsigned long env_val;
+    asm volatile ("mov %0, x25" : "=r" (env_val) : :);
+    unsigned long *helper1_cnt_ptr = (unsigned long *)(env_val - 88);
+    *helper1_cnt_ptr += 1;
+#elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
+    unsigned long env_val;
+    asm volatile ("mv %0, x25" : "=r" (env_val) : :);
+    unsigned long *helper1_cnt_ptr = (unsigned long *)(env_val - 88);
+    *helper1_cnt_ptr += 1;
+#endif
+#endif
+END
+      $body = $body.$counter_def;
+    }
+  }
+  my $new_content = &get_statements($func_ptr, $func_ptr->{'BODY_START'} + 1, $func_ptr->{'BODY_STOP'}, $epilog, $pi, $md, $exception_exit, $fc);
+  $body = $body.$new_content;
   if ((not exists $nosplit_helpers{$func_ptr->{'NAME'}}) and $func_ptr->{'HELPER_INTERFACE'} and $func_ptr->{'FUNC_TYPE'} eq "void") {
     my $exp_logic = "";
     if (exists $func_ptr->{'IS_FOREIGN'}) {
@@ -2540,7 +2602,7 @@ sub get_exception_path
 
 sub update_func_call
 {
-  my ($caller_ptr, $call_pos, $callee_ptr, $path_info, $fc, $exception_exit) = @_;
+  my ($caller_ptr, $call_pos, $callee_ptr, $path_info, $fc, $exception_exit, $md, $epilog) = @_;
   die "" if not exists $caller_ptr->{'CALLS'}->{$call_pos};
   my $call_info = $caller_ptr->{'CALLS'}->{$call_pos};
   my $str = "";
@@ -2568,51 +2630,19 @@ sub update_func_call
   foreach my $vec_arg (@{$call_info->{'VECTOR_CALL_ARGS'}}) {
     $call_list = $call_list.", $prefix$vec_arg";
   }
-  my %sub_calls = ();
-  foreach my $e (keys %{$caller_ptr->{'CALLS'}}) {
-    if ($e > $call_info->{'PAREN_START'} and $e < $call_info->{'PAREN_STOP'}) {
-      $sub_calls{$e} = 1;
-    }
-  }
-  my @sorted_sub_calls = sort {$a <=> $b} keys %sub_calls;
-  my $sub_call_idx = 0;
   foreach my $idx (0 .. $#{$call_info->{'SCALAR_CALL_ARGS'}}) {
     my $arg = $call_info->{'SCALAR_CALL_ARGS'}->[$idx];
-    if ($arg =~ /\(/ and ($arg =~ /\w\(/) and (not $arg =~ /^(\-|sizeof)?\(/)) {
-      die "" if not $arg =~ /\)/;
-      die "$caller_ptr->{'NAME'}:$call_pos $callee_ptr->{'NAME'} $idx:$arg:$sub_call_idx" if not exists $sorted_sub_calls[$sub_call_idx];
-      my $sub_call_info = $caller_ptr->{'CALLS'}->{$sorted_sub_calls[$sub_call_idx]};
-      if (exists $funcs{$sub_call_info->{'CALL_TARGET'}}) {
-        my $sub_call_txt = &update_func_call($caller_ptr, $sorted_sub_calls[$sub_call_idx], $funcs{$sub_call_info->{'CALL_TARGET'}}, $path_info, $fc, $exception_exit);
-        $call_list = $call_list.", ".$sub_call_txt;
-      } elsif (&FuncNameIsForeign($sub_call_info->{'CALL_TARGET'})) {
-        # Skip if the call target is a function pointer parameter of the caller
-        my $is_param = 0;
-        foreach my $arg (@{$caller_ptr->{'SCALAR_ARGS'}}) {
-            if ($arg->{'VAR_NAME'} eq $sub_call_info->{'CALL_TARGET'}) {
-                $is_param = 1;
-                last;
-            }
-        }
-        if ($is_param) {
-            # Keep the original call text unchanged
-            $call_list = $call_list.", ".&GetText($sub_call_info->{'NAME_START'}, $sub_call_info->{'PAREN_STOP'});
-        } else {
-            die "" if not exists $fc->{$sub_call_info->{'CALL_TARGET'}};
-            my $sub_call_txt = "";
-            if ($caller_ptr->{'HELPER_INTERFACE'}) {
-                $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(trigger_exception = 1)";
-            } else {
-                $sub_call_txt = "($fc->{$sub_call_info->{'CALL_TARGET'}})(*trigger_exception_ptr = 1)";
-            }
-            print "Exception due to: $sub_call_info->{'CALL_TARGET'} - $caller_ptr->{'NAME'} - $exception_exit\n";
-            $call_list = $call_list.", ".$sub_call_txt;
-        }
-      } else {
-        my $param = &update_vector_inside_single_param($caller_ptr, $call_info, $idx, $arg);
-        $call_list = $call_list.", ".$param;
+    my $arg_rinfo = $call_info->{'SCALAR_CALL_ARG_RANGES'}->[$idx];
+    my $got_call = 0;
+    foreach my $e (keys %{$caller_ptr->{'CALLS'}}) {
+      if ($e >= $arg_rinfo->{'START'} and $e <= $arg_rinfo->{'STOP'}) {
+        $got_call = 1;
+        last;
       }
-      $sub_call_idx = $sub_call_idx + 1;
+    }
+    if ($got_call) {
+      my $new_content = &get_statements($caller_ptr, $arg_rinfo->{'START'}, $arg_rinfo->{'STOP'}, $epilog, $path_info, $md, $exception_exit, $fc);
+      $call_list = $call_list.", ".$new_content;
     } else {
       my $param = &update_vector_inside_single_param($caller_ptr, $call_info, $idx, $arg);
       $call_list = $call_list.", ".$param;
@@ -2753,6 +2783,8 @@ sub FuncNameIsForeign
 {
   my ($func_name) = @_;
   if (exists $funcs{$func_name}) {
+    return 0;
+  } elsif ($func_name eq 'sizeof') {
     return 0;
   } elsif ($func_name eq 'fabs') {
     return 0;
