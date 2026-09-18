@@ -584,7 +584,6 @@ const bool helper_runtime_does_not_return[HELPER_MAX] = {
     [helper_raise_interrupt] = true,
     [helper_raise_exception] = true,
     [helper_jmp_ind] = true,
-    [helper_jumptable] = true,
     // FIXME: check below helpers
     [helper_icebp] = true,
     [helper_iret_ind] = true,

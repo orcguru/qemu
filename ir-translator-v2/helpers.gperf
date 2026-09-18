@@ -1053,7 +1053,6 @@ xsave, helper_xsave
 xsaveopt, helper_xsaveopt
 xsetbv, helper_xsetbv
 jmp_ind, helper_jmp_ind
-jumptable, helper_jumptable
 iret_ind, helper_iret_ind
 dump_registers, helper_dump_registers
 dump_load, helper_dump_load
