@@ -956,6 +956,7 @@ maxps_xmm                       maxps_xmm
 maxps_ymm                       maxps_ymm
 maxsd                           maxsd
 maxss                           maxss
+mb                              mb[^\n]*
 memset                          memset
 minpd_xmm                       minpd_xmm
 minpd_ymm                       minpd_ymm
@@ -1663,6 +1664,7 @@ xsetbv                          xsetbv
 \n                { next_column = 1; column = 1; }
 {COMMENT}         ; // Ignore line comment (content after ';' until end of line)
 [ \t]             ; // Ignore whitespace
+{mb}              ; // Ignore memory barrier
 %%
 size_t min(size_t a, size_t b) {
     return b < a ? b : a;
