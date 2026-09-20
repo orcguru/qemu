@@ -32,6 +32,11 @@ typedef struct FuncInstrList {
      * Reuse function by names
      */
     char          trampoline_name[128];
+
+    /* Information regarding additional parameters */
+    int added_param_count;
+    LLVMType *added_param_type;
+    const char **added_param_name;
 } FuncInstrList;
 
 typedef struct FuncListSet {
@@ -58,9 +63,7 @@ struct TcgContext {
     /* Set of llvm functions formed by one TCG IR block */
     FuncListSet llvm_func_set;
 
-    /* Optional: track the current function ID and external flag
-       (populated by the INTERNAL/EXTERNAL rules) */
-    uint64_t current_func_id;
+    /* Track the current function external flag (populated by the INTERNAL/EXTERNAL rules) */
     int      current_is_external;
 
     /* Lexer location info (if needed by error reporting) */

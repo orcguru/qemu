@@ -75,7 +75,7 @@ all: tcg_mapper tcg_printer
 tcg_mapper: parser.tab.o lexer.yy.o mapper.o mapper_util.o helper_lookup.o util.o expander.o operand_static_types.o i386_cpu.o
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
-tcg_printer: parser.tab.o lexer.yy.o tcg_printer.o mapper_util.o helper_lookup.o util.o expander.o operand_static_types.o i386_cpu.o
+tcg_printer: parser.tab.o lexer.yy.o printer.o mapper_util.o helper_lookup.o util.o expander.o operand_static_types.o i386_cpu.o
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
 parser.tab.o: parser.tab.c lexer.yy.h

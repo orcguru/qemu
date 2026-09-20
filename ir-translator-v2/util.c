@@ -26,6 +26,10 @@ static void func_list_free(FuncInstrList *list) {
     list->head = NULL;
     list->tail = NULL;
     list->count = 0;
+    if (list->added_param_count) {
+        free(list->added_param_type);
+        free(list->added_param_name);
+    }
 }
 
 static void func_list_set_free(FuncListSet *set) {
@@ -220,6 +224,9 @@ void func_list_init(FuncInstrList *list) {
     list->tail = NULL;
     list->count = 0;
     memset(&list->trampoline_name[0], 0, sizeof(list->trampoline_name));
+    list->added_param_count = 0;
+    list->added_param_type = NULL;
+    list->added_param_name = NULL;
 }
 
 void func_list_append(FuncInstrList *list, UnifiedInstr *u) {
@@ -360,8 +367,8 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
         for (int i = first_input_idx; i < u->operand_count; ++i) {
             if (u->operands[i].kind == OP_SLOT) {
                 assert(type_lookup_idx < MAX_ADDED_ARGS);
-                if (helper_collapse_xmm_arg_type[h][type_lookup_idx] != LLVMInvalidType) {
-                    set_operand_type(ctx, &u->operands[i], helper_collapse_xmm_arg_type[h][type_lookup_idx]);
+                if (helper_template_arg_type[h][type_lookup_idx] != LLVMInvalidType) {
+                    set_operand_type(ctx, &u->operands[i], helper_template_arg_type[h][type_lookup_idx]);
                 } else {
                     set_operand_type(ctx, &u->operands[i], LLVMInt64);
                 }
