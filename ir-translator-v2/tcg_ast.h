@@ -5,6 +5,7 @@
 #include <llvm-c/Types.h>
 
 #define LLVMMAXType                 LLVMInt128
+#define XMM_COUNT_MAX               15
 #define XMM_COUNT                   15
 #define XMM_TMP_IDX                 16
 #define MAX_INLINE_VEC_ARG_CNT      4
@@ -33,7 +34,7 @@ typedef signed long int64_t;
     X(ds_base) \
     X(fs_base) \
     X(gs_base) \
-    X(ENVVarMAX)
+    X(ENVVAR_MAX)
 
 typedef enum __attribute__((packed)) {
     #define X(name) name,
@@ -1498,8 +1499,6 @@ typedef struct {
     X(SUB_SLOT_ENVVAR) \
     X(SUB_SLOT_XREG) \
     X(SUB_SLOT_TMP) \
-    X(SUB_SLOT_ENV) \
-    X(SUB_SLOT_XMM) \
     X(SUB_SLOT_TMPL) \
     X(SUB_SLOT_TMPT)
 
@@ -1554,7 +1553,7 @@ typedef enum __attribute__((packed)) {
 
 #define LLVM_TYPE_LIST \
     X(LLVMInvalidType) \
-    X(LLVMIntANY) \
+    X(LLVMIntANY) /* no-op defined for opc:discard */ \
     X(LLVMInt8) \
     X(LLVMInt16) \
     X(LLVMInt32) \

@@ -16,6 +16,8 @@ extern const char *llvm_type_str[];
 extern const char *xmmreg_str[];
 extern const char *cvector_str[];
 extern const uint8_t opcoc[OPCODE_MAX];
+extern const uint64_t envvar_offsets[ENVVAR_MAX];
+extern const int llvm_vector_elem_bit_counts[LLVMMAXType * 2];
 extern const int helper_require_exception_path[HELPER_MAX];
 extern const bool helper_runtime_does_not_return[HELPER_MAX];
 

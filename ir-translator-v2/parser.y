@@ -178,6 +178,16 @@ scalar_instr:
         } else {
             free(u);
         }
+        if (u->opc == addci_i32 || u->opc == addci_i64 ||
+            u->opc == addcio_i32 || u->opc == addcio_i64 ||
+            u->opc == addco_i32 || u->opc == addco_i64) {
+            ctx->carry_on = true;
+        }
+        if (u->opc == subbi_i32 || u->opc == subbi_i64 ||
+            u->opc == subbio_i32 || u->opc == subbio_i64 ||
+            u->opc == subbo_i32 || u->opc == subbo_i64) {
+            ctx->borrow_on = true;
+        }
         $$ = 0;
     }
 ;
@@ -257,6 +267,7 @@ call_instr:
         free(merged);
         op_list_free(&$8);
         append_instr(ctx, u);
+        ctx->env_on = true;
         $$ = 0;
     }
 ;
@@ -269,6 +280,9 @@ slot_op:
         if ($1.type == SUB_SLOT_TMPL || $1.type == SUB_SLOT_TMPT) {
             $$.slot = get_slot_for(ctx, $1.type, $1.idx);
         } else {
+            if ($1.type == SUB_SLOT_ENVVAR) {
+                ctx->env_on = true;
+            }
             $$.slot = $1;
         }
     }
@@ -352,6 +366,7 @@ symbol_op:
     }
 ;
 
+/* new_instr handles OP_ENV+OP_IMM collapse */
 env:
     ENV
     {

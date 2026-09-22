@@ -592,27 +592,14 @@ const bool helper_runtime_does_not_return[HELPER_MAX] = {
     [helper_pause] = true,
 };
 
-const uint64_t xreg_offsets[XREG_MAX] = {
-    [rax] = ENV_OFFSET_rax,
-    [rcx] = ENV_OFFSET_rcx,
-    [rdx] = ENV_OFFSET_rdx,
-    [rbx] = ENV_OFFSET_rbx,
-    [rsp] = ENV_OFFSET_rsp,
-    [rbp] = ENV_OFFSET_rbp,
-    [rsi] = ENV_OFFSET_rsi,
-    [rdi] = ENV_OFFSET_rdi,
-    [r8] = ENV_OFFSET_r8,
-    [r9] = ENV_OFFSET_r9,
-    [r10] = ENV_OFFSET_r10,
-    [r11] = ENV_OFFSET_r11,
-    [r12] = ENV_OFFSET_r12,
-    [r13] = ENV_OFFSET_r13,
-    [r14] = ENV_OFFSET_r14,
-    [r15] = ENV_OFFSET_r15,
-    [cc_src] = ENV_OFFSET_cc_src,
-    [cc_dst] = ENV_OFFSET_cc_dst,
-    [cc_op] = ENV_OFFSET_cc_op,
-    [rip] = ENV_OFFSET_rip,
+const uint64_t envvar_offsets[ENVVAR_MAX] = {
+    [cc_src2] = ENV_OFFSET_cc_src2,
+    [es_base] = ENV_OFFSET_es_base,
+    [cs_base] = ENV_OFFSET_cs_base,
+    [ss_base] = ENV_OFFSET_ss_base,
+    [ds_base] = ENV_OFFSET_ds_base,
+    [fs_base] = ENV_OFFSET_fs_base,
+    [gs_base] = ENV_OFFSET_gs_base,
 };
 
 const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
@@ -622,8 +609,29 @@ const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
     [LLVMVector16xi8] = v16uchar,
 };
 
-// FIXME: sanity check and cover more helpers
-const int helper_do_not_sync_vector[HELPER_MAX] = {
-    [helper_cpuid] = 1,
-    [helper_rdtsc] = 1,
+const int llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {
+    [LLVMInt8 * 2] = 1,
+    [LLVMInt8 * 2 + 1] = 8,
+    [LLVMInt16 * 2] = 1,
+    [LLVMInt16 * 2 + 1] = 16,
+    [LLVMInt32 * 2] = 1,
+    [LLVMInt32 * 2 + 1] = 32,
+    [LLVMInt64 * 2] = 1,
+    [LLVMInt64 * 2 + 1] = 64,
+    [LLVMVector8xi8 * 2] = 8,
+    [LLVMVector8xi8 * 2 + 1] = 8,
+    [LLVMVector4xi16 * 2] = 4,
+    [LLVMVector4xi16 * 2 + 1] = 16,
+    [LLVMVector2xi32 * 2] = 2,
+    [LLVMVector2xi32 * 2 + 1] = 32,
+    [LLVMVector1xi64 * 2] = 1,
+    [LLVMVector1xi64 * 2 + 1] = 64,
+    [LLVMVector16xi8 * 2] = 16,
+    [LLVMVector16xi8 * 2 + 1] = 8,
+    [LLVMVector8xi16 * 2] = 8,
+    [LLVMVector8xi16 * 2 + 1] = 16,
+    [LLVMVector4xi32 * 2] = 4,
+    [LLVMVector4xi32 * 2 + 1] = 32,
+    [LLVMVector2xi64 * 2] = 2,
+    [LLVMVector2xi64 * 2 + 1] = 64,
 };

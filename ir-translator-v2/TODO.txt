@@ -1,0 +1,1 @@
+1. Draw a graph to describe the relationship between instruction and operands (remember to include ENVVAR). Regarding operands, please illustrate the hiearchy.

@@ -86,8 +86,8 @@ struct TcgContext {
 
     /* Bit array for stack alloca */
     uint32_t xreg_valid;
-    uint32_t vec_valid;
-    uint32_t vec_spare_valid;
+    uint32_t vec_valid;         /* vectors used by TCG IR */
+    uint32_t vec_spare_valid;   /* vectors clobbed by helper calls that need spill/reload */
 
     /* TMP slot DEF/USE tracking */
     /*
@@ -100,6 +100,16 @@ struct TcgContext {
     uint64_t *reaching_def_exclude_self_def;
     uint64_t *forward_use;
     bool *unexpected_branch;
+
+    /*
+     * Carry/borrow bit flag
+     */
+    bool carry_on, borrow_on;
+
+    /*
+     * LLVM function scope ENV var
+     */
+    bool env_on;
 };
 
 void tcg_context_init(TcgContext *ctx);

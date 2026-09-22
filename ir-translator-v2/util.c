@@ -337,6 +337,18 @@ void set_operand_type(TcgContext *ctx, Operand *op, LLVMType ty) {
     }
 }
 
+LLVMType get_operand_type(const Operand *op) {
+    LLVMType ty = LLVMInvalidType;
+    if (op->kind == OP_SLOT) {
+        ty = op->slot.op_type;
+    } else if (op->kind == OP_VEC) {
+        ty = op->vec.op_type;
+    } else if (op->kind == OP_ENV) {
+        ty = op->env.op_type;
+    }
+    return ty;
+}
+
 void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
     LLVMType ty = LLVMInvalidType;
     /* Vector */
@@ -494,10 +506,14 @@ UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
                     u->operands[dst_idx].env.offset = (uint16_t)ops[i + 1].imm;
                     u->operands[dst_idx].env.op_type = LLVMInvalidType;
                     u->operands[dst_idx].env.stack_type = LLVMInvalidType;
+                    ctx->env_on = true;
                 }
                 i += 1;
                 skip_cnt += 1;
             } else {
+                if (ops[i].kind == OP_ENV) {
+                    ctx->env_on = true;
+                }
                 u->operands[dst_idx] = ops[i];
             }
             dst_idx += 1;
