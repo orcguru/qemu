@@ -40,11 +40,11 @@ LLVMType get_operand_type(const Operand *op);
 #define TMP_WORD(idx)  ((idx) / 64)
 #define TMP_BIT(idx)   ((idx) % 64)
 
-static inline void set_tmp_bit(uint64_t *base, int tmp_idx) {
+static inline void set_bit(uint64_t *base, int tmp_idx) {
     base[TMP_WORD(tmp_idx)] |= (1ULL << TMP_BIT(tmp_idx));
 }
 
-static inline bool test_tmp_bit(const uint64_t *base, int tmp_idx) {
+static inline bool test_bit(const uint64_t *base, int tmp_idx) {
     return (base[TMP_WORD(tmp_idx)] >> TMP_BIT(tmp_idx)) & 1ULL;
 }
 
@@ -63,7 +63,7 @@ static inline void clear_mask(uint64_t *dst, const uint64_t *src, int words) {
 static inline int get_first_input_idx_on_call(const UnifiedInstr *u) {
     assert(u->operand_count >= TCG_CALL_OUT_FLAG_IDX &&
            u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
-    return u->operands[TCG_CALL_OUT_FLAG_IDX].imm ? (TCG_CALL_PREFIX_COUNT + 1) : TCG_CALL_PREFIX_COUNT;
+    return u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? (TCG_CALL_PREFIX_COUNT + 1) : TCG_CALL_PREFIX_COUNT;
 }
 
 static inline char *assemble_name_1(char *buffer, int size, const char *p1, int idx) {

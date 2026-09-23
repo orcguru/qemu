@@ -53,7 +53,7 @@ void sanity_check_op_type_solid(const TcgContext *ctx) {
 // Use SLOT_OP_EXTRA to copy from existing operand
 #define SLOT_OP_EXTRA(ty, index, op_ty, stack_ty)                           \
             ((Operand){ .kind = OP_SLOT, .slot.type = (ty), .slot.idx = (index), .slot.op_type = (op_ty), .slot.stack_type = (stack_ty) })
-#define IMM_OP(val)         ((Operand){ .kind = OP_IMM,   .imm = (val) })
+#define IMM_OP(value)       ((Operand){ .kind = OP_IMM,   .imm.val = (value) })
 #define ENV_OP(off)         ((Operand){ .kind = OP_ENV,   .env.offset = (off) })
 #define LABEL_OP(lbl)       ((Operand){ .kind = OP_LABEL, .label = (lbl) })
 #define RELOP_OP(r)         ((Operand){ .kind = OP_RELOP, .relop = (r) })
@@ -127,7 +127,7 @@ void expand_push_ret_addr(TcgContext *ctx) {
     assert(u->operands[1].kind == OP_IMM);
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, func_addr, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp3),
-        IMM_OP(u->operands[1].imm),
+        IMM_OP(u->operands[1].imm.val),
         IMM_OP(0));
 
     // - STORE the address of return into the entry
@@ -221,7 +221,7 @@ void expand_jmp_direct(TcgContext *ctx) {
         assert(u->operands[0].kind == OP_IMM);
         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, func_addr, 0, 0,
             SLOT_OP(SUB_SLOT_TMP, tmp1),
-            IMM_OP(u->operands[0].imm),
+            IMM_OP(u->operands[0].imm.val),
             IMM_OP(0));
 
         // - TAIL call
@@ -240,7 +240,7 @@ void expand_jmp_direct(TcgContext *ctx) {
 static int get_def_tmp_indices(const UnifiedInstr *u, int *out_idx, int out_cnt) {
     int ret_cnt = 0;
     if (u->opc == call &&
-        u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM && u->operands[TCG_CALL_OUT_FLAG_IDX].imm &&
+        u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM && u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val &&
         u->operands[TCG_CALL_PREFIX_COUNT].kind == OP_SLOT && u->operands[TCG_CALL_PREFIX_COUNT].slot.type == SUB_SLOT_TMP) {
         out_idx[ret_cnt++] = u->operands[TCG_CALL_PREFIX_COUNT].slot.idx;
     } else {
@@ -306,11 +306,11 @@ void build_per_instr_masks_collect_use_def(TcgContext *ctx) {
         int def_indices[2];
         int def_cnt = get_def_tmp_indices(u, def_indices, sizeof(def_indices)/sizeof(int));
         for (int i = 0; i < def_cnt; i++)
-            set_tmp_bit(&ctx->def_mask[idx * words], def_indices[i]);
+            set_bit(&ctx->def_mask[idx * words], def_indices[i]);
         int use_indices[16];
         int use_cnt = get_use_tmp_indices(u, use_indices, sizeof(use_indices)/sizeof(int));
         for (int i = 0; i < use_cnt; i++)
-            set_tmp_bit(&ctx->use_mask[idx * words], use_indices[i]);
+            set_bit(&ctx->use_mask[idx * words], use_indices[i]);
 
         u = u->next;
         idx++;
@@ -372,7 +372,7 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
             EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
             for (int i = 0; i < ctx->next_tmp_idx; ++i) {
-                if (test_tmp_bit(buf, i)) {
+                if (test_bit(buf, i)) {
                     // - CALCULATE negative offset into the shadow stack
                     // sub_i64 tmp_N3, tmp_N2, $tmp_slot_preserve_offset
                     assert(tmp_slot_preserve_offset < TMP_SLOT_PRESERVE_OFFSET_MAX);
@@ -435,7 +435,7 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
             EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
 
             for (int i = 0; i < ctx->next_tmp_idx; ++i) {
-                if (test_tmp_bit(buf, i)) {
+                if (test_bit(buf, i)) {
                     // - CALCULATE negative offset into the shadow stack
                     // sub_i64 tmp_N3, tmp_N2, $tmp_slot_preserve_offset
                     assert(tmp_slot_preserve_offset < TMP_SLOT_PRESERVE_OFFSET_MAX);
@@ -877,7 +877,7 @@ static void move_rv_to_next(TcgContext *ctx, const UnifiedInstr *orig_u, Unified
     setup_additional_param(&(ctx->llvm_func_set.lists[nfidx]), not_a_helper, false/*with_nc*/, true/*with_rv*/, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type);
     memcpy(&update_u->operands[TCG_CALL_PREFIX_COUNT], &update_u->operands[TCG_CALL_PREFIX_COUNT + 1],
            (update_u->operand_count - TCG_CALL_PREFIX_COUNT - 1) * sizeof(Operand));
-    update_u->operands[TCG_CALL_OUT_FLAG_IDX].imm = 0;
+    update_u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val = 0;
     update_u->operand_count -= 1;
 }
 
@@ -961,7 +961,7 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
 
                 // Move the output from the call to the beginning of the next step
                 assert(uu->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
-                if (uu->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
+                if (uu->operands[TCG_CALL_OUT_FLAG_IDX].imm.val) {
                     move_rv_to_next(ctx, u, uu);
                 }
                 instr_list_insert_before(&(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, uu);
@@ -1199,7 +1199,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
     }
 
     // Get the next call from argument (the last argument implicitly is the next call target), and do tail_call_qemuaot
-    if (u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
+    if (u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val) {
         // - tail_call_qemuaot next,helper_out
         // tail_call_qemuaot OP_LASTARG,helper_out
         EMIT_INSTR_APPEND_LIST(ctx, &result, tail_call_qemuaot, 0, 0,
@@ -1307,7 +1307,7 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
 
             // Move the output from the call to the beginning of the next step
             assert(uu->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
-            if (uu->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
+            if (uu->operands[TCG_CALL_OUT_FLAG_IDX].imm.val) {
                 move_rv_to_next(ctx, u, uu);
             }
 
@@ -1500,7 +1500,7 @@ int create_trampoline_for_runtime(TcgContext *ctx,
     }
 
     // Get the next call from argument (the last argument implicitly is the next call target), and do tail_call_qemuaot
-    if (u->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
+    if (u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val) {
         // - tail_call_qemuaot next,helper_out
         // tail_call_qemuaot OP_LASTARG,helper_out
         EMIT_INSTR_APPEND_LIST(ctx, &result, tail_call_qemuaot, 0, 0,
@@ -1627,7 +1627,7 @@ void expand_call_runtime(TcgContext *ctx) {
 
             // Move the output from the call to the beginning of the next step
             assert(uu->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
-            if (uu->operands[TCG_CALL_OUT_FLAG_IDX].imm) {
+            if (uu->operands[TCG_CALL_OUT_FLAG_IDX].imm.val) {
                 move_rv_to_next(ctx, u, uu);
             }
 

@@ -30,7 +30,7 @@ static inline int helper_defines_output(const UnifiedInstr *u) {
     assert(u->opc == call);
     const Operand *op = get_operand(u, 2);
     assert(op->kind == OP_IMM);
-    return op->imm;
+    return op->imm.val;
 }
 
 static inline int get_first_in_op_idx(const UnifiedInstr *u) {

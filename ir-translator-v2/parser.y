@@ -214,9 +214,9 @@ call_instr:
         op_list_init(&pre);
         Operand sym_op = { .kind = OP_SYMBOL, .symbol = $2 };
         op_list_add(&pre, sym_op);
-        Operand immx_op = { .kind = OP_IMM, .imm = $4 };
+        Operand immx_op = { .kind = OP_IMM, .imm.val = $4 };
         op_list_add(&pre, immx_op);
-        Operand immd_op = { .kind = OP_IMM, .imm = $6 };
+        Operand immd_op = { .kind = OP_IMM, .imm.val = $6 };
         op_list_add(&pre, immd_op);
         int total = pre.len + $8.len;
         Operand *merged = malloc(total * sizeof(Operand));
@@ -261,7 +261,7 @@ call_instr:
         }
         update_slot_types(ctx, u);
         register_stack_alloca(ctx, u);
-        if (u->operands[2].kind == OP_IMM && u->operands[2].imm) {
+        if (u->operands[2].kind == OP_IMM && u->operands[2].imm.val) {
             try_unregister_alias(ctx, &u->operands[3]);
         }
         free(merged);
@@ -292,22 +292,22 @@ imm_op:
     IMM
     {
         $$.kind = OP_IMM;
-        $$.imm = $1;
+        $$.imm.val = $1;
     }
     | IMMD
     {
         $$.kind = OP_IMM;
-        $$.imm = $1;
+        $$.imm.val = $1;
     }
     | IMMX
     {
         $$.kind = OP_IMM;
-        $$.imm = $1;
+        $$.imm.val = $1;
     }
     | VS_TOKEN IMMX
     {
         $$.kind = OP_IMM;
-        $$.imm = $2;
+        $$.imm.val = $2;
     }
 ;
 

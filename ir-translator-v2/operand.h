@@ -39,12 +39,17 @@ typedef struct __attribute__((packed)) {
 } EnvInfo;
 
 typedef struct __attribute__((packed)) {
+    uint64_t val;
+    LLVMType op_type;
+} ImmInfo;
+
+typedef struct __attribute__((packed)) {
     OperandKind kind;
     union {
         SlotInfo   slot;
         VecInfo    vec;
         EnvInfo    env;
-        uint64_t   imm;
+        ImmInfo    imm;
         uint16_t   label;
         RelopType  relop;
         AttrSrcInfo attr_info;

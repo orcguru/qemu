@@ -334,6 +334,8 @@ void set_operand_type(TcgContext *ctx, Operand *op, LLVMType ty) {
         op->vec.op_type = ty;
     } else if (op->kind == OP_ENV) {
         op->env.op_type = ty;
+    } else if (op->kind == OP_IMM) {
+        op->imm.op_type = ty;
     }
 }
 
@@ -369,7 +371,7 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
         assert(u->operands[2].kind == OP_IMM);
         HelperType h = u->operands[0].symbol;
         // Handle output
-        if (u->operands[2].imm) {
+        if (u->operands[2].imm.val) {
             first_input_idx += 1;
             assert(u->operands[TCG_CALL_PREFIX_COUNT].kind == OP_SLOT);
             assert(helper_return_type[h] != LLVMInvalidType);
@@ -377,7 +379,7 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
         }
         int type_lookup_idx = 0;
         for (int i = first_input_idx; i < u->operand_count; ++i) {
-            if (u->operands[i].kind == OP_SLOT) {
+            if (u->operands[i].kind == OP_SLOT || u->operands[i].kind == OP_IMM) {
                 assert(type_lookup_idx < MAX_ADDED_ARGS);
                 if (helper_template_arg_type[h][type_lookup_idx] != LLVMInvalidType) {
                     set_operand_type(ctx, &u->operands[i], helper_template_arg_type[h][type_lookup_idx]);
@@ -394,12 +396,16 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
                 } else {
                     u->operands[i].env.op_type = LLVMInt64;
                 }
+            } else {
+                assert(0);
             }
         }
         return;
     } else if (u->opc == tail_call_qemuaot) {
+        // tail_call_qemuaot clone operands from the original call, only the
+        // target operand need set type
         for (int i = 0; i < u->operand_count; ++i) {
-            if (u->operands[i].kind == OP_SLOT) {
+            if (u->operands[i].kind == OP_SLOT && u->operands[i].slot.op_type == LLVMInvalidType) {
                 set_operand_type(ctx, &u->operands[i], LLVMInt64);
             }
         }
@@ -409,7 +415,8 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
     for (int i = 0; i < u->operand_count; ++i) {
         if (u->operands[i].kind != OP_SLOT &&
             u->operands[i].kind != OP_VEC &&
-            u->operands[i].kind != OP_ENV) {
+            u->operands[i].kind != OP_ENV &&
+            u->operands[i].kind != OP_IMM) {
             continue;
         }
         if (opcmem_addr_nzidx[u->opc] > 0) {
@@ -494,7 +501,7 @@ UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
          */
         for (int i = 0; i < nops; ++i) {
             if (ops[i].kind == OP_ENV && (i + 1) < nops && ops[i + 1].kind == OP_IMM) {
-                VecInfo v = lookup_vector(ops[i + 1].imm, true);
+                VecInfo v = lookup_vector(ops[i + 1].imm.val, true);
                 if (v.idx != NON_XMM) {
                     u->operands[dst_idx].kind = OP_VEC;
                     u->operands[dst_idx].vec.idx = v.idx;
@@ -503,7 +510,7 @@ UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
                     u->operands[dst_idx].vec.stack_type = LLVMVector2xi64;
                 } else {
                     u->operands[dst_idx].kind = OP_ENV;
-                    u->operands[dst_idx].env.offset = (uint16_t)ops[i + 1].imm;
+                    u->operands[dst_idx].env.offset = (uint16_t)ops[i + 1].imm.val;
                     u->operands[dst_idx].env.op_type = LLVMInvalidType;
                     u->operands[dst_idx].env.stack_type = LLVMInvalidType;
                     ctx->env_on = true;

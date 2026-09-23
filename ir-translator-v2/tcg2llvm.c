@@ -10,8 +10,8 @@
 
 void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, int *cnt_ptr) {
     char name_buf[32] = {0};
-    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1]);
-    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2]);
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, u->opc, *cnt_ptr);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, u->opc, *cnt_ptr);
     LLVMValueRef sum = LLVMBuildAdd(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "sum", *cnt_ptr));
     LLVMValueRef ca = build_load_with_alignment(builder, LLVMInt1Type(), stack->carry, assemble_name_1(&name_buf[0], sizeof(name_buf), "carry", *cnt_ptr), 8);
     LLVMValueRef ca_ext = LLVMBuildZExt(builder, ca, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_1(&name_buf[0], sizeof(name_buf), "carry_ext", *cnt_ptr));

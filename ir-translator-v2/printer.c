@@ -41,7 +41,7 @@ void print_operand(Operand *op, int is_output) {
         }
         break;
     case OP_IMM:
-        printf("0x%lx", op->imm);
+        printf("0x%lx", op->imm.val);
         break;
     case OP_LABEL:
         printf("L%d", op->label);
@@ -91,7 +91,7 @@ void print_instr(UnifiedInstr *u) {
     if (u->opc == call) {
         printf(" %s,", helper_str[u->operands[0].symbol]);
         for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
-            print_operand(&u->operands[i], (u->operands[2].imm && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
+            print_operand(&u->operands[i], (u->operands[2].imm.val && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
             if (i < (u->operand_count - 1)) {
                 printf(",");
             }
@@ -104,13 +104,13 @@ void print_instr(UnifiedInstr *u) {
         for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
             if (u->operands[i].kind != OP_VEC) {
                 printf(",");
-                print_operand(&u->operands[i], (u->operands[2].imm && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
+                print_operand(&u->operands[i], (u->operands[2].imm.val && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
             }
         }
         printf(" VEC_ARGS:");
         for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
             if (u->operands[i].kind == OP_VEC) {
-                print_operand(&u->operands[i], (u->operands[2].imm && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
+                print_operand(&u->operands[i], (u->operands[2].imm.val && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
                 printf(",");
             }
         }
@@ -122,7 +122,7 @@ void print_instr(UnifiedInstr *u) {
         for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
             assert(u->operands[i].kind != OP_VEC);
             printf(",");
-            print_operand(&u->operands[i], (u->operands[2].imm && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
+            print_operand(&u->operands[i], (u->operands[2].imm.val && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0);
         }
         printf("\n");
         return;
