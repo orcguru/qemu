@@ -35,9 +35,10 @@ int cfg_xmm_count = XMM_COUNT;
 void debug_print_instr(TcgContext *ctx, const char *msg) {}
 
 char *g_template_path = NULL;
+/* Set by '-d': dump the mapped LLVM-IR module and stop before compilation */
+int g_dump_ir = 0;
 LLVMTargetMachineRef g_target_machine = NULL;
 LLVMModuleRef g_module = NULL;
-LLVMContextRef g_context = NULL;
 LLVMBuilderRef g_builder = NULL;
 LLVMAttributeRef g_attr_target_features = NULL;
 LLVMAttributeRef g_attr_noinline = NULL;
@@ -242,7 +243,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, OpCodeTyp
                 (llvm_vector_elem_bit_counts[stack_ty * 2] * llvm_vector_elem_bit_counts[stack_ty * 2 + 1]));
             val = LLVMBuildBitCast(g_builder, val, get_llvm_type(stack_ty), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc", 0));
         } else {
-            assert(0);
+            assert(val_ty == stack_ty);
         }
         build_store_with_alignment(g_builder, val, op->kind == OP_SLOT ? stack->tmp.alloca[op->slot.idx] : stack->vector.alloca[op->vec.idx], GET_ALIGNMENT_FROM_TYPE(stack_ty));
         return;
@@ -360,9 +361,11 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
     }
     if (ctx->carry_on) {
         stack->carry = LLVMBuildAlloca(g_builder, LLVMInt1Type(), "carry.stack");
+        LLVMSetAlignment(stack->carry, 8);
     }
     if (ctx->borrow_on) {
         stack->borrow = LLVMBuildAlloca(g_builder, LLVMInt1Type(), "borrow.stack");
+        LLVMSetAlignment(stack->borrow, 8);
     }
     if (ctx->env_on) {
         stack->env = get_env();
@@ -429,7 +432,10 @@ void handle_func(TcgContext *ctx, int is_external) {
 }
 
 void print_usage(const char *progname) {
-    fprintf(stderr, "Usage: %s <input.tir>\n", progname);
+    fprintf(stderr, "Usage: %s [-d] [-h] <input.tir>\n", progname);
+    fprintf(stderr, "  -d    Dump the mapped LLVM-IR module to stdout and exit without\n");
+    fprintf(stderr, "        kicking off compilation (no passes, no object file)\n");
+    fprintf(stderr, "  -h    Print this help message\n");
 }
 
 void parse_tcg_instructions(const char *filename) {
@@ -482,10 +488,10 @@ int init_llvm() {
     g_target_machine = LLVMCreateTargetMachine(target, default_triple, "generic", features,
                                              LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelDefault);
 
-    g_context = LLVMGetGlobalContext();
-    g_attr_noinline = LLVMCreateEnumAttribute(g_context, LLVMNoInlineAttribute, 0);
-    g_attr_alwaysinline = LLVMCreateEnumAttribute(g_context, LLVMAlwaysInlineAttribute, 0);
-    g_attr_nounwind = LLVMCreateEnumAttribute(g_context, LLVMGetEnumAttributeKindForName("nounwind", strlen("nounwind")), 0);
+    LLVMContextRef context = LLVMGetGlobalContext();
+    g_attr_noinline = LLVMCreateEnumAttribute(context, LLVMNoInlineAttribute, 0);
+    g_attr_alwaysinline = LLVMCreateEnumAttribute(context, LLVMAlwaysInlineAttribute, 0);
+    g_attr_nounwind = LLVMCreateEnumAttribute(context, LLVMGetEnumAttributeKindForName("nounwind", strlen("nounwind")), 0);
     const char *attr_key = "target-features";
 #if defined(__aarch64__)
     const char *attr_value = "+neon";
@@ -496,8 +502,8 @@ int init_llvm() {
 #endif
     size_t attr_key_len = strlen(attr_key);
     size_t attr_value_len = strlen(attr_value);
-    g_attr_target_features = LLVMCreateStringAttribute(g_context, attr_key, attr_key_len, attr_value, attr_value_len);
-    g_module = LLVMModuleCreateWithNameInContext("qemuaot", g_context);
+    g_attr_target_features = LLVMCreateStringAttribute(context, attr_key, attr_key_len, attr_value, attr_value_len);
+    g_module = LLVMModuleCreateWithNameInContext("qemuaot", context);
 
 #if defined(__aarch64__)
     LLVMSetTarget(g_module, "aarch64-unknown-linux-gnu");
@@ -523,10 +529,26 @@ static int check_always_inline_status(LLVMValueRef F) {
 }
 
 int fini_llvm(const char *output_file) {
-    // FIXME: turn DUMP_IR into argument
-#ifdef DUMP_IR
-    LLVMDumpModule(g_module);
-#endif
+    int rc = 0;
+    LLVMPassBuilderOptionsRef options = NULL;
+
+    /*
+     * '-d': dump the mapped LLVM-IR module and bail out before kicking off
+     * the compilation pipeline (optimization passes + object emission).
+     */
+    if (g_dump_ir) {
+        char *ir = LLVMPrintModuleToString(g_module);
+        if (!ir) {
+            fprintf(stderr, "Failed to dump LLVM module\n");
+            rc = -1;
+            goto cleanup;
+        }
+        fputs(ir, stdout);
+        fflush(stdout);
+        LLVMDisposeMessage(ir);
+        goto cleanup;
+    }
+
     LLVMValueRef F = LLVMGetFirstFunction(g_module);
     while (F != NULL) {
         if (LLVMIsAFunction(F) && LLVMIsDeclaration(F) && strncmp(LLVMGetValueName(F), "Fx", 2) == 0) {
@@ -547,15 +569,16 @@ int fini_llvm(const char *output_file) {
         F = LLVMGetNextFunction(F);
     }
 
-    LLVMPassBuilderOptionsRef options = LLVMCreatePassBuilderOptions();
+    options = LLVMCreatePassBuilderOptions();
     LLVMErrorRef error = LLVMRunPasses(g_module, "default<O2>", g_target_machine, options);
+    LLVMDisposePassBuilderOptions(options);
+    options = NULL;
     if (error) {
         char* error_msg = LLVMGetErrorMessage(error);
         fprintf(stderr, "Optimization failed: %s\n", error_msg);
         LLVMDisposeErrorMessage(error_msg);
-        LLVMDisposePassBuilderOptions(options);
-        LLVMDisposeTargetMachine(g_target_machine);
-        return -1;
+        rc = -1;
+        goto cleanup;
     }
 
     // Remove standalone always_inline functions(helpers)
@@ -574,24 +597,58 @@ int fini_llvm(const char *output_file) {
     char *error_msg = NULL;
     if (LLVMTargetMachineEmitToFile(g_target_machine, g_module, output_file, LLVMObjectFile, &error_msg)) {
         fprintf(stderr, "Failed to emit object file: %s", error_msg);
-        return -1;
+        rc = -1;
+        goto cleanup;
     }
-    LLVMDisposeBuilder(g_builder);
-    LLVMDisposeModule(g_module);
-    LLVMContextDispose(g_context);
-    LLVMDisposeTargetMachine(g_target_machine);
-    return 0;
+
+cleanup:
+    if (options) {
+        LLVMDisposePassBuilderOptions(options);
+    }
+    if (g_builder) {
+        LLVMDisposeBuilder(g_builder);
+    }
+    if (g_module) {
+        LLVMDisposeModule(g_module);
+    }
+    if (g_target_machine) {
+        LLVMDisposeTargetMachine(g_target_machine);
+    }
+    return rc;
 }
 
-int main(int argc, const char *argv[]) {
+int main(int argc, char *argv[]) {
     int rc = 0;
     char *output_file = NULL;
+    int opt = 0;
     if (argc < 1) {
         print_usage(argv[0]);
         rc = -1;
         goto exit;
     }
-    const char *input_file = argv[1];
+    while ((opt = getopt(argc, argv, "dh")) != -1) {
+        switch (opt) {
+            case 'd':
+                /* Dump the mapped LLVM-IR module, skip compilation */
+                g_dump_ir = 1;
+                break;
+            case 'h':
+                print_usage(argv[0]);
+                rc = 0;
+                goto exit;
+            default:
+                print_usage(argv[0]);
+                rc = -1;
+                goto exit;
+        }
+    }
+    if (optind >= argc) {
+        fprintf(stderr, "Error: no input file specified\n");
+        print_usage(argv[0]);
+        rc = -1;
+        goto exit;
+    }
+    const char *input_file = argv[optind];
     if (!input_file) {
         fprintf(stderr, "Error: no input file specified\n");
         print_usage(argv[0]);
