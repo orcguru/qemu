@@ -44,6 +44,10 @@ static inline void set_bit(uint64_t *base, int tmp_idx) {
     base[TMP_WORD(tmp_idx)] |= (1ULL << TMP_BIT(tmp_idx));
 }
 
+static inline void clear_bit(uint64_t *base, int tmp_idx) {
+    base[TMP_WORD(tmp_idx)] &= ~(1ULL << TMP_BIT(tmp_idx));
+}
+
 static inline bool test_bit(const uint64_t *base, int tmp_idx) {
     return (base[TMP_WORD(tmp_idx)] >> TMP_BIT(tmp_idx)) & 1ULL;
 }

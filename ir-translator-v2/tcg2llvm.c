@@ -10,37 +10,40 @@
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 
-void translate_common(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca *stack, const UnifiedInstr *u) {
+void translate_common(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     char name_buf[32] = {0};
-    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, u->opc);
-    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, u->opc);
-    LLVMValueRef out = llvm_api(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "out"));
-    do_store(&u->operands[0], out, stack, u->opc);
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    LLVMValueRef out = llvm_api(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "out"));
+    do_store(&u->operands[0], out, stack, prefix);
 }
 
-void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u) {
+void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     char name_buf[32] = {0};
-    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, u->opc);
-    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, u->opc);
-    LLVMValueRef sum = LLVMBuildAdd(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "sum"));
-    LLVMValueRef ca = build_load_with_alignment(builder, LLVMInt1Type(), stack->carry, assemble_name_1(&name_buf[0], sizeof(name_buf), "carry"), 8);
-    LLVMValueRef ca_ext = LLVMBuildZExt(builder, ca, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_1(&name_buf[0], sizeof(name_buf), "carry_ext"));
-    LLVMValueRef out = LLVMBuildAdd(builder, sum, ca_ext, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "out"));
-    do_store(&u->operands[0], out, stack, u->opc);
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    LLVMValueRef sum = LLVMBuildAdd(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "sum"));
+    LLVMValueRef ca = build_load_with_alignment(builder, LLVMInt1Type(), stack->carry, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "carry"), 8);
+    LLVMValueRef ca_ext = LLVMBuildZExt(builder, ca, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&name_buf[0], sizeof(name_buf), LLVMGetValueName(ca), "zext"));
+    LLVMValueRef out = LLVMBuildAdd(builder, sum, ca_ext, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "out"));
+    do_store(&u->operands[0], out, stack, prefix);
 }
 
-#define CASE(opc, entry)                    \
-        case opc:                           \
-            entry(builder, stack, u);       \
+#define CASE(opc, entry)                            \
+        case opc:                                   \
+            entry(builder, stack, u, &prefix[0]);   \
             break
 
-#define CASE_COMMON(opc, llvm_api)          \
-        case opc:                           \
-            translate_common(builder, llvm_api, stack, u);  \
+#define CASE_COMMON(opc, llvm_api)                                      \
+        case opc:                                                       \
+            translate_common(builder, llvm_api, stack, u, &prefix[0]);  \
             break
 
 void translate_batch(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f) {
-    for (const UnifiedInstr *u = f->head; u; u = u->next) {
+    int idx = 0;
+    char prefix[32] = {0};
+    for (const UnifiedInstr *u = f->head; u; u = u->next, ++idx) {
+        snprintf(&prefix[0], sizeof(prefix), "T%d", idx);
         switch (u->opc) {
             // FIXME: support all TCG-ops
             case addc1o_i32:

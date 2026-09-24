@@ -30,8 +30,8 @@ typedef struct StackAlloca {
 LLVMTypeRef get_llvm_type(LLVMType type);
 LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVMValueRef PointerVal, unsigned Bytes);
 LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMValueRef PointerVal, const char *Name, unsigned Bytes);
-LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, OpCodeType opc);
-void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, OpCodeType opc);
+LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, const char *prefix);
+void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const char *prefix);
 void start_llvm_bb(LLVMBasicBlockRef bb, StackAlloca *stack);
 
 #define GET_ALIGNMENT_FROM_TYPE(type)       (type <= LLVMInt64 ? 8 : 16)
