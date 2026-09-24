@@ -2,6 +2,11 @@
  * FIXME Copyright
  */
 #include <glib.h>
+#include <assert.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "tcg_context.h"
 #include "util.h"
 #include "unified_instr.h"
@@ -585,4 +590,63 @@ void tcg_context_reset(TcgContext *ctx) {
     free(ctx->alias_ops_pool);
 
     tcg_context_init(ctx);
+}
+
+/*
+ * SBuf
+ */
+void sbuf_init(SBuf *b, char *buf, size_t cap)
+{
+    b->buf  = buf;
+    b->cap  = (buf && cap) ? cap : 0;
+    b->len  = 0;
+    b->want = 0;
+    if (b->cap) b->buf[0] = '\0';
+}
+
+void sbuf_putc(SBuf *b, char c)
+{
+    if (b->cap && b->len + 1 < b->cap) {
+        b->buf[b->len++] = c;
+        b->buf[b->len]   = '\0';
+    }
+    b->want++;
+}
+
+static int sbuf_vprintf(SBuf *b, const char *fmt, va_list ap)
+{
+    va_list aq;
+    int     n;
+    size_t  room = 0;
+
+    if (b->cap && b->len < b->cap)
+        room = b->cap - b->len;         /* >= 1, so at least the NUL fits */
+
+    va_copy(aq, ap);
+    n = vsnprintf(room ? b->buf + b->len : NULL, room, fmt, aq);
+    va_end(aq);
+
+    if (n < 0)
+        return -1;
+
+    b->want += (size_t)n;
+
+    if (room) {
+        size_t max   = room - 1;                     /* payload bytes allowed */
+        size_t wrote = ((size_t)n < max) ? (size_t)n : max;
+        b->len += wrote;
+        b->buf[b->len] = '\0';
+    }
+    return 0;
+}
+
+int sbuf_printf(SBuf *b, const char *fmt, ...)
+{
+    va_list ap;
+    int     rc;
+
+    va_start(ap, fmt);
+    rc = sbuf_vprintf(b, fmt, ap);
+    va_end(ap);
+    return rc;
 }

@@ -7,6 +7,7 @@
 #include "util.h"
 #include "mapper_util.h"
 #include <assert.h>
+#include "tcg_llvm_tag.h"
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 
@@ -29,6 +30,123 @@ void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
     do_store(&u->operands[0], out, stack, prefix);
 }
 
+static void print_operand(const Operand *op, int is_output, SBuf *b) {
+    if (is_output) {
+        sbuf_putc(b, '[');
+    }
+    switch (op->kind) {
+    case OP_SLOT:
+        switch (op->slot.type) {
+        case SUB_SLOT_ENVVAR:
+            sbuf_printf(b, "%s(env)", envvar_type_str[op->slot.idx]);
+            break;
+        case SUB_SLOT_XREG:
+            sbuf_printf(b, "%s", xreg_type_str[op->slot.idx]);
+            break;
+        case SUB_SLOT_TMP:
+            sbuf_printf(b, "t%d", op->slot.idx);
+            break;
+        default:
+            assert(0);
+        }
+        break;
+    case OP_IMM:
+        sbuf_printf(b, "0x%lx", op->imm.val);
+        break;
+    case OP_LABEL:
+        sbuf_printf(b, "L%d", op->label);
+        break;
+    case OP_RELOP:
+        sbuf_printf(b, "%s", relop_type_str[op->relop]);
+        break;
+    case OP_ATTR:
+        sbuf_printf(b, "attr");
+        break;
+    case OP_SYMBOL:
+        sbuf_printf(b, "%s", helper_str[op->symbol]);
+        break;
+    case OP_VEC:
+        if (op->vec.offset == 0) {
+            sbuf_printf(b, "v%d", op->vec.idx);
+        } else {
+            sbuf_printf(b, "v%d:o%d", op->vec.idx, op->vec.offset);
+        }
+        break;
+    case OP_ENV:
+        if (op->env.offset == 0) {
+            sbuf_printf(b, "env");
+        } else {
+            sbuf_printf(b, "env:0x%x", op->env.offset);
+        }
+        break;
+    case OP_ARG:
+        if (op->argidx == -1) {
+            sbuf_printf(b, "__last_arg__");
+        } else {
+            sbuf_printf(b, "arg%d", op->argidx);
+        }
+        break;
+    default:
+        assert(0);
+    }
+    if (is_output) {
+        sbuf_putc(b, ']');
+    }
+}
+
+static void print_instr(const UnifiedInstr *u, SBuf *b) {
+    sbuf_printf(b, "%s", opcode_type_str[u->opc]);
+    if (u->opc == call) {
+        sbuf_printf(b, " %s,", helper_str[u->operands[0].symbol]);
+        for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+            print_operand(&u->operands[i], (u->operands[2].imm.val && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0, b);
+            if (i < (u->operand_count - 1)) {
+                sbuf_putc(b, ',');
+            }
+        }
+        sbuf_putc(b, '\n');
+        return;
+    } else if (u->opc == tail_call_qemuaot || u->opc == call_qemuaot) {
+        sbuf_putc(b, ' ');
+        print_operand(&u->operands[0], 0, b);
+        for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+            if (u->operands[i].kind != OP_VEC) {
+                sbuf_putc(b, ',');
+                print_operand(&u->operands[i], (u->operands[2].imm.val && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0, b);
+            }
+        }
+        sbuf_printf(b, " VEC_ARGS:");
+        for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+            if (u->operands[i].kind == OP_VEC) {
+                print_operand(&u->operands[i], (u->operands[2].imm.val && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0, b);
+                sbuf_putc(b, ',');
+            }
+        }
+        sbuf_putc(b, '\n');
+        return;
+    } else if (u->opc == tail_call_default || u->opc == call_default) {
+        sbuf_putc(b, ' ');
+        print_operand(&u->operands[0], 0, b);
+        for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+            assert(u->operands[i].kind != OP_VEC);
+            sbuf_putc(b, ',');
+            print_operand(&u->operands[i], (u->operands[2].imm.val && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0, b);
+        }
+        sbuf_putc(b, '\n');
+        return;
+    } else if (u->vs != 0) {
+        sbuf_printf(b, " v%d,e%d,", u->vs, u->es);
+    } else {
+        sbuf_putc(b, ' ');
+    }
+    for (int i = 0; i < u->operand_count; ++i) {
+        print_operand(&u->operands[i], i < opcoc[u->opc] ? 1 : 0, b);
+        if (i < (u->operand_count - 1)) {
+            sbuf_putc(b, ',');
+        }
+    }
+}
+
 #define CASE(opc, entry)                            \
         case opc:                                   \
             entry(builder, stack, u, &prefix[0]);   \
@@ -39,11 +157,26 @@ void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
             translate_common(builder, llvm_api, stack, u, &prefix[0]);  \
             break
 
-void translate_batch(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f) {
+void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f) {
     int idx = 0;
     char prefix[32] = {0};
+
+    TcgTag tag;
+    tcg_tag_init(&tag, LLVMGetModuleContext(module), builder);
+
+#ifdef USE_TCG_DEBUGINFO
+    LLVMDIBuilderRef dib = NULL;
+    if (tcg_tag_setup_dbg(&tag, module, F, "tcg.ir", "tb", &dib) != 0)
+        fprintf(stderr, "warning: debug info setup failed\n");
+#endif
+
     for (const UnifiedInstr *u = f->head; u; u = u->next, ++idx) {
         snprintf(&prefix[0], sizeof(prefix), "T%d", idx);
+        SBuf b;
+        char dump_instr_buf[128] = {0};
+        sbuf_init(&b, &dump_instr_buf[0], sizeof(dump_instr_buf));
+        print_instr(u, &b);
+        tcg_tag_begin(&tag, idx, "%s", &dump_instr_buf[0]);
         switch (u->opc) {
             // FIXME: support all TCG-ops
             case addc1o_i32:
@@ -420,5 +553,17 @@ void translate_batch(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack,
 #endif
             default: assert(0);
         }
+        tcg_tag_end(&tag);
     }
+
+    //if (tcg_tag_dump_map(&tag, "tb.tcgmap") != 0)
+    //    fprintf(stderr, "warning: could not write tb.tcgmap\n");
+
+#ifdef USE_TCG_DEBUGINFO
+    if (dib) {
+        LLVMDIBuilderFinalize(dib);
+        LLVMDisposeDIBuilder(dib);
+    }
+#endif
+    tcg_tag_dispose(&tag);
 }

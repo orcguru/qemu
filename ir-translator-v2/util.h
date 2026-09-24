@@ -8,6 +8,13 @@
 #include <string.h>
 #include "tcg_ast.h"
 
+typedef struct {
+    char  *buf;     /* destination, may be NULL                        */
+    size_t cap;     /* allocated bytes; 0 == measure only              */
+    size_t len;     /* bytes actually stored, excluding NUL; always < cap */
+    size_t want;    /* bytes the output would have taken, excluding NUL */
+} SBuf;
+
 uint64_t get_vec_offset(uint64_t vec_idx);
 void register_xmm(uint64_t idx, uint64_t offset);
 void register_xmm_tmp(uint64_t offset);
@@ -36,6 +43,9 @@ void func_list_append(FuncInstrList *list, UnifiedInstr *u);
 void func_list_init(FuncInstrList *list);
 int get_next_func_list_idx(TcgContext *ctx);
 LLVMType get_operand_type(const Operand *op);
+void sbuf_init(SBuf *b, char *buf, size_t cap);
+void sbuf_putc(SBuf *b, char c);
+int sbuf_printf(SBuf *b, const char *fmt, ...);
 
 #define TMP_WORD(idx)  ((idx) / 64)
 #define TMP_BIT(idx)   ((idx) % 64)

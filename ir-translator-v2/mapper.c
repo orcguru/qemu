@@ -426,9 +426,7 @@ void translate_to_llvm_func(TcgContext *ctx, const char *name, FuncInstrList *f,
     LLVMPositionBuilderAtEnd(g_builder, entry);
     StackAlloca *stack = setup_stack(ctx, F);
     // One-to-one mapping from TCG-ops to LLVM-IR
-    translate_batch(g_builder, F, stack, f);
-    for (const UnifiedInstr *u = f->head; u; u = u->next) {
-    }
+    translate_batch(g_module, g_builder, F, stack, f);
     release_stack(stack);
 }
 
@@ -507,7 +505,8 @@ int init_llvm() {
     g_target_machine = LLVMCreateTargetMachine(target, default_triple, "generic", features,
                                              LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelDefault);
 
-    LLVMContextRef context = LLVMGetGlobalContext();
+    g_module = LLVMModuleCreateWithName("qemuaot");
+    LLVMContextRef context = LLVMGetModuleContext(g_module);
     g_attr_noinline = LLVMCreateEnumAttribute(context, LLVMNoInlineAttribute, 0);
     g_attr_alwaysinline = LLVMCreateEnumAttribute(context, LLVMAlwaysInlineAttribute, 0);
     g_attr_nounwind = LLVMCreateEnumAttribute(context, LLVMGetEnumAttributeKindForName("nounwind", strlen("nounwind")), 0);
@@ -522,7 +521,6 @@ int init_llvm() {
     size_t attr_key_len = strlen(attr_key);
     size_t attr_value_len = strlen(attr_value);
     g_attr_target_features = LLVMCreateStringAttribute(context, attr_key, attr_key_len, attr_value, attr_value_len);
-    g_module = LLVMModuleCreateWithNameInContext("qemuaot", context);
 
 #if defined(__aarch64__)
     LLVMSetTarget(g_module, "aarch64-unknown-linux-gnu");

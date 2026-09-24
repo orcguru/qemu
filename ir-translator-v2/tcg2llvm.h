@@ -6,6 +6,6 @@
 #include "mapper.h"
 #include "tcg_context.h"
 
-void translate_batch(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f);
+void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f);
 
 #endif

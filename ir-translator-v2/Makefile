@@ -72,7 +72,7 @@ BUILD_LOG := $(QEMU_BUILD)/fpu_helper_build.log
 
 all: tcg_mapper tcg_printer
 
-tcg_mapper: parser.tab.o lexer.yy.o mapper.o tcg2llvm.o mapper_util.o helper_lookup.o util.o expander.o operand_static_types.o i386_cpu.o
+tcg_mapper: parser.tab.o lexer.yy.o mapper.o tcg_llvm_tag.o tcg2llvm.o mapper_util.o helper_lookup.o util.o expander.o operand_static_types.o i386_cpu.o
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
 tcg_printer: parser.tab.o lexer.yy.o printer.o mapper_util.o helper_lookup.o util.o expander.o operand_static_types.o i386_cpu.o
