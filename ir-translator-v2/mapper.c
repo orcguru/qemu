@@ -45,15 +45,14 @@ LLVMAttributeRef g_attr_noinline = NULL;
 LLVMAttributeRef g_attr_alwaysinline = NULL;
 LLVMAttributeRef g_attr_nounwind = NULL;
 
-LLVMValueRef get_stack_or_copy(AllocaWithState *as, int idx, const char *base_name) {
+static LLVMValueRef get_copy_or_load_from_stack(AllocaWithState *as, int idx, const char *base_name) {
     LLVMValueRef val = NULL;
     char var_name[32] = {0};
     if (test_bit(as->copy_valid, idx)) {
         val = as->copy[idx];
         assert(val);
     } else {
-        val = build_load_with_alignment(g_builder, get_llvm_type(as->ty[idx]), as->alloca[idx], assemble_name_2(&var_name[0], sizeof(var_name), base_name, "val", as->copy_idx[idx]), GET_ALIGNMENT_FROM_TYPE(as->ty[idx]));
-        as->copy_idx[idx] += 1;
+        val = build_load_with_alignment(g_builder, get_llvm_type(as->ty[idx]), as->alloca[idx], assemble_name_2(&var_name[0], sizeof(var_name), base_name, "val"), GET_ALIGNMENT_FROM_TYPE(as->ty[idx]));
         as->copy[idx] = val;
         set_bit(as->copy_valid, idx);
     }
@@ -64,10 +63,10 @@ LLVMValueRef shrink_llvm_value(LLVMValueRef val, LLVMType from, LLVMType to) {
     assert(to < from);
     char var_name[32] = {0};
     if (from <= LLVMInt64) {
-        return LLVMBuildTrunc(g_builder, val, get_llvm_type(to), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "trunc", 0));
+        return LLVMBuildTrunc(g_builder, val, get_llvm_type(to), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "trunc"));
     }
     if ((llvm_vector_elem_bit_counts[from * 2] * llvm_vector_elem_bit_counts[from * 2 + 1]) == (llvm_vector_elem_bit_counts[to * 2] * llvm_vector_elem_bit_counts[to * 2 + 1])) {
-        return LLVMBuildBitCast(g_builder, val, get_llvm_type(to), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc", 0));
+        return LLVMBuildBitCast(g_builder, val, get_llvm_type(to), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc"));
     }
     assert((llvm_vector_elem_bit_counts[from * 2] * llvm_vector_elem_bit_counts[from * 2 + 1]) % (llvm_vector_elem_bit_counts[to * 2] * llvm_vector_elem_bit_counts[to * 2 + 1]) == 0);
     int elem_cnt = (llvm_vector_elem_bit_counts[from * 2] * llvm_vector_elem_bit_counts[from * 2 + 1]) / (llvm_vector_elem_bit_counts[to * 2] * llvm_vector_elem_bit_counts[to * 2 + 1]);
@@ -88,16 +87,16 @@ LLVMValueRef shrink_llvm_value(LLVMValueRef val, LLVMType from, LLVMType to) {
         }
     }
     assert(bc_ty != LLVMInvalidType && elem_ty != LLVMInvalidType);
-    val = LLVMBuildBitCast(g_builder, val, get_llvm_type(bc_ty), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc", 0));
+    val = LLVMBuildBitCast(g_builder, val, get_llvm_type(bc_ty), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc"));
     LLVMValueRef index = LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0);
-    val = LLVMBuildExtractElement(g_builder, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "elem", 0));
+    val = LLVMBuildExtractElement(g_builder, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "elem"));
     if (elem_ty != to) {
-        val = LLVMBuildBitCast(g_builder, val, get_llvm_type(to), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc", 0));
+        val = LLVMBuildBitCast(g_builder, val, get_llvm_type(to), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc"));
     }
     return val;
 }
 
-LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, OpCodeType opc, int cnt) {
+LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, OpCodeType opc) {
     LLVMValueRef val = NULL;
     char var_name[32] = {0};
     if (op->kind == OP_IMM) {
@@ -127,12 +126,12 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, Op
         assert(op->kind != OP_ENV || op->env.offset != 0);
         LLVMType op_ty = op->kind == OP_SLOT ? op->slot.op_type : op->env.op_type;
         LLVMValueRef offset = LLVMConstInt(get_llvm_type(LLVMInt64), op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset, 0);
-        LLVMValueRef addr = LLVMBuildAdd(g_builder, stack->env, offset, assemble_name_3(&var_name[0], sizeof(var_name), "addr", op->kind == OP_SLOT ? envvar_type_str[op->slot.idx] : "envoff", opcode_type_str[opc], cnt));
-        LLVMValueRef ptr = LLVMBuildIntToPtr(g_builder, addr, LLVMPointerType(get_llvm_type(op_ty), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr", 0));
-        val = build_load_with_alignment(g_builder, get_llvm_type(op_ty), ptr, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "val", 0), op->kind == OP_SLOT ? 8 : GET_ALIGNMENT_FROM_OFFSET(op->env.offset));
+        LLVMValueRef addr = LLVMBuildAdd(g_builder, stack->env, offset, assemble_name_3(&var_name[0], sizeof(var_name), "addr", op->kind == OP_SLOT ? envvar_type_str[op->slot.idx] : "envoff", opcode_type_str[opc]));
+        LLVMValueRef ptr = LLVMBuildIntToPtr(g_builder, addr, LLVMPointerType(get_llvm_type(op_ty), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
+        val = build_load_with_alignment(g_builder, get_llvm_type(op_ty), ptr, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "val"), op->kind == OP_SLOT ? 8 : GET_ALIGNMENT_FROM_OFFSET(op->env.offset));
         return val;
     } else if (op->kind == OP_VEC) {
-        val = get_stack_or_copy(&stack->vector, op->vec.idx, qemuaot_default_stack_alloca_name[XREG_MAX + op->vec.idx]);
+        val = get_copy_or_load_from_stack(&stack->vector, op->vec.idx, qemuaot_default_stack_alloca_name[XREG_MAX + op->vec.idx]);
         if (op->vec.offset == 0) {
             if (op->vec.op_type != stack->vector.ty[op->vec.idx]) {
                 val = shrink_llvm_value(val, stack->vector.ty[op->vec.idx], op->vec.op_type);
@@ -144,10 +143,10 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, Op
         assert(op->vec.offset % ((llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1] / 8)) == 0);
         LLVMValueRef index = LLVMConstInt(get_llvm_type(LLVMInt64), (op->vec.offset / ((llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1] / 8))), 0);
         if (((stack->vector.ty[op->vec.idx] - op->vec.op_type) % 4) != 0) {
-            val = LLVMBuildBitCast(g_builder, val, get_llvm_type(op->vec.op_type + LLVMVector16xi8 - LLVMInt8), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc", 0));
+            val = LLVMBuildBitCast(g_builder, val, get_llvm_type(op->vec.op_type + LLVMVector16xi8 - LLVMInt8), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc"));
         }
         // FIXME: scalable vector
-        val = LLVMBuildExtractElement(g_builder, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "elem", 0));
+        val = LLVMBuildExtractElement(g_builder, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "elem"));
         return val;
     } else if (op->kind == OP_SLOT) {
         assert(op->slot.type == SUB_SLOT_XREG || op->slot.type == SUB_SLOT_TMP);
@@ -158,7 +157,7 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, Op
         } else {
             p_name = qemuaot_default_stack_alloca_name[op->slot.idx];
         }
-        val = get_stack_or_copy(op->slot.type == SUB_SLOT_TMP ? &stack->tmp : &stack->xreg, op->slot.idx, p_name);
+        val = get_copy_or_load_from_stack(op->slot.type == SUB_SLOT_TMP ? &stack->tmp : &stack->xreg, op->slot.idx, p_name);
         LLVMType stack_ty = op->slot.type == SUB_SLOT_TMP ? stack->tmp.ty[op->slot.idx] : stack->xreg.ty[op->slot.idx];
         assert(op->slot.op_type <= stack_ty);
         if (op->slot.op_type != stack_ty) {
@@ -207,7 +206,7 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
 /*
  * Notice: LLVMInt128 store not supported
  */
-void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, OpCodeType opc, int cnt) {
+void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, OpCodeType opc) {
     char var_name[32] = {0};
     if ((op->kind == OP_SLOT && op->slot.type == SUB_SLOT_TMP) || op->kind == OP_VEC) {
         LLVMType val_ty = get_operand_type(op);
@@ -217,7 +216,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, OpCodeTyp
                (val_ty <= LLVMInt64 && stack_ty > LLVMInt64) ||
                (val_ty > LLVMInt64 && stack_ty > LLVMInt64));
         if (val_ty <= LLVMInt64 && stack_ty <= LLVMInt64 && val_ty < stack_ty) {
-            val = LLVMBuildZExt(g_builder, val, get_llvm_type(stack_ty), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "zext", 0));
+            val = LLVMBuildZExt(g_builder, val, get_llvm_type(stack_ty), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "zext"));
         } else if ((val_ty <= LLVMInt64 && stack_ty > LLVMInt64) || (val_ty <= LLVMVector1xi64 && stack_ty > LLVMVector1xi64)) {
             // Store overwrite the whole content of vector type with zero background
             assert(op->kind != OP_VEC || (op->vec.offset * 8) % (llvm_vector_elem_bit_counts[val_ty * 2] * llvm_vector_elem_bit_counts[val_ty * 2 + 1]) == 0);
@@ -225,10 +224,10 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, OpCodeTyp
             LLVMValueRef constants[16];
             if (val_ty > LLVMInt64) {
                 if (val_ty != LLVMVector1xi64) {
-                    val = LLVMBuildBitCast(g_builder, val, get_llvm_type(LLVMVector1xi64), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc", 0));
+                    val = LLVMBuildBitCast(g_builder, val, get_llvm_type(LLVMVector1xi64), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc"));
                 }
                 LLVMValueRef index = LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0);
-                val = LLVMBuildExtractElement(g_builder, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "val", 0));
+                val = LLVMBuildExtractElement(g_builder, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "val"));
                 val_ty = LLVMInt64;
             }
             LLVMValueRef element_value = LLVMConstInt(get_llvm_type(val_ty), 0, 0);
@@ -237,14 +236,14 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, OpCodeTyp
             }
             LLVMValueRef vec_zero = LLVMConstVector(constants, elem_cnt);
             LLVMValueRef index = LLVMConstInt(get_llvm_type(LLVMInt64), op->kind == OP_SLOT ? 0 : ((op->vec.offset * 8) / llvm_vector_elem_bit_counts[val_ty * 2 + 1]), 0);
-            val = LLVMBuildInsertElement(g_builder, vec_zero, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "vec", 0));
+            val = LLVMBuildInsertElement(g_builder, vec_zero, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "vec"));
             if (((stack_ty - val_ty) % 4) != 0) {
-                val = LLVMBuildBitCast(g_builder, val, get_llvm_type(stack_ty), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc", 0));
+                val = LLVMBuildBitCast(g_builder, val, get_llvm_type(stack_ty), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc"));
             }
         } else if (val_ty > LLVMInt64 && stack_ty > LLVMInt64 && val_ty != stack_ty) {
             assert((llvm_vector_elem_bit_counts[val_ty * 2] * llvm_vector_elem_bit_counts[val_ty * 2 + 1]) ==
                 (llvm_vector_elem_bit_counts[stack_ty * 2] * llvm_vector_elem_bit_counts[stack_ty * 2 + 1]));
-            val = LLVMBuildBitCast(g_builder, val, get_llvm_type(stack_ty), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc", 0));
+            val = LLVMBuildBitCast(g_builder, val, get_llvm_type(stack_ty), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc"));
         } else {
             assert(val_ty == stack_ty);
         }
@@ -257,7 +256,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, OpCodeTyp
     }
     if ((op->kind == OP_SLOT && op->slot.type == SUB_SLOT_ENVVAR) || op->kind == OP_ENV) {
         LLVMValueRef offset = LLVMConstInt(get_llvm_type(LLVMInt64), op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset, 0);
-        LLVMValueRef addr = LLVMBuildAdd(g_builder, stack->env, offset, assemble_name_3(&var_name[0], sizeof(var_name), "addr", op->kind == OP_SLOT ? envvar_type_str[op->slot.idx] : "envoff", opcode_type_str[opc], cnt));
+        LLVMValueRef addr = LLVMBuildAdd(g_builder, stack->env, offset, assemble_name_3(&var_name[0], sizeof(var_name), "addr", op->kind == OP_SLOT ? envvar_type_str[op->slot.idx] : "envoff", opcode_type_str[opc]));
         build_store_with_alignment(g_builder, val, addr, op->kind == OP_SLOT ? GET_ALIGNMENT_FROM_TYPE(op->slot.op_type) : GET_ALIGNMENT_FROM_OFFSET(op->env.offset));
         return;
     }
@@ -327,7 +326,6 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
     stack->xreg.copy_valid = (uint64_t *)calloc(1, sizeof(uint64_t));
     stack->xreg.copy_valid_cnt = 1;
     stack->xreg.copy = (LLVMValueRef *)calloc(XREG_MAX, sizeof(LLVMValueRef));
-    stack->xreg.copy_idx = (int *)calloc(XREG_MAX, sizeof(int));
     stack->xreg.cnt = XREG_MAX;
     for (int i = 0; i < XREG_MAX; ++i) {
         if (ctx->xreg_valid & (1 << i)) {
@@ -342,7 +340,6 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
     stack->vector.copy_valid = (uint64_t *)calloc(1, sizeof(uint64_t));
     stack->vector.copy_valid_cnt = 1;
     stack->vector.copy = (LLVMValueRef *)calloc((2 * XMM_COUNT_MAX), sizeof(LLVMValueRef));
-    stack->vector.copy_idx = (int *)calloc((2 * XMM_COUNT_MAX), sizeof(int));
     stack->vector.cnt = (2 * XMM_COUNT_MAX);
     for (int i = 0; i < (2 * XMM_COUNT_MAX); ++i) {
         if ((ctx->vec_valid & (1 << i)) || (ctx->vec_spare_valid & (1 << i))) {
@@ -357,7 +354,6 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
     stack->tmp.copy_valid = (uint64_t *)calloc((ctx->next_tmp_idx + 63) / 64, sizeof(uint64_t));
     stack->tmp.copy_valid_cnt = (ctx->next_tmp_idx + 63) / 64;
     stack->tmp.copy = (LLVMValueRef *)calloc(ctx->next_tmp_idx, sizeof(LLVMValueRef));
-    stack->tmp.copy_idx = (int *)calloc(ctx->next_tmp_idx, sizeof(int));
     stack->tmp.cnt = ctx->next_tmp_idx;
     for (int i = 0; i < ctx->next_tmp_idx; ++i) {
         LLVMType stack_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
@@ -397,17 +393,14 @@ static void release_stack(StackAlloca *stack) {
     free(stack->xreg.alloca);
     free(stack->xreg.copy_valid);
     free(stack->xreg.copy);
-    free(stack->xreg.copy_idx);
     free(stack->vector.ty);
     free(stack->vector.alloca);
     free(stack->vector.copy_valid);
     free(stack->vector.copy);
-    free(stack->vector.copy_idx);
     free(stack->tmp.ty);
     free(stack->tmp.alloca);
     free(stack->tmp.copy_valid);
     free(stack->tmp.copy);
-    free(stack->tmp.copy_idx);
     free(stack);
 }
 

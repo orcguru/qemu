@@ -10,37 +10,33 @@
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 
-void translate_common(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca *stack, const UnifiedInstr *u, int *cnt_ptr) {
+void translate_common(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca *stack, const UnifiedInstr *u) {
     char name_buf[32] = {0};
-    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, u->opc, *cnt_ptr);
-    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, u->opc, *cnt_ptr);
-    LLVMValueRef out = llvm_api(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "out", *cnt_ptr));
-    do_store(&u->operands[0], out, stack, u->opc, *cnt_ptr);
-    *cnt_ptr += 1;
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, u->opc);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, u->opc);
+    LLVMValueRef out = llvm_api(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "out"));
+    do_store(&u->operands[0], out, stack, u->opc);
 }
 
-void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, int *cnt_ptr) {
+void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u) {
     char name_buf[32] = {0};
-    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, u->opc, *cnt_ptr);
-    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, u->opc, *cnt_ptr);
-    LLVMValueRef sum = LLVMBuildAdd(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "sum", *cnt_ptr));
-    LLVMValueRef ca = build_load_with_alignment(builder, LLVMInt1Type(), stack->carry, assemble_name_1(&name_buf[0], sizeof(name_buf), "carry", *cnt_ptr), 8);
-    LLVMValueRef ca_ext = LLVMBuildZExt(builder, ca, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_1(&name_buf[0], sizeof(name_buf), "carry_ext", *cnt_ptr));
-    LLVMValueRef out = LLVMBuildAdd(builder, sum, ca_ext, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "out", *cnt_ptr));
-    do_store(&u->operands[0], out, stack, u->opc, *cnt_ptr);
-    *cnt_ptr += 1;
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, u->opc);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, u->opc);
+    LLVMValueRef sum = LLVMBuildAdd(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "sum"));
+    LLVMValueRef ca = build_load_with_alignment(builder, LLVMInt1Type(), stack->carry, assemble_name_1(&name_buf[0], sizeof(name_buf), "carry"), 8);
+    LLVMValueRef ca_ext = LLVMBuildZExt(builder, ca, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_1(&name_buf[0], sizeof(name_buf), "carry_ext"));
+    LLVMValueRef out = LLVMBuildAdd(builder, sum, ca_ext, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "out"));
+    do_store(&u->operands[0], out, stack, u->opc);
 }
 
 #define CASE(opc, entry)                    \
         case opc:                           \
-            int cnt_##opc = 0;              \
-            entry(builder, stack, u, &cnt_##opc);  \
+            entry(builder, stack, u);       \
             break
 
 #define CASE_COMMON(opc, llvm_api)          \
         case opc:                           \
-            int cnt_##opc = 0;              \
-            translate_common(builder, llvm_api, stack, u, &cnt_##opc);  \
+            translate_common(builder, llvm_api, stack, u);  \
             break
 
 void translate_batch(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f) {
@@ -56,7 +52,6 @@ void translate_batch(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack,
             case divu2_i32:
             case divu2_i64:
             case dup_vec:
-                int cnt0 = 0;
                 assert(0);
                 break;
 

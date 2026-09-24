@@ -66,30 +66,18 @@ static inline int get_first_input_idx_on_call(const UnifiedInstr *u) {
     return u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? (TCG_CALL_PREFIX_COUNT + 1) : TCG_CALL_PREFIX_COUNT;
 }
 
-static inline char *assemble_name_1(char *buffer, int size, const char *p1, int idx) {
-    if (idx == 0) {
-        snprintf(buffer, size, "%s", p1);
-    } else {
-        snprintf(buffer, size, "%s.%d", p1, idx);
-    }
+static inline char *assemble_name_1(char *buffer, int size, const char *p1) {
+    snprintf(buffer, size, "%s", p1);
     return buffer;
 }
 
-static inline char *assemble_name_2(char *buffer, int size, const char *p1, const char *p2, int idx) {
-    if (idx == 0) {
-        snprintf(buffer, size, "%s.%s", p1, p2);
-    } else {
-        snprintf(buffer, size, "%s.%s.%d", p1, p2, idx);
-    }
+static inline char *assemble_name_2(char *buffer, int size, const char *p1, const char *p2) {
+    snprintf(buffer, size, "%s.%s", p1, p2);
     return buffer;
 }
 
-static inline char *assemble_name_3(char *buffer, int size, const char *p1, const char *p2, const char *p3, int idx) {
-    if (idx == 0) {
-        snprintf(buffer, size, "%s.%s.%s", p1, p2, p3);
-    } else {
-        snprintf(buffer, size, "%s.%s.%s.%d", p1, p2, p3, idx);
-    }
+static inline char *assemble_name_3(char *buffer, int size, const char *p1, const char *p2, const char *p3) {
+    snprintf(buffer, size, "%s.%s.%s", p1, p2, p3);
     return buffer;
 }
 
