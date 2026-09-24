@@ -8,6 +8,17 @@
 #include "mapper_util.h"
 #include <assert.h>
 
+typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
+
+void translate_common(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca *stack, const UnifiedInstr *u, int *cnt_ptr) {
+    char name_buf[32] = {0};
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, u->opc, *cnt_ptr);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, u->opc, *cnt_ptr);
+    LLVMValueRef out = llvm_api(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), opcode_type_str[u->opc], "out", *cnt_ptr));
+    do_store(&u->operands[0], out, stack, u->opc, *cnt_ptr);
+    *cnt_ptr += 1;
+}
+
 void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, int *cnt_ptr) {
     char name_buf[32] = {0};
     LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, u->opc, *cnt_ptr);
@@ -24,6 +35,12 @@ void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
         case opc:                           \
             int cnt_##opc = 0;              \
             entry(builder, stack, u, &cnt_##opc);  \
+            break
+
+#define CASE_COMMON(opc, llvm_api)          \
+        case opc:                           \
+            int cnt_##opc = 0;              \
+            translate_common(builder, llvm_api, stack, u, &cnt_##opc);  \
             break
 
 void translate_batch(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f) {
@@ -136,9 +153,11 @@ void translate_batch(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack,
             case ussub_vec:
                 translate_binary_intrinsic(opc, u, "llvm.usub.sat");
                 break;
-            case add_i64:
-                translate_binary(opc, u, LLVMBuildAdd);
-                break;
+#endif
+            CASE_COMMON(add_i32, LLVMBuildAdd);
+            CASE_COMMON(add_i64, LLVMBuildAdd);
+            CASE_COMMON(add_vec, LLVMBuildAdd);
+#if 0
             case add_i32:
             case add_vec:
                 translate_binary(opc, u, LLVMBuildAdd);

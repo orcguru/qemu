@@ -7,9 +7,17 @@
 typedef struct AllocaWithState {
     LLVMType *ty;
     LLVMValueRef *alloca;
-    uint64_t *copy_valid;
-    LLVMValueRef *copy;
+    // Postfix index number keeps growing on each reference for variable names
     int *copy_idx;
+    int cnt;
+    /*
+     * Information regarding the value cache within current BB,
+     * gets reset on entering a new BB
+     */
+    LLVMValueRef *copy;
+    // Bit array to validate the copy array
+    uint64_t *copy_valid;
+    int copy_valid_cnt;
 } AllocaWithState;
 
 typedef struct StackAlloca {
@@ -26,6 +34,7 @@ LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVM
 LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMValueRef PointerVal, const char *Name, unsigned Bytes);
 LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, OpCodeType opc, int cnt);
 void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, OpCodeType opc, int cnt);
+void start_llvm_bb(LLVMBasicBlockRef bb, StackAlloca *stack);
 
 #define GET_ALIGNMENT_FROM_TYPE(type)       (type <= LLVMInt64 ? 8 : 16)
 

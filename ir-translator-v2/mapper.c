@@ -66,6 +66,9 @@ LLVMValueRef shrink_llvm_value(LLVMValueRef val, LLVMType from, LLVMType to) {
     if (from <= LLVMInt64) {
         return LLVMBuildTrunc(g_builder, val, get_llvm_type(to), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "trunc", 0));
     }
+    if ((llvm_vector_elem_bit_counts[from * 2] * llvm_vector_elem_bit_counts[from * 2 + 1]) == (llvm_vector_elem_bit_counts[to * 2] * llvm_vector_elem_bit_counts[to * 2 + 1])) {
+        return LLVMBuildBitCast(g_builder, val, get_llvm_type(to), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc", 0));
+    }
     assert((llvm_vector_elem_bit_counts[from * 2] * llvm_vector_elem_bit_counts[from * 2 + 1]) % (llvm_vector_elem_bit_counts[to * 2] * llvm_vector_elem_bit_counts[to * 2 + 1]) == 0);
     int elem_cnt = (llvm_vector_elem_bit_counts[from * 2] * llvm_vector_elem_bit_counts[from * 2 + 1]) / (llvm_vector_elem_bit_counts[to * 2] * llvm_vector_elem_bit_counts[to * 2 + 1]);
     int elem_bits = (llvm_vector_elem_bit_counts[to * 2] * llvm_vector_elem_bit_counts[to * 2 + 1]);
@@ -322,8 +325,10 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
     stack->xreg.ty = (LLVMType *)calloc(XREG_MAX, sizeof(LLVMType));
     stack->xreg.alloca = (LLVMValueRef *)calloc(XREG_MAX, sizeof(LLVMValueRef));
     stack->xreg.copy_valid = (uint64_t *)calloc(1, sizeof(uint64_t));
+    stack->xreg.copy_valid_cnt = 1;
     stack->xreg.copy = (LLVMValueRef *)calloc(XREG_MAX, sizeof(LLVMValueRef));
     stack->xreg.copy_idx = (int *)calloc(XREG_MAX, sizeof(int));
+    stack->xreg.cnt = XREG_MAX;
     for (int i = 0; i < XREG_MAX; ++i) {
         if (ctx->xreg_valid & (1 << i)) {
             stack->xreg.ty[i] = qemuaot_default_param_type[i];
@@ -335,8 +340,10 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
     stack->vector.ty = (LLVMType *)calloc((2 * XMM_COUNT_MAX), sizeof(LLVMType));
     stack->vector.alloca = (LLVMValueRef *)calloc((2 * XMM_COUNT_MAX), sizeof(LLVMValueRef));
     stack->vector.copy_valid = (uint64_t *)calloc(1, sizeof(uint64_t));
+    stack->vector.copy_valid_cnt = 1;
     stack->vector.copy = (LLVMValueRef *)calloc((2 * XMM_COUNT_MAX), sizeof(LLVMValueRef));
     stack->vector.copy_idx = (int *)calloc((2 * XMM_COUNT_MAX), sizeof(int));
+    stack->vector.cnt = (2 * XMM_COUNT_MAX);
     for (int i = 0; i < (2 * XMM_COUNT_MAX); ++i) {
         if ((ctx->vec_valid & (1 << i)) || (ctx->vec_spare_valid & (1 << i))) {
             stack->vector.ty[i] = qemuaot_default_param_type[XREG_MAX + i];
@@ -348,8 +355,10 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
     stack->tmp.ty = (LLVMType *)calloc(ctx->next_tmp_idx, sizeof(LLVMType));
     stack->tmp.alloca = (LLVMValueRef *)calloc(ctx->next_tmp_idx, sizeof(LLVMValueRef));
     stack->tmp.copy_valid = (uint64_t *)calloc((ctx->next_tmp_idx + 63) / 64, sizeof(uint64_t));
+    stack->tmp.copy_valid_cnt = (ctx->next_tmp_idx + 63) / 64;
     stack->tmp.copy = (LLVMValueRef *)calloc(ctx->next_tmp_idx, sizeof(LLVMValueRef));
     stack->tmp.copy_idx = (int *)calloc(ctx->next_tmp_idx, sizeof(int));
+    stack->tmp.cnt = ctx->next_tmp_idx;
     for (int i = 0; i < ctx->next_tmp_idx; ++i) {
         LLVMType stack_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
         assert(stack_ty != LLVMInvalidType);
@@ -371,6 +380,16 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
         stack->env = get_env();
     }
     return stack;
+}
+
+void start_llvm_bb(LLVMBasicBlockRef bb, StackAlloca *stack) {
+    LLVMPositionBuilderAtEnd(g_builder, bb);
+    memset(stack->xreg.copy_valid, 0, stack->xreg.copy_valid_cnt * sizeof(uint64_t));
+    memset(stack->xreg.copy, 0, stack->xreg.cnt * sizeof(LLVMValueRef));
+    memset(stack->vector.copy_valid, 0, stack->vector.copy_valid_cnt * sizeof(uint64_t));
+    memset(stack->vector.copy, 0, stack->vector.cnt * sizeof(LLVMValueRef));
+    memset(stack->tmp.copy_valid, 0, stack->tmp.copy_valid_cnt * sizeof(uint64_t));
+    memset(stack->tmp.copy, 0, stack->tmp.cnt * sizeof(LLVMValueRef));
 }
 
 static void release_stack(StackAlloca *stack) {

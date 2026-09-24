@@ -165,6 +165,8 @@ const LLVMType opciosz[OPCODE_MAX][2] = {
     [qemu_st2_i128] = SAME(LLVMInt64),
     [qemu_st_i32] = {LLVMInvalidType, LLVMInt32},
     [qemu_st_i64] = {LLVMInvalidType, LLVMInt64},
+    // MISC
+    [jmp_direct] = {LLVMInt64, LLVMInvalidType},
     // Vector
     [abs_vec] = SAME(LLVMInvalidType),
     [dupm_vec] = SAME(LLVMInvalidType),

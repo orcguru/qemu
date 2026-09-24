@@ -422,7 +422,7 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
         if (opcmem_addr_nzidx[u->opc] > 0) {
             // Memory operations
             if (i < opcmem_addr_nzidx[u->opc]) {
-                assert(u->operands[i].kind == OP_SLOT);
+                assert(u->operands[i].kind == OP_SLOT || u->operands[i].kind == OP_IMM);
                 // Register-bits
                 set_operand_type(ctx, &u->operands[i], opciosz[u->opc][1]);
             } else {
