@@ -30,6 +30,40 @@ void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
     do_store(&u->operands[0], out, stack, prefix);
 }
 
+static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
+    LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
+    while (bb != NULL) {
+        const char *block_name = LLVMGetBasicBlockName(bb);
+        if (block_name != NULL && strcmp(block_name, name) == 0) {
+            return bb;
+        }
+        bb = LLVMGetNextBasicBlock(bb);
+    }
+    return NULL;
+}
+
+void translate_set_label(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    assert(u->operands[0].kind == OP_LABEL);
+    char label_name[16] = {0};
+    sprintf(label_name, "bb_L%d", u->operands[0].label);
+    LLVMBasicBlockRef label = get_bb(F, &label_name[0]);
+    if (!label) {
+        label = LLVMAppendBasicBlock(F, &label_name[0]);
+    }
+    start_llvm_bb(label, stack);
+}
+
+void translate_br(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    assert(u->operands[0].kind == OP_LABEL);
+    char label_name[16] = {0};
+    sprintf(label_name, "bb_L%d", u->operands[0].label);
+    LLVMBasicBlockRef label = get_bb(F, &label_name[0]);
+    if (!label) {
+        label = LLVMAppendBasicBlock(F, &label_name[0]);
+    }
+    LLVMBuildBr(builder, label);
+}
+
 static void print_operand(const Operand *op, int is_output, SBuf *b) {
     if (is_output) {
         sbuf_putc(b, '[');
@@ -155,6 +189,11 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
 #define CASE_COMMON(opc, llvm_api)                                      \
         case opc:                                                       \
             translate_common(builder, llvm_api, stack, u, &prefix[0]);  \
+            break
+
+#define CASE_FUNC(opc, entry)                       \
+        case opc:                                   \
+            entry(builder, F, stack, u, &prefix[0]);\
             break
 
 void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f) {
@@ -531,9 +570,10 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
             case xor_vec:
                 translate_binary(opc, u, LLVMBuildXor);
                 break;
-            case set_label:
-                translate_set_label(opc, u);
-                break;
+#endif
+            CASE_FUNC(set_label, translate_set_label);
+            CASE_FUNC(br, translate_br);
+#if 0
             case brcond_i32:
             case brcond_i64:
                 translate_brcond_i64(opc, u);
@@ -546,9 +586,6 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
                 break;
             case call:
                 translate_call(opc, u);
-                break;
-            case br:
-                translate_br(opc, u);
                 break;
 #endif
             default: assert(0);

@@ -148,11 +148,11 @@ def main():
     else:
         sys.stdout.write(text)
 
-    if not args.no_stats:
-        print('llvm_annotate: %d TCG groups, %d tagged instructions'
-              % (len(counts), sum(counts.values())), file=sys.stderr)
-        for k, v in list(counts.items())[:10]:
-            print('  %4d instrs  %s' % (v, k), file=sys.stderr)
+    #if not args.no_stats:
+    #    print('llvm_annotate: %d TCG groups, %d tagged instructions'
+    #          % (len(counts), sum(counts.values())), file=sys.stderr)
+    #    for k, v in list(counts.items())[:10]:
+    #        print('  %4d instrs  %s' % (v, k), file=sys.stderr)
 
 
 if __name__ == '__main__':
