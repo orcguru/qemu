@@ -459,13 +459,23 @@ clean-qemu-source:
 clean-local:
 	rm -f *.o parser.tab.* lexer.yy.* tcg_mapper tcg_printer helper_lookup.c tests/expand_tcg_ir/*.out collect_helper_templates/*.E collect_helper_templates/*.E.out collect_helper_templates/*.E.err helper_templates/*
 	rm -rf collect_helper_templates/*.o.E.helper_templates
+	rm -rf tests/translate_to_llvm_ir/out
 
 # Alias preserved from original Makefile
 clean-all: clean
 
 # ============================================================================
-# Testing infrastructure (preserved)
+# Testing infrastructure
+#
+# Two suites:
+#   1. tests/expand_tcg_ir        -> tcg_printer, compared against .exp
+#   2. tests/translate_to_llvm_ir -> tcg_mapper + llvm_annotate.py, compared
+#      against a *host-arch specific* golden .ll file
 # ============================================================================
+
+# ----------------------------------------------------------------------------
+# Suite 1: tests/expand_tcg_ir (tcg_printer vs .exp)
+# ----------------------------------------------------------------------------
 TEST_DIR := tests/expand_tcg_ir
 TIR_FILES := $(wildcard $(TEST_DIR)/*.tir)
 
@@ -475,7 +485,7 @@ endif
 
 # Run tcg_printer over every .tir file, diff the result against .exp, and
 # fail the build if any output differs.
-test:
+test-expand-tcg-ir: $(TCG_PRINTER)
 	@rc=0; \
 	for tir in $(TIR_FILES); do \
 		case "$$tir" in \
@@ -504,7 +514,157 @@ test:
 	done; \
 	exit $$rc
 
-.PHONY: all test clean clean-all clean-local clean-qemu-source \
+# ----------------------------------------------------------------------------
+# Suite 2: tests/translate_to_llvm_ir
+#
+# Every case is a <name>.tir file.  The pipeline is:
+#
+#     ./tcg_mapper -d tests/translate_to_llvm_ir/<name>.tir   >  <name>.ll
+#     ./llvm_annotate.py -o <name>.annotate.ll  <name>.ll
+#
+# and the annotated IR is diffed against the golden file
+#
+#     tests/translate_to_llvm_ir/<name>.tir.$(TEST_ARCH).ll
+#     e.g.  load_store_stack.tir.aarch64.ll   on an aarch64 host
+#           load_store_stack.tir.riscv64.ll   on a riscv64  host
+#
+# The generated IR is host dependent (pointer size, host triplet, host
+# registers, ...), so each native machine keeps its own golden copy.  The arch
+# suffix defaults to the native architecture reported by `uname -m` and can be
+# overridden on the command line, e.g. to re-check a golden set belonging to
+# another machine.
+#
+# Handy invocations:
+#   make test                              # both suites
+#   make test-llvm-ir                      # only the LLVM-IR suite
+#   make test-llvm-ir ONLY=load_store      # subset (substring of case name)
+#   make test-llvm-ir TEST_ARCH=riscv64    # compare against another arch's copy
+#   make test-llvm-ir-update               # (re)create goldens for THIS host
+#   make test-llvm-ir-update ONLY=load_store
+#
+# Artifacts (kept for inspection, cleaned by `make clean`):
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.ll
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.annotate.ll   <- compared
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.diff
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.mapper.err
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.annotate.err
+# ----------------------------------------------------------------------------
+
+# Host architecture used to pick the golden file.  Normalise the usual
+# aliases so that `arm64` (macOS) and `amd64` also land on a sensible suffix.
+# Override with:  make test-llvm-ir TEST_ARCH=riscv64
+ifeq ($(TEST_ARCH),)
+TEST_ARCH := $(ARCH_HOST)
+ifeq ($(TEST_ARCH),arm64)
+TEST_ARCH := aarch64
+endif
+ifeq ($(TEST_ARCH),amd64)
+TEST_ARCH := x86_64
+endif
+endif
+
+LLVM_TIR_DIR    := tests/translate_to_llvm_ir
+LLVM_TIR_FILES  := $(sort $(wildcard $(LLVM_TIR_DIR)/*.tir))
+LLVM_TIR_OUTDIR := $(LLVM_TIR_DIR)/out/$(TEST_ARCH)
+
+LLVM_ANNOTATE ?= ./llvm_annotate.py
+PYTHON        ?= python3
+MAPPER_FLAGS  ?= -d
+
+ifeq ($(TCG_MAPPER),)
+	TCG_MAPPER := ./tcg_mapper
+endif
+
+# Optional subset filter: make test-llvm-ir ONLY=load_store_stack
+ifeq ($(ONLY),)
+LLVM_TIR_CASES := $(LLVM_TIR_FILES)
+else
+LLVM_TIR_CASES := $(foreach f,$(LLVM_TIR_FILES),\
+	$(if $(findstring $(ONLY),$(basename $(notdir $f))),$f))
+endif
+
+# Run every translate_to_llvm_ir case and diff against the per-arch golden.
+test-llvm-ir: $(TCG_MAPPER)
+	@mkdir -p "$(LLVM_TIR_OUTDIR)"
+	@if [ -z "$(LLVM_TIR_CASES)" ]; then \
+		echo "No .tir case found under $(LLVM_TIR_DIR)/"; \
+		exit 0; \
+	fi
+	@echo "==================================================================="
+	@echo "translate_to_llvm_ir: $(words $(LLVM_TIR_CASES)) case(s), TEST_ARCH=$(TEST_ARCH)"
+	@echo "golden file pattern : <name>.tir.$(TEST_ARCH).ll"
+	@echo "==================================================================="
+	@rc=0; pass=0; fail=0; skip=0; \
+	for tir in $(LLVM_TIR_CASES); do \
+		name=$$(basename "$$tir" .tir); \
+		ll="$(LLVM_TIR_OUTDIR)/$$name.ll"; \
+		ann="$(LLVM_TIR_OUTDIR)/$$name.annotate.ll"; \
+		diffout="$(LLVM_TIR_OUTDIR)/$$name.diff"; \
+		exp="$${tir}.$(TEST_ARCH).ll"; \
+		if [ ! -f "$$exp" ] && [ -f "$${tir}.ll" ]; then \
+			exp="$${tir}.ll"; \
+		fi; \
+		echo "==> $$tir"; \
+		if ! $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" 2> "$(LLVM_TIR_OUTDIR)/$$name.mapper.err"; then \
+			echo "FAIL: $$tir (tcg_mapper failed - see $(LLVM_TIR_OUTDIR)/$$name.mapper.err)"; \
+			tail -n 20 "$(LLVM_TIR_OUTDIR)/$$name.mapper.err"; \
+			fail=$$((fail+1)); rc=1; continue; \
+		fi; \
+		if ! $(PYTHON) $(LLVM_ANNOTATE) -o "$$ann" "$$ll" 2> "$(LLVM_TIR_OUTDIR)/$$name.annotate.err"; then \
+			echo "FAIL: $$tir (llvm_annotate.py failed - see $(LLVM_TIR_OUTDIR)/$$name.annotate.err)"; \
+			tail -n 20 "$(LLVM_TIR_OUTDIR)/$$name.annotate.err"; \
+			fail=$$((fail+1)); rc=1; continue; \
+		fi; \
+		if [ ! -s "$$ann" ]; then \
+			echo "FAIL: $$tir ($$ann was not produced by llvm_annotate.py)"; \
+			fail=$$((fail+1)); rc=1; continue; \
+		fi; \
+		if [ ! -f "$$exp" ]; then \
+			echo "SKIP: $$tir (no golden $${tir}.$(TEST_ARCH).ll - wrote $$ann)"; \
+			skip=$$((skip+1)); continue; \
+		fi; \
+		if diff -u "$$exp" "$$ann" > "$$diffout"; then \
+			echo "PASS: $$tir"; \
+			pass=$$((pass+1)); \
+		else \
+			echo "FAIL: $$tir (diff vs $$exp)"; \
+			cat "$$diffout"; \
+			fail=$$((fail+1)); rc=1; \
+		fi; \
+	done; \
+	echo "-------------------------------------------------------------------"; \
+	echo "translate_to_llvm_ir [$(TEST_ARCH)]: $$pass passed, $$fail failed, $$skip skipped"; \
+	if [ "$$skip" -gt 0 ]; then \
+		echo "hint: run 'make test-llvm-ir-update' to create the missing goldens"; \
+	fi; \
+	exit $$rc
+
+# (Re)generate the golden files for the *current* host architecture.
+# Run this on each native machine once, then commit
+# <name>.tir.<arch>.ll next to the .tir file.
+test-llvm-ir-update: $(TCG_MAPPER)
+	@mkdir -p "$(LLVM_TIR_OUTDIR)"
+	@for tir in $(LLVM_TIR_CASES); do \
+		name=$$(basename "$$tir" .tir); \
+		ll="$(LLVM_TIR_OUTDIR)/$$name.ll"; \
+		ann="$(LLVM_TIR_OUTDIR)/$$name.annotate.ll"; \
+		gold="$${tir}.$(TEST_ARCH).ll"; \
+		echo "==> $$tir"; \
+		if $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" && \
+		   $(PYTHON) $(LLVM_ANNOTATE) -o "$$ann" "$$ll"; then \
+			cp -f "$$ann" "$$gold"; \
+			echo "UPDATE: $$gold"; \
+		else \
+			echo "ERROR: pipeline failed for $$tir (golden left untouched)"; \
+		fi; \
+	done
+
+# Default: run both suites.
+test: test-expand-tcg-ir test-llvm-ir
+
+
+.PHONY: all test test-expand-tcg-ir test-llvm-ir test-llvm-ir-update \
+	clean clean-all clean-local clean-qemu-source \
 	qemu-preprocess qemu-preprocess-tcg-runtime \
 	qemu-preprocess-cc-helper qemu-preprocess-int-helper \
 	qemu-preprocess-user-exec \
