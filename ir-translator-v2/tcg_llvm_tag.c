@@ -314,7 +314,8 @@ void tcg_tag_begin(TcgTag *t, unsigned index, const char *fmt, ...)
     vsnprintf(t->text, sizeof t->text, fmt, ap);
     va_end(ap);
 
-    snprintf(t->prefix, sizeof t->prefix, "t%u.", index);
+    // Prefix handled by translate_batch
+    //snprintf(t->prefix, sizeof t->prefix, "T%u.", index);
     snprintf(t->label,  sizeof t->label,  "[%u] %s", index, t->text);
 
     tcg_map_put(t, index, t->text);
