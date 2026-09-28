@@ -143,16 +143,33 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
             }
             return val;
         }
-        // Vectors do not have non-zero offset
         assert(op->vec.op_type <= LLVMInt64);
-        assert(op->vec.offset % ((llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1] / 8)) == 0);
-        LLVMValueRef index = LLVMConstInt(get_llvm_type(LLVMInt64), (op->vec.offset / ((llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1] / 8))), 0);
-        if (((stack->vector.ty[op->vec.idx] - op->vec.op_type) % 4) != 0) {
-            val = LLVMBuildBitCast(g_builder, val, get_llvm_type(op->vec.op_type + LLVMVector16xi8 - LLVMInt8), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc"));
+        if (op->vec.offset % ((llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1] / 8)) == 0) {
+            LLVMValueRef index = LLVMConstInt(get_llvm_type(LLVMInt64), (op->vec.offset / ((llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1] / 8))), 0);
+            if (((stack->vector.ty[op->vec.idx] - op->vec.op_type) % 4) != 0) {
+                val = LLVMBuildBitCast(g_builder, val, get_llvm_type(op->vec.op_type + LLVMVector16xi8 - LLVMInt8), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "bc"));
+            }
+            // FIXME: scalable vector
+            val = LLVMBuildExtractElement(g_builder, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ee"));
+            return val;
+        } else {
+            // Store the content of vector into CPUArchState, and then do the load
+            Operand op_vec = *op;
+            op_vec.vec.offset = 0;
+            op_vec.vec.op_type = op_vec.vec.stack_type;
+            val = get_input_val_for_operand(&op_vec, stack, prefix);
+            Operand op_env_offset;
+            op_env_offset.kind = OP_ENV;
+            op_env_offset.env.offset = get_vec_offset(op->vec.idx);
+            op_env_offset.env.op_type = op_env_offset.env.stack_type = op_vec.vec.stack_type;
+            do_store(&op_env_offset, val, stack, prefix);
+            Operand op_env_load;
+            op_env_load.kind = OP_ENV;
+            op_env_load.env.offset = get_vec_offset(op->vec.idx) + op->vec.offset;
+            op_env_load.env.op_type = op->vec.op_type;
+            op_env_load.env.stack_type = LLVMInvalidType;
+            return get_input_val_for_operand(&op_env_load, stack, prefix);
         }
-        // FIXME: scalable vector
-        val = LLVMBuildExtractElement(g_builder, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ee"));
-        return val;
     } else if (op->kind == OP_SLOT) {
         assert(op->slot.type == SUB_SLOT_XREG || op->slot.type == SUB_SLOT_TMP);
         const char *p_name = NULL;
@@ -264,7 +281,9 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
     if ((op->kind == OP_SLOT && op->slot.type == SUB_SLOT_ENVVAR) || op->kind == OP_ENV) {
         LLVMValueRef offset = LLVMConstInt(get_llvm_type(LLVMInt64), op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset, 0);
         LLVMValueRef addr = LLVMBuildAdd(g_builder, stack->env, offset, assemble_name_3(&var_name[0], sizeof(var_name), prefix, "addr", op->kind == OP_SLOT ? envvar_type_str[op->slot.idx] : "envoff"));
-        build_store_with_alignment(g_builder, val, addr, op->kind == OP_SLOT ? GET_ALIGNMENT_FROM_TYPE(op->slot.op_type) : GET_ALIGNMENT_FROM_OFFSET(op->env.offset));
+        LLVMType op_ty = op->kind == OP_SLOT ? op->slot.op_type : op->env.op_type;
+        LLVMValueRef ptr = LLVMBuildIntToPtr(g_builder, addr, LLVMPointerType(get_llvm_type(op_ty), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
+        build_store_with_alignment(g_builder, val, ptr, op->kind == OP_SLOT ? GET_ALIGNMENT_FROM_TYPE(op->slot.op_type) : GET_ALIGNMENT_FROM_OFFSET(op->env.offset));
         return;
     }
     assert(0);

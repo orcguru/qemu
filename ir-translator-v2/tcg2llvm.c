@@ -64,6 +64,49 @@ void translate_br(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, co
     LLVMBuildBr(builder, label);
 }
 
+void translate_ld_zext(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char name_buf[32] = {0};
+    LLVMValueRef in = NULL;
+    if (u->operand_count == 2) {
+        in = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    } else {
+        assert(u->operand_count == 3 && u->operands[1].kind == OP_VEC && u->operands[2].kind == OP_IMM);
+        Operand op_vec_offset = u->operands[1];
+        op_vec_offset.vec.offset = u->operands[2].imm.val;
+        in = get_input_val_for_operand(&op_vec_offset, stack, prefix);
+    }
+    LLVMValueRef out = LLVMBuildZExt(builder, in, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "out"));
+    do_store(&u->operands[0], out, stack, prefix);
+}
+
+void translate_ld_sext(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char name_buf[32] = {0};
+    LLVMValueRef in = NULL;
+    if (u->operand_count == 2) {
+        in = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    } else {
+        assert(u->operand_count == 3 && u->operands[1].kind == OP_VEC && u->operands[2].kind == OP_IMM);
+        Operand op_vec_offset = u->operands[1];
+        op_vec_offset.vec.offset = u->operands[2].imm.val;
+        in = get_input_val_for_operand(&op_vec_offset, stack, prefix);
+    }
+    LLVMValueRef out = LLVMBuildSExt(builder, in, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "out"));
+    do_store(&u->operands[0], out, stack, prefix);
+}
+
+void translate_ld(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    LLVMValueRef in = NULL;
+    if (u->operand_count == 2) {
+        in = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    } else {
+        assert(u->operand_count == 3 && u->operands[1].kind == OP_VEC && u->operands[2].kind == OP_IMM);
+        Operand op_vec_offset = u->operands[1];
+        op_vec_offset.vec.offset = u->operands[2].imm.val;
+        in = get_input_val_for_operand(&op_vec_offset, stack, prefix);
+    }
+    do_store(&u->operands[0], in, stack, prefix);
+}
+
 static void print_operand(const Operand *op, int is_output, SBuf *b) {
     if (is_output) {
         sbuf_putc(b, '[');
@@ -469,27 +512,21 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
             case or_vec:
                 translate_binary(opc, u, LLVMBuildOr);
                 break;
-            case ld8u_i32:
-            case ld8u_i64:
-            case ld16u_i32:
-            case ld16u_i64:
-            case ld32u_i64:
-                translate_ld_ext(opc, u, LLVMBuildZExt);
-                break;
-            case ld8s_i32:
-            case ld8s_i64:
-            case ld16s_i32:
-            case ld16s_i64:
-            case ld32s_i64:
-                translate_ld_ext(opc, u, LLVMBuildSExt);
-                break;
-            case ld_vec:
-                translate_ld_vec(opc, u);
-                break;
-            case ld_i32:
-            case ld_i64:
-                translate_ld_env_xmm(opc, u);
-                break;
+#endif
+            CASE(ld8u_i32, translate_ld_zext);
+            CASE(ld8u_i64, translate_ld_zext);
+            CASE(ld16u_i32, translate_ld_zext);
+            CASE(ld16u_i64, translate_ld_zext);
+            CASE(ld32u_i64, translate_ld_zext);
+            CASE(ld8s_i32, translate_ld_sext);
+            CASE(ld8s_i64, translate_ld_sext);
+            CASE(ld16s_i32, translate_ld_sext);
+            CASE(ld16s_i64, translate_ld_sext);
+            CASE(ld32s_i64, translate_ld_sext);
+            CASE(ld_vec, translate_ld);
+            CASE(ld_i32, translate_ld);
+            CASE(ld_i64, translate_ld);
+#if 0
             case qemu_ld2_i128:
                 translate_qemu_ld2_i128(opc, u);
                 break;
@@ -516,6 +553,7 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
             case st_vec:
                 translate_st_vec(opc, u);
                 break;
+
             case rotr_i32:
             case rotr_i64:
                 translate_rotr(opc, u);
