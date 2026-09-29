@@ -552,6 +552,12 @@ UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
          */
         memcpy(u->operands, ops, (nops * sizeof(Operand)));
         assert(u->operands[0].kind == OP_SYMBOL && u->operands[0].symbol != not_a_helper);
+        if (u->operands[0].symbol == helper_atomic_cmpxchgo_be ||
+            u->operands[0].symbol == helper_atomic_cmpxchgo_le ||
+            u->operands[0].symbol == helper_nonatomic_cmpxchgo) {
+            // Int128 as type of return value is not supported
+            assert(0);
+        }
     }
     u->operand_count = nops - skip_cnt;
     u->prev = NULL;

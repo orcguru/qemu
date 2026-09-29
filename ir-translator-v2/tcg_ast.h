@@ -90,13 +90,13 @@ typedef enum __attribute__((packed)) {
 #define ENV_OFFSET_cc_dst   0x90
 #define ENV_OFFSET_cc_op    0xa8
 #define ENV_OFFSET_rip  0x80
-#define ENV_OFFSET_cc_src2  160
-#define ENV_OFFSET_es_base  192
-#define ENV_OFFSET_cs_base  216
-#define ENV_OFFSET_ss_base  240
-#define ENV_OFFSET_ds_base  264
-#define ENV_OFFSET_fs_base  288
-#define ENV_OFFSET_gs_base  312
+#define ENV_OFFSET_cc_src2  0xa0
+#define ENV_OFFSET_es_base  0xc0
+#define ENV_OFFSET_cs_base  0xd8
+#define ENV_OFFSET_ss_base  0xf0
+#define ENV_OFFSET_ds_base  0x108
+#define ENV_OFFSET_fs_base  0x120
+#define ENV_OFFSET_gs_base  0x138
 
 #define RELOP_TYPE_LIST \
     X(eq) \

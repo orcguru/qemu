@@ -142,6 +142,20 @@ void translate_ld2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
     do_store(&u->operands[1], elem1, stack, prefix);
 }
 
+void translate_st(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMValueRef in = get_input_val_for_operand(&u->operands[0], stack, prefix);
+    Operand out = u->operands[1];
+    if (u->operand_count == 3) {
+        assert(u->operands[1].kind == OP_VEC && u->operands[2].kind == OP_IMM);
+        out.vec.offset = u->operands[2].imm.val;
+    }
+    if (get_operand_type(&u->operands[0]) > get_operand_type(&u->operands[1])) {
+        in = LLVMBuildTrunc(builder, in, get_llvm_type(get_operand_type(&u->operands[1])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(in), "trunc"));
+    }
+    do_store(&out, in, stack, prefix);
+}
+
 static void print_operand(const Operand *op, int is_output, SBuf *b) {
     if (is_output) {
         sbuf_putc(b, '[');
@@ -564,6 +578,14 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
             CASE(qemu_ld_i32, translate_ld_with_attr);
             CASE(qemu_ld_i64, translate_ld_with_attr);
             CASE(qemu_ld2_i128, translate_ld2_with_attr);
+            CASE(st8_i32, translate_st);
+            CASE(st8_i64, translate_st);
+            CASE(st16_i32, translate_st);
+            CASE(st16_i64, translate_st);
+            CASE(st32_i64, translate_st);
+            CASE(st_i32, translate_st);
+            CASE(st_i64, translate_st);
+            CASE(st_vec, translate_st);
 #if 0
             case qemu_st2_i128:
                 translate_qemu_st2_i128(opc, u);
@@ -571,18 +593,6 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
             case qemu_st_i32:
             case qemu_st_i64:
                 translate_qemu_st(opc, u);
-                break;
-            case st8_i32:
-            case st8_i64:
-            case st16_i32:
-            case st16_i64:
-            case st32_i64:
-            case st_i32:
-            case st_i64:
-                translate_st(opc, u);
-                break;
-            case st_vec:
-                translate_st_vec(opc, u);
                 break;
 
             case rotr_i32:

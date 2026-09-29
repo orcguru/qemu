@@ -33,6 +33,7 @@ LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMVal
 LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, const char *prefix);
 void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const char *prefix);
 void start_llvm_bb(LLVMBasicBlockRef bb, StackAlloca *stack);
+LLVMValueRef get_env();
 
 #define GET_ALIGNMENT_FROM_TYPE(type)       (type <= LLVMInt64 ? 8 : 16)
 
