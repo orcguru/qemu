@@ -332,6 +332,9 @@ attr_op:
     {
         $$.kind = OP_ATTR;
         merge_attr(&$$.attr_info, $1);
+        if ($$.attr_info.p.storage.atomic == INVALID_ATOMIC) {
+            $$.attr_info.p.storage.atomic = ATOM_IFALIGN;
+        }
     }
 ;
 

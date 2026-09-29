@@ -111,35 +111,42 @@ rip             rip
 cc_src          cc_src
 cc_op           cc_op
 cc_dst          cc_dst
+never           never
+always          always
 eq              eq
-ge              ge
-gt              gt
-le              le
-lt              lt
-geu             geu
-gtu             gtu
-leu             leu
-ltu             ltu
 ne              ne
+lt              lt
+ge              ge
+le              le
+gt              gt
+ltu             ltu
+geu             geu
+leu             leu
+gtu             gtu
 tsteq           tsteq
 tstne           tstne
 unal            unal
+un              un
 al              al
 al2             al2
 al4             al4
 al8             al8
-leq             leq
-lesl            lesl
+al16            al16
+al32            al32
+al64            al64
+ub              ub
+sb              sb
+leuw            leuw
 lesw            lesw
 leul            leul
-leuw            leuw
-noat            noat
-sb              sb
-ub              ub
-un              un
-al16            al16
+lesl            lesl
+leq             leq
 leo             leo
-al32            al32
+noat            noat
+sub             sub
+w16p            w16p
+w16             w16
+pair            pair
 ENV             env
 V64             v64
 V128            v128
@@ -1401,7 +1408,11 @@ xsetbv                          xsetbv
 {IMMD}            { HANDLE_COLUMN; errno = 0; yylval->ival = strtoll(yytext + 1, NULL, 10); assert(!errno); return IMMD; }
 {NUM}             { HANDLE_COLUMN; yylval->ival = atoi(yytext); return IMM; }
 {LABEL}           { HANDLE_COLUMN; yylval->ival = atoi(yytext + 2); return LABEL; }
-{noat}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.atomic = NONATOMIC; return MEMATTR; }
+{noat}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.atomic = ATOM_NONE; return MEMATTR; }
+{sub}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.atomic = ATOM_SUBALIGN; return MEMATTR; }
+{w16p}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.atomic = ATOM_WITHIN16_PAIR; return MEMATTR; }
+{w16}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.atomic = ATOM_WITHIN16; return MEMATTR; }
+{pair}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.atomic = ATOM_IFALIGN_PAIR; return MEMATTR; }
 {un}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = UNALIGNED; return MEMATTR; }
 {unal}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = UNALIGNED; return MEMATTR; }
 {al}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_MEM_SIZE; return MEMATTR; }
@@ -1410,6 +1421,7 @@ xsetbv                          xsetbv
 {al8}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_8; return MEMATTR; }
 {al16}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_16; return MEMATTR; }
 {al32}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_32; return MEMATTR; }
+{al64}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.alignment = ALIGN_64; return MEMATTR; }
 {sb}              { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = SIGN; yylval->attr_info.p.storage.size = SRC1B; return MEMATTR; }
 {lesw}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = SIGN; yylval->attr_info.p.storage.size = SRC2B; return MEMATTR; }
 {lesl}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = SIGN; yylval->attr_info.p.storage.size = SRC4B; return MEMATTR; }
@@ -1445,6 +1457,8 @@ xsetbv                          xsetbv
 {cc_dst}          { SET_XREG(cc_dst); }
 {cc_op}           { SET_XREG(cc_op); }
 {rip}             { SET_XREG(rip); }
+{never}           { HANDLE_COLUMN; yylval->r = never; return RELOP; }
+{always}          { HANDLE_COLUMN; yylval->r = always; return RELOP; }
 {eq}              { HANDLE_COLUMN; yylval->r = eq; return RELOP; }
 {ge}              { HANDLE_COLUMN; yylval->r = ge; return RELOP; }
 {gt}              { HANDLE_COLUMN; yylval->r = gt; return RELOP; }

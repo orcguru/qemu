@@ -78,7 +78,7 @@ LLVMValueRef shrink_llvm_value(LLVMValueRef val, LLVMType from, LLVMType to) {
     LLVMType bc_ty = LLVMInvalidType;
     LLVMType elem_ty = LLVMInvalidType;
     // FIXME: can this be calculated?
-    for (LLVMType ty = LLVMVector8xi8; ty < LLVMMAXType; ++ty) {
+    for (LLVMType ty = LLVMVector8xi8; ty < LLVM_TYPE_MAX; ++ty) {
         if (llvm_vector_elem_bit_counts[ty * 2] == elem_cnt && llvm_vector_elem_bit_counts[ty * 2 + 1] == elem_bits) {
             bc_ty = ty;
             break;
@@ -225,9 +225,6 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
     return ty;
 }
 
-/*
- * Notice: LLVMInt128 store not supported
- */
 void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const char *prefix) {
     char var_name[32] = {0};
     if ((op->kind == OP_SLOT && op->slot.type == SUB_SLOT_TMP) || op->kind == OP_VEC) {

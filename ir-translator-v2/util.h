@@ -46,6 +46,7 @@ LLVMType get_operand_type(const Operand *op);
 void sbuf_init(SBuf *b, char *buf, size_t cap);
 void sbuf_putc(SBuf *b, char c);
 int sbuf_printf(SBuf *b, const char *fmt, ...);
+int alignment_from_attr(AttrSrcInfo attr, LLVMType mem_type);
 
 #define TMP_WORD(idx)  ((idx) / 64)
 #define TMP_BIT(idx)   ((idx) % 64)

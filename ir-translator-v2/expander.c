@@ -94,11 +94,11 @@ void expand_push_ret_addr(TcgContext *ctx) {
         IMM_OP(-8ULL));
 
     // - LOAD the shadow stack ptr
-    // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
+    // qemu_ld_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         SLOT_OP(SUB_SLOT_TMP, tmp1),
-        ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+        ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
 
     // - ALLOCATE an entry on the shadow stack
     // add_i64 tmp_N2,tmp_N2,-8UL
@@ -108,12 +108,12 @@ void expand_push_ret_addr(TcgContext *ctx) {
         IMM_OP(-8ULL));
 
     // - STORE x64_ret_addr into the entry
-    // qemu_st_i64 op0,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+    // qemu_st_i64 op0,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
     assert(u->operands[0].kind == OP_SLOT);
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0,
         SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type, u->operands[0].slot.stack_type),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
-        ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+        ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
 
     // - ALLOCATE an entry on the shadow stack
     // add_i64 tmp_N2,tmp_N2,-8UL
@@ -131,18 +131,18 @@ void expand_push_ret_addr(TcgContext *ctx) {
         IMM_OP(0));
 
     // - STORE the address of return into the entry
-    // qemu_st_i64 tmp_N3,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+    // qemu_st_i64 tmp_N3,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp3),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
-        ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+        ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
 
     // - UPDATE the shadow stack ptr
-    // qemu_st_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
+    // qemu_st_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         SLOT_OP(SUB_SLOT_TMP, tmp1),
-        ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+        ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
 
     instr_list_remove_and_free(&ctx->instr_head, &ctx->instr_tail, u);
 }
@@ -163,28 +163,28 @@ void expand_ret(TcgContext *ctx) {
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
 
     // - LOAD the shadow stack ptr
-    // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    // qemu_ld_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
 
     // - LOAD the address of return
-    // qemu_ld_i64 tmp_N3,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    // qemu_ld_i64 tmp_N3,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
 
     // - POP the shadow stack
     // add_i64 tmp_N2,tmp_N2,8UL
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
 
     // - LOAD the x64_ret_addr
-    // qemu_ld_i64 tmp_N4,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp4), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    // qemu_ld_i64 tmp_N4,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp4), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
 
     // - POP the shadow stack
     // add_i64 tmp_N2,tmp_N2,8UL
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
 
     // - UPDATE the shadow stack ptr
-    // qemu_st_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+    // qemu_st_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
 
     // - CHECK if lookup is needed
     // brcond_i64 op0,tmp_N4,ne,L0
@@ -368,8 +368,8 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
             EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
             EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
             // - LOAD the shadow stack ptr
-            // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+            // qemu_ld_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
 
             for (int i = 0; i < ctx->next_tmp_idx; ++i) {
                 if (test_bit(buf, i)) {
@@ -395,17 +395,16 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
                     case LLVMInt8:
                         src_sz += (SRC1B - INVALID_SRCSIZE);
                         // - BACKUP tmp slot
-                        // qemu_st_i64 i,tmp_N3,attr:NONATOMIC,ALIGN_16,$src_sz
+                        // qemu_st_i64 i,tmp_N3,attr:ATOM_IFALIGN,ALIGN_16,$src_sz
                         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, qemu_st_i64, 0, 0,
                             SLOT_OP(SUB_SLOT_TMP, i),
                             SLOT_OP(SUB_SLOT_TMP, tmp3),
-                            ATTR_STORAGE_OP(NONATOMIC, ALIGN_16, src_sz));
+                            ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_16, src_sz));
                         break;
                     case LLVMVector16xi8:
                     case LLVMVector8xi16:
                     case LLVMVector4xi32:
                     case LLVMVector2xi64:
-                    case LLVMInt128:
                         // - BACKUP tmp slot
                         // st_vec v128,e8,tmp_i,tmp_N3
                         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, st_vec, 128, 8,
@@ -431,8 +430,8 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
             EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
             EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
             // - LOAD the shadow stack ptr
-            // qemu_ld_i64 tmp_N2,tmp_N1,attr:NONATOMIC,ALIGN_8,SRC8B
-            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+            // qemu_ld_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
 
             for (int i = 0; i < ctx->next_tmp_idx; ++i) {
                 if (test_bit(buf, i)) {
@@ -458,17 +457,16 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
                     case LLVMInt8:
                         src_sz += (SRC1B - INVALID_SRCSIZE);
                         // - RESTORE tmp slot
-                        // qemu_ld_i64 i,tmp_N3,attr:NONATOMIC,ALIGN_16,$src_sz
+                        // qemu_ld_i64 i,tmp_N3,attr:ATOM_IFALIGN,ALIGN_16,$src_sz
                         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, qemu_ld_i64, 0, 0,
                             SLOT_OP(SUB_SLOT_TMP, i),
                             SLOT_OP(SUB_SLOT_TMP, tmp3),
-                            ATTR_STORAGE_OP(NONATOMIC, ALIGN_16, src_sz));
+                            ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_16, src_sz));
                         break;
                     case LLVMVector16xi8:
                     case LLVMVector8xi16:
                     case LLVMVector4xi32:
                     case LLVMVector2xi64:
-                    case LLVMInt128:
                         // - RESTORE tmp slot
                         // ld_vec v128,e8,tmp_i,tmp_N3
                         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, ld_vec, 128, 8,
@@ -1056,17 +1054,17 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
             SLOT_OP(SUB_SLOT_TMP, tmp1),
             IMM_OP(off));
         if (ty == LLVMInt64) {
-            // qemu_st_i64 r,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+            // qemu_st_i64 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
             EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i64, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
                 SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
         } else {
-            // qemu_st_i32 r,tmp_N2,attr:NONATOMIC,ALIGN_4,SRC4B
+            // qemu_st_i32 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_4,SRC4B
             EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i32, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
                 SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(NONATOMIC, ALIGN_4, SRC4B));
+                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_4, SRC4B));
         }
     }
 
@@ -1169,17 +1167,17 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
             SLOT_OP(SUB_SLOT_TMP, tmp1),
             IMM_OP(off));
         if (ty == LLVMInt64) {
-            // qemu_st_i64 r,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+            // qemu_st_i64 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
             EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i64, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
                 SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
         } else {
-            // qemu_st_i32 r,tmp_N2,attr:NONATOMIC,ALIGN_4,SRC4B
+            // qemu_st_i32 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_4,SRC4B
             EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i32, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
                 SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(NONATOMIC, ALIGN_4, SRC4B));
+                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_4, SRC4B));
         }
     }
 
@@ -1386,17 +1384,17 @@ int create_trampoline_for_runtime(TcgContext *ctx,
             SLOT_OP(SUB_SLOT_TMP, tmp1),
             IMM_OP(off));
         if (ty == LLVMInt64) {
-            // qemu_st_i64 r,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+            // qemu_st_i64 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
             EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i64, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
                 SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
         } else {
-            // qemu_st_i32 r,tmp_N2,attr:NONATOMIC,ALIGN_4,SRC4B
+            // qemu_st_i32 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_4,SRC4B
             EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i32, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
                 SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(NONATOMIC, ALIGN_4, SRC4B));
+                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_4, SRC4B));
         }
     }
 
@@ -1470,17 +1468,17 @@ int create_trampoline_for_runtime(TcgContext *ctx,
             SLOT_OP(SUB_SLOT_TMP, tmp1),
             IMM_OP(off));
         if (ty == LLVMInt64) {
-            // qemu_st_i64 r,tmp_N2,attr:NONATOMIC,ALIGN_8,SRC8B
+            // qemu_st_i64 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
             EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i64, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
                 SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(NONATOMIC, ALIGN_8, SRC8B));
+                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
         } else {
-            // qemu_st_i32 r,tmp_N2,attr:NONATOMIC,ALIGN_4,SRC4B
+            // qemu_st_i32 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_4,SRC4B
             EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i32, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
                 SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(NONATOMIC, ALIGN_4, SRC4B));
+                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_4, SRC4B));
         }
     }
 

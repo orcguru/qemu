@@ -79,6 +79,22 @@ static LLVMType storage_size_to_type(SrcSizeType sz) {
     }
 }
 
+int alignment_from_attr(AttrSrcInfo attr, LLVMType mem_type) {
+    assert(attr.subt == SUB_ATTR_STORAGE);
+    switch (attr.p.storage.alignment) {
+    case UNALIGNED: return 1;
+    case ALIGN_2: return 2;
+    case ALIGN_4: return 4;
+    case ALIGN_8: return 8;
+    case ALIGN_16: return 16;
+    case ALIGN_32: return 32;
+    case ALIGN_64: return 64;
+    case ALIGN_MEM_SIZE:
+        return llvm_vector_elem_bit_counts[mem_type * 2 + 1] / 8;
+    default: return 1;
+    }
+}
+
 /*
  * X/YMM-Vector mapping related
  * QEMU TCG emulates X/Y/ZMM registers by array of 0x40 bytes: XMM occupies the

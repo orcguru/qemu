@@ -611,10 +611,11 @@ const LLVMType helper_return_type[HELPER_MAX] = {
     [helper_atomic_cmpxchgl_le] = LLVMInt32,
     [helper_atomic_cmpxchgq_be] = LLVMInt64,
     [helper_atomic_cmpxchgq_le] = LLVMInt64,
-    //FIXME
-    [helper_atomic_cmpxchgo_be] = LLVMInt128,
-    [helper_atomic_cmpxchgo_le] = LLVMInt128,
-    [helper_nonatomic_cmpxchgo] = LLVMInt128,
+    ///NOTICE: Int128 not supported
+    [helper_atomic_cmpxchgo_be] = LLVMInt64,
+    [helper_atomic_cmpxchgo_le] = LLVMInt64,
+    [helper_nonatomic_cmpxchgo] = LLVMInt64,
+    ///---
     [helper_atomic_fetch_addb] = LLVMInt32,
     [helper_atomic_fetch_addw_le] = LLVMInt32,
     [helper_atomic_fetch_addw_be] = LLVMInt32,

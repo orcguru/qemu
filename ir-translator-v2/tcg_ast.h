@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <llvm-c/Types.h>
 
-#define LLVMMAXType                 LLVMInt128
 #define XMM_COUNT_MAX               15
 #define XMM_COUNT                   15
 #define XMM_TMP_IDX                 16
@@ -112,7 +111,9 @@ typedef enum __attribute__((packed)) {
     X(ltu) \
     X(tsteq) \
     X(tstne) \
-    X(RELOPMAX)
+    X(never) \
+    X(always) \
+    X(RELOP_MAX)
 
 typedef enum __attribute__((packed)) {
     #define X(name) name,
@@ -1410,7 +1411,8 @@ typedef enum __attribute__((packed)) {
     X(ALIGN_4) \
     X(ALIGN_8) \
     X(ALIGN_16) \
-    X(ALIGN_32)
+    X(ALIGN_32) \
+    X(ALIGN_64)
 
 typedef enum __attribute__((packed)) {
     #define X(name) name,
@@ -1420,7 +1422,12 @@ typedef enum __attribute__((packed)) {
 
 #define ATOMIC_TYPE_LIST \
     X(INVALID_ATOMIC) \
-    X(NONATOMIC)
+    X(ATOM_NONE) \
+    X(ATOM_SUBALIGN) \
+    X(ATOM_WITHIN16_PAIR) \
+    X(ATOM_WITHIN16) \
+    X(ATOM_IFALIGN_PAIR) \
+    X(ATOM_IFALIGN)
 
 typedef enum __attribute__((packed)) {
     #define X(name) name,
@@ -1566,7 +1573,7 @@ typedef enum __attribute__((packed)) {
     X(LLVMVector8xi16) \
     X(LLVMVector4xi32) \
     X(LLVMVector2xi64) \
-    X(LLVMInt128)
+    X(LLVM_TYPE_MAX)
 
 typedef enum __attribute__((packed)) {
     #define X(name) name,

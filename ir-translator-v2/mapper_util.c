@@ -602,14 +602,14 @@ const uint64_t envvar_offsets[ENVVAR_MAX] = {
     [gs_base] = ENV_OFFSET_gs_base,
 };
 
-const CVectorType cvector_type_for_llvm_type[LLVMMAXType] = {
+const CVectorType cvector_type_for_llvm_type[LLVM_TYPE_MAX] = {
     [LLVMVector2xi64] = v2ulong,
     [LLVMVector4xi32] = v4uint,
     [LLVMVector8xi16] = v8ushort,
     [LLVMVector16xi8] = v16uchar,
 };
 
-const int llvm_vector_elem_bit_counts[LLVMMAXType * 2] = {
+const int llvm_vector_elem_bit_counts[LLVM_TYPE_MAX * 2] = {
     [LLVMInt8 * 2] = 1,
     [LLVMInt8 * 2 + 1] = 8,
     [LLVMInt16 * 2] = 1,
