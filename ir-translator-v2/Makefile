@@ -70,12 +70,18 @@ PREPROCESSED_OUT := $(QEMU_BUILD)/$(PREPROCESSED_OBJ).E
 # Build-log captured from V=1 (contains the full clang command line)
 BUILD_LOG := $(QEMU_BUILD)/fpu_helper_build.log
 
+# Object lists are shared by the native build and the sanitizer build.
+COMMON_OBJS  := parser.tab.o lexer.yy.o mapper_util.o helper_lookup.o \
+	util.o expander.o operand_static_types.o i386_cpu.o
+MAPPER_OBJS  := $(COMMON_OBJS) mapper.o tcg_llvm_tag.o tcg2llvm.o
+PRINTER_OBJS := $(COMMON_OBJS) printer.o
+
 all: tcg_mapper tcg_printer
 
-tcg_mapper: parser.tab.o lexer.yy.o mapper.o tcg_llvm_tag.o tcg2llvm.o mapper_util.o helper_lookup.o util.o expander.o operand_static_types.o i386_cpu.o
+tcg_mapper: $(MAPPER_OBJS)
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
-tcg_printer: parser.tab.o lexer.yy.o printer.o mapper_util.o helper_lookup.o util.o expander.o operand_static_types.o i386_cpu.o
+tcg_printer: $(PRINTER_OBJS)
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
 parser.tab.o: parser.tab.c lexer.yy.h
@@ -460,6 +466,8 @@ clean-local:
 	rm -f *.o parser.tab.* lexer.yy.* tcg_mapper tcg_printer helper_lookup.c tests/expand_tcg_ir/*.out collect_helper_templates/*.E collect_helper_templates/*.E.out collect_helper_templates/*.E.err helper_templates/*
 	rm -rf collect_helper_templates/*.o.E.helper_templates
 	rm -rf tests/translate_to_llvm_ir/out
+	rm -rf .san
+	rm -f tests/expand_tcg_ir/*.err
 
 # Alias preserved from original Makefile
 clean-all: clean
@@ -471,6 +479,10 @@ clean-all: clean
 #   1. tests/expand_tcg_ir        -> tcg_printer, compared against .exp
 #   2. tests/translate_to_llvm_ir -> tcg_mapper + llvm_annotate.py, compared
 #      against a *host-arch specific* golden .ll file
+#
+# Both suites normally run the plain binaries.  The *-san targets re-run them
+# against sanitizer-instrumented copies (see the "sanitizers" section below);
+# that is the supported way to hunt memory bugs on this tree.
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -483,35 +495,78 @@ ifeq ($(TCG_PRINTER),)
 	TCG_PRINTER := ./tcg_printer
 endif
 
-# Run tcg_printer over every .tir file, diff the result against .exp, and
-# fail the build if any output differs.
+# stderr routing for suite 1.
+#   native    -> merged into stdout (historic behaviour; some .exp files may
+#                legitimately contain diagnostics)
+#   sanitized -> kept apart, otherwise an ASan/MSan report would end up inside
+#                the very file that gets diffed against the golden .exp
+ifeq ($(EXPAND_STDERR),separate)
+EXPAND_ERRDEV = 2>"$$errlog"
+else
+EXPAND_ERRDEV = 2>&1
+endif
+
+# Run tcg_printer over every .tir file and diff against .exp.
+# With REPEAT=N each case runs N times and runs 2..N are cross-checked against
+# run 1 - that is what catches a memory bug whose effect only shows up
+# "sometimes".
 test-expand-tcg-ir: $(TCG_PRINTER)
-	@rc=0; \
+	@rc=0; pass=0; fail=0; skip=0; unstable=0; \
+	runs=$(REPEAT); \
+	case "$$runs" in ''|*[!0-9]*) runs=1 ;; esac; \
+	[ "$$runs" -ge 1 ] || runs=1; \
 	for tir in $(TIR_FILES); do \
-		case "$$tir" in \
-			*/*) dir=$(dir $$tir); base=$(notdir $$tir);; \
-			*)   dir="";       base=$$tir;; \
-		esac; \
-		exp="$${tir%.tir}.exp"; \
-		out="$${tir%.tir}.out"; \
-		extra=""; \
-		fline=$$(head -n 1 "$$tir"); \
-		case "$$fline" in \
-			';'*) extra=$${fline#';'} ;; \
-		esac; \
-		echo "==> $$tir $$extra"; \
-		$(TCG_PRINTER) $$extra "$$tir" > "$$out" 2>&1; \
-		if [ -f "$$exp" ]; then \
-			if diff -u "$$exp" "$$out"; then \
-				echo "PASS: $$tir"; \
-			else \
-				echo "FAIL: $$tir (see diff above)"; \
-				rc=1; \
-			fi; \
-		else \
-			echo "WARNING: no .exp for $$tir (wrote .out only)"; \
-		fi; \
+	dir=$${tir%/*}; \
+	base=$${tir##*/}; \
+	[ "$$dir" = "$$tir" ] && dir=""; \
+	exp="$${tir%.tir}.exp"; \
+	out="$${tir%.tir}.out"; \
+	out1="$${tir%.tir}.run1.out"; \
+	errlog="$${tir%.tir}.err"; \
+	extra=""; \
+	fline=$$(head -n 1 "$$tir"); \
+	case "$$fline" in \
+	';'*) extra=$${fline#';'} ;; \
+	esac; \
+	i=1; \
+	while [ $$i -le $$runs ]; do \
+	echo "==> $$tir $$extra (run $$i/$$runs)"; \
+	st=0; $(TCG_PRINTER) $$extra "$$tir" > "$$out" $(EXPAND_ERRDEV) || st=$$?; \
+	if [ "$$st" -eq $(SAN_ERROR_EXIT) ]; then \
+	echo "SANITIZER FAIL: $$tir - see $$errlog"; \
+	tail -n 25 "$$errlog" 2>/dev/null; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	if [ "$$st" -ne 0 ]; then \
+	echo "NOTE: $$tir - tcg_printer exited $$st"; \
+	fi; \
+	[ $$i -eq 1 ] && cp -f "$$out" "$$out1"; \
+	if [ ! -f "$$exp" ]; then \
+	echo "WARNING: no .exp for $$tir (wrote .out only)"; \
+	skip=$$((skip+1)); break; \
+	fi; \
+	if diff -u "$$exp" "$$out"; then \
+	[ $$i -eq 1 ] && pass=$$((pass+1)); \
+	echo "PASS: $$tir"; \
+	else \
+	echo "FAIL: $$tir (see diff above)"; \
+	if [ "$(EXPAND_STDERR)" = separate ]; then \
+	echo "       NB: this run split stderr into $$errlog."; \
+	echo "       If the .exp was recorded with stderr merged, regenerate it"; \
+	echo "       or re-run with EXPAND_STDERR=merge."; \
+	fi; \
+	fail=$$((fail+1)); rc=1; \
+	fi; \
+	if [ $$i -gt 1 ] && ! diff -q "$$out1" "$$out" > /dev/null; then \
+	echo "UNSTABLE: $$tir - run $$i differs from run 1 ($$out1 vs $$out)"; \
+	diff -u "$$out1" "$$out" | head -n 40; \
+	unstable=$$((unstable+1)); rc=1; \
+	fi; \
+	i=$$((i+1)); \
 	done; \
+	done; \
+	echo "-------------------------------------------------------------------"; \
+	echo "expand_tcg_ir: $$pass passed, $$fail failed, $$unstable unstable, $$skip without .exp (REPEAT=$$runs; fail/unstable counted per run)"; \
 	exit $$rc
 
 # ----------------------------------------------------------------------------
@@ -541,12 +596,17 @@ test-expand-tcg-ir: $(TCG_PRINTER)
 #   make test-llvm-ir TEST_ARCH=riscv64    # compare against another arch's copy
 #   make test-llvm-ir-update               # (re)create goldens for THIS host
 #   make test-llvm-ir-update ONLY=load_store
+#   make test REPEAT=5                     # each case 5x, catch flaky output
+#
+#   make test-san                          # same, under the sanitizer
+#   make test-san SAN=msan REPEAT=3
 #
 # Artifacts (kept for inspection, cleaned by `make clean`):
 #   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.ll
 #   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.annotate.ll   <- compared
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.run1.annotate.ll
 #   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.diff
-#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.mapper.err
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.mapper.err    <- sanitizer report
 #   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.annotate.err
 # ----------------------------------------------------------------------------
 
@@ -583,59 +643,83 @@ LLVM_TIR_CASES := $(foreach f,$(LLVM_TIR_FILES),\
 	$(if $(findstring $(ONLY),$(basename $(notdir $f))),$f))
 endif
 
+# How many times each case is executed (run 2..N are diffed against run 1).
+REPEAT ?= 1
+
 # Run every translate_to_llvm_ir case and diff against the per-arch golden.
 test-llvm-ir: $(TCG_MAPPER)
 	@mkdir -p "$(LLVM_TIR_OUTDIR)"
 	@if [ -z "$(LLVM_TIR_CASES)" ]; then \
-		echo "No .tir case found under $(LLVM_TIR_DIR)/"; \
-		exit 0; \
+	echo "No .tir case found under $(LLVM_TIR_DIR)/"; \
+	exit 0; \
 	fi
 	@echo "==================================================================="
 	@echo "translate_to_llvm_ir: $(words $(LLVM_TIR_CASES)) case(s), TEST_ARCH=$(TEST_ARCH)"
 	@echo "golden file pattern : <name>.tir.$(TEST_ARCH).ll"
 	@echo "==================================================================="
-	@rc=0; pass=0; fail=0; skip=0; \
+	@rc=0; pass=0; fail=0; skip=0; unstable=0; \
+	runs=$(REPEAT); \
+	case "$$runs" in ''|*[!0-9]*) runs=1 ;; esac; \
+	[ "$$runs" -ge 1 ] || runs=1; \
 	for tir in $(LLVM_TIR_CASES); do \
-		name=$$(basename "$$tir" .tir); \
-		ll="$(LLVM_TIR_OUTDIR)/$$name.ll"; \
-		ann="$(LLVM_TIR_OUTDIR)/$$name.annotate.ll"; \
-		diffout="$(LLVM_TIR_OUTDIR)/$$name.diff"; \
-		exp="$${tir}.$(TEST_ARCH).ll"; \
-		if [ ! -f "$$exp" ] && [ -f "$${tir}.ll" ]; then \
-			exp="$${tir}.ll"; \
-		fi; \
-		echo "==> $$tir"; \
-		if ! $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" 2> "$(LLVM_TIR_OUTDIR)/$$name.mapper.err"; then \
-			echo "FAIL: $$tir (tcg_mapper failed - see $(LLVM_TIR_OUTDIR)/$$name.mapper.err)"; \
-			tail -n 20 "$(LLVM_TIR_OUTDIR)/$$name.mapper.err"; \
-			fail=$$((fail+1)); rc=1; continue; \
-		fi; \
-		if ! $(PYTHON) $(LLVM_ANNOTATE) -o "$$ann" "$$ll" 2> "$(LLVM_TIR_OUTDIR)/$$name.annotate.err"; then \
-			echo "FAIL: $$tir (llvm_annotate.py failed - see $(LLVM_TIR_OUTDIR)/$$name.annotate.err)"; \
-			tail -n 20 "$(LLVM_TIR_OUTDIR)/$$name.annotate.err"; \
-			fail=$$((fail+1)); rc=1; continue; \
-		fi; \
-		if [ ! -s "$$ann" ]; then \
-			echo "FAIL: $$tir ($$ann was not produced by llvm_annotate.py)"; \
-			fail=$$((fail+1)); rc=1; continue; \
-		fi; \
-		if [ ! -f "$$exp" ]; then \
-			echo "SKIP: $$tir (no golden $${tir}.$(TEST_ARCH).ll - wrote $$ann)"; \
-			skip=$$((skip+1)); continue; \
-		fi; \
-		if diff -u "$$exp" "$$ann" > "$$diffout"; then \
-			echo "PASS: $$tir"; \
-			pass=$$((pass+1)); \
-		else \
-			echo "FAIL: $$tir (diff vs $$exp)"; \
-			cat "$$diffout"; \
-			fail=$$((fail+1)); rc=1; \
-		fi; \
+	name=$$(basename "$$tir" .tir); \
+	ll="$(LLVM_TIR_OUTDIR)/$$name.ll"; \
+	ann="$(LLVM_TIR_OUTDIR)/$$name.annotate.ll"; \
+	ann1="$(LLVM_TIR_OUTDIR)/$$name.run1.annotate.ll"; \
+	diffout="$(LLVM_TIR_OUTDIR)/$$name.diff"; \
+	errlog="$(LLVM_TIR_OUTDIR)/$$name.mapper.err"; \
+	exp="$${tir}.$(TEST_ARCH).ll"; \
+	if [ ! -f "$$exp" ] && [ -f "$${tir}.ll" ]; then \
+	exp="$${tir}.ll"; \
+	fi; \
+	i=1; \
+	while [ $$i -le $$runs ]; do \
+	echo "==> $$tir (run $$i/$$runs)"; \
+	st=0; $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" 2> "$$errlog" || st=$$?; \
+	if [ "$$st" -eq $(SAN_ERROR_EXIT) ]; then \
+	echo "SANITIZER FAIL: $$tir - see $$errlog"; \
+	tail -n 25 "$$errlog"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	if [ "$$st" -ne 0 ]; then \
+	echo "FAIL: $$tir (tcg_mapper exit $$st - see $$errlog)"; \
+	tail -n 20 "$$errlog"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	if ! $(PYTHON) $(LLVM_ANNOTATE) -o "$$ann" "$$ll" 2> "$(LLVM_TIR_OUTDIR)/$$name.annotate.err"; then \
+	echo "FAIL: $$tir (llvm_annotate.py failed - see $(LLVM_TIR_OUTDIR)/$$name.annotate.err)"; \
+	tail -n 20 "$(LLVM_TIR_OUTDIR)/$$name.annotate.err"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	if [ ! -s "$$ann" ]; then \
+	echo "FAIL: $$tir ($$ann was not produced by llvm_annotate.py)"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	[ $$i -eq 1 ] && cp -f "$$ann" "$$ann1"; \
+	if [ ! -f "$$exp" ]; then \
+	echo "SKIP: $$tir (no golden $${tir}.$(TEST_ARCH).ll - wrote $$ann)"; \
+	skip=$$((skip+1)); break; \
+	fi; \
+	if diff -u "$$exp" "$$ann" > "$$diffout"; then \
+	[ $$i -eq 1 ] && pass=$$((pass+1)); \
+	echo "PASS: $$tir"; \
+	else \
+	echo "FAIL: $$tir (diff vs $$exp)"; \
+	cat "$$diffout"; \
+	fail=$$((fail+1)); rc=1; \
+	fi; \
+	if [ $$i -gt 1 ] && ! diff -q "$$ann1" "$$ann" > /dev/null; then \
+	echo "UNSTABLE: $$tir - run $$i differs from run 1 ($$ann1 vs $$ann)"; \
+	diff -u "$$ann1" "$$ann" | head -n 40; \
+	unstable=$$((unstable+1)); rc=1; \
+	fi; \
+	i=$$((i+1)); \
+	done; \
 	done; \
 	echo "-------------------------------------------------------------------"; \
-	echo "translate_to_llvm_ir [$(TEST_ARCH)]: $$pass passed, $$fail failed, $$skip skipped"; \
+	echo "translate_to_llvm_ir [$(TEST_ARCH)]: $$pass passed, $$fail failed, $$unstable unstable, $$skip skipped (REPEAT=$$runs; fail/unstable counted per run)"; \
 	if [ "$$skip" -gt 0 ]; then \
-		echo "hint: run 'make test-llvm-ir-update' to create the missing goldens"; \
+	echo "hint: run 'make test-llvm-ir-update' to create the missing goldens"; \
 	fi; \
 	exit $$rc
 
@@ -645,25 +729,178 @@ test-llvm-ir: $(TCG_MAPPER)
 test-llvm-ir-update: $(TCG_MAPPER)
 	@mkdir -p "$(LLVM_TIR_OUTDIR)"
 	@for tir in $(LLVM_TIR_CASES); do \
-		name=$$(basename "$$tir" .tir); \
-		ll="$(LLVM_TIR_OUTDIR)/$$name.ll"; \
-		ann="$(LLVM_TIR_OUTDIR)/$$name.annotate.ll"; \
-		gold="$${tir}.$(TEST_ARCH).ll"; \
-		echo "==> $$tir"; \
-		if $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" && \
-		   $(PYTHON) $(LLVM_ANNOTATE) -o "$$ann" "$$ll"; then \
-			cp -f "$$ann" "$$gold"; \
-			echo "UPDATE: $$gold"; \
-		else \
-			echo "ERROR: pipeline failed for $$tir (golden left untouched)"; \
-		fi; \
+	name=$$(basename "$$tir" .tir); \
+	ll="$(LLVM_TIR_OUTDIR)/$$name.ll"; \
+	ann="$(LLVM_TIR_OUTDIR)/$$name.annotate.ll"; \
+	gold="$${tir}.$(TEST_ARCH).ll"; \
+	echo "==> $$tir"; \
+	if $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" && \
+	   $(PYTHON) $(LLVM_ANNOTATE) -o "$$ann" "$$ll"; then \
+	cp -f "$$ann" "$$gold"; \
+	echo "UPDATE: $$gold"; \
+	else \
+	echo "ERROR: pipeline failed for $$tir (golden left untouched)"; \
+	fi; \
 	done
 
-# Default: run both suites.
+# ============================================================================
+# Sanitizers
+#   make test-san                    # both suites, AddressSanitizer + UBSan
+#   make test-llvm-ir-san            # only the LLVM-IR suite
+#   make test-expand-tcg-ir-san      # only the expand_tcg_ir suite
+#   make test-san SAN=msan           # MemorySanitizer (uninitialised reads)
+#   make test-san SAN=ubsan          # undefined behaviour only (fastest)
+#   make test-san ONLY=load_store    # filters work as usual
+#   make test-san REPEAT=5           # 5 runs per case
+#
+# The sanitized binaries are built from the same sources into their own
+# directory (.san/<san>/) with -O1, so the -O0 objects used by the normal
+# build are left untouched.  Sanitizer reports go to stderr, which the test
+# recipes already keep out of the file that is diffed against the golden, so
+# a report never corrupts a comparison.
+#
+# Which sanitizer finds what:
+#   asan  - out-of-bounds (heap/stack/global), use-after-free, double free,
+#           invalid free.  Plus LSan for leaks when SAN_LEAKS=1.
+#   ubsan - misaligned/invalid casts, signed overflow, null deref, ...
+#   msan  - reads of uninitialised memory.  This is the one that matches
+#           "the same input sometimes produces different output": an
+#           uninitialised value feeding a branch or an address is the classic
+#           cause.  Caveat below.
+#
+# MSan caveat: MemorySanitizer can only track uninitialised bits through code
+# that was itself instrumented.  glibc is intercepted, but libstdc++/libc++
+# (this tree links -lstdc++) and any pre-built LLVM libraries are not, so
+# expect false positives originating inside them.  Either build those with
+# -fsanitize=memory, or filter them with MSAN_OPTIONS / a suppression list.
+# ============================================================================
+
+SAN ?= asan
+SAN_ERROR_EXIT ?= 99
+SAN_OBJDIR := .san/$(SAN)
+
+SAN_MAPPER  := $(SAN_OBJDIR)/tcg_mapper
+SAN_PRINTER := $(SAN_OBJDIR)/tcg_printer
+
+SAN_MAPPER_OBJS  := $(addprefix $(SAN_OBJDIR)/,$(MAPPER_OBJS))
+SAN_PRINTER_OBJS := $(addprefix $(SAN_OBJDIR)/,$(PRINTER_OBJS))
+
+# MSan is clang-only; ASan/UBSan work with either compiler.
+ifeq ($(SAN),msan)
+SAN_CC ?= clang
+else
+SAN_CC ?= gcc
+endif
+
+# Per-sanitizer flag sets.  These must be defined *before* SAN_CFLAGS /
+# SAN_LDFLAGS below, which expand immediately (":=").
+# -fsanitize=undefined is folded into the asan build: it is cheap and catches
+# a different bug class.  Override SAN_FLAGS to tune.
+SAN_FLAGS_asan    := -fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-common
+SAN_FLAGS_ubsan   := -fsanitize=undefined -fno-omit-frame-pointer
+SAN_FLAGS_msan    := -fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fPIE
+# MSan additionally needs a PIE link; the others follow the toolchain default.
+ifeq ($(SAN),msan)
+SAN_LDFLAGS_EXTRA := -pie
+else
+SAN_LDFLAGS_EXTRA :=
+endif
+SAN_FLAGS         := $(SAN_FLAGS_$(SAN))
+
+# Sanitized builds want at least -O1 (the manuals recommend -O1 as the
+# practical trade-off); everything else from CFLAGS (include paths etc.) is
+# kept as-is.
+SAN_OPT     ?= -O1
+SAN_CFLAGS  := $(subst -O0,$(SAN_OPT),$(CFLAGS)) $(SAN_FLAGS)
+SAN_LDFLAGS := $(SAN_FLAGS)
+
+# Leak detection is OFF by default: this tree links all of LLVM and glib, and
+# LSan would drown the real findings in third-party "leaks".  Turn it on with
+# SAN_LEAKS=1 once the noise is under control (and/or drop an lsan.supp next
+# to the Makefile - it is picked up automatically when present).
+ASAN_DETECT_LEAKS ?= $(if $(filter 1,$(SAN_LEAKS)),1,0)
+LSAN_SUPP         ?= lsan.supp
+
+# Runtime options.  Exported, so they reach the test recipes; harmless when
+# running non-instrumented binaries.  Kept on single lines on purpose: a
+# backslash-continuation inside a make variable becomes a space, which would
+# corrupt the option string.
+export ASAN_OPTIONS := detect_leaks=$(ASAN_DETECT_LEAKS):abort_on_error=0:exitcode=$(SAN_ERROR_EXIT):detect_stack_use_after_return=1:check_initialization_order=1:strict_string_checks=1:print_stacktrace=1
+export UBSAN_OPTIONS := print_stacktrace=1:report_error_type=1
+export MSAN_OPTIONS := exit_code=$(SAN_ERROR_EXIT):halt_on_error=0:print_stacktrace=1:keep_going=1
+ifneq ($(wildcard $(LSAN_SUPP)),)
+export LSAN_OPTIONS := suppressions=$(LSAN_SUPP):print_suppressions=0
+endif
+
+# --- sanitized binaries -----------------------------------------------------
+$(SAN_OBJDIR):
+	@mkdir -p "$(SAN_OBJDIR)"
+
+$(SAN_OBJDIR)/%.o: %.c | $(SAN_OBJDIR)
+	$(SAN_CC) $(SAN_CFLAGS) -c $< -o $@
+
+$(SAN_OBJDIR)/parser.tab.o: parser.tab.c lexer.yy.h
+$(SAN_OBJDIR)/lexer.yy.o: lexer.yy.c lexer.yy.h
+
+$(SAN_MAPPER): $(SAN_MAPPER_OBJS)
+	$(SAN_CC) -o $@ $^ $(SAN_LDFLAGS) $(SAN_LDFLAGS_EXTRA) $(LDFLAGS) -lfl
+
+$(SAN_PRINTER): $(SAN_PRINTER_OBJS)
+	$(SAN_CC) -o $@ $^ $(SAN_LDFLAGS) $(SAN_LDFLAGS_EXTRA) $(LDFLAGS) -lfl
+
+san-build: $(SAN_MAPPER) $(SAN_PRINTER)
+
+# Sanity-check the chosen sanitizer before spending time on a build.
+check-san:
+	@case "$(SAN)" in \
+	asan|ubsan|msan) ;; \
+	*) echo "ERROR: SAN='$(SAN)' is not one of asan|ubsan|msan."; exit 1 ;; \
+	esac
+	@command -v $(SAN_CC) > /dev/null 2>&1 || { \
+	echo "ERROR: compiler '$(SAN_CC)' not found (set SAN_CC=...)."; exit 1; \
+	}
+	@echo "sanitizer       : $(SAN)"
+	@echo "compiler        : $(SAN_CC)"
+	@echo "compile flags   : $(SAN_FLAGS)"
+	@echo "link flags      : $(SAN_LDFLAGS) $(SAN_LDFLAGS_EXTRA)"
+	@echo "binaries        : $(SAN_MAPPER) $(SAN_PRINTER)"
+	@echo "error exit code : $(SAN_ERROR_EXIT)"
+	@if [ "$(SAN)" = msan ]; then \
+	echo ""; \
+	echo "NOTE: MemorySanitizer needs every linked library instrumented too."; \
+	echo "      glibc is intercepted, but libstdc++ and pre-built LLVM are not,"; \
+	echo "      so expect false positives from inside them."; \
+	fi
+
+# --- sanitizer test entry points -------------------------------------------
+# These just re-run the normal targets with the instrumented binaries, so
+# ONLY=, TEST_ARCH= and REPEAT= keep working.
+test-expand-tcg-ir-san: check-san $(SAN_PRINTER)
+	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) \
+	TCG_PRINTER='$(SAN_PRINTER)' EXPAND_STDERR=separate \
+	ONLY='$(ONLY)' REPEAT='$(REPEAT)' \
+	test-expand-tcg-ir
+
+test-llvm-ir-san: check-san $(SAN_MAPPER)
+	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) \
+	TCG_MAPPER='$(SAN_MAPPER)' \
+	ONLY='$(ONLY)' TEST_ARCH='$(TEST_ARCH)' REPEAT='$(REPEAT)' \
+	test-llvm-ir
+
+# Both suites under the sanitizer; -k keeps suite 2 running if suite 1 fails.
+test-san: check-san $(SAN_MAPPER) $(SAN_PRINTER)
+	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) -k \
+	TCG_MAPPER='$(SAN_MAPPER)' TCG_PRINTER='$(SAN_PRINTER)' \
+	EXPAND_STDERR=separate \
+	ONLY='$(ONLY)' TEST_ARCH='$(TEST_ARCH)' REPEAT='$(REPEAT)' \
+	test
+
+# Default: run both suites against the plain binaries.
 test: test-expand-tcg-ir test-llvm-ir
 
 
 .PHONY: all test test-expand-tcg-ir test-llvm-ir test-llvm-ir-update \
+	test-san test-expand-tcg-ir-san test-llvm-ir-san san-build check-san \
 	clean clean-all clean-local clean-qemu-source \
 	qemu-preprocess qemu-preprocess-tcg-runtime \
 	qemu-preprocess-cc-helper qemu-preprocess-int-helper \

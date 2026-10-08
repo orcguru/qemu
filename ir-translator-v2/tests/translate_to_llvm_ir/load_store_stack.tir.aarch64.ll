@@ -26,7 +26,6 @@ entry:
   %tmp6.stack = alloca <2 x i64>, align 16
   %tmp7.stack = alloca <2 x i64>, align 16
   %tmp8.stack = alloca i64, align 8
-  %carry.stack = alloca i1, align 8
   %env = call i64 asm sideeffect "mov $0, x25", "=r"()
 ; ======== TCG [0] add_i64 [rax],rbx,rdx ========
   %T0.rbx = load i64, ptr %rbx.stack, align 8, !tcg.op !0

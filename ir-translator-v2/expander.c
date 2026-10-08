@@ -873,7 +873,7 @@ static void move_rv_to_next(TcgContext *ctx, const UnifiedInstr *orig_u, Unified
         SLOT_OP_EXTRA(update_u->operands[TCG_CALL_PREFIX_COUNT].slot.type, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type),
         ARG_OP(-1));
     setup_additional_param(&(ctx->llvm_func_set.lists[nfidx]), not_a_helper, false/*with_nc*/, true/*with_rv*/, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type);
-    memcpy(&update_u->operands[TCG_CALL_PREFIX_COUNT], &update_u->operands[TCG_CALL_PREFIX_COUNT + 1],
+    memmove(&update_u->operands[TCG_CALL_PREFIX_COUNT], &update_u->operands[TCG_CALL_PREFIX_COUNT + 1],
            (update_u->operand_count - TCG_CALL_PREFIX_COUNT - 1) * sizeof(Operand));
     update_u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val = 0;
     update_u->operand_count -= 1;
@@ -931,7 +931,7 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
              */
             int first_input_idx = get_first_input_idx_on_call(u);
             if (u->operands[first_input_idx].kind == OP_ENV && u->operands[first_input_idx].env.offset == 0) {
-                memcpy(&u->operands[first_input_idx], &u->operands[first_input_idx + 1],
+                memmove(&u->operands[first_input_idx], &u->operands[first_input_idx + 1],
                        ((u->operand_count - (first_input_idx + 1)) * sizeof(Operand)));
                 u->operand_count -= 1;
             }
@@ -1320,7 +1320,7 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
              */
             int first_input_idx = get_first_input_idx_on_call(u);
             if (u->operands[first_input_idx].kind == OP_ENV && u->operands[first_input_idx].env.offset == 0) {
-                memcpy(&u->operands[first_input_idx], &u->operands[first_input_idx + 1],
+                memmove(&u->operands[first_input_idx], &u->operands[first_input_idx + 1],
                        ((u->operand_count - (first_input_idx + 1)) * sizeof(Operand)));
                 u->operand_count -= 1;
             }

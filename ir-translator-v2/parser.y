@@ -172,12 +172,6 @@ scalar_instr:
                 try_unregister_alias(ctx, &u->operands[i]);
             }
         }
-        if (skip_alias_instr == 0) {
-            op_list_free(&$2);
-            append_instr(ctx, u);
-        } else {
-            free(u);
-        }
         if (u->opc == addci_i32 || u->opc == addci_i64 ||
             u->opc == addcio_i32 || u->opc == addcio_i64 ||
             u->opc == addco_i32 || u->opc == addco_i64) {
@@ -187,6 +181,12 @@ scalar_instr:
             u->opc == subbio_i32 || u->opc == subbio_i64 ||
             u->opc == subbo_i32 || u->opc == subbo_i64) {
             ctx->borrow_on = true;
+        }
+        if (skip_alias_instr == 0) {
+            op_list_free(&$2);
+            append_instr(ctx, u);
+        } else {
+            free(u);
         }
         $$ = 0;
     }
