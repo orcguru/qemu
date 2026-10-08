@@ -466,7 +466,8 @@ clean-local:
 	rm -f *.o parser.tab.* lexer.yy.* tcg_mapper tcg_printer helper_lookup.c tests/expand_tcg_ir/*.out collect_helper_templates/*.E collect_helper_templates/*.E.out collect_helper_templates/*.E.err helper_templates/*
 	rm -rf collect_helper_templates/*.o.E.helper_templates
 	rm -rf tests/translate_to_llvm_ir/out
-	rm -rf .san
+	rm -rf .san .cov coverage
+	rm -f *.gcda *.gcno *.gcov
 	rm -f tests/expand_tcg_ir/*.err
 
 # Alias preserved from original Makefile
@@ -897,10 +898,141 @@ test-san: check-san $(SAN_MAPPER) $(SAN_PRINTER)
 
 # Default: run both suites against the plain binaries.
 test: test-expand-tcg-ir test-llvm-ir
+# ============================================================================
+# Source coverage
+#
+#   make coverage                 # build + run both suites + write report
+#   make cov-build                # only build the instrumented binaries
+#   make cov-run                  # only run the suites (counts accumulate)
+#   make coverage-report          # only (re)generate the report
+#   make cov-reset                # drop accumulated counts, keep binaries
+#   make coverage COV_RUN=0       # report from existing data, do not re-run
+#
+# gcc/gcov based.  --coverage makes every object emit a .gcno at compile time
+# and a .gcda when the binary exits.  Crucially, counts ACCUMULATE across runs,
+# so pushing the whole corpus through both binaries gives one merged picture
+# with no extra merge step.  That is why cov-run can simply invoke the normal
+# `test` target with the instrumented binaries, and why failures are tolerated
+# (-k): a case that crashes or mismatches still contributed its counts.
+#
+# Reports go to ./coverage/.  Backend is picked in this order:
+#   1. gcovr      -> HTML + text summary        (pip install gcovr)
+#   2. lcov/genhtml -> HTML                     (dnf install lcov)
+#   3. plain gcov -> per-file *.gcov text dumps (always available with gcc)
+#
+# Generated sources are excluded by default (they are machine written, so their
+# coverage is noise): adjust with COV_EXCLUDE.
+# ============================================================================
 
+CC ?= gcc
+
+COV_DIR   := .cov
+COV_OUT   ?= coverage
+COV_TITLE ?= tcg_mapper / tcg_printer coverage
+
+COV_MAPPER       := $(COV_DIR)/tcg_mapper
+COV_PRINTER      := $(COV_DIR)/tcg_printer
+COV_MAPPER_OBJS  := $(addprefix $(COV_DIR)/,$(MAPPER_OBJS))
+COV_PRINTER_OBJS := $(addprefix $(COV_DIR)/,$(PRINTER_OBJS))
+
+# Coverage is most trustworthy at -O0 (with optimisation, lines get merged and
+# the mapping back to source becomes fuzzy).  Everything else from CFLAGS -
+# include paths in particular - is kept.
+COV_CFLAGS  := $(filter-out -O%,$(CFLAGS)) -O0 -g --coverage
+COV_LDFLAGS := --coverage
+
+COV_RUN     ?= 1
+COV_EXCLUDE ?= tests/ lexer.yy.c parser.tab.c helper_lookup.c
+
+# Sources handed to plain gcov in the fallback path (one per object).
+COV_SRC := $(sort $(patsubst $(COV_DIR)/%.o,%.c,$(COV_MAPPER_OBJS) $(COV_PRINTER_OBJS)))
+
+# Which report generators exist on this machine.
+GCOVR  := $(shell command -v gcovr 2>/dev/null)
+LCOV   := $(shell command -v lcov 2>/dev/null)
+GENHTML := $(shell command -v genhtml 2>/dev/null)
+
+# --- instrumented binaries --------------------------------------------------
+$(COV_DIR):
+	@mkdir -p "$(COV_DIR)"
+
+$(COV_DIR)/%.o: %.c | $(COV_DIR)
+	$(CC) $(COV_CFLAGS) -c $< -o $@
+
+$(COV_DIR)/parser.tab.o: parser.tab.c lexer.yy.h
+$(COV_DIR)/lexer.yy.o: lexer.yy.c lexer.yy.h
+
+$(COV_MAPPER): $(COV_MAPPER_OBJS)
+	$(CC) -o $@ $^ $(COV_LDFLAGS) $(LDFLAGS) -lfl
+
+$(COV_PRINTER): $(COV_PRINTER_OBJS)
+	$(CC) -o $@ $^ $(COV_LDFLAGS) $(LDFLAGS) -lfl
+
+cov-build: $(COV_MAPPER) $(COV_PRINTER)
+
+# --- run the suites with the instrumented binaries --------------------------
+# -k so one failing suite does not stop the other; failures are expected and
+# tolerated here, we want the counts either way.
+cov-run: $(COV_MAPPER) $(COV_PRINTER)
+	-@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) -k \
+	TCG_MAPPER='$(COV_MAPPER)' TCG_PRINTER='$(COV_PRINTER)' \
+	TEST_ARCH='$(TEST_ARCH)' ONLY='$(ONLY)' \
+	test
+
+# --- drop accumulated counts (binaries stay) --------------------------------
+cov-reset:
+	@rm -f $(COV_DIR)/*.gcda
+	@echo "coverage counters reset ($(COV_DIR)/*.gcda removed)"
+
+# --- report -----------------------------------------------------------------
+coverage-report:
+	@mkdir -p "$(COV_OUT)"
+	@if [ -n "$(GCOVR)" ]; then \
+	echo "generating report with gcovr -> $(COV_OUT)/index.html"; \
+	$(GCOVR) --root . --object-directory "$(COV_DIR)" \
+	$(foreach p,$(COV_EXCLUDE),--exclude '$(p)') \
+	--html-details "$(COV_OUT)/index.html" \
+	--html-title "$(COV_TITLE)" \
+	--print-summary; \
+	elif [ -n "$(LCOV)" ] && [ -n "$(GENHTML)" ]; then \
+	echo "generating report with lcov/genhtml -> $(COV_OUT)/"; \
+	info="$(COV_OUT)/coverage.info"; \
+	$(LCOV) --directory "$(COV_DIR)" --capture --output-file "$$info"; \
+	for p in $(COV_EXCLUDE); do \
+	$(LCOV) --remove "$$info" "*$$p*" --output-file "$$info"; \
+	done; \
+	$(GENHTML) "$$info" --output-directory "$(COV_OUT)" --title "$(COV_TITLE)"; \
+	else \
+	echo "neither gcovr nor lcov/genhtml found - falling back to plain gcov."; \
+	echo "  rich HTML:  pip install gcovr   (or)   dnf install lcov"; \
+	echo "  text dumps: see $(CURDIR)/*.gcov"; \
+	gcov -o "$(COV_DIR)" $(COV_SRC) 2>&1 | grep -E '^(File |Lines executed)' || true; \
+	fi
+	@echo "-------------------------------------------------------------------"
+	@echo "coverage report : $(CURDIR)/$(COV_OUT)"
+
+# --- one-shot ---------------------------------------------------------------
+coverage:
+	@if [ "$(COV_RUN)" = 1 ]; then \
+	$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) cov-run; \
+	else \
+	echo "COV_RUN=0: reusing existing counters in $(COV_DIR)/"; \
+	fi
+	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) coverage-report
+
+# Convenience: try to open the HTML report in a browser.
+coverage-open: coverage-report
+	@url="$(CURDIR)/$(COV_OUT)/index.html"; \
+	if [ -f "$$url" ]; then \
+	echo "$$url"; \
+	command -v xdg-open > /dev/null 2>&1 && xdg-open "$$url" || true; \
+	else \
+	echo "no HTML report at $$url (see *.gcov text dumps)"; \
+	fi
 
 .PHONY: all test test-expand-tcg-ir test-llvm-ir test-llvm-ir-update \
 	test-san test-expand-tcg-ir-san test-llvm-ir-san san-build check-san \
+	coverage cov-build cov-run cov-reset coverage-report coverage-open \
 	clean clean-all clean-local clean-qemu-source \
 	qemu-preprocess qemu-preprocess-tcg-runtime \
 	qemu-preprocess-cc-helper qemu-preprocess-int-helper \
