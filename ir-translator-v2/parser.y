@@ -55,7 +55,6 @@ void op_list_init(OpList *l);
 void op_list_add(OpList *l, Operand op);
 void op_list_free(OpList *l);
 void append_instr(TcgContext *ctx, UnifiedInstr *u);
-void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src);
 void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s);
 extern int column;
 extern char *lineptr;
@@ -331,7 +330,7 @@ attr_op:
     attrs
     {
         $$.kind = OP_ATTR;
-        merge_attr(&$$.attr_info, $1);
+        $$.attr_info = $1;
         if ($$.attr_info.p.storage.atomic == INVALID_ATOMIC) {
             $$.attr_info.p.storage.atomic = ATOM_IFALIGN;
         }
@@ -345,8 +344,7 @@ attrs:
     }
     | attrs PLUS attr
     {
-        $$ = $1;
-        merge_attr(&$$, $3);
+        $$ = $3;
     }
 ;
 
@@ -434,23 +432,6 @@ void op_list_free(OpList *l) {
 
 void append_instr(TcgContext *ctx, UnifiedInstr *u) {
     instr_list_insert_before(&ctx->instr_head, &ctx->instr_tail, NULL, u);
-}
-
-void merge_attr(AttrSrcInfo *dest, const AttrSrcInfo src) {
-    if (src.subt == SUB_ATTR_STORAGE) {
-        if (src.p.storage.atomic)
-            dest->p.storage.atomic = src.p.storage.atomic;
-        if (src.p.storage.alignment)
-            dest->p.storage.alignment = src.p.storage.alignment;
-        if (src.p.storage.ext)
-            dest->p.storage.ext = src.p.storage.ext;
-        if (src.p.storage.size)
-            dest->p.storage.size = src.p.storage.size;
-        dest->subt = SUB_ATTR_STORAGE;
-    } else if (src.subt == SUB_ATTR_SWAP) {
-        dest->p.swap |= src.p.swap;
-        dest->subt = SUB_ATTR_SWAP;
-    }
 }
 
 void yyerror(yyscan_t scanner, TcgContext *ctx, const char *s) {

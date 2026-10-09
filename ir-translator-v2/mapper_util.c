@@ -42,9 +42,21 @@ const char *helper_str[] = {
     #undef X
 };
 
+const char *atomic_type_str[] = {
+    #define X(name) #name,
+    ATOMIC_TYPE_LIST
+    #undef X
+};
+
 const char *alignment_type_str[] = {
     #define X(name) #name,
     ALIGNMENT_TYPE_LIST
+    #undef X
+};
+
+const char *srcsize_type_str[] = {
+    #define X(name) #name,
+    SRCSIZE_TYPE_LIST
     #undef X
 };
 

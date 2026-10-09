@@ -111,7 +111,10 @@ void translate_ld_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const Un
     char var_name[32] = {0};
     assert(u->operands[1].kind == OP_SLOT && u->operands[2].kind == OP_ATTR);
     Operand op_addr = u->operands[1];
+    assert(op_addr.slot.type == SUB_SLOT_XREG || op_addr.slot.type == SUB_SLOT_TMP);
+    // Dirty hack to set address size
     op_addr.slot.op_type = LLVMInt64;
+    assert(op_addr.slot.op_type <= (op_addr.slot.type == SUB_SLOT_TMP ? stack->tmp.ty[op_addr.slot.idx] : stack->xreg.ty[op_addr.slot.idx]));
     LLVMValueRef addr = get_input_val_for_operand(&op_addr, stack, prefix);
     LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(u->operands[1].slot.op_type), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
     LLVMValueRef val = build_load_with_alignment(builder, get_llvm_type(u->operands[1].slot.op_type), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld"), alignment_from_attr(u->operands[2].attr_info, u->operands[1].slot.op_type));
@@ -132,7 +135,10 @@ void translate_ld2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
     char var_name[32] = {0};
     assert(u->operands[2].kind == OP_SLOT && u->operands[3].kind == OP_ATTR);
     Operand op_addr = u->operands[2];
+    assert(op_addr.slot.type == SUB_SLOT_XREG || op_addr.slot.type == SUB_SLOT_TMP);
+    // Dirty hack to set address size
     op_addr.slot.op_type = LLVMInt64;
+    assert(op_addr.slot.op_type <= (op_addr.slot.type == SUB_SLOT_TMP ? stack->tmp.ty[op_addr.slot.idx] : stack->xreg.ty[op_addr.slot.idx]));
     LLVMValueRef addr = get_input_val_for_operand(&op_addr, stack, prefix);
     LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(LLVMVector2xi64), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
     LLVMValueRef val = build_load_with_alignment(builder, get_llvm_type(LLVMVector2xi64), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld"), alignment_from_attr(u->operands[3].attr_info, LLVMVector2xi64));
@@ -144,16 +150,56 @@ void translate_ld2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
 
 void translate_st(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     char var_name[32] = {0};
-    LLVMValueRef in = get_input_val_for_operand(&u->operands[0], stack, prefix);
+    LLVMValueRef val = get_input_val_for_operand(&u->operands[0], stack, prefix);
     Operand out = u->operands[1];
     if (u->operand_count == 3) {
         assert(u->operands[1].kind == OP_VEC && u->operands[2].kind == OP_IMM);
         out.vec.offset = u->operands[2].imm.val;
     }
     if (get_operand_type(&u->operands[0]) > get_operand_type(&u->operands[1])) {
-        in = LLVMBuildTrunc(builder, in, get_llvm_type(get_operand_type(&u->operands[1])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(in), "trunc"));
+        val = LLVMBuildTrunc(builder, val, get_llvm_type(get_operand_type(&u->operands[1])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "trunc"));
     }
-    do_store(&out, in, stack, prefix);
+    do_store(&out, val, stack, prefix);
+}
+
+void translate_st_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    assert(u->operands[1].kind == OP_SLOT && u->operands[2].kind == OP_ATTR);
+    Operand op_addr = u->operands[1];
+    assert(op_addr.slot.type == SUB_SLOT_XREG || op_addr.slot.type == SUB_SLOT_TMP);
+    // Dirty hack to set address size
+    op_addr.slot.op_type = LLVMInt64;
+    assert(op_addr.slot.op_type <= (op_addr.slot.type == SUB_SLOT_TMP ? stack->tmp.ty[op_addr.slot.idx] : stack->xreg.ty[op_addr.slot.idx]));
+    LLVMValueRef addr = get_input_val_for_operand(&op_addr, stack, prefix);
+    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(u->operands[1].slot.op_type), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
+    LLVMValueRef val = get_input_val_for_operand(&u->operands[0], stack, prefix);
+    if (u->operands[1].slot.op_type < get_operand_type(&u->operands[0])) {
+        val = shrink_llvm_value(val, get_operand_type(&u->operands[0]), u->operands[1].slot.op_type);
+    }
+    build_store_with_alignment(builder, val, ptr, alignment_from_attr(u->operands[2].attr_info, u->operands[1].slot.op_type));
+}
+
+void translate_st2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    assert(u->operands[2].kind == OP_SLOT && u->operands[3].kind == OP_ATTR);
+    Operand op_addr = u->operands[2];
+    assert(op_addr.slot.type == SUB_SLOT_XREG || op_addr.slot.type == SUB_SLOT_TMP);
+    // Dirty hack to set address size
+    op_addr.slot.op_type = LLVMInt64;
+    assert(op_addr.slot.op_type <= (op_addr.slot.type == SUB_SLOT_TMP ? stack->tmp.ty[op_addr.slot.idx] : stack->xreg.ty[op_addr.slot.idx]));
+    LLVMValueRef addr = get_input_val_for_operand(&op_addr, stack, prefix);
+    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(LLVMVector2xi64), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
+
+    LLVMValueRef elem0 = get_input_val_for_operand(&u->operands[0], stack, prefix);
+    LLVMValueRef elem1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    Operand out;
+    out.kind = OP_IMM;
+    out.imm.val = 0;
+    out.imm.op_type = LLVMVector2xi64;
+    LLVMValueRef val = get_input_val_for_operand(&out, stack, prefix);
+    val = LLVMBuildInsertElement(builder, val, elem0, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ie"));
+    val = LLVMBuildInsertElement(builder, val, elem1, LLVMConstInt(get_llvm_type(LLVMInt64), 1, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ie"));
+    build_store_with_alignment(builder, val, ptr, alignment_from_attr(u->operands[3].attr_info, u->operands[2].slot.op_type));
 }
 
 static void print_operand(const Operand *op, int is_output, SBuf *b) {
@@ -187,6 +233,21 @@ static void print_operand(const Operand *op, int is_output, SBuf *b) {
         break;
     case OP_ATTR:
         sbuf_printf(b, "attr");
+        assert(op->attr_info.subt != SUB_ATTR_INVALID);
+        sbuf_printf(b, "-");
+        if (op->attr_info.subt == SUB_ATTR_STORAGE) {
+            sbuf_printf(b, "stg");
+            sbuf_printf(b, ":%s", atomic_type_str[op->attr_info.p.storage.atomic]);
+            sbuf_printf(b, ":%s", alignment_type_str[op->attr_info.p.storage.alignment]);
+            sbuf_printf(b, ":%s", srcext_type_str[op->attr_info.p.storage.ext]);
+            sbuf_printf(b, ":%s", srcsize_type_str[op->attr_info.p.storage.size]);
+        } else {
+            sbuf_printf(b, "swp");
+            sbuf_printf(b, "%s", (op->attr_info.p.swap & (1 << 0)) ? ":iz" : "");
+            sbuf_printf(b, "%s", (op->attr_info.p.swap & (1 << 1)) ? ":oz" : "");
+            sbuf_printf(b, "%s", (op->attr_info.p.swap & (1 << 2)) ? ":is" : "");
+            sbuf_printf(b, "%s", (op->attr_info.p.swap & (1 << 3)) ? ":os" : "");
+        }
         break;
     case OP_SYMBOL:
         sbuf_printf(b, "%s", helper_str[op->symbol]);
@@ -586,15 +647,10 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
             CASE(st_i32, translate_st);
             CASE(st_i64, translate_st);
             CASE(st_vec, translate_st);
+            CASE(qemu_st_i32, translate_st_with_attr);
+            CASE(qemu_st_i64, translate_st_with_attr);
+            CASE(qemu_st2_i128, translate_st2_with_attr);
 #if 0
-            case qemu_st2_i128:
-                translate_qemu_st2_i128(opc, u);
-                break;
-            case qemu_st_i32:
-            case qemu_st_i64:
-                translate_qemu_st(opc, u);
-                break;
-
             case rotr_i32:
             case rotr_i64:
                 translate_rotr(opc, u);

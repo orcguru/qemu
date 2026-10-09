@@ -17,12 +17,12 @@ XMM15:$0x720
 XMM_t0:$0xb60
 
 EXTERNAL:$0x0:
-ld8u_i32 loc1,env,$0xac
+ld8u_i32 loc1,env,$0xab
 ld8u_i64 loc1,env,$0xac
-ld16u_i32 loc1,env,$0xac
+ld16u_i32 loc1,env,$0xab
 ld16u_i64 loc1,env,$0xac
 ld32u_i64 loc1,env,$0xac
-ld8s_i32 loc1,env,$0xac
+ld8s_i32 loc1,env,$0xab
 ld8s_i64 loc1,env,$0xac
 ld16s_i32 loc1,env,$0xac
 ld16s_i64 loc1,env,$0xac
@@ -37,6 +37,7 @@ ld_i64 loc3,env,$0x3e4
 ld_i64 loc3,env,$0x3e8
 add_i64 loc0,rsp,$0x0
 qemu_ld_i64 loc6,loc0,un+ub,2
+qemu_ld_i64 loc6,loc0,ub,2
 qemu_ld_i64 loc6,loc0,un+sb,2
 qemu_ld_i64 loc6,loc0,un+leuw,2
 qemu_ld_i64 loc6,loc0,un+lesw,2
@@ -69,6 +70,7 @@ qemu_ld_i64 loc6,loc0,w16p+al+leq,2
 qemu_ld_i64 loc6,loc0,w16+al+leq,2
 qemu_ld_i64 loc6,loc0,pair+al+leq,2
 qemu_ld2_i128 loc9,loc10,loc0,un+leo,2
+qemu_ld2_i128 loc9,loc10,loc0,al16+leo,2
 st8_i32 loc1,env,$0xac
 st8_i64 loc1,env,$0xac
 st16_i32 loc1,env,$0xac
@@ -134,3 +136,37 @@ st_vec v64,e8,loc22,env,$0x36c
 st_vec v64,e8,loc22,env,$0x36d
 st_vec v64,e8,loc22,env,$0x36e
 st_vec v64,e8,loc22,env,$0x36f
+qemu_st_i64 loc6,loc0,un+ub,2
+qemu_st_i64 loc6,loc0,un+sb,2
+qemu_st_i64 loc6,loc0,un+leuw,2
+qemu_st_i64 loc6,loc0,un+lesw,2
+qemu_st_i64 loc6,loc0,un+leul,2
+qemu_st_i64 loc6,loc0,un+lesl,2
+qemu_st_i64 loc6,loc0,un+leq,2
+qemu_st_i64 loc6,loc0,al+ub,2
+qemu_st_i64 loc6,loc0,al+sb,2
+qemu_st_i64 loc6,loc0,al+leuw,2
+qemu_st_i64 loc6,loc0,al+lesw,2
+qemu_st_i64 loc6,loc0,al+leul,2
+qemu_st_i64 loc6,loc0,al+lesl,2
+qemu_st_i64 loc6,loc0,al+leq,2
+qemu_st_i64 loc6,loc0,al2+leq,2
+qemu_st_i64 loc6,loc0,al4+leq,2
+qemu_st_i64 loc6,loc0,al8+leq,2
+qemu_st_i64 loc6,loc0,al16+leq,2
+qemu_st_i64 loc6,loc0,al32+leq,2
+qemu_st_i64 loc6,loc0,al64+leq,2
+qemu_st_i32 loc7,loc0,un+ub,2
+qemu_st_i32 loc7,loc0,un+sb,2
+qemu_st_i32 loc7,loc0,un+leuw,2
+qemu_st_i32 loc7,loc0,un+lesw,2
+qemu_st_i32 loc7,loc0,un+leul,2
+qemu_st_i32 loc7,loc0,un+lesl,2
+qemu_st_i32 loc7,loc0,un+leq,2
+qemu_st_i64 loc6,loc0,noat+al+leq,2
+qemu_st_i64 loc6,loc0,sub+al+leq,2
+qemu_st_i64 loc6,loc0,w16p+al+leq,2
+qemu_st_i64 loc6,loc0,w16+al+leq,2
+qemu_st_i64 loc6,loc0,pair+al+leq,2
+qemu_st2_i128 loc9,loc10,loc0,un+leo,2
+qemu_st2_i128 loc9,loc10,loc0,al16+leo,2
