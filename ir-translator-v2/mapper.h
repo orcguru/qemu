@@ -8,14 +8,6 @@ typedef struct AllocaWithState {
     LLVMType *ty;
     LLVMValueRef *alloca;
     int cnt;
-    /*
-     * Information regarding the value cache within current BB,
-     * gets reset on entering a new BB
-     */
-    LLVMValueRef *copy;
-    // Bit array to validate the copy array
-    uint64_t *copy_valid;
-    int copy_valid_cnt;
 } AllocaWithState;
 
 typedef struct StackAlloca {

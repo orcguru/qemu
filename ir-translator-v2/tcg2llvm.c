@@ -71,6 +71,7 @@ void translate_ld_zext(LLVMBuilderRef builder, StackAlloca *stack, const Unified
         in = get_input_val_for_operand(&u->operands[1], stack, prefix);
     } else {
         assert(u->operand_count == 3 && u->operands[1].kind == OP_VEC && u->operands[2].kind == OP_IMM);
+        assert(u->operands[2].imm.val < 0x10);
         Operand op_vec_offset = u->operands[1];
         op_vec_offset.vec.offset = u->operands[2].imm.val;
         in = get_input_val_for_operand(&op_vec_offset, stack, prefix);
@@ -86,6 +87,7 @@ void translate_ld_sext(LLVMBuilderRef builder, StackAlloca *stack, const Unified
         in = get_input_val_for_operand(&u->operands[1], stack, prefix);
     } else {
         assert(u->operand_count == 3 && u->operands[1].kind == OP_VEC && u->operands[2].kind == OP_IMM);
+        assert(u->operands[2].imm.val < 0x10);
         Operand op_vec_offset = u->operands[1];
         op_vec_offset.vec.offset = u->operands[2].imm.val;
         in = get_input_val_for_operand(&op_vec_offset, stack, prefix);
@@ -100,6 +102,7 @@ void translate_ld(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr
         in = get_input_val_for_operand(&u->operands[1], stack, prefix);
     } else {
         assert(u->operand_count == 3 && u->operands[1].kind == OP_VEC && u->operands[2].kind == OP_IMM);
+        assert(u->operands[2].imm.val < 0x10);
         Operand op_vec_offset = u->operands[1];
         op_vec_offset.vec.offset = u->operands[2].imm.val;
         in = get_input_val_for_operand(&op_vec_offset, stack, prefix);
@@ -122,7 +125,7 @@ void translate_ld_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const Un
         if (u->operands[2].attr_info.p.storage.ext == SIGN) {
             val = LLVMBuildSExt(builder, val, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "sext"));
         } else {
-            val = LLVMBuildZExt(builder, val, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "sext"));
+            val = LLVMBuildZExt(builder, val, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "zext"));
         }
     }
     if (u->operands[1].slot.op_type > get_operand_type(&u->operands[0])) {
@@ -154,6 +157,7 @@ void translate_st(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr
     Operand out = u->operands[1];
     if (u->operand_count == 3) {
         assert(u->operands[1].kind == OP_VEC && u->operands[2].kind == OP_IMM);
+        assert(u->operands[2].imm.val < 0x10);
         out.vec.offset = u->operands[2].imm.val;
     }
     if (get_operand_type(&u->operands[0]) > get_operand_type(&u->operands[1])) {
@@ -173,8 +177,15 @@ void translate_st_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const Un
     LLVMValueRef addr = get_input_val_for_operand(&op_addr, stack, prefix);
     LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(u->operands[1].slot.op_type), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
     LLVMValueRef val = get_input_val_for_operand(&u->operands[0], stack, prefix);
-    if (u->operands[1].slot.op_type < get_operand_type(&u->operands[0])) {
-        val = shrink_llvm_value(val, get_operand_type(&u->operands[0]), u->operands[1].slot.op_type);
+    LLVMType src_ty = get_operand_type(&u->operands[0]);
+    if (u->operands[1].slot.op_type < src_ty) {
+        val = shrink_llvm_value(val, src_ty, u->operands[1].slot.op_type);
+    } else if (u->operands[1].slot.op_type > src_ty) {
+        if (u->operands[2].attr_info.p.storage.ext == SIGN) {
+            val = LLVMBuildSExt(builder, val, get_llvm_type(u->operands[1].slot.op_type), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "sext"));
+        } else {
+            val = LLVMBuildZExt(builder, val, get_llvm_type(u->operands[1].slot.op_type), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "zext"));
+        }
     }
     build_store_with_alignment(builder, val, ptr, alignment_from_attr(u->operands[2].attr_info, u->operands[1].slot.op_type));
 }
@@ -197,8 +208,8 @@ void translate_st2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
     out.imm.val = 0;
     out.imm.op_type = LLVMVector2xi64;
     LLVMValueRef val = get_input_val_for_operand(&out, stack, prefix);
-    val = LLVMBuildInsertElement(builder, val, elem0, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ie"));
-    val = LLVMBuildInsertElement(builder, val, elem1, LLVMConstInt(get_llvm_type(LLVMInt64), 1, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ie"));
+    val = LLVMBuildInsertElement(builder, val, elem0, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "st2", "ie"));
+    val = LLVMBuildInsertElement(builder, val, elem1, LLVMConstInt(get_llvm_type(LLVMInt64), 1, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "st2", "ie"));
     build_store_with_alignment(builder, val, ptr, alignment_from_attr(u->operands[3].attr_info, u->operands[2].slot.op_type));
 }
 
