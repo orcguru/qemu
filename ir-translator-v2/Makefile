@@ -468,7 +468,7 @@ clean-local:
 	rm -rf tests/translate_to_llvm_ir/out
 	rm -rf .san .cov coverage
 	rm -f *.gcda *.gcno *.gcov
-	rm -f tests/expand_tcg_ir/*.err
+	rm -f tests/expand_tcg_ir/*.err tests/expand_tcg_ir/*.exp.tmp
 
 # Alias preserved from original Makefile
 clean-all: clean
@@ -507,6 +507,14 @@ else
 EXPAND_ERRDEV = 2>&1
 endif
 
+# Optional subset filter, same idea as suite 2: make test-expand-tcg-ir ONLY=call
+ifeq ($(ONLY),)
+EXPAND_TIR_CASES := $(TIR_FILES)
+else
+EXPAND_TIR_CASES := $(foreach f,$(TIR_FILES),\
+	$(if $(findstring $(ONLY),$(basename $(notdir $f))),$f))
+endif
+
 # Run tcg_printer over every .tir file and diff against .exp.
 # With REPEAT=N each case runs N times and runs 2..N are cross-checked against
 # run 1 - that is what catches a memory bug whose effect only shows up
@@ -516,7 +524,7 @@ test-expand-tcg-ir: $(TCG_PRINTER)
 	runs=$(REPEAT); \
 	case "$$runs" in ''|*[!0-9]*) runs=1 ;; esac; \
 	[ "$$runs" -ge 1 ] || runs=1; \
-	for tir in $(TIR_FILES); do \
+	for tir in $(EXPAND_TIR_CASES); do \
 	dir=$${tir%/*}; \
 	base=$${tir##*/}; \
 	[ "$$dir" = "$$tir" ] && dir=""; \
@@ -570,6 +578,50 @@ test-expand-tcg-ir: $(TCG_PRINTER)
 	echo "expand_tcg_ir: $$pass passed, $$fail failed, $$unstable unstable, $$skip without .exp (REPEAT=$$runs; fail/unstable counted per run)"; \
 	exit $$rc
 
+# (Re)generate the .exp goldens for suite 1.  Counterpart of
+# test-llvm-ir-update:
+#
+#   make test-expand-tcg-ir-update                 # all cases
+#   make test-expand-tcg-ir-update ONLY=call       # only names containing "call"
+#
+# Notes:
+#   * The per-case extra flags are read from the first line of the .tir when it
+#     starts with ';' - exactly like the run does - so the golden is produced
+#     from the very same command line that will later be diffed against it.
+#   * stderr is ALWAYS merged here (2>&1).  That matches the native run, which
+#     is what the committed .exp files are recorded from.  (The sanitizer run
+#     deliberately splits stderr and therefore cannot share these goldens; see
+#     the note in the sanitizers section.)
+#   * Output goes to a temp file and is only moved into place on success: a
+#     plain "> $$exp" would truncate the existing golden the moment the shell
+#     sets up the redirect, so a failing printer would destroy it.  A case that
+#     fails leaves its .exp byte-for-byte intact and makes the target exit
+#     non-zero, so a broken build can never silently re-record garbage.
+test-expand-tcg-ir-update: $(TCG_PRINTER)
+	@rc=0; updated=0; failed=0; \
+	for tir in $(EXPAND_TIR_CASES); do \
+	exp="$${tir%.tir}.exp"; \
+	tmp="$${tir%.tir}.exp.tmp"; \
+	extra=""; \
+	fline=$$(head -n 1 "$$tir"); \
+	case "$$fline" in \
+	';'*) extra=$${fline#';'} ;; \
+	esac; \
+	echo "==> $$tir $$extra"; \
+	if $(TCG_PRINTER) $$extra "$$tir" > "$$tmp" 2>&1; then \
+		mv -f "$$tmp" "$$exp"; \
+		echo "UPDATE: $$exp"; \
+		updated=$$((updated+1)); \
+	else \
+		rm -f "$$tmp"; \
+		echo "ERROR: tcg_printer failed for $$tir (golden left untouched)"; \
+		failed=$$((failed+1)); rc=1; \
+	fi; \
+	done; \
+	echo "-------------------------------------------------------------------"; \
+	echo "expand_tcg_ir update: $$updated updated, $$failed failed"; \
+	exit $$rc
+
 # ----------------------------------------------------------------------------
 # Suite 2: tests/translate_to_llvm_ir
 #
@@ -597,6 +649,8 @@ test-expand-tcg-ir: $(TCG_PRINTER)
 #   make test-llvm-ir TEST_ARCH=riscv64    # compare against another arch's copy
 #   make test-llvm-ir-update               # (re)create goldens for THIS host
 #   make test-llvm-ir-update ONLY=load_store
+#   make test-expand-tcg-ir-update         # (re)create the .exp goldens
+#   make test-expand-tcg-ir-update ONLY=call
 #   make test REPEAT=5                     # each case 5x, catch flaky output
 #
 #   make test-san                          # same, under the sanitizer
@@ -746,6 +800,7 @@ test-llvm-ir-update: $(TCG_MAPPER)
 
 # ============================================================================
 # Sanitizers
+#
 #   make test-san                    # both suites, AddressSanitizer + UBSan
 #   make test-llvm-ir-san            # only the LLVM-IR suite
 #   make test-expand-tcg-ir-san      # only the expand_tcg_ir suite
@@ -1030,8 +1085,11 @@ coverage-open: coverage-report
 	echo "no HTML report at $$url (see *.gcov text dumps)"; \
 	fi
 
+
+
 .PHONY: all test test-expand-tcg-ir test-llvm-ir test-llvm-ir-update \
 	test-san test-expand-tcg-ir-san test-llvm-ir-san san-build check-san \
+	test-expand-tcg-ir-update \
 	coverage cov-build cov-run cov-reset coverage-report coverage-open \
 	clean clean-all clean-local clean-qemu-source \
 	qemu-preprocess qemu-preprocess-tcg-runtime \

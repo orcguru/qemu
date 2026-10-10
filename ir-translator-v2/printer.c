@@ -51,6 +51,21 @@ void print_operand(Operand *op, int is_output) {
         break;
     case OP_ATTR:
         printf("attr");
+        assert(op->attr_info.subt != SUB_ATTR_INVALID);
+        printf("-");
+        if (op->attr_info.subt == SUB_ATTR_STORAGE) {
+            printf("stg");
+            printf(":%s", atomic_type_str[op->attr_info.p.storage.atomic]);
+            printf(":%s", alignment_type_str[op->attr_info.p.storage.alignment]);
+            printf(":%s", srcext_type_str[op->attr_info.p.storage.ext]);
+            printf(":%s", srcsize_type_str[op->attr_info.p.storage.size]);
+        } else {
+            printf("swp");
+            printf("%s", (op->attr_info.p.swap & (1 << 0)) ? ":iz" : "");
+            printf("%s", (op->attr_info.p.swap & (1 << 1)) ? ":oz" : "");
+            printf("%s", (op->attr_info.p.swap & (1 << 2)) ? ":is" : "");
+            printf("%s", (op->attr_info.p.swap & (1 << 3)) ? ":os" : "");
+        }
         break;
     case OP_SYMBOL:
         printf("%s", helper_str[op->symbol]);
@@ -66,7 +81,7 @@ void print_operand(Operand *op, int is_output) {
         if (op->env.offset == 0) {
             printf("env");
         } else {
-            printf("env:0x%x", op->env.offset);
+            printf("env:0x%lx", op->env.offset);
         }
         break;
     case OP_ARG:

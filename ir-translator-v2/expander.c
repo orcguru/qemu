@@ -31,7 +31,7 @@ void sanity_check_op_type_solid(const TcgContext *ctx) {
     do {                                                                    \
         Operand _ops[] = { __VA_ARGS__ };                                   \
         size_t _cnt = sizeof(_ops) / sizeof(_ops[0]);                       \
-        UnifiedInstr *_u = new_instr(ctx, opc, vs, es, _ops, _cnt);         \
+        UnifiedInstr *_u = new_instr(ctx, opc, vs, es, _ops, _cnt, false);         \
         expand_slot_alias(ctx, _u);                                         \
         update_slot_types(ctx, _u);                                         \
         register_vec_spare_stack_alloca(ctx, _u);                           \
@@ -42,7 +42,7 @@ void sanity_check_op_type_solid(const TcgContext *ctx) {
     do {                                                                    \
         Operand _ops[] = { __VA_ARGS__ };                                   \
         size_t _cnt = sizeof(_ops) / sizeof(_ops[0]);                       \
-        UnifiedInstr *_u = new_instr(ctx, opc, vs, es, _ops, _cnt);         \
+        UnifiedInstr *_u = new_instr(ctx, opc, vs, es, _ops, _cnt, false);         \
         expand_slot_alias(ctx, _u);                                         \
         update_slot_types(ctx, _u);                                         \
         func_list_append(list, _u);                                         \
@@ -59,10 +59,10 @@ void sanity_check_op_type_solid(const TcgContext *ctx) {
 #define RELOP_OP(r)         ((Operand){ .kind = OP_RELOP, .relop = (r) })
 #define SYMBOL_OP(sym)      ((Operand){ .kind = OP_SYMBOL, .symbol = (sym) })
 #define ARG_OP(pos)         ((Operand){ .kind = OP_ARG,   .argidx = (pos) })
-#define ATTR_STORAGE_OP(nonatomic, align, sz)                             \
+#define ATTR_STORAGE_OP(nonatomic, align, sz, e)                           \
     ((Operand){ .kind = OP_ATTR, .attr_info = {                            \
         .subt = SUB_ATTR_STORAGE,                                          \
-        .p.storage = { .atomic = (nonatomic), .alignment = (align), .size = (sz) } \
+        .p.storage = { .atomic = (nonatomic), .alignment = (align), .size = (sz), .ext = (e) } \
     }})
 
 static inline UnifiedInstr *get_single_target_opc(const TcgContext *ctx, OpCodeType opc) {
@@ -78,27 +78,14 @@ void expand_push_ret_addr(TcgContext *ctx) {
     if (!u) {
         return;
     }
-    int tmp1 = get_next_tmp_idx(ctx);
     int tmp2 = get_next_tmp_idx(ctx);
     int tmp3 = get_next_tmp_idx(ctx);
 
-    // - GET pointer to the shadow stack ptr
-    // mov_i64 tmp_N1,env
-    // add_i64 tmp_N1,tmp_N1,-8UL
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, mov_i64, 0, 0,
-        SLOT_OP(SUB_SLOT_TMP, tmp1),
-        ENV_OP(0));
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0,
-        SLOT_OP(SUB_SLOT_TMP, tmp1),
-        SLOT_OP(SUB_SLOT_TMP, tmp1),
-        IMM_OP(-8ULL));
-
     // - LOAD the shadow stack ptr
-    // qemu_ld_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0,
+    // ld_i64 tmp_N2,env,-8ULL
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, ld_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
-        SLOT_OP(SUB_SLOT_TMP, tmp1),
-        ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+        ENV_OP(0), IMM_OP(-8ULL));
 
     // - ALLOCATE an entry on the shadow stack
     // add_i64 tmp_N2,tmp_N2,-8UL
@@ -113,7 +100,7 @@ void expand_push_ret_addr(TcgContext *ctx) {
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0,
         SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type, u->operands[0].slot.stack_type),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
-        ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+        ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B, ZERO));
 
     // - ALLOCATE an entry on the shadow stack
     // add_i64 tmp_N2,tmp_N2,-8UL
@@ -135,14 +122,13 @@ void expand_push_ret_addr(TcgContext *ctx) {
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp3),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
-        ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+        ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B, ZERO));
 
     // - UPDATE the shadow stack ptr
-    // qemu_st_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0,
+    // st_i64 tmp_N2,env,-8ULL
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, st_i64, 0, 0,
         SLOT_OP(SUB_SLOT_TMP, tmp2),
-        SLOT_OP(SUB_SLOT_TMP, tmp1),
-        ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+        ENV_OP(0), IMM_OP(-8ULL));
 
     instr_list_remove_and_free(&ctx->instr_head, &ctx->instr_tail, u);
 }
@@ -152,39 +138,37 @@ void expand_ret(TcgContext *ctx) {
     if (!u) {
         return;
     }
-    int tmp1 = get_next_tmp_idx(ctx);
     int tmp2 = get_next_tmp_idx(ctx);
     int tmp3 = get_next_tmp_idx(ctx);
     int tmp4 = get_next_tmp_idx(ctx);
-    // - GET pointer to the shadow stack ptr
-    // mov_i64 tmp_N1,env
-    // add_i64 tmp_N1,tmp_N1,-8UL
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
 
     // - LOAD the shadow stack ptr
-    // qemu_ld_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+    // ld_i64 tmp_N2,env,-8ULL
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, ld_i64, 0, 0,
+                      SLOT_OP(SUB_SLOT_TMP, tmp2),
+                      ENV_OP(0), IMM_OP(-8ULL));
 
     // - LOAD the address of return
     // qemu_ld_i64 tmp_N3,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B, ZERO));
 
     // - POP the shadow stack
-    // add_i64 tmp_N2,tmp_N2,8UL
+    // add_i64 tmp_N2,tmp_N2,8ULL
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
 
     // - LOAD the x64_ret_addr
     // qemu_ld_i64 tmp_N4,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp4), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp4), SLOT_OP(SUB_SLOT_TMP, tmp2), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B, ZERO));
 
     // - POP the shadow stack
-    // add_i64 tmp_N2,tmp_N2,8UL
+    // add_i64 tmp_N2,tmp_N2,8ULL
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(8ULL));
 
     // - UPDATE the shadow stack ptr
-    // qemu_st_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+    // st_i64 tmp_N2,env,-8ULL
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, st_i64, 0, 0,
+                      SLOT_OP(SUB_SLOT_TMP, tmp2),
+                      ENV_OP(0), IMM_OP(-8ULL));
 
     // - CHECK if lookup is needed
     // brcond_i64 op0,tmp_N4,ne,L0
@@ -359,17 +343,13 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
         // Instructions to backup slot contents
         if (accumulated) {
             uint64_t tmp_slot_preserve_offset = 16;
-            int tmp1 = get_next_tmp_idx(ctx);
             int tmp2 = get_next_tmp_idx(ctx);
             int tmp3 = get_next_tmp_idx(ctx);
-            // - GET pointer to the shadow stack ptr
-            // mov_i64 tmp_N1,env
-            // add_i64 tmp_N1,tmp_N1,-8UL
-            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
-            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
             // - LOAD the shadow stack ptr
-            // qemu_ld_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+            // ld_i64 tmp_N2,env,-8ULL
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, ld_i64, 0, 0,
+                              SLOT_OP(SUB_SLOT_TMP, tmp2),
+                              ENV_OP(0), IMM_OP(-8ULL));
 
             for (int i = 0; i < ctx->next_tmp_idx; ++i) {
                 if (test_bit(buf, i)) {
@@ -399,7 +379,7 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
                         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, qemu_st_i64, 0, 0,
                             SLOT_OP(SUB_SLOT_TMP, i),
                             SLOT_OP(SUB_SLOT_TMP, tmp3),
-                            ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_16, src_sz));
+                            ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_16, src_sz, ZERO));
                         break;
                     case LLVMVector16xi8:
                     case LLVMVector8xi16:
@@ -421,17 +401,13 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
         if (accumulated) {
             UnifiedInstr *c_next = c->next;
             uint64_t tmp_slot_preserve_offset = 16;
-            int tmp1 = get_next_tmp_idx(ctx);
             int tmp2 = get_next_tmp_idx(ctx);
             int tmp3 = get_next_tmp_idx(ctx);
-            // - GET pointer to the shadow stack ptr
-            // mov_i64 tmp_N1,env
-            // add_i64 tmp_N1,tmp_N1,-8UL
-            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, mov_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), ENV_OP(0));
-            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, add_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp1), SLOT_OP(SUB_SLOT_TMP, tmp1), IMM_OP(-8ULL));
             // - LOAD the shadow stack ptr
-            // qemu_ld_i64 tmp_N2,tmp_N1,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, qemu_ld_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp2), SLOT_OP(SUB_SLOT_TMP, tmp1), ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+            // ld_i64 tmp_N2,env,-8ULL
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, ld_i64, 0, 0,
+                              SLOT_OP(SUB_SLOT_TMP, tmp2),
+                              ENV_OP(0), IMM_OP(-8ULL));
 
             for (int i = 0; i < ctx->next_tmp_idx; ++i) {
                 if (test_bit(buf, i)) {
@@ -461,7 +437,7 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
                         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, qemu_ld_i64, 0, 0,
                             SLOT_OP(SUB_SLOT_TMP, i),
                             SLOT_OP(SUB_SLOT_TMP, tmp3),
-                            ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_16, src_sz));
+                            ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_16, src_sz, ZERO));
                         break;
                     case LLVMVector16xi8:
                     case LLVMVector8xi16:
@@ -819,51 +795,16 @@ void add_spill_load_vector(TcgContext *ctx,
                               const int cnt,
                               bool before_call) {
     for (int i = 0; i < cnt; ++i) {
-        int tmp1 = get_next_tmp_idx(ctx);
         // - SPILL
-        // mov_i64 tmp_N1,env
-        // (bc)add_i64 tmp_N1,tmp_N1,get_vec_offset()
-        // (ac)add_i64 tmp_N1,tmp_N1,env_vecs[i]
-        // st_vec v128,e8,spare_vecs[i],tmp_N1
-        EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, mov_i64, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
-            ENV_OP(0));
-        if (before_call) {
-            EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, add_i64, 0, 0,
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                IMM_OP(get_vec_offset(spare_vecs[i].vec.idx)));
-        } else {
-            EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, add_i64, 0, 0,
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                IMM_OP(env_vecs[i].env.offset));
-        }
+        // st_vec v128,e8,spare_vecs[i],env,offset
         EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, st_vec, 128, 8,
             VEC_OP(spare_vecs[i].vec.idx, spare_vecs[i].vec.offset),
-            SLOT_OP(SUB_SLOT_TMP, tmp1));
+            ENV_OP(0), (before_call ? IMM_OP(get_vec_offset(spare_vecs[i].vec.idx)) : IMM_OP(env_vecs[i].env.offset)));
         // - LOAD
-        // mov_i64 tmp_N1,env
-        // (bc)add_i64 tmp_N1,tmp_N1,env_vecs[i]
-        // (ac)add_i64 tmp_N1,tmp_N1,get_vec_offset()
-        // ld_vec v128,e8,spare_vecs[i],tmp_N1
-        EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, mov_i64, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
-            ENV_OP(0));
-        if (before_call) {
-            EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, add_i64, 0, 0,
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                IMM_OP(env_vecs[i].env.offset));
-        } else {
-            EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, add_i64, 0, 0,
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                IMM_OP(get_vec_offset(spare_vecs[i].vec.idx)));
-        }
+        // ld_vec v128,e8,spare_vecs[i],env,offset
         EMIT_INSTR_BEFORE(ctx, head_p, tail_p, u, ld_vec, 128, 8,
             VEC_OP(spare_vecs[i].vec.idx, spare_vecs[i].vec.offset),
-            SLOT_OP(SUB_SLOT_TMP, tmp1));
+            ENV_OP(0), (before_call ? IMM_OP(env_vecs[i].env.offset) : IMM_OP(get_vec_offset(spare_vecs[i].vec.idx))));
     }
 }
 
@@ -1037,34 +978,19 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
     int func_idx = get_next_func_list_idx(ctx);
 
     // Store all GP registers to ENV
-    int tmp1 = get_next_tmp_idx(ctx);
-    // - GET env pointer
-    // mov_i64 tmp_N1,env
-    EMIT_INSTR_APPEND_LIST(ctx, &result, mov_i64, 0, 0,
-        SLOT_OP(SUB_SLOT_TMP, tmp1),
-        ENV_OP(0));
     for (int r = rax; r < XREG_MAX; ++r) {
-        int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = env_regs_offset[r];
         LLVMType ty = env_regs_type[r];
-        // - CALCULATE offset to CPUArchState field
-        // add_i64 tmp_N2,tmp_N1,offset
-        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp2),
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
-            IMM_OP(off));
         if (ty == LLVMInt64) {
-            // qemu_st_i64 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i64, 0, 0,
+            // st_i64 r,env,off
+            EMIT_INSTR_APPEND_LIST(ctx, &result, st_i64, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
-                SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+                ENV_OP(0), IMM_OP(off));
         } else {
-            // qemu_st_i32 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_4,SRC4B
-            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i32, 0, 0,
+            // st_i32 r,env,off
+            EMIT_INSTR_APPEND_LIST(ctx, &result, st_i32, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
-                SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_4, SRC4B));
+                ENV_OP(0), IMM_OP(off));
         }
     }
 
@@ -1074,17 +1000,10 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
 
     // Store all Vector registers to ENV
     for (int i = 0; i < (cfg_xmm_count * 2); ++i) {
-        int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = get_vec_offset(i);
-        // - CALCULATE offset to CPUArchState field
-        // add_i64 tmp_N2,tmp_N1,offset
-        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp2),
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
-            IMM_OP(off));
         EMIT_INSTR_APPEND_LIST(ctx, &result, st_vec, 128, 8,
             VEC_OP(i, 0),
-            SLOT_OP(SUB_SLOT_TMP, tmp2));
+            ENV_OP(0), IMM_OP(off));
     }
 
     // Setup native call arguments
@@ -1114,11 +1033,10 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
             int tmp2 = get_next_tmp_idx(ctx);
             uint64_t off = get_vec_offset(nc->operands[i].vec.idx);
             // - CALCULATE offset to CPUArchState xmm
-            // add_i64 tmp_N2,tmp_N1,offset
+            // add_i64 tmp_N2,env,offset
             EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
                 SLOT_OP(SUB_SLOT_TMP, tmp2),
-                SLOT_OP(SUB_SLOT_TMP, tmp1),
-                IMM_OP(off));
+                ENV_OP(0), IMM_OP(off));
             nc->operands[i].kind = OP_SLOT;
             nc->operands[i].slot.type = SUB_SLOT_TMP;
             nc->operands[i].slot.idx = tmp2;
@@ -1133,11 +1051,10 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
             if (idx < cnt) {
                 int tmp2 = get_next_tmp_idx(ctx);
                 // - CALCULATE offset to CPUArchState xmm
-                // add_i64 tmp_N2,tmp_N1,env.offset
+                // add_i64 tmp_N2,env,env.offset
                 EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
                     SLOT_OP(SUB_SLOT_TMP, tmp2),
-                    SLOT_OP(SUB_SLOT_TMP, tmp1),
-                    IMM_OP(nc->operands[i].env.offset));
+                    ENV_OP(0), IMM_OP(nc->operands[i].env.offset));
                 nc->operands[i].kind = OP_SLOT;
                 nc->operands[i].slot.type = SUB_SLOT_TMP;
                 nc->operands[i].slot.idx = tmp2;
@@ -1157,43 +1074,27 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
 
     // Load all GP registers from ENV
     for (int r = rax; r < XREG_MAX; ++r) {
-        int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = env_regs_offset[r];
         LLVMType ty = env_regs_type[r];
-        // - CALCULATE offset to CPUArchState field
-        // add_i64 tmp_N2,tmp_N1,offset
-        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp2),
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
-            IMM_OP(off));
         if (ty == LLVMInt64) {
-            // qemu_st_i64 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i64, 0, 0,
+            // ld_i64 r,env,off
+            EMIT_INSTR_APPEND_LIST(ctx, &result, ld_i64, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
-                SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+                ENV_OP(0), IMM_OP(off));
         } else {
-            // qemu_st_i32 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_4,SRC4B
-            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i32, 0, 0,
+            // ld_i32 r,env,off
+            EMIT_INSTR_APPEND_LIST(ctx, &result, ld_i32, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
-                SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_4, SRC4B));
+                ENV_OP(0), IMM_OP(off));
         }
     }
 
     // Load all Vector registers from ENV
     for (int i = 0; i < (cfg_xmm_count * 2); ++i) {
-        int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = get_vec_offset(i);
-        // - CALCULATE offset to CPUArchState field
-        // add_i64 tmp_N2,tmp_N1,offset
-        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp2),
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
-            IMM_OP(off));
         EMIT_INSTR_APPEND_LIST(ctx, &result, ld_vec, 128, 8,
             VEC_OP(i, 0),
-            SLOT_OP(SUB_SLOT_TMP, tmp2));
+            ENV_OP(0), IMM_OP(off));
     }
 
     // Get the next call from argument (the last argument implicitly is the next call target), and do tail_call_qemuaot
@@ -1367,50 +1268,28 @@ int create_trampoline_for_runtime(TcgContext *ctx,
     int func_idx = get_next_func_list_idx(ctx);
 
     // Store all GP registers to ENV
-    int tmp1 = get_next_tmp_idx(ctx);
-    // - GET env pointer
-    // mov_i64 tmp_N1,env
-    EMIT_INSTR_APPEND_LIST(ctx, &result, mov_i64, 0, 0,
-        SLOT_OP(SUB_SLOT_TMP, tmp1),
-        ENV_OP(0));
     for (int r = rax; r < XREG_MAX; ++r) {
-        int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = env_regs_offset[r];
         LLVMType ty = env_regs_type[r];
-        // - CALCULATE offset to CPUArchState field
-        // add_i64 tmp_N2,tmp_N1,offset
-        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp2),
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
-            IMM_OP(off));
         if (ty == LLVMInt64) {
-            // qemu_st_i64 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i64, 0, 0,
+            // st_i64 r,env,off
+            EMIT_INSTR_APPEND_LIST(ctx, &result, st_i64, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
-                SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+                ENV_OP(0), IMM_OP(off));
         } else {
-            // qemu_st_i32 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_4,SRC4B
-            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_st_i32, 0, 0,
+            // st_i32 r,env,off
+            EMIT_INSTR_APPEND_LIST(ctx, &result, st_i32, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
-                SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_4, SRC4B));
+                ENV_OP(0), IMM_OP(off));
         }
     }
 
     // Store all Vector registers to ENV
     for (int i = 0; i < (cfg_xmm_count * 2); ++i) {
-        int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = get_vec_offset(i);
-        // - CALCULATE offset to CPUArchState field
-        // add_i64 tmp_N2,tmp_N1,offset
-        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp2),
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
-            IMM_OP(off));
         EMIT_INSTR_APPEND_LIST(ctx, &result, st_vec, 128, 8,
             VEC_OP(i, 0),
-            SLOT_OP(SUB_SLOT_TMP, tmp2));
+            ENV_OP(0), IMM_OP(off));
     }
 
     // Setup native call arguments
@@ -1458,43 +1337,27 @@ int create_trampoline_for_runtime(TcgContext *ctx,
 
     // Load all GP registers from ENV
     for (int r = rax; r < XREG_MAX; ++r) {
-        int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = env_regs_offset[r];
         LLVMType ty = env_regs_type[r];
-        // - CALCULATE offset to CPUArchState field
-        // add_i64 tmp_N2,tmp_N1,offset
-        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp2),
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
-            IMM_OP(off));
         if (ty == LLVMInt64) {
-            // qemu_st_i64 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
-            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i64, 0, 0,
+            // ld_i64 r,env,off
+            EMIT_INSTR_APPEND_LIST(ctx, &result, ld_i64, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
-                SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B));
+                ENV_OP(0), IMM_OP(off));
         } else {
-            // qemu_st_i32 r,tmp_N2,attr:ATOM_IFALIGN,ALIGN_4,SRC4B
-            EMIT_INSTR_APPEND_LIST(ctx, &result, qemu_ld_i32, 0, 0,
+            // ld_i32 r,env,off
+            EMIT_INSTR_APPEND_LIST(ctx, &result, ld_i32, 0, 0,
                 SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
-                SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_4, SRC4B));
+                ENV_OP(0), IMM_OP(off));
         }
     }
 
     // Load all Vector registers from ENV
     for (int i = 0; i < (cfg_xmm_count * 2); ++i) {
-        int tmp2 = get_next_tmp_idx(ctx);
         uint64_t off = get_vec_offset(i);
-        // - CALCULATE offset to CPUArchState field
-        // add_i64 tmp_N2,tmp_N1,offset
-        EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp2),
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
-            IMM_OP(off));
         EMIT_INSTR_APPEND_LIST(ctx, &result, ld_vec, 128, 8,
             VEC_OP(i, 0),
-            SLOT_OP(SUB_SLOT_TMP, tmp2));
+            ENV_OP(0), IMM_OP(off));
     }
 
     // Get the next call from argument (the last argument implicitly is the next call target), and do tail_call_qemuaot
@@ -1567,21 +1430,13 @@ void expand_call_runtime(TcgContext *ctx) {
             uu->opc = tail_call_qemuaot;
             for (int i = 0; i < u->operand_count; ++i) {
                 if (u->operands[i].kind == OP_VEC) {
-                    int tmp1 = get_next_tmp_idx(ctx);
                     int tmp2 = get_next_tmp_idx(ctx);
-                    // - GET env pointer
-                    // mov_i64 tmp_N1,env
-                    EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, mov_i64, 0, 0,
-                        SLOT_OP(SUB_SLOT_TMP, tmp1),
-                        ENV_OP(0));
-
                     uint64_t off = get_vec_offset(u->operands[i].vec.idx);
                     // - CALCULATE offset to CPUArchState xmm
-                    // add_i64 tmp_N2,tmp_N1,offset
+                    // add_i64 tmp_N2,env,offset
                     EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, add_i64, 0, 0,
                         SLOT_OP(SUB_SLOT_TMP, tmp2),
-                        SLOT_OP(SUB_SLOT_TMP, tmp1),
-                        IMM_OP(off));
+                        ENV_OP(0), IMM_OP(off));
                     uu->operands[i].kind = OP_SLOT;
                     uu->operands[i].slot.type = SUB_SLOT_TMP;
                     uu->operands[i].slot.idx = tmp2;

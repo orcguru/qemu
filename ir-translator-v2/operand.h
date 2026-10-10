@@ -33,7 +33,7 @@ typedef struct __attribute__((packed)) {
 } VecInfo;
 
 typedef struct __attribute__((packed)) {
-    uint16_t offset;
+    uint64_t offset;
     LLVMType op_type;
     LLVMType stack_type;
 } EnvInfo;

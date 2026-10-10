@@ -274,7 +274,7 @@ static void print_operand(const Operand *op, int is_output, SBuf *b) {
         if (op->env.offset == 0) {
             sbuf_printf(b, "env");
         } else {
-            sbuf_printf(b, "env:0x%x", op->env.offset);
+            sbuf_printf(b, "env:0x%lx", op->env.offset);
         }
         break;
     case OP_ARG:

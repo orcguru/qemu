@@ -8,7 +8,7 @@ FUNC:0 N1
 mov_vec v128,e8,[t3],0x0
 st_vec v128,e8,t3,v11
 add_i64 [t4],rip,0x8426a
-qemu_ld_i64 [t5],t4,attr,0x2
+qemu_ld_i64 [t5],t4,attr-stg:ATOM_NONE:ALIGN_8:ZERO:SRC8B,0x2
 st_i64 0x0,v14,0x8
 st_i64 t5,v14,0x0
 mov_vec v128,e8,[t7],0x0
@@ -32,7 +32,7 @@ st_vec v128,e8,t18,v0
 mov_vec v128,e8,[t19],0x0
 st_vec v128,e8,t19,v1
 add_i64 [t4],rip,0x84572
-qemu_ld2_i128 [t20],[t21],t4,attr,0x2
+qemu_ld2_i128 [t20],[t21],t4,attr-stg:ATOM_NONE:ALIGN_8:ZERO:SRC16B,0x2
 st_i64 t20,env:0xb60
 st_i64 t21,env:0xb68
 ld_vec v128,e8,[t22],v0

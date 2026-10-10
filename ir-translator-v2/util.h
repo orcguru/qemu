@@ -25,7 +25,8 @@ SlotInfo get_slot_for(TcgContext *ctx, SlotType type, uint16_t idx);
 
 UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
                                 uint8_t vs, uint8_t es,
-                                Operand *ops, int nops);
+                                Operand *ops, int nops,
+                                bool convert_vec_on);
 void tcg_context_reset(TcgContext *ctx);
 void register_alias(TcgContext *ctx, const Operand *s, const Operand *vec_env);
 void try_unregister_alias(TcgContext *ctx, const Operand *op);

@@ -155,7 +155,7 @@ instr:
 scalar_instr:
     OPCODE arg_list
     {
-        UnifiedInstr *u = new_instr(ctx, $1, 0, 0, $2.data, $2.len);
+        UnifiedInstr *u = new_instr(ctx, $1, 0, 0, $2.data, $2.len, true);
         expand_slot_alias(ctx, u);
         update_slot_types(ctx, u);
         register_stack_alloca(ctx, u);
@@ -195,7 +195,7 @@ scalar_instr:
 vector_instr:
     OPCODE VS_TOKEN COMMA ES_TOKEN COMMA arg_list
     {
-        UnifiedInstr *u = new_instr(ctx, $1, $2.vs, $4.es, $6.data, $6.len);
+        UnifiedInstr *u = new_instr(ctx, $1, $2.vs, $4.es, $6.data, $6.len, true);
         expand_slot_alias(ctx, u);
         update_slot_types(ctx, u);
         register_stack_alloca(ctx, u);
@@ -222,7 +222,7 @@ call_instr:
         memcpy(merged, pre.data, pre.len * sizeof(Operand));
         memcpy(merged + pre.len, $8.data, $8.len * sizeof(Operand));
         free(pre.data);
-        UnifiedInstr *u = new_instr(ctx, $1, 0, 0, merged, total);
+        UnifiedInstr *u = new_instr(ctx, $1, 0, 0, merged, total, false);
         expand_slot_alias(ctx, u);
         // Create operands for YMM
         if ($2 > ABOVE_HELPER_IS_YMM) {

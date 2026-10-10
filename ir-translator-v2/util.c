@@ -507,7 +507,8 @@ void type_map_apply(const TcgContext *ctx) {
 // OP_VEC/OP_ENV conversion
 UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
                                 uint8_t vs, uint8_t es,
-                                Operand *ops, int nops) {
+                                Operand *ops, int nops,
+                                bool convert_vec_on) {
     UnifiedInstr *u = calloc(1, sizeof(UnifiedInstr) + (size_t)nops * sizeof(Operand));
     u->opc = opc;
     u->vs = vs;
@@ -523,7 +524,7 @@ UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
         for (int i = 0; i < nops; ++i) {
             if (ops[i].kind == OP_ENV && (i + 1) < nops && ops[i + 1].kind == OP_IMM) {
                 VecInfo v = lookup_vector(ops[i + 1].imm.val, true);
-                if (v.idx != NON_XMM) {
+                if (convert_vec_on && v.idx != NON_XMM) {
                     u->operands[dst_idx].kind = OP_VEC;
                     u->operands[dst_idx].vec.idx = v.idx;
                     u->operands[dst_idx].vec.offset = v.offset;
@@ -531,7 +532,7 @@ UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
                     u->operands[dst_idx].vec.stack_type = LLVMVector2xi64;
                 } else {
                     u->operands[dst_idx].kind = OP_ENV;
-                    u->operands[dst_idx].env.offset = (uint16_t)ops[i + 1].imm.val;
+                    u->operands[dst_idx].env.offset = ops[i + 1].imm.val;
                     u->operands[dst_idx].env.op_type = LLVMInvalidType;
                     u->operands[dst_idx].env.stack_type = LLVMInvalidType;
                 }

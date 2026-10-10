@@ -2,17 +2,17 @@ FINAL:0x0 EXT:
 FUNC:0 N0
 mov_i64 [t0],0x10
 add_i64 [t0],t0,fs_base(env)
-qemu_ld_i64 [t1],t0,attr,0x2
+qemu_ld_i64 [t1],t0,attr-stg:ATOM_NONE:UNALIGNED:ZERO:SRC8B,0x2
 mov_i64 [rax],t1
 add_i64 [t0],rax,0x318
 mov_i64 [t1],t0
 mov_i64 [rdi],t1
 add_i64 [t0],rax,0x310
 mov_i64 [t1],0x0
-qemu_st_i64 t1,t0,attr,0x2
+qemu_st_i64 t1,t0,attr-stg:ATOM_NONE:UNALIGNED:ZERO:SRC8B,0x2
 add_i64 [t0],rax,0x508
 mov_i64 [t1],0x0
-qemu_st_i64 t1,t0,attr,0x2
+qemu_st_i64 t1,t0,attr-stg:ATOM_NONE:UNALIGNED:ZERO:SRC8B,0x2
 mov_i64 [t1],rdi
 mov_i64 [t2],0xfffffffffffffff8
 and_i64 [t1],t1,t2
@@ -52,7 +52,7 @@ add_i64 [t7],rcx,0xffffffffffffffff
 brcond_i64 t7,0xffffffffffffffff,tsteq,L0
 set_label L1
 mov_i64 [t0],rdi
-qemu_st_i64 t1,t0,attr,0x2
+qemu_st_i64 t1,t0,attr-stg:ATOM_NONE:UNALIGNED:ZERO:SRC8B,0x2
 add_i64 [rdi],rdi,t6
 mov_i64 [rcx],t7
 add_i64 [t7],t7,0xffffffffffffffff
@@ -70,7 +70,7 @@ func_addr t10,0xa8d7a,0x0
 tail_call_qemuaot t10 VEC_ARGS:
 set_label L0
 mov_i64 [t0],rdi
-qemu_st_i64 t1,t0,attr,0x2
+qemu_st_i64 t1,t0,attr-stg:ATOM_NONE:UNALIGNED:ZERO:SRC8B,0x2
 add_i64 [rdi],rdi,t6
 mov_i64 [rcx],t7
 br L2
