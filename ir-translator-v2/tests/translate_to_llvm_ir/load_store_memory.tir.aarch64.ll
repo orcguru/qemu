@@ -3,7 +3,7 @@ source_filename = "qemuaot"
 target triple = "aarch64-unknown-linux-gnu"
 
 ; Function Attrs: noinline nounwind
-define qemuaot void @Fx0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h) #0 section ".text.Fx0" {
+define qemuaot void @Fx0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr align 8 dereferenceable(26528) %cpu) #0 section ".text.Fx0" {
 entry:
   %v1.stack = alloca <2 x i64>, align 16
   store <2 x i64> %ymm0_h, ptr %v1.stack, align 16
@@ -38,65 +38,55 @@ entry:
   %tmp12.stack = alloca <2 x i64>, align 16
   %tmp13.stack = alloca <2 x i64>, align 16
   %tmp14.stack = alloca <2 x i64>, align 16
-  %env = call i64 asm sideeffect "mov $0, x25", "=r"()
+  %env = getelementptr i8, ptr %cpu, i64 11472
 ; ======== TCG [0] ld8u_i32 [t0],env:0xab ========
-  %T0.addr.envoff = add i64 %env, 171, !tcg.op !0
-  %T0.addr.envoff.ptr = inttoptr i64 %T0.addr.envoff to ptr, !tcg.op !0
-  %T0.envval = load i8, ptr %T0.addr.envoff.ptr, align 1, !tcg.op !0
+  %T0.envptr = getelementptr i8, ptr %env, i64 171, !tcg.op !0
+  %T0.envval = load i8, ptr %T0.envptr, align 1, !tcg.op !0
   %T0.out = zext i8 %T0.envval to i32, !tcg.op !0
   store i32 %T0.out, ptr %tmp0.stack, align 8, !tcg.op !0
 ; ======== TCG [1] ld8u_i64 [t0],env:0xac ========
-  %T1.addr.envoff = add i64 %env, 172, !tcg.op !1
-  %T1.addr.envoff.ptr = inttoptr i64 %T1.addr.envoff to ptr, !tcg.op !1
-  %T1.envval = load i8, ptr %T1.addr.envoff.ptr, align 4, !tcg.op !1
+  %T1.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !1
+  %T1.envval = load i8, ptr %T1.envptr, align 4, !tcg.op !1
   %T1.out = zext i8 %T1.envval to i64, !tcg.op !1
   store i64 %T1.out, ptr %tmp0.stack, align 8, !tcg.op !1
 ; ======== TCG [2] ld16u_i32 [t0],env:0xab ========
-  %T2.addr.envoff = add i64 %env, 171, !tcg.op !2
-  %T2.addr.envoff.ptr = inttoptr i64 %T2.addr.envoff to ptr, !tcg.op !2
-  %T2.envval = load i16, ptr %T2.addr.envoff.ptr, align 1, !tcg.op !2
+  %T2.envptr = getelementptr i8, ptr %env, i64 171, !tcg.op !2
+  %T2.envval = load i16, ptr %T2.envptr, align 1, !tcg.op !2
   %T2.out = zext i16 %T2.envval to i32, !tcg.op !2
   store i32 %T2.out, ptr %tmp0.stack, align 8, !tcg.op !2
 ; ======== TCG [3] ld16u_i64 [t0],env:0xac ========
-  %T3.addr.envoff = add i64 %env, 172, !tcg.op !3
-  %T3.addr.envoff.ptr = inttoptr i64 %T3.addr.envoff to ptr, !tcg.op !3
-  %T3.envval = load i16, ptr %T3.addr.envoff.ptr, align 4, !tcg.op !3
+  %T3.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !3
+  %T3.envval = load i16, ptr %T3.envptr, align 4, !tcg.op !3
   %T3.out = zext i16 %T3.envval to i64, !tcg.op !3
   store i64 %T3.out, ptr %tmp0.stack, align 8, !tcg.op !3
 ; ======== TCG [4] ld32u_i64 [t0],env:0xac ========
-  %T4.addr.envoff = add i64 %env, 172, !tcg.op !4
-  %T4.addr.envoff.ptr = inttoptr i64 %T4.addr.envoff to ptr, !tcg.op !4
-  %T4.envval = load i32, ptr %T4.addr.envoff.ptr, align 4, !tcg.op !4
+  %T4.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !4
+  %T4.envval = load i32, ptr %T4.envptr, align 4, !tcg.op !4
   %T4.out = zext i32 %T4.envval to i64, !tcg.op !4
   store i64 %T4.out, ptr %tmp0.stack, align 8, !tcg.op !4
 ; ======== TCG [5] ld8s_i32 [t0],env:0xab ========
-  %T5.addr.envoff = add i64 %env, 171, !tcg.op !5
-  %T5.addr.envoff.ptr = inttoptr i64 %T5.addr.envoff to ptr, !tcg.op !5
-  %T5.envval = load i8, ptr %T5.addr.envoff.ptr, align 1, !tcg.op !5
+  %T5.envptr = getelementptr i8, ptr %env, i64 171, !tcg.op !5
+  %T5.envval = load i8, ptr %T5.envptr, align 1, !tcg.op !5
   %T5.out = sext i8 %T5.envval to i32, !tcg.op !5
   store i32 %T5.out, ptr %tmp0.stack, align 8, !tcg.op !5
 ; ======== TCG [6] ld8s_i64 [t0],env:0xac ========
-  %T6.addr.envoff = add i64 %env, 172, !tcg.op !6
-  %T6.addr.envoff.ptr = inttoptr i64 %T6.addr.envoff to ptr, !tcg.op !6
-  %T6.envval = load i8, ptr %T6.addr.envoff.ptr, align 4, !tcg.op !6
+  %T6.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !6
+  %T6.envval = load i8, ptr %T6.envptr, align 4, !tcg.op !6
   %T6.out = sext i8 %T6.envval to i64, !tcg.op !6
   store i64 %T6.out, ptr %tmp0.stack, align 8, !tcg.op !6
 ; ======== TCG [7] ld16s_i32 [t0],env:0xac ========
-  %T7.addr.envoff = add i64 %env, 172, !tcg.op !7
-  %T7.addr.envoff.ptr = inttoptr i64 %T7.addr.envoff to ptr, !tcg.op !7
-  %T7.envval = load i16, ptr %T7.addr.envoff.ptr, align 4, !tcg.op !7
+  %T7.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !7
+  %T7.envval = load i16, ptr %T7.envptr, align 4, !tcg.op !7
   %T7.out = sext i16 %T7.envval to i32, !tcg.op !7
   store i32 %T7.out, ptr %tmp0.stack, align 8, !tcg.op !7
 ; ======== TCG [8] ld16s_i64 [t0],env:0xac ========
-  %T8.addr.envoff = add i64 %env, 172, !tcg.op !8
-  %T8.addr.envoff.ptr = inttoptr i64 %T8.addr.envoff to ptr, !tcg.op !8
-  %T8.envval = load i16, ptr %T8.addr.envoff.ptr, align 4, !tcg.op !8
+  %T8.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !8
+  %T8.envval = load i16, ptr %T8.envptr, align 4, !tcg.op !8
   %T8.out = sext i16 %T8.envval to i64, !tcg.op !8
   store i64 %T8.out, ptr %tmp0.stack, align 8, !tcg.op !8
 ; ======== TCG [9] ld32s_i64 [t0],env:0xac ========
-  %T9.addr.envoff = add i64 %env, 172, !tcg.op !9
-  %T9.addr.envoff.ptr = inttoptr i64 %T9.addr.envoff to ptr, !tcg.op !9
-  %T9.envval = load i32, ptr %T9.addr.envoff.ptr, align 4, !tcg.op !9
+  %T9.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !9
+  %T9.envval = load i32, ptr %T9.envptr, align 4, !tcg.op !9
   %T9.out = sext i32 %T9.envval to i64, !tcg.op !9
   store i64 %T9.out, ptr %tmp0.stack, align 8, !tcg.op !9
 ; ======== TCG [10] ld32s_i64 [t2],v18,0x4 ========
@@ -105,31 +95,26 @@ entry:
   %T10.out = sext i32 %T10.v18.ee to i64, !tcg.op !10
   store i64 %T10.out, ptr %tmp2.stack, align 8, !tcg.op !10
 ; ======== TCG [11] ld_vec v128,e8,[t3],env:0xb60 ========
-  %T11.addr.envoff = add i64 %env, 2912, !tcg.op !11
-  %T11.addr.envoff.ptr = inttoptr i64 %T11.addr.envoff to ptr, !tcg.op !11
-  %T11.envval = load <16 x i8>, ptr %T11.addr.envoff.ptr, align 8, !tcg.op !11
+  %T11.envptr = getelementptr i8, ptr %env, i64 2912, !tcg.op !11
+  %T11.envval = load <16 x i8>, ptr %T11.envptr, align 8, !tcg.op !11
   store <16 x i8> %T11.envval, ptr %tmp3.stack, align 16, !tcg.op !11
 ; ======== TCG [12] ld_i32 [t4],env:0xd0 ========
-  %T12.addr.envoff = add i64 %env, 208, !tcg.op !12
-  %T12.addr.envoff.ptr = inttoptr i64 %T12.addr.envoff to ptr, !tcg.op !12
-  %T12.envval = load i32, ptr %T12.addr.envoff.ptr, align 8, !tcg.op !12
+  %T12.envptr = getelementptr i8, ptr %env, i64 208, !tcg.op !12
+  %T12.envval = load i32, ptr %T12.envptr, align 8, !tcg.op !12
   store i32 %T12.envval, ptr %tmp4.stack, align 8, !tcg.op !12
 ; ======== TCG [13] ld_i64 [t5],env:0x88 ========
-  %T13.addr.envoff = add i64 %env, 136, !tcg.op !13
-  %T13.addr.envoff.ptr = inttoptr i64 %T13.addr.envoff to ptr, !tcg.op !13
-  %T13.envval = load i64, ptr %T13.addr.envoff.ptr, align 8, !tcg.op !13
+  %T13.envptr = getelementptr i8, ptr %env, i64 136, !tcg.op !13
+  %T13.envval = load i64, ptr %T13.envptr, align 8, !tcg.op !13
   store i64 %T13.envval, ptr %tmp5.stack, align 8, !tcg.op !13
 ; ======== TCG [14] ld_i64 [t6],v4 ========
   %T14.v4 = load i64, ptr %v4.stack, align 16, !tcg.op !14
   store i64 %T14.v4, ptr %tmp6.stack, align 8, !tcg.op !14
 ; ======== TCG [15] ld_i64 [t6],v4:o4 ========
   %T15.v4 = load <2 x i64>, ptr %v4.stack, align 16, !tcg.op !15
-  %T15.addr.envoff = add i64 %env, 992, !tcg.op !15
-  %T15.addr.envoff.ptr = inttoptr i64 %T15.addr.envoff to ptr, !tcg.op !15
-  store <2 x i64> %T15.v4, ptr %T15.addr.envoff.ptr, align 8, !tcg.op !15
-  %T15.addr.envoff1 = add i64 %env, 996, !tcg.op !15
-  %T15.addr.envoff1.ptr = inttoptr i64 %T15.addr.envoff1 to ptr, !tcg.op !15
-  %T15.envval = load i64, ptr %T15.addr.envoff1.ptr, align 4, !tcg.op !15
+  %T15.envptr = getelementptr i8, ptr %env, i64 992, !tcg.op !15
+  store <2 x i64> %T15.v4, ptr %T15.envptr, align 8, !tcg.op !15
+  %T15.envptr1 = getelementptr i8, ptr %env, i64 996, !tcg.op !15
+  %T15.envval = load i64, ptr %T15.envptr1, align 4, !tcg.op !15
   store i64 %T15.envval, ptr %tmp6.stack, align 8, !tcg.op !15
 ; ======== TCG [16] ld_i64 [t6],v4:o8 ========
   %T16.v4 = load <2 x i64>, ptr %v4.stack, align 16, !tcg.op !16
@@ -341,43 +326,36 @@ entry:
 ; ======== TCG [53] st8_i32 t0,env:0xac ========
   %T53.tmp0 = load i32, ptr %tmp0.stack, align 8, !tcg.op !53
   %T53.tmp0.trunc = trunc i32 %T53.tmp0 to i8, !tcg.op !53
-  %T53.addr.envoff = add i64 %env, 172, !tcg.op !53
-  %T53.addr.envoff.ptr = inttoptr i64 %T53.addr.envoff to ptr, !tcg.op !53
-  store i8 %T53.tmp0.trunc, ptr %T53.addr.envoff.ptr, align 4, !tcg.op !53
+  %T53.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !53
+  store i8 %T53.tmp0.trunc, ptr %T53.envptr, align 4, !tcg.op !53
 ; ======== TCG [54] st8_i64 t0,env:0xac ========
   %T54.tmp0 = load i64, ptr %tmp0.stack, align 8, !tcg.op !54
   %T54.tmp0.trunc = trunc i64 %T54.tmp0 to i8, !tcg.op !54
-  %T54.addr.envoff = add i64 %env, 172, !tcg.op !54
-  %T54.addr.envoff.ptr = inttoptr i64 %T54.addr.envoff to ptr, !tcg.op !54
-  store i8 %T54.tmp0.trunc, ptr %T54.addr.envoff.ptr, align 4, !tcg.op !54
+  %T54.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !54
+  store i8 %T54.tmp0.trunc, ptr %T54.envptr, align 4, !tcg.op !54
 ; ======== TCG [55] st16_i32 t0,env:0xac ========
   %T55.tmp0 = load i32, ptr %tmp0.stack, align 8, !tcg.op !55
   %T55.tmp0.trunc = trunc i32 %T55.tmp0 to i16, !tcg.op !55
-  %T55.addr.envoff = add i64 %env, 172, !tcg.op !55
-  %T55.addr.envoff.ptr = inttoptr i64 %T55.addr.envoff to ptr, !tcg.op !55
-  store i16 %T55.tmp0.trunc, ptr %T55.addr.envoff.ptr, align 4, !tcg.op !55
+  %T55.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !55
+  store i16 %T55.tmp0.trunc, ptr %T55.envptr, align 4, !tcg.op !55
 ; ======== TCG [56] st16_i64 t0,env:0xac ========
   %T56.tmp0 = load i64, ptr %tmp0.stack, align 8, !tcg.op !56
   %T56.tmp0.trunc = trunc i64 %T56.tmp0 to i16, !tcg.op !56
-  %T56.addr.envoff = add i64 %env, 172, !tcg.op !56
-  %T56.addr.envoff.ptr = inttoptr i64 %T56.addr.envoff to ptr, !tcg.op !56
-  store i16 %T56.tmp0.trunc, ptr %T56.addr.envoff.ptr, align 4, !tcg.op !56
+  %T56.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !56
+  store i16 %T56.tmp0.trunc, ptr %T56.envptr, align 4, !tcg.op !56
 ; ======== TCG [57] st32_i64 t0,env:0xac ========
   %T57.tmp0 = load i64, ptr %tmp0.stack, align 8, !tcg.op !57
   %T57.tmp0.trunc = trunc i64 %T57.tmp0 to i32, !tcg.op !57
-  %T57.addr.envoff = add i64 %env, 172, !tcg.op !57
-  %T57.addr.envoff.ptr = inttoptr i64 %T57.addr.envoff to ptr, !tcg.op !57
-  store i32 %T57.tmp0.trunc, ptr %T57.addr.envoff.ptr, align 4, !tcg.op !57
+  %T57.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !57
+  store i32 %T57.tmp0.trunc, ptr %T57.envptr, align 4, !tcg.op !57
 ; ======== TCG [58] st_i32 t0,env:0xac ========
   %T58.tmp0 = load i32, ptr %tmp0.stack, align 8, !tcg.op !58
-  %T58.addr.envoff = add i64 %env, 172, !tcg.op !58
-  %T58.addr.envoff.ptr = inttoptr i64 %T58.addr.envoff to ptr, !tcg.op !58
-  store i32 %T58.tmp0, ptr %T58.addr.envoff.ptr, align 4, !tcg.op !58
+  %T58.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !58
+  store i32 %T58.tmp0, ptr %T58.envptr, align 4, !tcg.op !58
 ; ======== TCG [59] st_i64 t0,env:0xac ========
   %T59.tmp0 = load i64, ptr %tmp0.stack, align 8, !tcg.op !59
-  %T59.addr.envoff = add i64 %env, 172, !tcg.op !59
-  %T59.addr.envoff.ptr = inttoptr i64 %T59.addr.envoff to ptr, !tcg.op !59
-  store i64 %T59.tmp0, ptr %T59.addr.envoff.ptr, align 4, !tcg.op !59
+  %T59.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !59
+  store i64 %T59.tmp0, ptr %T59.envptr, align 4, !tcg.op !59
 ; ======== TCG [60] st32_i64 t2,v18,0x4 ========
   %T60.tmp2 = load i64, ptr %tmp2.stack, align 8, !tcg.op !60
   %T60.tmp2.trunc = trunc i64 %T60.tmp2 to i32, !tcg.op !60
@@ -387,16 +365,13 @@ entry:
 ; ======== TCG [61] st32_i64 t2,v18,0x2 ========
   %T61.tmp2 = load i64, ptr %tmp2.stack, align 8, !tcg.op !61
   %T61.tmp2.trunc = trunc i64 %T61.tmp2 to i32, !tcg.op !61
-  %T61.addr.envoff = add i64 %env, 1442, !tcg.op !61
-  %T61.addr.envoff.ptr = inttoptr i64 %T61.addr.envoff to ptr, !tcg.op !61
-  %T61.addr.envoff4 = add i64 %env, 1440, !tcg.op !61
-  %T61.addr.envoff4.ptr = inttoptr i64 %T61.addr.envoff4 to ptr, !tcg.op !61
+  %T61.envptr = getelementptr i8, ptr %env, i64 1442, !tcg.op !61
+  %T61.envptr4 = getelementptr i8, ptr %env, i64 1440, !tcg.op !61
   %T61.v18 = load <2 x i64>, ptr %v18.stack, align 16, !tcg.op !61
-  store <2 x i64> %T61.v18, ptr %T61.addr.envoff4.ptr, align 8, !tcg.op !61
-  store i32 %T61.tmp2.trunc, ptr %T61.addr.envoff.ptr, align 2, !tcg.op !61
-  %T61.addr.envoff5 = add i64 %env, 1440, !tcg.op !61
-  %T61.addr.envoff5.ptr = inttoptr i64 %T61.addr.envoff5 to ptr, !tcg.op !61
-  %T61.envval = load <2 x i64>, ptr %T61.addr.envoff5.ptr, align 8, !tcg.op !61
+  store <2 x i64> %T61.v18, ptr %T61.envptr4, align 8, !tcg.op !61
+  store i32 %T61.tmp2.trunc, ptr %T61.envptr, align 2, !tcg.op !61
+  %T61.envptr5 = getelementptr i8, ptr %env, i64 1440, !tcg.op !61
+  %T61.envval = load <2 x i64>, ptr %T61.envptr5, align 8, !tcg.op !61
   store <2 x i64> %T61.envval, ptr %v18.stack, align 16, !tcg.op !61
 ; ======== TCG [62] add_vec v128,e64,[t12],v18,v18 ========
   %T62.v18 = load <2 x i64>, ptr %v18.stack, align 16, !tcg.op !62
@@ -405,71 +380,55 @@ entry:
   store <2 x i64> %T62.out, ptr %tmp12.stack, align 16, !tcg.op !62
 ; ======== TCG [63] st_i64 t0,env ========
   %T63.tmp0 = load i64, ptr %tmp0.stack, align 8, !tcg.op !63
-  %T63.addr.envoff = add i64 %env, 0, !tcg.op !63
-  %T63.addr.envoff.ptr = inttoptr i64 %T63.addr.envoff to ptr, !tcg.op !63
-  %T63.addr.envoff7 = add i64 %env, 0, !tcg.op !63
-  %T63.addr.envoff7.ptr = inttoptr i64 %T63.addr.envoff7 to ptr, !tcg.op !63
+  %T63.envptr = getelementptr i8, ptr %env, i64 0, !tcg.op !63
+  %T63.envptr7 = getelementptr i8, ptr %env, i64 0, !tcg.op !63
   %T63.rax = load i64, ptr %rax.stack, align 8, !tcg.op !63
-  store i64 %T63.rax, ptr %T63.addr.envoff7.ptr, align 8, !tcg.op !63
-  store i64 %T63.tmp0, ptr %T63.addr.envoff.ptr, align 8, !tcg.op !63
-  %T63.addr.envoff8 = add i64 %env, 0, !tcg.op !63
-  %T63.addr.envoff8.ptr = inttoptr i64 %T63.addr.envoff8 to ptr, !tcg.op !63
-  %T63.envval = load i64, ptr %T63.addr.envoff8.ptr, align 8, !tcg.op !63
+  store i64 %T63.rax, ptr %T63.envptr7, align 8, !tcg.op !63
+  store i64 %T63.tmp0, ptr %T63.envptr, align 8, !tcg.op !63
+  %T63.envptr8 = getelementptr i8, ptr %env, i64 0, !tcg.op !63
+  %T63.envval = load i64, ptr %T63.envptr8, align 8, !tcg.op !63
   store i64 %T63.envval, ptr %rax.stack, align 8, !tcg.op !63
 ; ======== TCG [64] st_i64 t0,env:0x1 ========
   %T64.tmp0 = load i64, ptr %tmp0.stack, align 8, !tcg.op !64
-  %T64.addr.envoff = add i64 %env, 1, !tcg.op !64
-  %T64.addr.envoff.ptr = inttoptr i64 %T64.addr.envoff to ptr, !tcg.op !64
-  %T64.addr.envoff9 = add i64 %env, 0, !tcg.op !64
-  %T64.addr.envoff9.ptr = inttoptr i64 %T64.addr.envoff9 to ptr, !tcg.op !64
+  %T64.envptr = getelementptr i8, ptr %env, i64 1, !tcg.op !64
+  %T64.envptr9 = getelementptr i8, ptr %env, i64 0, !tcg.op !64
   %T64.rax = load i64, ptr %rax.stack, align 8, !tcg.op !64
-  store i64 %T64.rax, ptr %T64.addr.envoff9.ptr, align 8, !tcg.op !64
-  %T64.addr.envoff10 = add i64 %env, 8, !tcg.op !64
-  %T64.addr.envoff10.ptr = inttoptr i64 %T64.addr.envoff10 to ptr, !tcg.op !64
+  store i64 %T64.rax, ptr %T64.envptr9, align 8, !tcg.op !64
+  %T64.envptr10 = getelementptr i8, ptr %env, i64 8, !tcg.op !64
   %T64.rcx = load i64, ptr %rcx.stack, align 8, !tcg.op !64
-  store i64 %T64.rcx, ptr %T64.addr.envoff10.ptr, align 8, !tcg.op !64
-  store i64 %T64.tmp0, ptr %T64.addr.envoff.ptr, align 1, !tcg.op !64
-  %T64.addr.envoff11 = add i64 %env, 0, !tcg.op !64
-  %T64.addr.envoff11.ptr = inttoptr i64 %T64.addr.envoff11 to ptr, !tcg.op !64
-  %T64.envval = load i64, ptr %T64.addr.envoff11.ptr, align 8, !tcg.op !64
+  store i64 %T64.rcx, ptr %T64.envptr10, align 8, !tcg.op !64
+  store i64 %T64.tmp0, ptr %T64.envptr, align 1, !tcg.op !64
+  %T64.envptr11 = getelementptr i8, ptr %env, i64 0, !tcg.op !64
+  %T64.envval = load i64, ptr %T64.envptr11, align 8, !tcg.op !64
   store i64 %T64.envval, ptr %rax.stack, align 8, !tcg.op !64
-  %T64.addr.envoff12 = add i64 %env, 8, !tcg.op !64
-  %T64.addr.envoff12.ptr = inttoptr i64 %T64.addr.envoff12 to ptr, !tcg.op !64
-  %T64.envval13 = load i64, ptr %T64.addr.envoff12.ptr, align 8, !tcg.op !64
+  %T64.envptr12 = getelementptr i8, ptr %env, i64 8, !tcg.op !64
+  %T64.envval13 = load i64, ptr %T64.envptr12, align 8, !tcg.op !64
   store i64 %T64.envval13, ptr %rcx.stack, align 8, !tcg.op !64
 ; ======== TCG [65] st_i32 t0,env ========
   %T65.tmp0 = load i32, ptr %tmp0.stack, align 8, !tcg.op !65
-  %T65.addr.envoff = add i64 %env, 0, !tcg.op !65
-  %T65.addr.envoff.ptr = inttoptr i64 %T65.addr.envoff to ptr, !tcg.op !65
-  %T65.addr.envoff14 = add i64 %env, 0, !tcg.op !65
-  %T65.addr.envoff14.ptr = inttoptr i64 %T65.addr.envoff14 to ptr, !tcg.op !65
+  %T65.envptr = getelementptr i8, ptr %env, i64 0, !tcg.op !65
+  %T65.envptr14 = getelementptr i8, ptr %env, i64 0, !tcg.op !65
   %T65.rax = load i64, ptr %rax.stack, align 8, !tcg.op !65
-  store i64 %T65.rax, ptr %T65.addr.envoff14.ptr, align 8, !tcg.op !65
-  store i32 %T65.tmp0, ptr %T65.addr.envoff.ptr, align 8, !tcg.op !65
-  %T65.addr.envoff15 = add i64 %env, 0, !tcg.op !65
-  %T65.addr.envoff15.ptr = inttoptr i64 %T65.addr.envoff15 to ptr, !tcg.op !65
-  %T65.envval = load i64, ptr %T65.addr.envoff15.ptr, align 8, !tcg.op !65
+  store i64 %T65.rax, ptr %T65.envptr14, align 8, !tcg.op !65
+  store i32 %T65.tmp0, ptr %T65.envptr, align 8, !tcg.op !65
+  %T65.envptr15 = getelementptr i8, ptr %env, i64 0, !tcg.op !65
+  %T65.envval = load i64, ptr %T65.envptr15, align 8, !tcg.op !65
   store i64 %T65.envval, ptr %rax.stack, align 8, !tcg.op !65
 ; ======== TCG [66] st_i32 t0,env:0x5 ========
   %T66.tmp0 = load i32, ptr %tmp0.stack, align 8, !tcg.op !66
-  %T66.addr.envoff = add i64 %env, 5, !tcg.op !66
-  %T66.addr.envoff.ptr = inttoptr i64 %T66.addr.envoff to ptr, !tcg.op !66
-  %T66.addr.envoff16 = add i64 %env, 0, !tcg.op !66
-  %T66.addr.envoff16.ptr = inttoptr i64 %T66.addr.envoff16 to ptr, !tcg.op !66
+  %T66.envptr = getelementptr i8, ptr %env, i64 5, !tcg.op !66
+  %T66.envptr16 = getelementptr i8, ptr %env, i64 0, !tcg.op !66
   %T66.rax = load i64, ptr %rax.stack, align 8, !tcg.op !66
-  store i64 %T66.rax, ptr %T66.addr.envoff16.ptr, align 8, !tcg.op !66
-  %T66.addr.envoff17 = add i64 %env, 8, !tcg.op !66
-  %T66.addr.envoff17.ptr = inttoptr i64 %T66.addr.envoff17 to ptr, !tcg.op !66
+  store i64 %T66.rax, ptr %T66.envptr16, align 8, !tcg.op !66
+  %T66.envptr17 = getelementptr i8, ptr %env, i64 8, !tcg.op !66
   %T66.rcx = load i64, ptr %rcx.stack, align 8, !tcg.op !66
-  store i64 %T66.rcx, ptr %T66.addr.envoff17.ptr, align 8, !tcg.op !66
-  store i32 %T66.tmp0, ptr %T66.addr.envoff.ptr, align 1, !tcg.op !66
-  %T66.addr.envoff18 = add i64 %env, 0, !tcg.op !66
-  %T66.addr.envoff18.ptr = inttoptr i64 %T66.addr.envoff18 to ptr, !tcg.op !66
-  %T66.envval = load i64, ptr %T66.addr.envoff18.ptr, align 8, !tcg.op !66
+  store i64 %T66.rcx, ptr %T66.envptr17, align 8, !tcg.op !66
+  store i32 %T66.tmp0, ptr %T66.envptr, align 1, !tcg.op !66
+  %T66.envptr18 = getelementptr i8, ptr %env, i64 0, !tcg.op !66
+  %T66.envval = load i64, ptr %T66.envptr18, align 8, !tcg.op !66
   store i64 %T66.envval, ptr %rax.stack, align 8, !tcg.op !66
-  %T66.addr.envoff19 = add i64 %env, 8, !tcg.op !66
-  %T66.addr.envoff19.ptr = inttoptr i64 %T66.addr.envoff19 to ptr, !tcg.op !66
-  %T66.envval20 = load i64, ptr %T66.addr.envoff19.ptr, align 8, !tcg.op !66
+  %T66.envptr19 = getelementptr i8, ptr %env, i64 8, !tcg.op !66
+  %T66.envval20 = load i64, ptr %T66.envptr19, align 8, !tcg.op !66
   store i64 %T66.envval20, ptr %rcx.stack, align 8, !tcg.op !66
 ; ======== TCG [67] st32_i64 t2,v18 ========
   %T67.tmp2 = load i64, ptr %tmp2.stack, align 8, !tcg.op !67
@@ -478,16 +437,13 @@ entry:
 ; ======== TCG [68] st32_i64 t2,v18,0x1 ========
   %T68.tmp2 = load i64, ptr %tmp2.stack, align 8, !tcg.op !68
   %T68.tmp2.trunc = trunc i64 %T68.tmp2 to i32, !tcg.op !68
-  %T68.addr.envoff = add i64 %env, 1441, !tcg.op !68
-  %T68.addr.envoff.ptr = inttoptr i64 %T68.addr.envoff to ptr, !tcg.op !68
-  %T68.addr.envoff21 = add i64 %env, 1440, !tcg.op !68
-  %T68.addr.envoff21.ptr = inttoptr i64 %T68.addr.envoff21 to ptr, !tcg.op !68
+  %T68.envptr = getelementptr i8, ptr %env, i64 1441, !tcg.op !68
+  %T68.envptr21 = getelementptr i8, ptr %env, i64 1440, !tcg.op !68
   %T68.v18 = load <2 x i64>, ptr %v18.stack, align 16, !tcg.op !68
-  store <2 x i64> %T68.v18, ptr %T68.addr.envoff21.ptr, align 8, !tcg.op !68
-  store i32 %T68.tmp2.trunc, ptr %T68.addr.envoff.ptr, align 1, !tcg.op !68
-  %T68.addr.envoff22 = add i64 %env, 1440, !tcg.op !68
-  %T68.addr.envoff22.ptr = inttoptr i64 %T68.addr.envoff22 to ptr, !tcg.op !68
-  %T68.envval = load <2 x i64>, ptr %T68.addr.envoff22.ptr, align 8, !tcg.op !68
+  store <2 x i64> %T68.v18, ptr %T68.envptr21, align 8, !tcg.op !68
+  store i32 %T68.tmp2.trunc, ptr %T68.envptr, align 1, !tcg.op !68
+  %T68.envptr22 = getelementptr i8, ptr %env, i64 1440, !tcg.op !68
+  %T68.envval = load <2 x i64>, ptr %T68.envptr22, align 8, !tcg.op !68
   store <2 x i64> %T68.envval, ptr %v18.stack, align 16, !tcg.op !68
 ; ======== TCG [69] st32_i64 t2,v18,0x4 ========
   %T69.tmp2 = load i64, ptr %tmp2.stack, align 8, !tcg.op !69
@@ -498,24 +454,19 @@ entry:
 ; ======== TCG [70] st32_i64 t2,v18,0xd ========
   %T70.tmp2 = load i64, ptr %tmp2.stack, align 8, !tcg.op !70
   %T70.tmp2.trunc = trunc i64 %T70.tmp2 to i32, !tcg.op !70
-  %T70.addr.envoff = add i64 %env, 1453, !tcg.op !70
-  %T70.addr.envoff.ptr = inttoptr i64 %T70.addr.envoff to ptr, !tcg.op !70
-  %T70.addr.envoff23 = add i64 %env, 1440, !tcg.op !70
-  %T70.addr.envoff23.ptr = inttoptr i64 %T70.addr.envoff23 to ptr, !tcg.op !70
+  %T70.envptr = getelementptr i8, ptr %env, i64 1453, !tcg.op !70
+  %T70.envptr23 = getelementptr i8, ptr %env, i64 1440, !tcg.op !70
   %T70.v18 = load <2 x i64>, ptr %v18.stack, align 16, !tcg.op !70
-  store <2 x i64> %T70.v18, ptr %T70.addr.envoff23.ptr, align 8, !tcg.op !70
-  %T70.addr.envoff24 = add i64 %env, 1456, !tcg.op !70
-  %T70.addr.envoff24.ptr = inttoptr i64 %T70.addr.envoff24 to ptr, !tcg.op !70
+  store <2 x i64> %T70.v18, ptr %T70.envptr23, align 8, !tcg.op !70
+  %T70.envptr24 = getelementptr i8, ptr %env, i64 1456, !tcg.op !70
   %T70.v19 = load <2 x i64>, ptr %v19.stack, align 16, !tcg.op !70
-  store <2 x i64> %T70.v19, ptr %T70.addr.envoff24.ptr, align 8, !tcg.op !70
-  store i32 %T70.tmp2.trunc, ptr %T70.addr.envoff.ptr, align 1, !tcg.op !70
-  %T70.addr.envoff25 = add i64 %env, 1440, !tcg.op !70
-  %T70.addr.envoff25.ptr = inttoptr i64 %T70.addr.envoff25 to ptr, !tcg.op !70
-  %T70.envval = load <2 x i64>, ptr %T70.addr.envoff25.ptr, align 8, !tcg.op !70
+  store <2 x i64> %T70.v19, ptr %T70.envptr24, align 8, !tcg.op !70
+  store i32 %T70.tmp2.trunc, ptr %T70.envptr, align 1, !tcg.op !70
+  %T70.envptr25 = getelementptr i8, ptr %env, i64 1440, !tcg.op !70
+  %T70.envval = load <2 x i64>, ptr %T70.envptr25, align 8, !tcg.op !70
   store <2 x i64> %T70.envval, ptr %v18.stack, align 16, !tcg.op !70
-  %T70.addr.envoff26 = add i64 %env, 1456, !tcg.op !70
-  %T70.addr.envoff26.ptr = inttoptr i64 %T70.addr.envoff26 to ptr, !tcg.op !70
-  %T70.envval27 = load <2 x i64>, ptr %T70.addr.envoff26.ptr, align 8, !tcg.op !70
+  %T70.envptr26 = getelementptr i8, ptr %env, i64 1456, !tcg.op !70
+  %T70.envval27 = load <2 x i64>, ptr %T70.envptr26, align 8, !tcg.op !70
   store <2 x i64> %T70.envval27, ptr %v19.stack, align 16, !tcg.op !70
 ; ======== TCG [71] ld_vec v64,e32,[t13],v26 ========
   %T71.v26 = load <2 x i32>, ptr %v26.stack, align 16, !tcg.op !71
@@ -531,37 +482,29 @@ entry:
   store <2 x i32> %T74.tmp14, ptr %v0.stack, align 16, !tcg.op !74
 ; ======== TCG [75] st_vec v64,e8,t13,v0:o1 ========
   %T75.tmp13 = load <8 x i8>, ptr %tmp13.stack, align 16, !tcg.op !75
-  %T75.addr.envoff = add i64 %env, 865, !tcg.op !75
-  %T75.addr.envoff.ptr = inttoptr i64 %T75.addr.envoff to ptr, !tcg.op !75
-  %T75.addr.envoff28 = add i64 %env, 864, !tcg.op !75
-  %T75.addr.envoff28.ptr = inttoptr i64 %T75.addr.envoff28 to ptr, !tcg.op !75
+  %T75.envptr = getelementptr i8, ptr %env, i64 865, !tcg.op !75
+  %T75.envptr28 = getelementptr i8, ptr %env, i64 864, !tcg.op !75
   %T75.v0 = load <2 x i64>, ptr %v0.stack, align 16, !tcg.op !75
-  store <2 x i64> %T75.v0, ptr %T75.addr.envoff28.ptr, align 8, !tcg.op !75
-  store <8 x i8> %T75.tmp13, ptr %T75.addr.envoff.ptr, align 1, !tcg.op !75
-  %T75.addr.envoff29 = add i64 %env, 864, !tcg.op !75
-  %T75.addr.envoff29.ptr = inttoptr i64 %T75.addr.envoff29 to ptr, !tcg.op !75
-  %T75.envval = load <2 x i64>, ptr %T75.addr.envoff29.ptr, align 8, !tcg.op !75
+  store <2 x i64> %T75.v0, ptr %T75.envptr28, align 8, !tcg.op !75
+  store <8 x i8> %T75.tmp13, ptr %T75.envptr, align 1, !tcg.op !75
+  %T75.envptr29 = getelementptr i8, ptr %env, i64 864, !tcg.op !75
+  %T75.envval = load <2 x i64>, ptr %T75.envptr29, align 8, !tcg.op !75
   store <2 x i64> %T75.envval, ptr %v0.stack, align 16, !tcg.op !75
 ; ======== TCG [76] st_vec v64,e8,t13,v0:o9 ========
   %T76.tmp13 = load <8 x i8>, ptr %tmp13.stack, align 16, !tcg.op !76
-  %T76.addr.envoff = add i64 %env, 873, !tcg.op !76
-  %T76.addr.envoff.ptr = inttoptr i64 %T76.addr.envoff to ptr, !tcg.op !76
-  %T76.addr.envoff30 = add i64 %env, 864, !tcg.op !76
-  %T76.addr.envoff30.ptr = inttoptr i64 %T76.addr.envoff30 to ptr, !tcg.op !76
+  %T76.envptr = getelementptr i8, ptr %env, i64 873, !tcg.op !76
+  %T76.envptr30 = getelementptr i8, ptr %env, i64 864, !tcg.op !76
   %T76.v0 = load <2 x i64>, ptr %v0.stack, align 16, !tcg.op !76
-  store <2 x i64> %T76.v0, ptr %T76.addr.envoff30.ptr, align 8, !tcg.op !76
-  %T76.addr.envoff31 = add i64 %env, 880, !tcg.op !76
-  %T76.addr.envoff31.ptr = inttoptr i64 %T76.addr.envoff31 to ptr, !tcg.op !76
+  store <2 x i64> %T76.v0, ptr %T76.envptr30, align 8, !tcg.op !76
+  %T76.envptr31 = getelementptr i8, ptr %env, i64 880, !tcg.op !76
   %T76.v1 = load <2 x i64>, ptr %v1.stack, align 16, !tcg.op !76
-  store <2 x i64> %T76.v1, ptr %T76.addr.envoff31.ptr, align 8, !tcg.op !76
-  store <8 x i8> %T76.tmp13, ptr %T76.addr.envoff.ptr, align 1, !tcg.op !76
-  %T76.addr.envoff32 = add i64 %env, 864, !tcg.op !76
-  %T76.addr.envoff32.ptr = inttoptr i64 %T76.addr.envoff32 to ptr, !tcg.op !76
-  %T76.envval = load <2 x i64>, ptr %T76.addr.envoff32.ptr, align 8, !tcg.op !76
+  store <2 x i64> %T76.v1, ptr %T76.envptr31, align 8, !tcg.op !76
+  store <8 x i8> %T76.tmp13, ptr %T76.envptr, align 1, !tcg.op !76
+  %T76.envptr32 = getelementptr i8, ptr %env, i64 864, !tcg.op !76
+  %T76.envval = load <2 x i64>, ptr %T76.envptr32, align 8, !tcg.op !76
   store <2 x i64> %T76.envval, ptr %v0.stack, align 16, !tcg.op !76
-  %T76.addr.envoff33 = add i64 %env, 880, !tcg.op !76
-  %T76.addr.envoff33.ptr = inttoptr i64 %T76.addr.envoff33 to ptr, !tcg.op !76
-  %T76.envval34 = load <2 x i64>, ptr %T76.addr.envoff33.ptr, align 8, !tcg.op !76
+  %T76.envptr33 = getelementptr i8, ptr %env, i64 880, !tcg.op !76
+  %T76.envval34 = load <2 x i64>, ptr %T76.envptr33, align 8, !tcg.op !76
   store <2 x i64> %T76.envval34, ptr %v1.stack, align 16, !tcg.op !76
 ; ======== TCG [77] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC1B,0x2 ========
   %T77.tmp7 = load i64, ptr %tmp7.stack, align 8, !tcg.op !77

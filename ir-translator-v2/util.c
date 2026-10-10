@@ -534,14 +534,10 @@ UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
                     u->operands[dst_idx].env.offset = (uint16_t)ops[i + 1].imm.val;
                     u->operands[dst_idx].env.op_type = LLVMInvalidType;
                     u->operands[dst_idx].env.stack_type = LLVMInvalidType;
-                    ctx->env_on = true;
                 }
                 i += 1;
                 skip_cnt += 1;
             } else {
-                if (ops[i].kind == OP_ENV) {
-                    ctx->env_on = true;
-                }
                 u->operands[dst_idx] = ops[i];
             }
             dst_idx += 1;

@@ -3,7 +3,7 @@ source_filename = "qemuaot"
 target triple = "aarch64-unknown-linux-gnu"
 
 ; Function Attrs: noinline nounwind
-define qemuaot void @Fx0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h) #0 section ".text.Fx0" {
+define qemuaot void @Fx0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr align 8 dereferenceable(26528) %cpu) #0 section ".text.Fx0" {
 entry:
   %rax.stack = alloca i64, align 8
   store i64 %rax, ptr %rax.stack, align 8
@@ -21,7 +21,7 @@ entry:
   %tmp1.stack = alloca i64, align 8
   %tmp2.stack = alloca i64, align 8
   %tmp3.stack = alloca <2 x i64>, align 16
-  %env = call i64 asm sideeffect "mov $0, x25", "=r"()
+  %env = getelementptr i8, ptr %cpu, i64 11472
 ; ======== TCG [0] add_i64 [rax],rbx,rdx ========
   %T0.rbx = load i64, ptr %rbx.stack, align 8, !tcg.op !0
   %T0.rdx = load i64, ptr %rdx.stack, align 8, !tcg.op !0
@@ -58,9 +58,8 @@ entry:
   store <2 x i64> %T6.out, ptr %tmp3.stack, align 16, !tcg.op !6
 ; ======== TCG [7] add_i64 [t3],rax,fs_base(env) ========
   %T7.rax = load i64, ptr %rax.stack, align 8, !tcg.op !7
-  %T7.addr.fs_base = add i64 %env, 288, !tcg.op !7
-  %T7.addr.fs_base.ptr = inttoptr i64 %T7.addr.fs_base to ptr, !tcg.op !7
-  %T7.fs_base = load i64, ptr %T7.addr.fs_base.ptr, align 8, !tcg.op !7
+  %T7.envptr = getelementptr i8, ptr %env, i64 288, !tcg.op !7
+  %T7.fs_base = load i64, ptr %T7.envptr, align 8, !tcg.op !7
   %T7.out = add i64 %T7.rax, %T7.fs_base, !tcg.op !7
   store i64 %T7.out, ptr %tmp3.stack, align 16, !tcg.op !7
 ; ======== TCG [8] add_i32 [t3],t3,t3 ========

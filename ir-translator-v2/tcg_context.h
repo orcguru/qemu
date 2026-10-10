@@ -105,11 +105,6 @@ struct TcgContext {
      * Carry/borrow bit flag
      */
     bool carry_on, borrow_on;
-
-    /*
-     * LLVM function scope ENV var
-     */
-    bool env_on;
 };
 
 void tcg_context_init(TcgContext *ctx);
