@@ -19,9 +19,15 @@ typedef struct StackAlloca {
     LLVMValueRef env;
 } StackAlloca;
 
+typedef struct {
+    LLVMValueRef cpu_tag;
+    LLVMValueRef guest_tag;
+    unsigned      kind;          /* MDKindID of "tbaa" */
+} TBAA;
+
 LLVMTypeRef get_llvm_type(LLVMType type);
-LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVMValueRef PointerVal, unsigned Bytes);
-LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMValueRef PointerVal, const char *Name, unsigned Bytes);
+LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVMValueRef PointerVal, unsigned Bytes, bool is_guest);
+LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMValueRef PointerVal, const char *Name, unsigned Bytes, bool is_guest);
 LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, const char *prefix);
 void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const char *prefix);
 void start_llvm_bb(LLVMBasicBlockRef bb, StackAlloca *stack);
@@ -30,7 +36,7 @@ LLVMValueRef shrink_llvm_value(LLVMValueRef val, LLVMType from, LLVMType to);
 
 #define GET_ALIGNMENT_FROM_TYPE(type)       (type <= LLVMInt64 ? 8 : 16)
 
-#define GET_ALIGNMENT_FROM_OFFSET(off)      ((off) % 8 == 0 ? 8 : ((off) % 4 == 0 ? 4 : ((off) % 2 == 0 ? 2 : 1)))
+#define GET_ALIGNMENT_FROM_OFFSET(off)      ((off) % 16 == 0 ? 16 : ((off) % 8 == 0 ? 8 : ((off) % 4 == 0 ? 4 : ((off) % 2 == 0 ? 2 : 1))))
 
 #define OPC_FIRST_SCALAR_TYPE   LLVMInt8
 #define OPC_VECTOR_TO_FIXED(T)      (((T - OPC_FIRST_SCALAR_TYPE) % 4) + OPC_FIRST_SCALAR_TYPE)
