@@ -19,15 +19,22 @@ typedef struct StackAlloca {
     LLVMValueRef env;
 } StackAlloca;
 
+typedef enum TagType {
+    CPU_TAG,
+    GUEST_TAG,
+    SPILL_TAG
+} TagType;
+
 typedef struct {
     LLVMValueRef cpu_tag;
     LLVMValueRef guest_tag;
-    unsigned      kind;          /* MDKindID of "tbaa" */
+    LLVMValueRef spill_tag;
+    unsigned     kind;          /* MDKindID of "tbaa" */
 } TBAA;
 
 LLVMTypeRef get_llvm_type(LLVMType type);
-LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVMValueRef PointerVal, unsigned Bytes, bool is_guest);
-LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMValueRef PointerVal, const char *Name, unsigned Bytes, bool is_guest);
+LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVMValueRef PointerVal, unsigned Bytes, TagType tag_ty);
+LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMValueRef PointerVal, const char *Name, unsigned Bytes, TagType tag_ty);
 LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, const char *prefix);
 void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const char *prefix);
 void start_llvm_bb(LLVMBasicBlockRef bb, StackAlloca *stack);

@@ -72,7 +72,7 @@ entry:
 attributes #0 = { noinline nounwind "target-features"="+neon" }
 
 !0 = !{!1, !1, i64 0}
-!1 = !{!"GuestMem", !2}
+!1 = !{!"SpillSlo", !2}
 !2 = !{!"Root"}
 !3 = !{!"[0] add_i64 [rax],rbx,rdx"}
 !4 = !{!"[1] add_i64 [t0],rax,0x42"}

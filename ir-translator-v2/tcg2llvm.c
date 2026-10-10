@@ -24,7 +24,7 @@ void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
     LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
     LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
     LLVMValueRef sum = LLVMBuildAdd(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "sum"));
-    LLVMValueRef ca = build_load_with_alignment(builder, LLVMInt1Type(), stack->carry, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "carry"), 8, true);
+    LLVMValueRef ca = build_load_with_alignment(builder, LLVMInt1Type(), stack->carry, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "carry"), 8, SPILL_TAG);
     LLVMValueRef ca_ext = LLVMBuildZExt(builder, ca, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&name_buf[0], sizeof(name_buf), LLVMGetValueName(ca), "zext"));
     LLVMValueRef out = LLVMBuildAdd(builder, sum, ca_ext, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "out"));
     do_store(&u->operands[0], out, stack, prefix);
@@ -120,7 +120,7 @@ void translate_ld_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const Un
     assert(op_addr.slot.op_type <= (op_addr.slot.type == SUB_SLOT_TMP ? stack->tmp.ty[op_addr.slot.idx] : stack->xreg.ty[op_addr.slot.idx]));
     LLVMValueRef addr = get_input_val_for_operand(&op_addr, stack, prefix);
     LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(u->operands[1].slot.op_type), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
-    LLVMValueRef val = build_load_with_alignment(builder, get_llvm_type(u->operands[1].slot.op_type), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld"), alignment_from_attr(u->operands[2].attr_info, u->operands[1].slot.op_type), true);
+    LLVMValueRef val = build_load_with_alignment(builder, get_llvm_type(u->operands[1].slot.op_type), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld"), alignment_from_attr(u->operands[2].attr_info, u->operands[1].slot.op_type), GUEST_TAG);
     if (u->operands[1].slot.op_type < get_operand_type(&u->operands[0])) {
         if (u->operands[2].attr_info.p.storage.ext == SIGN) {
             val = LLVMBuildSExt(builder, val, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "sext"));
@@ -144,7 +144,7 @@ void translate_ld2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
     assert(op_addr.slot.op_type <= (op_addr.slot.type == SUB_SLOT_TMP ? stack->tmp.ty[op_addr.slot.idx] : stack->xreg.ty[op_addr.slot.idx]));
     LLVMValueRef addr = get_input_val_for_operand(&op_addr, stack, prefix);
     LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(LLVMVector2xi64), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
-    LLVMValueRef val = build_load_with_alignment(builder, get_llvm_type(LLVMVector2xi64), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld"), alignment_from_attr(u->operands[3].attr_info, LLVMVector2xi64), true);
+    LLVMValueRef val = build_load_with_alignment(builder, get_llvm_type(LLVMVector2xi64), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld"), alignment_from_attr(u->operands[3].attr_info, LLVMVector2xi64), GUEST_TAG);
     LLVMValueRef elem0 = LLVMBuildExtractElement(builder, val, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ee"));
     do_store(&u->operands[0], elem0, stack, prefix);
     LLVMValueRef elem1 = LLVMBuildExtractElement(builder, val, LLVMConstInt(get_llvm_type(LLVMInt64), 1, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ee"));
@@ -187,7 +187,7 @@ void translate_st_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const Un
             val = LLVMBuildZExt(builder, val, get_llvm_type(u->operands[1].slot.op_type), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "zext"));
         }
     }
-    build_store_with_alignment(builder, val, ptr, alignment_from_attr(u->operands[2].attr_info, u->operands[1].slot.op_type), true);
+    build_store_with_alignment(builder, val, ptr, alignment_from_attr(u->operands[2].attr_info, u->operands[1].slot.op_type), GUEST_TAG);
 }
 
 void translate_st2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
@@ -210,7 +210,7 @@ void translate_st2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
     LLVMValueRef val = get_input_val_for_operand(&out, stack, prefix);
     val = LLVMBuildInsertElement(builder, val, elem0, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "st2", "ie"));
     val = LLVMBuildInsertElement(builder, val, elem1, LLVMConstInt(get_llvm_type(LLVMInt64), 1, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "st2", "ie"));
-    build_store_with_alignment(builder, val, ptr, alignment_from_attr(u->operands[3].attr_info, u->operands[2].slot.op_type), true);
+    build_store_with_alignment(builder, val, ptr, alignment_from_attr(u->operands[3].attr_info, u->operands[2].slot.op_type), GUEST_TAG);
 }
 
 static void print_operand(const Operand *op, int is_output, SBuf *b) {
