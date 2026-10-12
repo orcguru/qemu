@@ -59,7 +59,7 @@ entry:
 ; ======== TCG [7] add_i64 [t3],rax,fs_base(env) ========
   %T7.rax = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !10
   %T7.envptr = getelementptr i8, ptr %env, i64 288, !tcg.op !10
-  %T7.fs_base = load i64, ptr %T7.envptr, align 8, !tbaa !11, !tcg.op !10
+  %T7.fs_base = load i64, ptr %T7.envptr, align 16, !tbaa !11, !tcg.op !10
   %T7.out = add i64 %T7.rax, %T7.fs_base, !tcg.op !10
   store i64 %T7.out, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !10
 ; ======== TCG [8] add_i32 [t3],t3,t3 ========

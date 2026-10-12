@@ -3,11 +3,14 @@
 
 #include <llvm-c/Core.h>
 #include "operand.h"
+#include "tcg_context.h"
 
 typedef struct AllocaWithState {
-    LLVMType *ty;
-    LLVMValueRef *alloca;
-    int cnt;
+    LLVMValueRef    *alloca;
+    LLVMType        *tcg_ty;
+    LLVMTypeRef     *llvm_ty;
+    unsigned        *align;
+    int             cnt;
 } AllocaWithState;
 
 typedef struct StackAlloca {
@@ -40,6 +43,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
 void start_llvm_bb(LLVMBasicBlockRef bb, StackAlloca *stack);
 LLVMValueRef get_env();
 LLVMValueRef shrink_llvm_value(LLVMValueRef val, LLVMType from, LLVMType to);
+LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, FuncInstrList *f);
 
 #define GET_ALIGNMENT_FROM_TYPE(type)       (type <= LLVMInt64 ? 8 : 16)
 

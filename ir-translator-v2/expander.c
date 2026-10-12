@@ -113,7 +113,7 @@ void expand_push_ret_addr(TcgContext *ctx) {
     // func_addr tmp_N3,op1,0
     assert(u->operands[1].kind == OP_IMM);
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, func_addr, 0, 0,
-        SLOT_OP(SUB_SLOT_TMP, tmp3),
+        SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp3, LLVMFuncPtr, LLVMFuncPtr),
         IMM_OP(u->operands[1].imm.val),
         IMM_OP(0));
 
@@ -204,7 +204,7 @@ void expand_jmp_direct(TcgContext *ctx) {
         // func_addr tmp_N1,op0,0
         assert(u->operands[0].kind == OP_IMM);
         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, func_addr, 0, 0,
-            SLOT_OP(SUB_SLOT_TMP, tmp1),
+            SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp1, LLVMFuncPtr, LLVMFuncPtr),
             IMM_OP(u->operands[0].imm.val),
             IMM_OP(0));
 
@@ -886,7 +886,7 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
                 // func_addr tmp_n,hex_offset,nfidx
                 int tmp_n = get_next_tmp_idx(ctx);
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP(SUB_SLOT_TMP, tmp_n),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr, LLVMFuncPtr),
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(nfidx));
 
@@ -1152,7 +1152,7 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
             // func_addr tmp_t,hex_offset,tfidx
             int tmp_t = get_next_tmp_idx(ctx);
             EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                SLOT_OP(SUB_SLOT_TMP, tmp_t),
+                SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_t, LLVMFuncPtr, LLVMFuncPtr),
                 IMM_OP(ctx->hex_offset),
                 IMM_OP(tfidx));
 
@@ -1160,7 +1160,7 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
             // func_addr tmp_n,hex_offset,nfidx
             int tmp_n = get_next_tmp_idx(ctx);
             EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                SLOT_OP(SUB_SLOT_TMP, tmp_n),
+                SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr, LLVMFuncPtr),
                 IMM_OP(ctx->hex_offset),
                 IMM_OP(nfidx));
 
@@ -1173,7 +1173,7 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
             op_entry.kind = OP_SLOT;
             op_entry.slot.type = SUB_SLOT_TMP;
             op_entry.slot.idx = tmp_entry;
-            op_entry.slot.op_type = LLVMInt64;
+            op_entry.slot.op_type = op_entry.slot.stack_type = LLVMFuncPtr;
             entry->operands[0] = op_entry;
             entry->operands[1] = u->operands[0];
             entry->operand_count = 2;
@@ -1398,12 +1398,12 @@ void expand_call_runtime(TcgContext *ctx) {
             int tmp_entry = get_next_tmp_idx(ctx);
             if (h != helper_jmp_ind) {
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP(SUB_SLOT_TMP, tmp_entry),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_entry, LLVMFuncPtr, LLVMFuncPtr),
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(create_trampoline_for_runtime(ctx, u, !helper_runtime_does_not_return[h])));
             } else {
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP(SUB_SLOT_TMP, tmp_entry),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_entry, LLVMFuncPtr, LLVMFuncPtr),
                     SYMBOL_OP(helper_jmp_ind));
             }
 
@@ -1413,14 +1413,14 @@ void expand_call_runtime(TcgContext *ctx) {
                 // - GET the address of next
                 // func_addr tmp_n,hex_offset,nfidx
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP(SUB_SLOT_TMP, tmp_n),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr, LLVMFuncPtr),
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(lookup_next_func_idx(ctx, u)));
             } else if (h == helper_jmp_ind) {
                 // - GET the address of next
                 // func_addr tmp_n,jmp_ind_callback
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP(SUB_SLOT_TMP, tmp_n),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr, LLVMFuncPtr),
                     SYMBOL_OP(jmp_ind_callback));
             }
 
@@ -1457,7 +1457,7 @@ void expand_call_runtime(TcgContext *ctx) {
             if (h == helper_jmp_ind) {
                 int tmp_t = get_next_tmp_idx(ctx);
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP(SUB_SLOT_TMP, tmp_t),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_t, LLVMFuncPtr, LLVMFuncPtr),
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(create_trampoline_for_runtime(ctx, u, !helper_runtime_does_not_return[h])));
                 Operand tf;

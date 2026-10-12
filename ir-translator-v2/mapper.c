@@ -93,13 +93,13 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
 
 static LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name) {
     char var_name[32] = {0};
-    assert(as->ty[idx] != LLVMInvalidType);
-    assert((as->ty[idx] <= LLVMInt64 && ty <= as->ty[idx]) || (as->ty[idx] <= LLVMVector1xi64 && ty <= LLVMVector1xi64) || as->ty[idx] <= LLVMVector2xi64);
-    return build_load_with_alignment(g_builder, get_llvm_type(ty), as->alloca[idx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, reg_name), GET_ALIGNMENT_FROM_TYPE(as->ty[idx]), SPILL_TAG);
+    assert(as->tcg_ty[idx] != LLVMInvalidType);
+    assert((as->tcg_ty[idx] <= LLVMInt64 && ty <= as->tcg_ty[idx]) || (as->tcg_ty[idx] <= LLVMVector1xi64 && ty <= LLVMVector1xi64) || as->tcg_ty[idx] <= LLVMVector2xi64);
+    return build_load_with_alignment(g_builder, get_llvm_type(ty), as->alloca[idx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, reg_name), as->align[idx], SPILL_TAG);
 }
 
 static LLVMType get_vector_type_for_elem(int elem_cnt, int elem_bits) {
-    for (LLVMType ty = LLVMVector8xi8; ty < LLVM_TYPE_MAX; ++ty) {
+    for (LLVMType ty = LLVMVector8xi8; ty < LLVMTypeEnd; ++ty) {
         if (llvm_vector_elem_bit_counts[ty * 2] == elem_cnt && llvm_vector_elem_bit_counts[ty * 2 + 1] == elem_bits) {
             return ty;
         }
@@ -169,7 +169,7 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
         LLVMType op_ty = op->kind == OP_SLOT ? op->slot.op_type : op->env.op_type;
         LLVMValueRef offset = LLVMConstInt(get_llvm_type(LLVMInt64), op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset, 0);
         LLVMValueRef ptr = LLVMBuildGEP2(g_builder, LLVMInt8Type(), stack->env, &offset, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "envptr"));
-        val = build_load_with_alignment(g_builder, get_llvm_type(op_ty), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, op->kind == OP_SLOT ? envvar_type_str[op->slot.idx] : "envval"), op->kind == OP_SLOT ? 8 : GET_ALIGNMENT_FROM_OFFSET(op->env.offset), CPU_TAG);
+        val = build_load_with_alignment(g_builder, get_llvm_type(op_ty), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, op->kind == OP_SLOT ? envvar_type_str[op->slot.idx] : "envval"), GET_ALIGNMENT_FROM_OFFSET(op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset), CPU_TAG);
         return val;
     } else if (op->kind == OP_VEC) {
         snprintf(&var_name[0], sizeof(var_name), "v%d", op->vec.idx);
@@ -180,7 +180,7 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
         assert(op->vec.op_type <= LLVMInt64);
         if (op->vec.offset % ((llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1] / 8)) == 0) {
             LLVMValueRef index = LLVMConstInt(get_llvm_type(LLVMInt64), (op->vec.offset / ((llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1] / 8))), 0);
-            LLVMType stack_ty = stack->vector.ty[op->vec.idx];
+            LLVMType stack_ty = stack->vector.tcg_ty[op->vec.idx];
             int elem_cnt = (llvm_vector_elem_bit_counts[stack_ty * 2 + 1] * llvm_vector_elem_bit_counts[stack_ty * 2]) / llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1];
             LLVMType load_ty = get_vector_type_for_elem(elem_cnt, llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1]);
             val = load_from_stack_as_type(&stack->vector, op->vec.idx, load_ty, prefix, &var_name[0]);
@@ -224,15 +224,17 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
 
 static void add_stack_alloca_force_writeback(AllocaWithState *as, int idx, LLVMType default_ty, int param_idx, const char *default_name, int env_offset, const Operand *op, StackAlloca *stack, const char *prefix) {
     char var_name[32] = {0};
-    if (as->ty[idx] == LLVMInvalidType) {
+    if (as->tcg_ty[idx] == LLVMInvalidType) {
         LLVMBasicBlockRef current = LLVMGetInsertBlock(g_builder);
         LLVMValueRef parent_fn  = LLVMGetBasicBlockParent(current);
         LLVMBasicBlockRef init = LLVMGetFirstBasicBlock(parent_fn);
         LLVMPositionBuilder(g_builder, init, LLVMGetFirstInstruction(init));
-        as->ty[idx] = default_ty;
-        as->alloca[idx] = LLVMBuildAlloca(g_builder, get_llvm_type(as->ty[idx]), default_name);
-        LLVMSetAlignment(as->alloca[idx], GET_ALIGNMENT_FROM_TYPE(as->ty[idx]));
-        build_store_with_alignment(g_builder, LLVMGetParam(parent_fn, param_idx), as->alloca[idx], GET_ALIGNMENT_FROM_TYPE(as->ty[idx]), SPILL_TAG);
+        as->tcg_ty[idx] = default_ty;
+        as->llvm_ty[idx] = get_llvm_type(as->tcg_ty[idx]);
+        as->alloca[idx] = LLVMBuildAlloca(g_builder, as->llvm_ty[idx], default_name);
+        as->align[idx] = GET_ALIGNMENT_FROM_TYPE(as->tcg_ty[idx]);
+        LLVMSetAlignment(as->alloca[idx], as->align[idx]);
+        build_store_with_alignment(g_builder, LLVMGetParam(parent_fn, param_idx), as->alloca[idx], as->align[idx], SPILL_TAG);
         LLVMPositionBuilderAtEnd(g_builder, current);
     }
     // Write-back stack alloca
@@ -242,12 +244,12 @@ static void add_stack_alloca_force_writeback(AllocaWithState *as, int idx, LLVMT
 }
 
 static void add_stack_alloca_force_update(AllocaWithState *as, int idx, LLVMType default_ty, int param_idx, const char *default_name, int env_offset, const Operand *op, StackAlloca *stack, const char *prefix) {
-    assert(as->ty[idx] != LLVMInvalidType);
+    assert(as->tcg_ty[idx] != LLVMInvalidType);
     // Reload/store-update stack alloca
     Operand op_env_load;
     op_env_load.kind = OP_ENV;
     op_env_load.env.offset = env_offset;
-    op_env_load.env.op_type = as->ty[idx];
+    op_env_load.env.op_type = as->tcg_ty[idx];
     op_env_load.env.stack_type = LLVMInvalidType;
     do_store(op, get_input_val_for_operand(&op_env_load, stack, prefix), stack, prefix);
 }
@@ -256,7 +258,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
     char var_name[32] = {0};
     if ((op->kind == OP_SLOT && op->slot.type == SUB_SLOT_TMP) || op->kind == OP_VEC) {
         LLVMType val_ty = get_operand_type(op);
-        LLVMType stack_ty = op->kind == OP_SLOT ? stack->tmp.ty[op->slot.idx] : stack->vector.ty[op->vec.idx];
+        LLVMType stack_ty = op->kind == OP_SLOT ? stack->tmp.tcg_ty[op->slot.idx] : stack->vector.tcg_ty[op->vec.idx];
         assert(val_ty != LLVMInvalidType && stack_ty != LLVMInvalidType);
         assert((val_ty <= LLVMInt64 && stack_ty <= LLVMInt64 && val_ty <= stack_ty) ||
                (val_ty <= LLVMInt64 && stack_ty > LLVMInt64) ||
@@ -299,11 +301,11 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
         } else {
             assert(val_ty == stack_ty);
         }
-        build_store_with_alignment(g_builder, val, op->kind == OP_SLOT ? stack->tmp.alloca[op->slot.idx] : stack->vector.alloca[op->vec.idx], GET_ALIGNMENT_FROM_TYPE(stack_ty), SPILL_TAG);
+        build_store_with_alignment(g_builder, val, op->kind == OP_SLOT ? stack->tmp.alloca[op->slot.idx] : stack->vector.alloca[op->vec.idx], op->kind == OP_SLOT ? stack->tmp.align[op->slot.idx] : stack->vector.align[op->vec.idx], SPILL_TAG);
         return;
     }
     if (op->kind == OP_SLOT && op->slot.type == SUB_SLOT_XREG) {
-        build_store_with_alignment(g_builder, val, stack->xreg.alloca[op->slot.idx], GET_ALIGNMENT_FROM_TYPE(stack->xreg.ty[op->slot.idx]), SPILL_TAG);
+        build_store_with_alignment(g_builder, val, stack->xreg.alloca[op->slot.idx], stack->xreg.align[op->slot.idx], SPILL_TAG);
         return;
     }
     if ((op->kind == OP_SLOT && op->slot.type == SUB_SLOT_ENVVAR) || op->kind == OP_ENV) {
@@ -350,7 +352,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
         }
 
         // The potential store clobber
-        build_store_with_alignment(g_builder, val, ptr, op->kind == OP_SLOT ? GET_ALIGNMENT_FROM_TYPE(op->slot.op_type) : GET_ALIGNMENT_FROM_OFFSET(op->env.offset), CPU_TAG);
+        build_store_with_alignment(g_builder, val, ptr, GET_ALIGNMENT_FROM_OFFSET(op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset), CPU_TAG);
 
         // Check possibility of alias with xreg/vector
         if (op->kind == OP_ENV) {
@@ -394,7 +396,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
     assert(0);
 }
 
-static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, FuncInstrList *f, int with_ret) {
+LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, FuncInstrList *f) {
     // Trampoline may have already been defined
     LLVMValueRef F = LLVMGetNamedFunction(g_module, name);
     if (!F) {
@@ -404,8 +406,10 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, FuncInstrL
             arg_types[arg_cnt++] = get_llvm_type(qemuaot_default_param_type[i]);
         }
         arg_types[arg_cnt++] = LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0);
-        for (int i = 0; i < f->added_param_count; ++i) {
-            arg_types[arg_cnt++] = get_llvm_type(f->added_param_type[i]);
+        if (f) {
+            for (int i = 0; i < f->added_param_count; ++i) {
+                arg_types[arg_cnt++] = get_llvm_type(f->added_param_type[i]);
+            }
         }
         LLVMTypeRef f_type = LLVMFunctionType(LLVMVoidType(), arg_types, arg_cnt, 0);
         F = LLVMAddFunction(g_module, name, f_type);
@@ -423,8 +427,10 @@ static LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, FuncInstrL
         LLVMSetParamAlignment(LLVMGetParam(F, cpu_pos), 8);
         LLVMAttributeIndex idx = (LLVMAttributeIndex)(cpu_pos + 1);
         LLVMAddAttributeAtIndex(F, idx, LLVMCreateEnumAttribute(LLVMGetModuleContext(g_module), LLVMGetEnumAttributeKindForName("dereferenceable", strlen("dereferenceable")), QEMU_CPUSTATE_CPUARCHSTATE_TOTAL_SIZE));
-        for (int i = 0, arg_idx = (XREG_MAX + 2 * XMM_COUNT_MAX + 1); i < f->added_param_count; ++i, ++arg_idx) {
-            LLVMSetValueName(LLVMGetParam(F, arg_idx), f->added_param_name[i]);
+        if (f) {
+            for (int i = 0, arg_idx = (XREG_MAX + 2 * XMM_COUNT_MAX + 1); i < f->added_param_count; ++i, ++arg_idx) {
+                LLVMSetValueName(LLVMGetParam(F, arg_idx), f->added_param_name[i]);
+            }
         }
     }
     return F;
@@ -451,39 +457,56 @@ LLVMValueRef get_env(LLVMValueRef F) {
 
 static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
     StackAlloca *stack = (StackAlloca *)calloc(1, sizeof(StackAlloca));
-    stack->xreg.ty = (LLVMType *)calloc(XREG_MAX, sizeof(LLVMType));
+    stack->xreg.tcg_ty = (LLVMType *)calloc(XREG_MAX, sizeof(LLVMType));
+    stack->xreg.llvm_ty = (LLVMTypeRef *)calloc(XREG_MAX, sizeof(LLVMTypeRef));
     stack->xreg.alloca = (LLVMValueRef *)calloc(XREG_MAX, sizeof(LLVMValueRef));
+    stack->xreg.align = (unsigned *)calloc(XREG_MAX, sizeof(unsigned));
     stack->xreg.cnt = XREG_MAX;
     for (int i = 0; i < XREG_MAX; ++i) {
         if (ctx->xreg_valid & (1 << i)) {
-            stack->xreg.ty[i] = qemuaot_default_param_type[i];
-            stack->xreg.alloca[i] = LLVMBuildAlloca(g_builder, get_llvm_type(stack->xreg.ty[i]), qemuaot_default_stack_alloca_name[i]);
-            LLVMSetAlignment(stack->xreg.alloca[i], GET_ALIGNMENT_FROM_TYPE(stack->xreg.ty[i]));
-            build_store_with_alignment(g_builder, LLVMGetParam(F, i), stack->xreg.alloca[i], GET_ALIGNMENT_FROM_TYPE(stack->xreg.ty[i]), SPILL_TAG);
+            stack->xreg.tcg_ty[i] = qemuaot_default_param_type[i];
+            stack->xreg.llvm_ty[i] = get_llvm_type(stack->xreg.tcg_ty[i]);
+            stack->xreg.alloca[i] = LLVMBuildAlloca(g_builder, stack->xreg.llvm_ty[i], qemuaot_default_stack_alloca_name[i]);
+            stack->xreg.align[i] = GET_ALIGNMENT_FROM_TYPE(stack->xreg.tcg_ty[i]);
+            LLVMSetAlignment(stack->xreg.alloca[i], stack->xreg.align[i]);
+            build_store_with_alignment(g_builder, LLVMGetParam(F, i), stack->xreg.alloca[i], stack->xreg.align[i], SPILL_TAG);
         }
     }
-    stack->vector.ty = (LLVMType *)calloc((2 * XMM_COUNT_MAX), sizeof(LLVMType));
+    stack->vector.tcg_ty = (LLVMType *)calloc((2 * XMM_COUNT_MAX), sizeof(LLVMType));
+    stack->vector.llvm_ty = (LLVMTypeRef *)calloc((2 * XMM_COUNT_MAX), sizeof(LLVMTypeRef));
     stack->vector.alloca = (LLVMValueRef *)calloc((2 * XMM_COUNT_MAX), sizeof(LLVMValueRef));
+    stack->vector.align = (unsigned *)calloc((2 * XMM_COUNT_MAX), sizeof(unsigned));
     stack->vector.cnt = (2 * XMM_COUNT_MAX);
     for (int i = 0; i < (2 * XMM_COUNT_MAX); ++i) {
         if ((ctx->vec_valid & (1 << i)) || (ctx->vec_spare_valid & (1 << i))) {
-            stack->vector.ty[i] = qemuaot_default_param_type[XREG_MAX + i];
-            stack->vector.alloca[i] = LLVMBuildAlloca(g_builder, get_llvm_type(stack->vector.ty[i]), qemuaot_default_stack_alloca_name[XREG_MAX + i]);
-            LLVMSetAlignment(stack->vector.alloca[i], GET_ALIGNMENT_FROM_TYPE(stack->vector.ty[i]));
-            build_store_with_alignment(g_builder, LLVMGetParam(F, (XREG_MAX + i)), stack->vector.alloca[i], GET_ALIGNMENT_FROM_TYPE(stack->vector.ty[i]), SPILL_TAG);
+            stack->vector.tcg_ty[i] = qemuaot_default_param_type[XREG_MAX + i];
+            stack->vector.llvm_ty[i] = get_llvm_type(stack->vector.tcg_ty[i]);
+            stack->vector.alloca[i] = LLVMBuildAlloca(g_builder, stack->vector.llvm_ty[i], qemuaot_default_stack_alloca_name[XREG_MAX + i]);
+            stack->vector.align[i] = GET_ALIGNMENT_FROM_TYPE(stack->vector.tcg_ty[i]);
+            LLVMSetAlignment(stack->vector.alloca[i], stack->vector.align[i]);
+            build_store_with_alignment(g_builder, LLVMGetParam(F, (XREG_MAX + i)), stack->vector.alloca[i], stack->vector.align[i], SPILL_TAG);
         }
     }
-    stack->tmp.ty = (LLVMType *)calloc(ctx->next_tmp_idx, sizeof(LLVMType));
+    stack->tmp.tcg_ty = (LLVMType *)calloc(ctx->next_tmp_idx, sizeof(LLVMType));
+    stack->tmp.llvm_ty = (LLVMTypeRef *)calloc(ctx->next_tmp_idx, sizeof(LLVMTypeRef));
     stack->tmp.alloca = (LLVMValueRef *)calloc(ctx->next_tmp_idx, sizeof(LLVMValueRef));
+    stack->tmp.align = (unsigned *)calloc(ctx->next_tmp_idx, sizeof(unsigned));
     stack->tmp.cnt = ctx->next_tmp_idx;
     for (int i = 0; i < ctx->next_tmp_idx; ++i) {
         LLVMType stack_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
         assert(stack_ty != LLVMInvalidType);
         char tmp_alloca_name[16] = {0};
         sprintf(&tmp_alloca_name[0], "tmp%d.stack", (i & 0xffff));
-        stack->tmp.ty[i] = stack_ty;
-        stack->tmp.alloca[i] = LLVMBuildAlloca(g_builder, get_llvm_type(stack->tmp.ty[i]), tmp_alloca_name);
-        LLVMSetAlignment(stack->tmp.alloca[i], GET_ALIGNMENT_FROM_TYPE(stack->tmp.ty[i]));
+        stack->tmp.tcg_ty[i] = stack_ty;
+        if (stack->tmp.tcg_ty[i] > LLVMTypeBegin && stack->tmp.tcg_ty[i] < LLVMTypeEnd) {
+            stack->tmp.llvm_ty[i] = get_llvm_type(stack->tmp.tcg_ty[i]);
+            stack->tmp.alloca[i] = LLVMBuildAlloca(g_builder, stack->tmp.llvm_ty[i], tmp_alloca_name);
+            stack->tmp.align[i] = GET_ALIGNMENT_FROM_TYPE(stack->tmp.tcg_ty[i]);
+            LLVMSetAlignment(stack->tmp.alloca[i], stack->tmp.align[i]);
+        } else {
+            assert(stack->tmp.tcg_ty[i] == LLVMFuncPtr);
+
+        }
     }
     if (ctx->carry_on) {
         stack->carry = LLVMBuildAlloca(g_builder, LLVMInt1Type(), "carry.stack");
@@ -502,18 +525,24 @@ void start_llvm_bb(LLVMBasicBlockRef bb, StackAlloca *stack) {
 }
 
 static void release_stack(StackAlloca *stack) {
-    free(stack->xreg.ty);
+    free(stack->xreg.tcg_ty);
+    free(stack->xreg.llvm_ty);
     free(stack->xreg.alloca);
-    free(stack->vector.ty);
+    free(stack->xreg.align);
+    free(stack->vector.tcg_ty);
+    free(stack->vector.llvm_ty);
     free(stack->vector.alloca);
-    free(stack->tmp.ty);
+    free(stack->vector.align);
+    free(stack->tmp.tcg_ty);
+    free(stack->tmp.llvm_ty);
     free(stack->tmp.alloca);
+    free(stack->tmp.align);
     free(stack);
 }
 
 void translate_to_llvm_func(TcgContext *ctx, const char *name, FuncInstrList *f, int is_external) {
     LLVMValueRef F = NULL;
-    F = get_or_add_func_with_qemuaot_cc(name, f, 0);
+    F = get_or_add_func_with_qemuaot_cc(name, f);
     if (is_external == 0) {
         LLVMSetLinkage(F, LLVMInternalLinkage);
         LLVMAddAttributeAtIndex(F, -1, g_attr_alwaysinline);
