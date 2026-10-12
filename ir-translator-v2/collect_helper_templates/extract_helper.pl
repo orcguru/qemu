@@ -81,7 +81,7 @@ my %DefaultVectorCType = (
   "" => "v2ulong",
   "_YMM" => "v4ulong",
 );
-my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
+my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip", "cpu_param");
 my %qemuaot_gp_params_map = (
   "rax" => "unsigned long",
   "rcx" => "unsigned long",
@@ -103,6 +103,7 @@ my %qemuaot_gp_params_map = (
   "qemuaot_dst" => "unsigned long",
   "qemuaot_op" => "unsigned int",
   "rip" => "unsigned long",
+  "cpu_param" => "CPUState *",
   "env->sse_status" => "float_status"
 );
 my $qemuaot_vec_invoke = "XMM_PARAM_LIST";
@@ -1357,6 +1358,12 @@ typedef unsigned char __attribute__((__vector_size__(32))) v32uchar;
 typedef unsigned int __attribute__((__vector_size__(32))) v8uint;
 typedef unsigned long __attribute__((__vector_size__(32))) v4ulong;
 
+static inline CPUArchState *cpu_env(CPUState *cpu)
+{
+
+    return (CPUArchState *)(cpu + 1);
+}
+
 EOF
   my %foreign_types = ();
   foreach my $ff (keys %foreign_calls) {
@@ -2041,12 +2048,7 @@ sub add_context_backup
     $backup_vars = $backup_vars."int trigger_exception = 0;\n";
   }
   if ($need_env or exists $funcs{$target_func}->{'DO_DEFINE_ENV'}) {
-    $backup_vars = $backup_vars."CPUX86State *env;\n";
-    if ($arch_info eq "riscv64") {
-      $backup_vars = $backup_vars."asm volatile (\"mv %0, x25\" : \"=r\" (env) : :);\n";
-    } else {
-      $backup_vars = $backup_vars."asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
-    }
+    $backup_vars = $backup_vars."CPUX86State *env = cpu_env(cpu_param);\n";
   }
   foreach my $bk (sort {$a cmp $b} keys %backups) {
     if ($bk =~ /^xmm/) {
@@ -2423,6 +2425,8 @@ sub get_statements
               if ($epilog ne "") {
                 $body = $body."{\n$epilog\n";
               }
+              # Hack to add tail cpu_param
+              $expr =~ s/\)$/, cpu_param\)/;
               $body = $body."return $expr;\n";
               if ($epilog ne "") {
                 $body = $body."}\n";
@@ -2436,6 +2440,9 @@ sub get_statements
                 $body = $body."$p, ";
               }
               $body =~ s/,\s+$/ /;
+              # Hack to add tail cpu_param
+              $expr =~ s/\)/, cpu_param\)/g;
+              $expr =~ s/\(,/\(/g;
               $body = $body.$qemuaot_vec_invoke.", $expr);\n";
               if ($epilog ne "") {
                 $body = $body."}\n";
@@ -2517,28 +2524,15 @@ sub get_func_body
   my $body = "";
   if (exists $func_ptr->{'DO_DEFINE_ENV'} and $func_ptr->{'NAME'} ne $exception_exit) {
     $body = "{\n";
-    $body = $body."   $func_ptr->{'ENV_TYPE'} env;\n";
-    if ($arch_info eq "riscv64") {
-      $body = $body."   asm volatile (\"mv %0, x25\" : \"=r\" (env) : :);\n";
-    } else {
-      $body = $body."   asm volatile (\"mov %0, x25\" : \"=r\" (env) : :);\n";
-    }
+    $body = $body."   $func_ptr->{'ENV_TYPE'} env = ($func_ptr->{'ENV_TYPE'})cpu_env(cpu_param);\n";
   } else {
     $body = "{\n";
     if ($func_ptr->{'HELPER_INTERFACE'}) {
       my $counter_def = <<~'END';
 #ifdef HELPER_COUNTERS
-#if defined(__aarch64__) && !defined(BUILD_RISCV_ON_AARCH)
-    unsigned long env_val;
-    asm volatile ("mov %0, x25" : "=r" (env_val) : :);
+    unsigned long env_val = (unsigned long)cpu_env(cpu_param);
     unsigned long *helper1_cnt_ptr = (unsigned long *)(env_val - 88);
     *helper1_cnt_ptr += 1;
-#elif (defined(__riscv) && __riscv_xlen == 64) || defined(BUILD_RISCV_ON_AARCH)
-    unsigned long env_val;
-    asm volatile ("mv %0, x25" : "=r" (env_val) : :);
-    unsigned long *helper1_cnt_ptr = (unsigned long *)(env_val - 88);
-    *helper1_cnt_ptr += 1;
-#endif
 #endif
 END
       $body = $body.$counter_def;
@@ -2650,11 +2644,13 @@ sub update_func_call
   }
   if ($callee_ptr->{'IS_FOREIGN'}) {
     if ($caller_ptr->{'HELPER_INTERFACE'}) {
-      $call_list = $call_list.", &trigger_exception";
+      $call_list = $call_list.", cpu_param, &trigger_exception";
     } else {
       die "" if (not exists $caller_ptr->{'IS_FOREIGN'});
-      $call_list = $call_list.", trigger_exception_ptr";
+      $call_list = $call_list.", cpu_param, trigger_exception_ptr";
     }
+  } else {
+    $call_list = $call_list.", cpu_param";
   }
   $call_list =~ s/^,\s+//;
   $str = $str.$call_list;
@@ -2745,7 +2741,9 @@ sub collect_func_args
       $args = $args.", unsigned long normal_return";
     }
   } elsif (exists $func_ptr->{'IS_FOREIGN'}) {
-    $args = $args.", int *trigger_exception_ptr";
+    $args = $args.", CPUState * cpu_param, int *trigger_exception_ptr";
+  } else {
+    $args = $args.", CPUState * cpu_param";
   }
   $args =~ s/^,\s+//;
   return $args;
