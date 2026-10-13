@@ -26,6 +26,7 @@
 #include "mapper.h"
 #include "tcg2llvm.h"
 #include "i386_cpu.h"
+#include "xymm_def.h"
 
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
@@ -40,6 +41,8 @@ int cfg_xmm_count = XMM_COUNT;
 void debug_print_instr(TcgContext *ctx, const char *msg) {}
 
 char *g_template_path = NULL;
+char *g_output_path = NULL;
+
 /* Set by '-d': dump the mapped LLVM-IR module and stop before compilation */
 int g_dump_ir = 0;
 LLVMTargetMachineRef g_target_machine = NULL;
@@ -428,6 +431,67 @@ LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, FuncInstrList *f)
         }
     }
     return F;
+}
+
+LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr *u) {
+    SBuf bh;
+    char dump_helper_buf[128] = {0};
+    sbuf_init(&bh, &dump_helper_buf[0], sizeof(dump_helper_buf));
+    sbuf_printf(&bh, "%s", helper_str[h]);
+    for (int i = 2; i < u->operand_count; ++i) {
+        assert(u->operands[i].kind == OP_VEC);
+        sbuf_printf(&bh, "_V%d", u->operands[i].vec.idx);
+    }
+    SBuf bm;
+    char dump_macro_buf[128] = {0};
+    sbuf_init(&bm, &dump_macro_buf[0], sizeof(dump_macro_buf));
+    for (int i = 2; i < u->operand_count; ++i) {
+        assert(u->operands[i].kind == OP_VEC);
+        sbuf_printf(&bm, " -DVEC%d=%s", (i - 2), qemuaot_default_param_name[XREG_MAX + u->operands[i].vec.idx]);
+    }
+
+#if defined(__aarch64__)
+    const char *clang_cmd_head = "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O2 -emit-llvm";
+#elif (defined(__riscv) && __riscv_xlen == 64)
+    const char *clang_cmd_head = "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O2 -emit-llvm";
+#endif
+    int cmd_sz = strlen(clang_cmd_head) + strlen(XMM_PARAM_DECLARE_COMMON) + strlen(XMM_PARAM_LIST) + 8 * 12 /* -DVEC/XY */ + strlen(g_output_path) + strlen(g_template_path) + strlen(dump_helper_buf) * 2 + strlen(dump_macro_buf) + 256 /*misc*/;
+    char *clang_cmd = (char *)malloc(cmd_sz);
+    snprintf(clang_cmd, cmd_sz, "%s -DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\" -DHELPER_NAME=%s %s %s/helper_templates/%s.c -o %s/%s.bc", clang_cmd_head, XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST, &dump_helper_buf[0], &dump_macro_buf[0], g_template_path, helper_str[h], g_output_path, &dump_helper_buf[0]);
+    printf("cmd: %s\n", clang_cmd);
+    return NULL;
+/*
+    FILE *check_fp = fopen(bc_name, "r");
+    if (!check_fp) {
+        char cmd[2048+PATH_MAX] = {0};
+        assert(strlen(cmd) < sizeof(cmd));
+        int rc = system(cmd);
+        if (rc) {
+            printf("Build command %s failed\n", cmd);
+        }
+        check_fp = fopen(bc_name, "r");
+    }
+    if (check_fp) {
+        fclose(check_fp);
+        char* error_msg = NULL;
+        LLVMMemoryBufferRef memory_buffer = NULL;
+        LLVMModuleRef helper_module = NULL;
+        if (LLVMCreateMemoryBufferWithContentsOfFile(bc_name, &memory_buffer, &error_msg)) {
+            fprintf(stderr, "Failed to create memory buffer: %s\n", error_msg);
+            LLVMDisposeMessage(error_msg);
+            return 0;
+        }
+        if (LLVMParseBitcode2(memory_buffer, &helper_module)) {
+            fprintf(stderr, "Failed to parse bitcode\n");
+            LLVMDisposeMemoryBuffer(memory_buffer);
+            return 0;
+        }
+        LLVMLinkModules2(g_module, helper_module);
+        LLVMDisposeMemoryBuffer(memory_buffer);
+        return 1;
+    }
+    return 0;
+    */
 }
 
 LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVMValueRef PointerVal, unsigned Bytes, TagType tag_ty) {
@@ -893,6 +957,20 @@ int main(int argc, char *argv[]) {
     assert((p - g_template_path) < PATH_MAX);
     *p = '\0';
 
+    // Get the path for intermediate output files
+    g_output_path = realpath(input_file, NULL);
+    assert(g_output_path);
+    p = g_output_path;
+    assert(p);
+    while (strstr(p, "/") != NULL) {
+        p = strstr(p, "/");
+        if (*p == '/') {
+            p += 1;
+        }
+    }
+    assert((p - g_output_path) < PATH_MAX);
+    *p = '\0';
+
     // Initialize LLVM target machine
     rc = init_llvm();
     if (rc != 0) {
@@ -911,6 +989,9 @@ int main(int argc, char *argv[]) {
 exit:
     if (g_template_path) {
         free(g_template_path);
+    }
+    if (g_output_path) {
+        free(g_output_path);
     }
     if (output_file) {
         free(output_file);

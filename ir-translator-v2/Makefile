@@ -463,15 +463,18 @@ clean-qemu-source:
 
 # Remove local build artifacts (original Makefile clean)
 clean-local:
-	rm -f *.o parser.tab.* lexer.yy.* tcg_mapper tcg_printer helper_lookup.c tests/expand_tcg_ir/*.out collect_helper_templates/*.E collect_helper_templates/*.E.out collect_helper_templates/*.E.err helper_templates/*
+	rm -f *.o parser.tab.* lexer.yy.* tcg_mapper tcg_printer helper_lookup.c tests/expand_tcg_ir/*.out collect_helper_templates/*.E collect_helper_templates/*.E.out collect_helper_templates/*.E.err
 	rm -rf collect_helper_templates/*.o.E.helper_templates
 	rm -rf tests/translate_to_llvm_ir/out
 	rm -rf .san .cov coverage
 	rm -f *.gcda *.gcno *.gcov
 	rm -f tests/expand_tcg_ir/*.err tests/expand_tcg_ir/*.exp.tmp
 
+clean-template:
+	rm -f helper_templates/*
+
 # Alias preserved from original Makefile
-clean-all: clean
+clean-all: clean clean-template
 
 # ============================================================================
 # Testing infrastructure
@@ -1091,7 +1094,7 @@ coverage-open: coverage-report
 	test-san test-expand-tcg-ir-san test-llvm-ir-san san-build check-san \
 	test-expand-tcg-ir-update \
 	coverage cov-build cov-run cov-reset coverage-report coverage-open \
-	clean clean-all clean-local clean-qemu-source \
+	clean clean-all clean-local clean-qemu-source clean-template \
 	qemu-preprocess qemu-preprocess-tcg-runtime \
 	qemu-preprocess-cc-helper qemu-preprocess-int-helper \
 	qemu-preprocess-user-exec \

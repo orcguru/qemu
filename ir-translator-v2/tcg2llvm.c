@@ -20,6 +20,11 @@ void translate_common(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca
     do_store(&u->operands[0], out, stack, prefix);
 }
 
+void translate_mov(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    do_store(&u->operands[0], in, stack, prefix);
+}
+
 void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     char name_buf[32] = {0};
     LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
@@ -222,6 +227,9 @@ void translate_func_addr(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *st
         assert(u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_TMP);
         int tmp_slot = u->operands[0].slot.idx;
         build_store_with_alignment(builder, TF, stack->tmp.alloca[tmp_slot], stack->tmp.align[tmp_slot], SPILL_TAG);
+    } else {
+        assert(u->operands[1].kind == OP_SYMBOL);
+        LLVMValueRef HLP = get_or_add_helper_with_qemuaot_cc(u->operands[1].symbol, u);
     }
 }
 
@@ -534,11 +542,11 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
             CASE_COMMON(add_i32, LLVMBuildAdd);
             CASE_COMMON(add_i64, LLVMBuildAdd);
             CASE_COMMON(add_vec, LLVMBuildAdd);
+            CASE(extrl_i64_i32, translate_mov);
+            CASE(mov_i32, translate_mov);
+            CASE(mov_i64, translate_mov);
+            CASE(mov_vec, translate_mov);
 #if 0
-            case add_i32:
-            case add_vec:
-                translate_binary(opc, u, LLVMBuildAdd);
-                break;
             case andc_i32:
             case andc_i64:
             case andc_vec:
@@ -616,12 +624,6 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
                 break;
             case extrh_i64_i32:
                 translate_extrh(opc, u);
-                break;
-            case extrl_i64_i32:
-            case mov_i32:
-            case mov_i64:
-            case mov_vec:
-                translate_mov(opc, u);
                 break;
             case ext_i32_i64:
                 translate_ext(opc, u, LLVMBuildSExt);
