@@ -165,6 +165,7 @@ VecInfo lookup_vector(uint64_t offset, bool in_register) {
  */
 SlotInfo get_slot_for(TcgContext *ctx, SlotType type, uint16_t idx) {
     SlotInfo ret;
+    memset(&ret, 0, sizeof(ret));
     ret.type = SUB_SLOT_TMP;
     uint16_t key_idx = idx;
 #define TMPT_OFFSET     (1 << 15)
@@ -339,6 +340,15 @@ void register_vec_spare_stack_alloca(TcgContext *ctx, const UnifiedInstr *u) {
  */
 void set_operand_type(TcgContext *ctx, Operand *op, LLVMType ty) {
     if (op->kind == OP_SLOT) {
+        if (op->slot.op_type != LLVMInvalidType &&
+            !(op->slot.op_type > LLVMTypeBegin && op->slot.op_type < LLVMTypeEnd)) {
+            if (op->slot.type == SUB_SLOT_TMP) {
+                if (!g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)op->slot.idx)) {
+                    g_hash_table_insert(ctx->stack_type_map, (gpointer)(long)op->slot.idx, (gpointer)(long)op->slot.op_type);
+                }
+            }
+            return;
+        }
         op->slot.op_type = ty;
         if (op->slot.type == SUB_SLOT_TMP) {
             LLVMType stack_ty = ty > LLVMInt64 ? LLVMVector2xi64 : ty;
@@ -479,27 +489,6 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
     return;
 }
 
-void type_map_apply(const TcgContext *ctx) {
-    for (int fi = 0; fi < ctx->llvm_func_set.num_lists; ++fi) {
-        for (UnifiedInstr *u = ctx->llvm_func_set.lists[fi].head; u; u = u->next) {
-            for (int i = 0; i < u->operand_count; ++i) {
-                Operand *op = &u->operands[i];
-                if (op->kind == OP_SLOT) {
-                    if (op->slot.type == SUB_SLOT_TMP) {
-                        LLVMType stack_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)op->slot.idx);
-                        assert(stack_ty != LLVMInvalidType);
-                        op->slot.stack_type = stack_ty;
-                    } else {
-                        assert(op->slot.stack_type != LLVMInvalidType);
-                    }
-                } else if (op->kind == OP_VEC) {
-                    assert(op->vec.stack_type != LLVMInvalidType);
-                }
-            }
-        }
-    }
-}
-
 /*
  * Instruction related
  */
@@ -529,12 +518,10 @@ UnifiedInstr *new_instr(TcgContext *ctx, uint8_t opc,
                     u->operands[dst_idx].vec.idx = v.idx;
                     u->operands[dst_idx].vec.offset = v.offset;
                     u->operands[dst_idx].vec.op_type = LLVMInvalidType;
-                    u->operands[dst_idx].vec.stack_type = LLVMVector2xi64;
                 } else {
                     u->operands[dst_idx].kind = OP_ENV;
                     u->operands[dst_idx].env.offset = ops[i + 1].imm.val;
                     u->operands[dst_idx].env.op_type = LLVMInvalidType;
-                    u->operands[dst_idx].env.stack_type = LLVMInvalidType;
                 }
                 i += 1;
                 skip_cnt += 1;

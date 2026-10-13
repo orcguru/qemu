@@ -64,7 +64,6 @@ void reduce_imm_force(char *ptr);
         yylval->si.type       = SUB_SLOT_XREG;                 \
         yylval->si.idx        = (reg);                         \
         yylval->si.op_type    = env_regs_type[yylval->si.idx]; \
-        yylval->si.stack_type = env_regs_type[yylval->si.idx]; \
         return SLOT;                                           \
     } while (0)
 %}
@@ -1402,8 +1401,8 @@ xsetbv                          xsetbv
 
 {XMMVAR}          { HANDLE_COLUMN; yylval->ival = atoi(yytext + 3); return XMMVAR; }
 {XMMTMP}          { HANDLE_COLUMN; return XMMTMP; }
-{TMPLVAR}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_TMPL; yylval->si.idx = atoi(yytext + 3); yylval->si.op_type = LLVMInvalidType; yylval->si.stack_type = LLVMInvalidType; return SLOT; }
-{TMPTVAR}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_TMPT; yylval->si.idx = atoi(yytext + 3); yylval->si.op_type = LLVMInvalidType; yylval->si.stack_type = LLVMInvalidType; return SLOT; }
+{TMPLVAR}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_TMPL; yylval->si.idx = atoi(yytext + 3); yylval->si.op_type = LLVMInvalidType; return SLOT; }
+{TMPTVAR}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_TMPT; yylval->si.idx = atoi(yytext + 3); yylval->si.op_type = LLVMInvalidType; return SLOT; }
 {IMMX}            { HANDLE_COLUMN; errno = 0; yylval->ival = strtoll(yytext + 1, NULL, 16); if (errno == ERANGE) { reduce_imm_force(yytext + 1); yylval->ival = strtoll(yytext + 1, NULL, 16); yylval->ival += 0x8000000000000000UL; } return IMMX; }
 {IMMD}            { HANDLE_COLUMN; errno = 0; yylval->ival = strtoll(yytext + 1, NULL, 10); assert(!errno); return IMMD; }
 {NUM}             { HANDLE_COLUMN; yylval->ival = atoi(yytext); return IMM; }
@@ -1430,13 +1429,13 @@ xsetbv                          xsetbv
 {leul}            { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC4B; return MEMATTR; }
 {leq}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC8B; return MEMATTR; }
 {leo}             { HANDLE_COLUMN; yylval->attr_info.subt = SUB_ATTR_STORAGE; yylval->attr_info.p.storage.ext = ZERO; yylval->attr_info.p.storage.size = SRC16B; return MEMATTR; }
-{cc_src2}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = cc_src2; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{es_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = es_base; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{cs_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = cs_base; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{ss_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = ss_base; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{ds_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = ds_base; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{fs_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = fs_base; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
-{gs_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = gs_base; yylval->si.op_type = LLVMInt64; yylval->si.stack_type = LLVMInt64; return SLOT; }
+{cc_src2}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = cc_src2; yylval->si.op_type = LLVMInt64; return SLOT; }
+{es_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = es_base; yylval->si.op_type = LLVMInt64; return SLOT; }
+{cs_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = cs_base; yylval->si.op_type = LLVMInt64; return SLOT; }
+{ss_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = ss_base; yylval->si.op_type = LLVMInt64; return SLOT; }
+{ds_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = ds_base; yylval->si.op_type = LLVMInt64; return SLOT; }
+{fs_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = fs_base; yylval->si.op_type = LLVMInt64; return SLOT; }
+{gs_base}         { HANDLE_COLUMN; yylval->si.type = SUB_SLOT_ENVVAR; yylval->si.idx = gs_base; yylval->si.op_type = LLVMInt64; return SLOT; }
 {rax}             { SET_XREG(rax); }
 {rcx}             { SET_XREG(rcx); }
 {rdx}             { SET_XREG(rdx); }

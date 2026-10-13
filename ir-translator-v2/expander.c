@@ -49,10 +49,10 @@ void sanity_check_op_type_solid(const TcgContext *ctx) {
     } while (0)
 
 #define SLOT_OP(ty, index)  ((Operand){ .kind = OP_SLOT, .slot.type = (ty), .slot.idx = (index) })
-#define VEC_OP(index, off)   ((Operand){ .kind = OP_VEC, .vec.idx = (index), .vec.offset = (off), .vec.stack_type = LLVMVector2xi64 })
+#define VEC_OP(index, off)   ((Operand){ .kind = OP_VEC, .vec.idx = (index), .vec.offset = (off)  })
 // Use SLOT_OP_EXTRA to copy from existing operand
-#define SLOT_OP_EXTRA(ty, index, op_ty, stack_ty)                           \
-            ((Operand){ .kind = OP_SLOT, .slot.type = (ty), .slot.idx = (index), .slot.op_type = (op_ty), .slot.stack_type = (stack_ty) })
+#define SLOT_OP_EXTRA(ty, index, op_ty)                           \
+            ((Operand){ .kind = OP_SLOT, .slot.type = (ty), .slot.idx = (index), .slot.op_type = (op_ty) })
 #define IMM_OP(value)       ((Operand){ .kind = OP_IMM,   .imm.val = (value) })
 #define ENV_OP(off)         ((Operand){ .kind = OP_ENV,   .env.offset = (off) })
 #define LABEL_OP(lbl)       ((Operand){ .kind = OP_LABEL, .label = (lbl) })
@@ -98,7 +98,7 @@ void expand_push_ret_addr(TcgContext *ctx) {
     // qemu_st_i64 op0,tmp_N2,attr:ATOM_IFALIGN,ALIGN_8,SRC8B
     assert(u->operands[0].kind == OP_SLOT);
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, qemu_st_i64, 0, 0,
-        SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type, u->operands[0].slot.stack_type),
+        SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type),
         SLOT_OP(SUB_SLOT_TMP, tmp2),
         ATTR_STORAGE_OP(ATOM_IFALIGN, ALIGN_8, SRC8B, ZERO));
 
@@ -113,7 +113,7 @@ void expand_push_ret_addr(TcgContext *ctx) {
     // func_addr tmp_N3,op1,0
     assert(u->operands[1].kind == OP_IMM);
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, func_addr, 0, 0,
-        SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp3, LLVMFuncPtr, LLVMFuncPtr),
+        SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp3, LLVMFuncPtr),
         IMM_OP(u->operands[1].imm.val),
         IMM_OP(0));
 
@@ -173,7 +173,7 @@ void expand_ret(TcgContext *ctx) {
     // - CHECK if lookup is needed
     // brcond_i64 op0,tmp_N4,ne,L0
     assert(u->operands[0].kind == OP_SLOT);
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, brcond_i64, 0, 0, SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type, u->operands[0].slot.stack_type), SLOT_OP(SUB_SLOT_TMP, tmp4), RELOP_OP(ne), LABEL_OP(0));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, brcond_i64, 0, 0, SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type), SLOT_OP(SUB_SLOT_TMP, tmp4), RELOP_OP(ne), LABEL_OP(0));
 
     // - TAIL call
     // tail_call_qemuaot tmp_N3,0,0
@@ -186,7 +186,7 @@ void expand_ret(TcgContext *ctx) {
     // set_label L0
     // call jmp_ind,0x1,0,op0
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, set_label, 0, 0, LABEL_OP(0));
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, call, 0, 0, SYMBOL_OP(helper_jmp_ind), IMM_OP(0x1), IMM_OP(0), SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type, u->operands[0].slot.stack_type));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, call, 0, 0, SYMBOL_OP(helper_jmp_ind), IMM_OP(0x1), IMM_OP(0), SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type));
 
     instr_list_remove_and_free(&ctx->instr_head, &ctx->instr_tail, u);
 }
@@ -204,14 +204,14 @@ void expand_jmp_direct(TcgContext *ctx) {
         // func_addr tmp_N1,op0,0
         assert(u->operands[0].kind == OP_IMM);
         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, func_addr, 0, 0,
-            SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp1, LLVMFuncPtr, LLVMFuncPtr),
+            SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp1, LLVMFuncPtr),
             IMM_OP(u->operands[0].imm.val),
             IMM_OP(0));
 
         // - TAIL call
         // tail_call_qemuaot tmp_N1,0,0
         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, tail_call_qemuaot, 0, 0,
-                          SLOT_OP(SUB_SLOT_TMP, tmp1),
+                          SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp1, LLVMFuncPtr),
                           IMM_OP(0),
                           IMM_OP(0));
 
@@ -353,13 +353,16 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
 
             for (int i = 0; i < ctx->next_tmp_idx; ++i) {
                 if (test_bit(buf, i)) {
+                    assert(g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)i));
+                    LLVMType current_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
+                    if (current_ty == LLVMFuncPtr) {
+                        continue;
+                    }
                     // - CALCULATE negative offset into the shadow stack
                     // sub_i64 tmp_N3, tmp_N2, $tmp_slot_preserve_offset
                     assert(tmp_slot_preserve_offset < TMP_SLOT_PRESERVE_OFFSET_MAX);
                     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c, sub_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(tmp_slot_preserve_offset));
                     tmp_slot_preserve_offset += 16;
-                    assert(g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)i));
-                    LLVMType current_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
                     SrcSizeType src_sz = INVALID_SRCSIZE;
                     switch (current_ty) {
                     case LLVMInt64:
@@ -411,13 +414,16 @@ void expand_tmp_slot_preservation(TcgContext *ctx) {
 
             for (int i = 0; i < ctx->next_tmp_idx; ++i) {
                 if (test_bit(buf, i)) {
+                    assert(g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)i));
+                    LLVMType current_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
+                    if (current_ty == LLVMFuncPtr) {
+                        continue;
+                    }
                     // - CALCULATE negative offset into the shadow stack
                     // sub_i64 tmp_N3, tmp_N2, $tmp_slot_preserve_offset
                     assert(tmp_slot_preserve_offset < TMP_SLOT_PRESERVE_OFFSET_MAX);
                     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, c_next, sub_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, tmp3), SLOT_OP(SUB_SLOT_TMP, tmp2), IMM_OP(tmp_slot_preserve_offset));
                     tmp_slot_preserve_offset += 16;
-                    assert(g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)i));
-                    LLVMType current_ty = (LLVMType)(long)g_hash_table_lookup(ctx->stack_type_map, (gpointer)(long)i);
                     SrcSizeType src_sz = INVALID_SRCSIZE;
                     switch (current_ty) {
                     case LLVMInt64:
@@ -724,7 +730,6 @@ int get_vector_spill_info(const UnifiedInstr *u,
                 spare_vecs[rc].kind = OP_VEC;
                 spare_vecs[rc].vec.idx = spare_idx;
                 spare_vecs[rc].vec.offset = 0;
-                spare_vecs[rc].vec.stack_type = LLVMVector2xi64;
                 rc += 1;
                 assert(rc <= cnt);
             }
@@ -811,7 +816,7 @@ void add_spill_load_vector(TcgContext *ctx,
 static void move_rv_to_next(TcgContext *ctx, const UnifiedInstr *orig_u, UnifiedInstr *update_u) {
     int nfidx = lookup_next_func_idx(ctx, orig_u);
     EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[nfidx].head), &(ctx->llvm_func_set.lists[nfidx].tail), ctx->llvm_func_set.lists[nfidx].head, mov_i64, 0, 0,
-        SLOT_OP_EXTRA(update_u->operands[TCG_CALL_PREFIX_COUNT].slot.type, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type),
+        SLOT_OP_EXTRA(update_u->operands[TCG_CALL_PREFIX_COUNT].slot.type, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type),
         ARG_OP(-1));
     setup_additional_param(&(ctx->llvm_func_set.lists[nfidx]), not_a_helper, false/*with_nc*/, true/*with_rv*/, update_u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type);
     memmove(&update_u->operands[TCG_CALL_PREFIX_COUNT], &update_u->operands[TCG_CALL_PREFIX_COUNT + 1],
@@ -846,7 +851,7 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
             op_entry.kind = OP_SLOT;
             op_entry.slot.type = SUB_SLOT_TMP;
             op_entry.slot.idx = tmp_entry;
-            op_entry.slot.op_type = LLVMInt64;
+            op_entry.slot.op_type = LLVMFuncPtr;
             entry->operands[0] = op_entry;
             entry->operands[1] = u->operands[0];
             entry->operand_count = 2;
@@ -886,7 +891,7 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
                 // func_addr tmp_n,hex_offset,nfidx
                 int tmp_n = get_next_tmp_idx(ctx);
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr, LLVMFuncPtr),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr),
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(nfidx));
 
@@ -984,12 +989,12 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
         if (ty == LLVMInt64) {
             // st_i64 r,env,off
             EMIT_INSTR_APPEND_LIST(ctx, &result, st_i64, 0, 0,
-                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty),
                 ENV_OP(0), IMM_OP(off));
         } else {
             // st_i32 r,env,off
             EMIT_INSTR_APPEND_LIST(ctx, &result, st_i32, 0, 0,
-                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty),
                 ENV_OP(0), IMM_OP(off));
         }
     }
@@ -1079,12 +1084,12 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
         if (ty == LLVMInt64) {
             // ld_i64 r,env,off
             EMIT_INSTR_APPEND_LIST(ctx, &result, ld_i64, 0, 0,
-                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty),
                 ENV_OP(0), IMM_OP(off));
         } else {
             // ld_i32 r,env,off
             EMIT_INSTR_APPEND_LIST(ctx, &result, ld_i32, 0, 0,
-                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty),
                 ENV_OP(0), IMM_OP(off));
         }
     }
@@ -1105,7 +1110,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
             ARG_OP(-1),
             IMM_OP(0),
             IMM_OP(0),
-            SLOT_OP_EXTRA(u->operands[TCG_CALL_PREFIX_COUNT].slot.type, u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, u->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type));
+            SLOT_OP_EXTRA(u->operands[TCG_CALL_PREFIX_COUNT].slot.type, u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type));
     } else {
         // - tail_call_qemuaot next
         // tail_call_qemuaot OP_LASTARG
@@ -1152,7 +1157,7 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
             // func_addr tmp_t,hex_offset,tfidx
             int tmp_t = get_next_tmp_idx(ctx);
             EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_t, LLVMFuncPtr, LLVMFuncPtr),
+                SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_t, LLVMFuncPtr),
                 IMM_OP(ctx->hex_offset),
                 IMM_OP(tfidx));
 
@@ -1160,7 +1165,7 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
             // func_addr tmp_n,hex_offset,nfidx
             int tmp_n = get_next_tmp_idx(ctx);
             EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr, LLVMFuncPtr),
+                SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr),
                 IMM_OP(ctx->hex_offset),
                 IMM_OP(nfidx));
 
@@ -1173,7 +1178,7 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
             op_entry.kind = OP_SLOT;
             op_entry.slot.type = SUB_SLOT_TMP;
             op_entry.slot.idx = tmp_entry;
-            op_entry.slot.op_type = op_entry.slot.stack_type = LLVMFuncPtr;
+            op_entry.slot.op_type = LLVMFuncPtr;
             entry->operands[0] = op_entry;
             entry->operands[1] = u->operands[0];
             entry->operand_count = 2;
@@ -1274,12 +1279,12 @@ int create_trampoline_for_runtime(TcgContext *ctx,
         if (ty == LLVMInt64) {
             // st_i64 r,env,off
             EMIT_INSTR_APPEND_LIST(ctx, &result, st_i64, 0, 0,
-                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty),
                 ENV_OP(0), IMM_OP(off));
         } else {
             // st_i32 r,env,off
             EMIT_INSTR_APPEND_LIST(ctx, &result, st_i32, 0, 0,
-                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty),
                 ENV_OP(0), IMM_OP(off));
         }
     }
@@ -1342,12 +1347,12 @@ int create_trampoline_for_runtime(TcgContext *ctx,
         if (ty == LLVMInt64) {
             // ld_i64 r,env,off
             EMIT_INSTR_APPEND_LIST(ctx, &result, ld_i64, 0, 0,
-                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty),
                 ENV_OP(0), IMM_OP(off));
         } else {
             // ld_i32 r,env,off
             EMIT_INSTR_APPEND_LIST(ctx, &result, ld_i32, 0, 0,
-                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty, ty),
+                SLOT_OP_EXTRA(SUB_SLOT_XREG, r, ty),
                 ENV_OP(0), IMM_OP(off));
         }
     }
@@ -1368,7 +1373,7 @@ int create_trampoline_for_runtime(TcgContext *ctx,
             ARG_OP(-1),
             IMM_OP(0),
             IMM_OP(0),
-            SLOT_OP_EXTRA(u->operands[TCG_CALL_PREFIX_COUNT].slot.type, u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type, u->operands[TCG_CALL_PREFIX_COUNT].slot.stack_type));
+            SLOT_OP_EXTRA(u->operands[TCG_CALL_PREFIX_COUNT].slot.type, u->operands[TCG_CALL_PREFIX_COUNT].slot.idx, u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type));
     } else {
         // - tail_call_qemuaot next
         // tail_call_qemuaot OP_LASTARG
@@ -1398,12 +1403,12 @@ void expand_call_runtime(TcgContext *ctx) {
             int tmp_entry = get_next_tmp_idx(ctx);
             if (h != helper_jmp_ind) {
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_entry, LLVMFuncPtr, LLVMFuncPtr),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_entry, LLVMFuncPtr),
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(create_trampoline_for_runtime(ctx, u, !helper_runtime_does_not_return[h])));
             } else {
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_entry, LLVMFuncPtr, LLVMFuncPtr),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_entry, LLVMFuncPtr),
                     SYMBOL_OP(helper_jmp_ind));
             }
 
@@ -1413,14 +1418,14 @@ void expand_call_runtime(TcgContext *ctx) {
                 // - GET the address of next
                 // func_addr tmp_n,hex_offset,nfidx
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr, LLVMFuncPtr),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr),
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(lookup_next_func_idx(ctx, u)));
             } else if (h == helper_jmp_ind) {
                 // - GET the address of next
                 // func_addr tmp_n,jmp_ind_callback
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr, LLVMFuncPtr),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_n, LLVMFuncPtr),
                     SYMBOL_OP(jmp_ind_callback));
             }
 
@@ -1457,7 +1462,7 @@ void expand_call_runtime(TcgContext *ctx) {
             if (h == helper_jmp_ind) {
                 int tmp_t = get_next_tmp_idx(ctx);
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
-                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_t, LLVMFuncPtr, LLVMFuncPtr),
+                    SLOT_OP_EXTRA(SUB_SLOT_TMP, tmp_t, LLVMFuncPtr),
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(create_trampoline_for_runtime(ctx, u, !helper_runtime_does_not_return[h])));
                 Operand tf;

@@ -6,6 +6,8 @@
 #include "mapper.h"
 #include "tcg_context.h"
 
+#define QEMUAOT_CC                  124
+
 void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f);
 
 #endif

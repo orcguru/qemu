@@ -8,6 +8,7 @@
 #include "mapper_util.h"
 #include <assert.h>
 #include "tcg_llvm_tag.h"
+#include "operand_static_types.h"
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 
@@ -214,19 +215,45 @@ void translate_st2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
 }
 
 void translate_func_addr(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char fname[32] = {0};
     if (u->operands[1].kind == OP_IMM) {
         assert(u->operands[2].kind == OP_IMM);
-        char fhex_name[32] = {0};
-        if (u->operands[2].imm.val == 0) {
-            sprintf(fhex_name, "Fx%lx", u->operands[1].imm.val);
-        } else {
-            sprintf(fhex_name, "Fx%lx_%ld", u->operands[1].imm.val, u->operands[2].imm.val);
-        }
-        LLVMValueRef TF = get_or_add_func_with_qemuaot_cc(fhex_name, NULL);
+        LLVMValueRef TF = get_or_add_func_with_qemuaot_cc(get_func_name(u->operands[1].imm.val, (int)u->operands[2].imm.val, &fname[0], sizeof(fname)), NULL);
         assert(u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_TMP);
         int tmp_slot = u->operands[0].slot.idx;
-        assert(stack->tmp.tcg_ty[tmp_slot] == LLVMFuncPtr && stack->tmp.alloca[tmp_slot] == NULL);
+        build_store_with_alignment(builder, TF, stack->tmp.alloca[tmp_slot], stack->tmp.align[tmp_slot], SPILL_TAG);
     }
+}
+
+void translate_tail_call_qemuaot(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMValueRef call_args[XREG_MAX + 2 * XMM_COUNT_MAX + 1/*CPU*/ + MAX_ADDED_ARGS] = {NULL};
+    int arg_cnt = 0;
+    for (int i = 0; i < XREG_MAX; ++i) {
+        if (stack->xreg.alloca[i]) {
+            call_args[arg_cnt++] = load_from_stack_as_type(&stack->xreg, i, stack->xreg.tcg_ty[i], prefix, qemuaot_default_stack_alloca_name[i]);
+        } else {
+            call_args[arg_cnt++] = LLVMGetParam(F, i);
+        }
+    }
+    for (int i = 0; i < (2 * XMM_COUNT_MAX); ++i) {
+        if (stack->vector.alloca[i]) {
+            call_args[arg_cnt++] = load_from_stack_as_type(&stack->vector, i, stack->vector.tcg_ty[i], prefix, qemuaot_default_stack_alloca_name[XREG_MAX + i]);
+        } else {
+            call_args[arg_cnt++] = LLVMGetParam(F, (XREG_MAX + i));
+        }
+    }
+    call_args[arg_cnt++] = LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT_MAX));
+    for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+        call_args[arg_cnt++] = get_input_val_for_operand(&u->operands[i], stack, prefix);
+    }
+    assert(u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_TMP);
+    int func_slot = u->operands[0].slot.idx;
+    LLVMValueRef loaded_fn = LLVMBuildLoad2(builder, LLVMPointerType(stack->tmp.llvm_ty[func_slot], 0), stack->tmp.alloca[func_slot], assemble_name_2(&var_name[0], sizeof(var_name), prefix, "loaded_fn"));
+    LLVMValueRef call_inst = LLVMBuildCall2(builder, stack->tmp.llvm_ty[func_slot], loaded_fn, call_args, arg_cnt, "");
+    LLVMSetTailCall(call_inst, 1);
+    LLVMSetInstructionCallConv(call_inst, QEMUAOT_CC);
+    LLVMBuildRetVoid(builder);
 }
 
 static void print_operand(const Operand *op, int is_output, SBuf *b) {
@@ -729,13 +756,13 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
                 break;
             case xor_i32:
             case xor_i64:
-            case xor_vec:
-                translate_binary(opc, u, LLVMBuildXor);
+            case xor_vec: translate_binary(opc, u, LLVMBuildXor);
                 break;
 #endif
             CASE_FUNC(set_label, translate_set_label);
             CASE_FUNC(br, translate_br);
             CASE_FUNC(func_addr, translate_func_addr);
+            CASE_FUNC(tail_call_qemuaot, translate_tail_call_qemuaot);
 #if 0
             case brcond_i32:
             case brcond_i64:

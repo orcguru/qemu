@@ -134,7 +134,6 @@ func:
         debug_print_instr(ctx, "after call_runtime");
         /* End of function – apply final slot types */
         sanity_check_op_type_solid(ctx);
-        type_map_apply(ctx);
         handle_func(ctx, $1);
         tcg_context_reset(ctx);
     }
@@ -288,21 +287,25 @@ imm_op:
     {
         $$.kind = OP_IMM;
         $$.imm.val = $1;
+        $$.imm.op_type = LLVMInvalidType;
     }
     | IMMD
     {
         $$.kind = OP_IMM;
         $$.imm.val = $1;
+        $$.imm.op_type = LLVMInvalidType;
     }
     | IMMX
     {
         $$.kind = OP_IMM;
         $$.imm.val = $1;
+        $$.imm.op_type = LLVMInvalidType;
     }
     | VS_TOKEN IMMX
     {
         $$.kind = OP_IMM;
         $$.imm.val = $2;
+        $$.imm.op_type = LLVMInvalidType;
     }
 ;
 
@@ -369,6 +372,7 @@ env:
     {
         $$.kind = OP_ENV;
         $$.env.offset = 0;
+        $$.env.op_type = LLVMInvalidType;
     }
 ;
 

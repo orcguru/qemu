@@ -29,7 +29,6 @@
 
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
-#define QEMUAOT_CC                  124
 /*
  * Magic numbers collected by sizeof CPUState/CPUArchState in QEMU
  */
@@ -50,6 +49,7 @@ LLVMAttributeRef g_attr_target_features = NULL;
 LLVMAttributeRef g_attr_noinline = NULL;
 LLVMAttributeRef g_attr_alwaysinline = NULL;
 LLVMAttributeRef g_attr_nounwind = NULL;
+TcgContext *g_ctx = NULL;
 TBAA g_tbaa;
 
 static inline void tbaa_tag(LLVMValueRef inst, const TBAA *t, TagType tag_ty) {
@@ -91,7 +91,7 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
     return ty;
 }
 
-static LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name) {
+LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name) {
     char var_name[32] = {0};
     assert(as->tcg_ty[idx] != LLVMInvalidType);
     assert((as->tcg_ty[idx] <= LLVMInt64 && ty <= as->tcg_ty[idx]) || (as->tcg_ty[idx] <= LLVMVector1xi64 && ty <= LLVMVector1xi64) || as->tcg_ty[idx] <= LLVMVector2xi64);
@@ -191,7 +191,7 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
             // Store the content of vector into CPUArchState, and then do the load
             Operand op_vec = *op;
             op_vec.vec.offset = 0;
-            op_vec.vec.op_type = op_vec.vec.stack_type;
+            op_vec.vec.op_type = stack->vector.tcg_ty[op_vec.vec.idx];
             val = get_input_val_for_operand(&op_vec, stack, prefix);
             // Write-back stack alloca
             int env_offset = get_vec_offset(op->vec.idx);
@@ -204,7 +204,6 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
             op_env_load.kind = OP_ENV;
             op_env_load.env.offset = get_vec_offset(op->vec.idx) + op->vec.offset;
             op_env_load.env.op_type = op->vec.op_type;
-            op_env_load.env.stack_type = LLVMInvalidType;
             return get_input_val_for_operand(&op_env_load, stack, prefix);
         }
     } else if (op->kind == OP_SLOT) {
@@ -250,7 +249,6 @@ static void add_stack_alloca_force_update(AllocaWithState *as, int idx, LLVMType
     op_env_load.kind = OP_ENV;
     op_env_load.env.offset = env_offset;
     op_env_load.env.op_type = as->tcg_ty[idx];
-    op_env_load.env.stack_type = LLVMInvalidType;
     do_store(op, get_input_val_for_operand(&op_env_load, stack, prefix), stack, prefix);
 }
 
@@ -329,7 +327,6 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
                         xs.slot.type = SUB_SLOT_XREG;
                         xs.slot.idx = x;
                         xs.slot.op_type = qemuaot_default_param_type[x];
-                        xs.slot.stack_type = LLVMInvalidType;
                         add_stack_alloca_force_writeback(&stack->xreg, x, qemuaot_default_param_type[x], x, qemuaot_default_stack_alloca_name[x], env_regs_offset[x], &xs, stack, prefix);
                     }
                 }
@@ -344,7 +341,6 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
                         vs.vec.idx = i;
                         vs.vec.offset = 0;
                         vs.vec.op_type = qemuaot_default_param_type[XREG_MAX + i];
-                        vs.vec.stack_type = LLVMInvalidType;
                         add_stack_alloca_force_writeback(&stack->vector, i, qemuaot_default_param_type[XREG_MAX + i], (XREG_MAX + i), qemuaot_default_stack_alloca_name[XREG_MAX + i], get_vec_offset(i), &vs, stack, prefix);
                     }
                 }
@@ -370,7 +366,6 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
                         xs.slot.type = SUB_SLOT_XREG;
                         xs.slot.idx = x;
                         xs.slot.op_type = qemuaot_default_param_type[x];
-                        xs.slot.stack_type = LLVMInvalidType;
                         add_stack_alloca_force_update(&stack->xreg, x, qemuaot_default_param_type[x], x, qemuaot_default_stack_alloca_name[x], env_regs_offset[x], &xs, stack, prefix);
                     }
                 }
@@ -385,7 +380,6 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
                         vs.vec.idx = i;
                         vs.vec.offset = 0;
                         vs.vec.op_type = qemuaot_default_param_type[XREG_MAX + i];
-                        vs.vec.stack_type = LLVMInvalidType;
                         add_stack_alloca_force_update(&stack->vector, i, qemuaot_default_param_type[XREG_MAX + i], (XREG_MAX + i), qemuaot_default_stack_alloca_name[XREG_MAX + i], get_vec_offset(i), &vs, stack, prefix);
                     }
                 }
@@ -455,7 +449,7 @@ LLVMValueRef get_env(LLVMValueRef F) {
     return LLVMBuildGEP2(g_builder, LLVMInt8Type(), LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT_MAX)), &env_off, 1, "env");
 }
 
-static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
+static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F, FuncInstrList *f) {
     StackAlloca *stack = (StackAlloca *)calloc(1, sizeof(StackAlloca));
     stack->xreg.tcg_ty = (LLVMType *)calloc(XREG_MAX, sizeof(LLVMType));
     stack->xreg.llvm_ty = (LLVMTypeRef *)calloc(XREG_MAX, sizeof(LLVMTypeRef));
@@ -505,7 +499,37 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F) {
             LLVMSetAlignment(stack->tmp.alloca[i], stack->tmp.align[i]);
         } else {
             assert(stack->tmp.tcg_ty[i] == LLVMFuncPtr);
+            const UnifiedInstr *u = NULL;
+            for (u = f->head; u; u = u->next) {
+                if (u->opc == func_addr && u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_TMP && u->operands[0].slot.idx == i) {
+                    break;
+                }
+            }
+            assert(u);
+            if (u->operands[1].kind == OP_IMM) {
+                assert(u->operands[2].kind == OP_IMM);
+                int sub_func_idx = (int)u->operands[2].imm.val;
+                LLVMTypeRef arg_types[XREG_MAX + 2 * XMM_COUNT_MAX + 1/*CPU*/ + MAX_ADDED_ARGS] = {NULL};
+                int arg_cnt = 0;
+                for (int j = 0; j < (XREG_MAX + 2 * XMM_COUNT_MAX); ++j) {
+                    arg_types[arg_cnt++] = get_llvm_type(qemuaot_default_param_type[j]);
+                }
+                arg_types[arg_cnt++] = LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0);
+                if (u->operands[1].imm.val == ctx->hex_offset) {
+                    FuncInstrList *sub_f = &(ctx->llvm_func_set.lists[sub_func_idx]);
+                    for (int j = 0; j < sub_f->added_param_count; ++j) {
+                        arg_types[arg_cnt++] = get_llvm_type(sub_f->added_param_type[j]);
+                    }
+                }
+                LLVMTypeRef f_type = LLVMFunctionType(LLVMVoidType(), arg_types, arg_cnt, 0);
+                stack->tmp.llvm_ty[i] = f_type;
+                stack->tmp.alloca[i] = LLVMBuildAlloca(g_builder,
+                                      LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0), tmp_alloca_name);
+                stack->tmp.align[i] = 8;
+                LLVMSetAlignment(stack->tmp.alloca[i], stack->tmp.align[i]);
+            } else {
 
+            }
         }
     }
     if (ctx->carry_on) {
@@ -553,10 +577,30 @@ void translate_to_llvm_func(TcgContext *ctx, const char *name, FuncInstrList *f,
     // Create the entry block, then define/initialize stack alloca
     LLVMBasicBlockRef entry = LLVMAppendBasicBlock(F, "entry");
     LLVMPositionBuilderAtEnd(g_builder, entry);
-    StackAlloca *stack = setup_stack(ctx, F);
+    StackAlloca *stack = setup_stack(ctx, F, f);
     // One-to-one mapping from TCG-ops to LLVM-IR
+    // FIXME: setup g_ctx for get_func_name
+    g_ctx = ctx;
     translate_batch(g_module, g_builder, F, stack, f);
+    g_ctx = NULL;
     release_stack(stack);
+}
+
+char *get_func_name(unsigned long hex_offset, int sub_idx, char *buf, int buf_size) {
+    assert(g_ctx != NULL);
+    assert(sub_idx == 0 || (g_ctx->hex_offset == hex_offset && sub_idx < g_ctx->llvm_func_set.num_lists));
+    char *fname = NULL;
+    if (sub_idx && g_ctx->llvm_func_set.lists[sub_idx].trampoline_name[0]) {
+        fname = &g_ctx->llvm_func_set.lists[sub_idx].trampoline_name[0];
+    } else {
+        if (sub_idx == 0) {
+            snprintf(buf, buf_size, "Fx%lx", hex_offset);
+        } else {
+            snprintf(buf, buf_size, "Fx%lx_%d", hex_offset, sub_idx);
+        }
+        fname = buf;
+    }
+    return fname;
 }
 
 void handle_func(TcgContext *ctx, int is_external) {

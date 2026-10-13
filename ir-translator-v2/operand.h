@@ -22,20 +22,17 @@ typedef struct __attribute__((packed)) {
     SlotType type;
     uint16_t idx;
     LLVMType op_type;
-    LLVMType stack_type;
 } SlotInfo;
 
 typedef struct __attribute__((packed)) {
     uint8_t idx;
     uint8_t offset;
     LLVMType op_type;
-    LLVMType stack_type;
 } VecInfo;
 
 typedef struct __attribute__((packed)) {
     uint64_t offset;
     LLVMType op_type;
-    LLVMType stack_type;
 } EnvInfo;
 
 typedef struct __attribute__((packed)) {

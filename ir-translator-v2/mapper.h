@@ -44,6 +44,8 @@ void start_llvm_bb(LLVMBasicBlockRef bb, StackAlloca *stack);
 LLVMValueRef get_env();
 LLVMValueRef shrink_llvm_value(LLVMValueRef val, LLVMType from, LLVMType to);
 LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, FuncInstrList *f);
+LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name);
+char *get_func_name(unsigned long hex_offset, int sub_idx, char *buf, int buf_size);
 
 #define GET_ALIGNMENT_FROM_TYPE(type)       (type <= LLVMInt64 ? 8 : 16)
 

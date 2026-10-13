@@ -35,7 +35,6 @@ void expand_slot_alias(const TcgContext *ctx, UnifiedInstr *u);
 void update_slot_types(TcgContext *ctx, UnifiedInstr *u);
 void register_stack_alloca(TcgContext *ctx, const UnifiedInstr *u);
 void register_vec_spare_stack_alloca(TcgContext *ctx, const UnifiedInstr *u);
-void type_map_apply(const TcgContext *ctx);
 void instr_list_insert_before(UnifiedInstr **head_p, UnifiedInstr **tail_p, UnifiedInstr *anchor, UnifiedInstr *u);
 void instr_list_insert_after(UnifiedInstr **head_p, UnifiedInstr **tail_p, UnifiedInstr *anchor, UnifiedInstr *u);
 void instr_list_remove_and_free(UnifiedInstr **head_p, UnifiedInstr **tail_p, UnifiedInstr *u);
