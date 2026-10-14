@@ -81,7 +81,7 @@ my %DefaultVectorCType = (
   "" => "v2ulong",
   "_YMM" => "v4ulong",
 );
-my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip", "cpu_param");
+my @qemuaot_gp_params = ("rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "qemuaot_src1", "qemuaot_dst", "qemuaot_op", "rip");
 my %qemuaot_gp_params_map = (
   "rax" => "unsigned long",
   "rcx" => "unsigned long",
@@ -1380,7 +1380,7 @@ EOF
       print OUT "$qemuaot_gp_params_map{$p} $p ";
     }
   }
-  print OUT "$qemuaot_vec_declare";
+  print OUT "$qemuaot_vec_declare, ".$qemuaot_gp_params_map{"cpu_param"}." cpu_param";
   if ($funcs{$f}->{'FUNC_TYPE'} ne "void") {
     print OUT ", $funcs{$f}->{'FUNC_TYPE'} ret_val";
   }
@@ -1395,7 +1395,7 @@ EOF
         print OUT "$qemuaot_gp_params_map{$p} $p ";
       }
     }
-    print OUT "$qemuaot_vec_declare";
+    print OUT "$qemuaot_vec_declare, ".$qemuaot_gp_params_map{"cpu_param"}." cpu_param";
     my $func_ptr = $funcs{$f};
     foreach my $si (@{$func_ptr->{'SCALAR_ARGS'}}) {
       print OUT ", unsigned long $si->{'VAR_NAME'}";
@@ -2366,7 +2366,7 @@ sub get_statements
               $body = $body."$p, ";
             }
             $body =~ s/,\s+$/ /;
-            $body = $body.$qemuaot_vec_invoke.");\n";
+            $body = $body.$qemuaot_vec_invoke.", cpu_param);\n";
             if ($epilog ne "") {
               $body = $body."}\n";
             }
@@ -2387,7 +2387,7 @@ sub get_statements
               $body = $body."$p, ";
             }
             $body =~ s/,\s+$/ /;
-            $body = $body.$qemuaot_vec_invoke.", $expr);\n";
+            $body = $body.$qemuaot_vec_invoke.", cpu_param, $expr);\n";
             if ($epilog ne "") {
               $body = $body."}\n";
             }
@@ -2413,7 +2413,7 @@ sub get_statements
                 $body = $body."$p, ";
               }
               $body =~ s/,\s+$/ /;
-              $body = $body.$qemuaot_vec_invoke.");\n";
+              $body = $body.$qemuaot_vec_invoke.", cpu_param);\n";
               if ($epilog ne "") {
                 $body = $body."}\n";
               }
@@ -2443,7 +2443,7 @@ sub get_statements
               # Hack to add tail cpu_param
               $expr =~ s/\)/, cpu_param\)/g;
               $expr =~ s/\(,/\(/g;
-              $body = $body.$qemuaot_vec_invoke.", $expr);\n";
+              $body = $body.$qemuaot_vec_invoke.", cpu_param, $expr);\n";
               if ($epilog ne "") {
                 $body = $body."}\n";
               }
@@ -2554,7 +2554,7 @@ END
       $normal_logic = $normal_logic."$p, ";
     }
     $normal_logic =~ s/,\s+$/ /;
-    $normal_logic = $normal_logic.$qemuaot_vec_invoke.");\n";
+    $normal_logic = $normal_logic.$qemuaot_vec_invoke.", cpu_param);\n";
     if ($epilog ne "") {
       $normal_logic = $normal_logic."}\n";
     }
@@ -2579,7 +2579,7 @@ sub get_exception_path
     $body = $body."$p, ";
   }
   $body =~ s/,\s+$/ /;
-  $body = $body.$qemuaot_vec_invoke;
+  $body = $body.$qemuaot_vec_invoke.", cpu_param";
   foreach my $si (@{$func_ptr->{'SCALAR_ARGS'}}) {
     $body = $body.", backup_$si->{'VAR_NAME'}";
   }
@@ -2705,7 +2705,7 @@ sub collect_func_args
       $args = $args.$qemuaot_gp_params_map{$g}." ".$g.", ";
     }
     $args =~ s/,\s+$/ /;
-    $args = $args.$qemuaot_vec_declare;
+    $args = $args.$qemuaot_vec_declare.", ".$qemuaot_gp_params_map{"cpu_param"}." cpu_param";
   } else {
     my @sorted_keys = sort {$a cmp $b} keys %{$func_ptr->{'ENVVAR_AND_VECTORS'}};
     foreach my $sk (@sorted_keys) {
