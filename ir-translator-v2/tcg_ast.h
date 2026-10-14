@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <llvm-c/Types.h>
 
-#define XMM_COUNT_MAX               15
 #define XMM_COUNT                   15
 #define XMM_TMP_IDX                 16
 #define MAX_INLINE_VEC_ARG_CNT      4

@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdbool.h>
+#include <llvm-c/Core.h>
 #include "tcg_ast.h"
 
 const char *opcode_type_str[] = {
@@ -589,6 +590,7 @@ const int helper_require_exception_path[HELPER_MAX] = {
     [helper_idivl_EAX] = 1,
     [helper_idivw_AX] = 1,
     [helper_divsd] = 1,
+    [helper_jmp_ind] = 1,
 };
 
 const bool helper_runtime_does_not_return[HELPER_MAX] = {
@@ -646,4 +648,17 @@ const int llvm_vector_elem_bit_counts[LLVM_TYPE_MAX * 2] = {
     [LLVMVector4xi32 * 2 + 1] = 32,
     [LLVMVector2xi64 * 2] = 2,
     [LLVMVector2xi64 * 2 + 1] = 64,
+};
+
+const LLVMIntPredicate llvm_predicate[RELOP_MAX] = {
+    [eq] = LLVMIntEQ,
+    [ge] = LLVMIntSGE,
+    [geu] = LLVMIntUGE,
+    [gt] = LLVMIntSGT,
+    [gtu] = LLVMIntUGT,
+    [le] = LLVMIntSLE,
+    [leu] = LLVMIntULE,
+    [lt] = LLVMIntSLT,
+    [ltu] = LLVMIntULT,
+    [ne] = LLVMIntNE,
 };

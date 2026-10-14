@@ -349,6 +349,7 @@ const LLVMType helper_template_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_crc32] = {LLVMInt32, LLVMInt64, LLVMInt32},
     [helper_extrq_i] = {LLVMInt32, LLVMInt32},
     [helper_insertq_i] = {LLVMInt32, LLVMInt32},
+    [helper_jmp_ind] = {LLVMInt64},
 };
 
 const char *helper_template_arg_name[HELPER_MAX][MAX_ADDED_ARGS] = {
@@ -463,7 +464,7 @@ const char *helper_runtime_arg_name[MAX_ADDED_ARGS] = {
     "arg0", "arg1", "arg2", "arg3", "arg4", "arg5"
 };
 
-const char *qemuaot_default_param_name[XREG_MAX + 2 * XMM_COUNT_MAX] = {
+const char *qemuaot_default_param_name[XREG_MAX + 2 * XMM_COUNT] = {
     "rax",
     "rcx",
     "rdx",
@@ -501,7 +502,7 @@ const char *qemuaot_default_param_name[XREG_MAX + 2 * XMM_COUNT_MAX] = {
     "xmm14", "ymm14_h"
 };
 
-const char *qemuaot_default_stack_alloca_name[XREG_MAX + 2 * XMM_COUNT_MAX] = {
+const char *qemuaot_default_stack_alloca_name[XREG_MAX + 2 * XMM_COUNT] = {
     "rax.stack",
     "rcx.stack",
     "rdx.stack",
@@ -539,7 +540,7 @@ const char *qemuaot_default_stack_alloca_name[XREG_MAX + 2 * XMM_COUNT_MAX] = {
     "v28.stack", "v29.stack",
 };
 
-const LLVMType qemuaot_default_param_type[XREG_MAX + 2 * XMM_COUNT_MAX] = {
+const LLVMType qemuaot_default_param_type[XREG_MAX + 2 * XMM_COUNT] = {
     [rax] = LLVMInt64,
     [rcx] = LLVMInt64,
     [rdx] = LLVMInt64,

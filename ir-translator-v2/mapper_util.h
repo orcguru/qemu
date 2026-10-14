@@ -1,6 +1,7 @@
 #ifndef __MAPPER_UTIL_H
 #define __MAPPER_UTIL_H
 
+#include <llvm-c/Core.h>
 #include "tcg_ast.h"
 
 extern const char *opcode_type_str[];
@@ -22,6 +23,7 @@ extern const uint64_t envvar_offsets[ENVVAR_MAX];
 extern const int llvm_vector_elem_bit_counts[LLVM_TYPE_MAX * 2];
 extern const int helper_require_exception_path[HELPER_MAX];
 extern const bool helper_runtime_does_not_return[HELPER_MAX];
+extern const LLVMIntPredicate llvm_predicate[RELOP_MAX];
 
 static inline const Operand *get_operand(const UnifiedInstr *u, int idx) {
     assert(idx >= 0 && idx < u->operand_count);

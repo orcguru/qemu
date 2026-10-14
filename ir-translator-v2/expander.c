@@ -1317,10 +1317,10 @@ int create_trampoline_for_runtime(TcgContext *ctx,
         for (int i = 0; i < TCG_CALL_PREFIX_COUNT; ++i) {
             nc->operands[i] = u->operands[i];
         }
-        nc->operands[TCG_CALL_PREFIX_COUNT].kind = OP_ENV;
-        nc->operands[TCG_CALL_PREFIX_COUNT].env.offset = 0;
+        nc->operands[TCG_CALL_PREFIX_COUNT].kind = OP_ARG;
+        nc->operands[TCG_CALL_PREFIX_COUNT].argidx = 0;
         nc->operands[TCG_CALL_PREFIX_COUNT + 1].kind = OP_ARG;
-        nc->operands[TCG_CALL_PREFIX_COUNT + 1].argidx = 0;
+        nc->operands[TCG_CALL_PREFIX_COUNT + 1].argidx = 1;
         nc->operands[0].symbol = helper_jit;
         argc = 2;
     } else {
