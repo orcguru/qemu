@@ -360,7 +360,6 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
                 sbuf_putc(b, ',');
             }
         }
-        sbuf_putc(b, '\n');
         return;
     } else if (u->opc == tail_call_qemuaot || u->opc == call_qemuaot) {
         sbuf_putc(b, ' ');
@@ -378,7 +377,6 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
                 sbuf_putc(b, ',');
             }
         }
-        sbuf_putc(b, '\n');
         return;
     } else if (u->opc == tail_call_default || u->opc == call_default) {
         sbuf_putc(b, ' ');
@@ -388,7 +386,6 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
             sbuf_putc(b, ',');
             print_operand(&u->operands[i], (u->operands[2].imm.val && i == TCG_CALL_PREFIX_COUNT) ? 1 : 0, b);
         }
-        sbuf_putc(b, '\n');
         return;
     } else if (u->vs != 0) {
         sbuf_printf(b, " v%d,e%d,", u->vs, u->es);
