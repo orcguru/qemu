@@ -134,8 +134,13 @@ func:
         debug_print_instr(ctx, "after call_runtime");
         /* End of function – apply final slot types */
         sanity_check_op_type_solid(ctx);
-        handle_func(ctx, $1);
+        int rc = handle_func(ctx, $1);
         tcg_context_reset(ctx);
+        if (rc != 0) {
+            ctx->err = rc;
+            ctx->err_scope = $1;
+            YYABORT;
+        }
     }
 ;
 

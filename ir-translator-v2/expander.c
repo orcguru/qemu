@@ -899,6 +899,7 @@ void expand_call_template_wo_exception(TcgContext *ctx) {
                 nf.kind = OP_SLOT;
                 nf.slot.type = SUB_SLOT_TMP;
                 nf.slot.idx = tmp_n;
+                nf.slot.op_type = LLVMInt64;
                 UnifiedInstr *uu = clone_instr_optional_operands(u, 1, nf);
                 uu->opc = tail_call_qemuaot;
                 uu->operands[0] = op_entry;
@@ -1201,10 +1202,12 @@ void expand_call_template_wi_exception(TcgContext *ctx) {
             tf.kind = OP_SLOT;
             tf.slot.type = SUB_SLOT_TMP;
             tf.slot.idx = tmp_t;
+            tf.slot.op_type = LLVMInt64;
             Operand nf;
             nf.kind = OP_SLOT;
             nf.slot.type = SUB_SLOT_TMP;
             nf.slot.idx = tmp_n;
+            nf.slot.op_type = LLVMInt64;
             UnifiedInstr *uu = clone_instr_optional_operands(u, 2, tf, nf);
             uu->opc = tail_call_qemuaot;
             uu->operands[0] = op_entry;

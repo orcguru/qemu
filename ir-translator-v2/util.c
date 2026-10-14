@@ -433,8 +433,6 @@ void update_slot_types(TcgContext *ctx, UnifiedInstr *u) {
         }
         return;
     } else if (u->opc == tail_call_qemuaot) {
-        // tail_call_qemuaot clone operands from the original call, only the
-        // target operand need set type
         for (int i = 0; i < u->operand_count; ++i) {
             if (u->operands[i].kind == OP_SLOT && u->operands[i].slot.op_type == LLVMInvalidType) {
                 set_operand_type(ctx, &u->operands[i], LLVMInt64);

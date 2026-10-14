@@ -219,18 +219,23 @@ void translate_st2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
     build_store_with_alignment(builder, val, ptr, alignment_from_attr(u->operands[3].attr_info, u->operands[2].slot.op_type), GUEST_TAG);
 }
 
-void translate_func_addr(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+int translate_func_addr(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     char fname[32] = {0};
+    LLVMValueRef TF = NULL;
     if (u->operands[1].kind == OP_IMM) {
         assert(u->operands[2].kind == OP_IMM);
-        LLVMValueRef TF = get_or_add_func_with_qemuaot_cc(get_func_name(u->operands[1].imm.val, (int)u->operands[2].imm.val, &fname[0], sizeof(fname)), NULL);
-        assert(u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_TMP);
-        int tmp_slot = u->operands[0].slot.idx;
-        build_store_with_alignment(builder, TF, stack->tmp.alloca[tmp_slot], stack->tmp.align[tmp_slot], SPILL_TAG);
+        TF = get_or_add_func_with_qemuaot_cc(get_func_name(u->operands[1].imm.val, (int)u->operands[2].imm.val, &fname[0], sizeof(fname)), NULL);
     } else {
         assert(u->operands[1].kind == OP_SYMBOL);
-        LLVMValueRef HLP = get_or_add_helper_with_qemuaot_cc(u->operands[1].symbol, u);
+        TF = get_or_add_helper_with_qemuaot_cc(u->operands[1].symbol, u);
+        if (!TF) {
+            return 1;
+        }
     }
+    assert(u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_TMP);
+    int tmp_slot = u->operands[0].slot.idx;
+    build_store_with_alignment(builder, TF, stack->tmp.alloca[tmp_slot], stack->tmp.align[tmp_slot], SPILL_TAG);
+    return 0;
 }
 
 void translate_tail_call_qemuaot(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
@@ -253,7 +258,9 @@ void translate_tail_call_qemuaot(LLVMBuilderRef builder, LLVMValueRef F, StackAl
     }
     call_args[arg_cnt++] = LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT_MAX));
     for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
-        call_args[arg_cnt++] = get_input_val_for_operand(&u->operands[i], stack, prefix);
+        if (u->operands[i].kind != OP_VEC) {
+            call_args[arg_cnt++] = get_input_val_for_operand(&u->operands[i], stack, prefix);
+        }
     }
     assert(u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_TMP);
     int func_slot = u->operands[0].slot.idx;
@@ -411,7 +418,13 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
             entry(builder, F, stack, u, &prefix[0]);\
             break
 
-void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f) {
+#define CASE_FUNC_WITH_RC(opc, entry)               \
+        case opc:                                   \
+            rc = entry(builder, F, stack, u, &prefix[0]);\
+            break
+
+int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f) {
+    int rc = 0;
     int idx = 0;
     char prefix[32] = {0};
 
@@ -424,7 +437,7 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
         fprintf(stderr, "warning: debug info setup failed\n");
 #endif
 
-    for (const UnifiedInstr *u = f->head; u; u = u->next, ++idx) {
+    for (const UnifiedInstr *u = f->head; u && !rc; u = u->next, ++idx) {
         snprintf(&prefix[0], sizeof(prefix), "T%d", idx);
         SBuf b;
         char dump_instr_buf[128] = {0};
@@ -763,7 +776,7 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
 #endif
             CASE_FUNC(set_label, translate_set_label);
             CASE_FUNC(br, translate_br);
-            CASE_FUNC(func_addr, translate_func_addr);
+            CASE_FUNC_WITH_RC(func_addr, translate_func_addr);
             CASE_FUNC(tail_call_qemuaot, translate_tail_call_qemuaot);
 #if 0
             case brcond_i32:
@@ -795,4 +808,5 @@ void translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef 
     }
 #endif
     tcg_tag_dispose(&tag);
+    return rc;
 }

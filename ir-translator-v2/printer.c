@@ -177,7 +177,7 @@ void debug_print_instr(TcgContext *ctx, const char *msg) {
     }
 }
 
-void handle_func(TcgContext *ctx, int is_external) {
+int handle_func(TcgContext *ctx, int is_external) {
     printf("FINAL:0x%lx %s:\n", ctx->hex_offset, is_external ? "EXT":"INT");
     for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
         if (ctx->llvm_func_set.lists[i].trampoline_name[0]) {
@@ -190,6 +190,7 @@ void handle_func(TcgContext *ctx, int is_external) {
         }
         printf("\n");
     }
+    return 0;
 }
 
 void print_usage(const char *progname) {

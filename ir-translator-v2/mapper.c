@@ -89,6 +89,8 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
         case LLVMVector2xi64:
             ty = LLVMScalableVectorType(LLVMInt64Type(), 1); break;
 #endif
+        case LLVMInvalidType:
+            ty = LLVMVoidType(); break;
         default: assert(0);
     }
     return ty;
@@ -97,7 +99,7 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
 LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name) {
     char var_name[32] = {0};
     assert(as->tcg_ty[idx] != LLVMInvalidType);
-    assert((as->tcg_ty[idx] <= LLVMInt64 && ty <= as->tcg_ty[idx]) || (as->tcg_ty[idx] <= LLVMVector1xi64 && ty <= LLVMVector1xi64) || as->tcg_ty[idx] <= LLVMVector2xi64);
+    assert((as->tcg_ty[idx] <= LLVMInt64 && ty <= as->tcg_ty[idx]) || (as->tcg_ty[idx] <= LLVMVector1xi64 && ty <= LLVMVector1xi64) || as->tcg_ty[idx] <= LLVMVector2xi64 || as->tcg_ty[idx] == LLVMFuncPtr);
     return build_load_with_alignment(g_builder, get_llvm_type(ty), as->alloca[idx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, reg_name), as->align[idx], SPILL_TAG);
 }
 
@@ -442,56 +444,53 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
         assert(u->operands[i].kind == OP_VEC);
         sbuf_printf(&bh, "_V%d", u->operands[i].vec.idx);
     }
-    SBuf bm;
-    char dump_macro_buf[128] = {0};
-    sbuf_init(&bm, &dump_macro_buf[0], sizeof(dump_macro_buf));
-    for (int i = 2; i < u->operand_count; ++i) {
-        assert(u->operands[i].kind == OP_VEC);
-        sbuf_printf(&bm, " -DVEC%d=%s", (i - 2), qemuaot_default_param_name[XREG_MAX + u->operands[i].vec.idx]);
-    }
+    LLVMValueRef F = LLVMGetNamedFunction(g_module, &dump_helper_buf[0]);
+    if (!F) {
+        SBuf bm;
+        char dump_macro_buf[128] = {0};
+        sbuf_init(&bm, &dump_macro_buf[0], sizeof(dump_macro_buf));
+        for (int i = 2; i < u->operand_count; ++i) {
+            assert(u->operands[i].kind == OP_VEC);
+            sbuf_printf(&bm, " -DVEC%d=%s", (i - 2), qemuaot_default_param_name[XREG_MAX + u->operands[i].vec.idx]);
+        }
 
 #if defined(__aarch64__)
-    const char *clang_cmd_head = "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O2 -emit-llvm";
+        const char *clang_cmd_head = "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O2 -emit-llvm";
 #elif (defined(__riscv) && __riscv_xlen == 64)
-    const char *clang_cmd_head = "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O2 -emit-llvm";
+        const char *clang_cmd_head = "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O2 -emit-llvm";
 #endif
-    int cmd_sz = strlen(clang_cmd_head) + strlen(XMM_PARAM_DECLARE_COMMON) + strlen(XMM_PARAM_LIST) + 8 * 12 /* -DVEC/XY */ + strlen(g_output_path) + strlen(g_template_path) + strlen(dump_helper_buf) * 2 + strlen(dump_macro_buf) + 256 /*misc*/;
-    char *clang_cmd = (char *)malloc(cmd_sz);
-    snprintf(clang_cmd, cmd_sz, "%s -DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\" -DHELPER_NAME=%s %s %s/helper_templates/%s.c -o %s/%s.bc", clang_cmd_head, XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST, &dump_helper_buf[0], &dump_macro_buf[0], g_template_path, helper_str[h], g_output_path, &dump_helper_buf[0]);
-    printf("cmd: %s\n", clang_cmd);
-    return NULL;
-/*
-    FILE *check_fp = fopen(bc_name, "r");
-    if (!check_fp) {
-        char cmd[2048+PATH_MAX] = {0};
-        assert(strlen(cmd) < sizeof(cmd));
-        int rc = system(cmd);
-        if (rc) {
-            printf("Build command %s failed\n", cmd);
+        int cmd_sz = strlen(clang_cmd_head) + strlen(XMM_PARAM_DECLARE_COMMON) + strlen(XMM_PARAM_LIST) + 8 * 12 /* -DVEC/XY */ + strlen(g_output_path) + strlen(g_template_path) + strlen(dump_helper_buf) * 2 + strlen(dump_macro_buf) + 256 /*misc*/;
+        char *clang_cmd = (char *)malloc(cmd_sz);
+        snprintf(clang_cmd, cmd_sz, "%s -DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\" -DHELPER_NAME=%s %s %s/helper_templates/%s.c -o %s/%s.bc", clang_cmd_head, XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST, &dump_helper_buf[0], &dump_macro_buf[0], g_template_path, helper_str[h], g_output_path, &dump_helper_buf[0]);
+        if (system(clang_cmd)) {
+            fprintf(stderr, "Command failed\n:%s\n", clang_cmd);
+            free(clang_cmd);
+            return NULL;
         }
-        check_fp = fopen(bc_name, "r");
-    }
-    if (check_fp) {
-        fclose(check_fp);
+        free(clang_cmd);
+        clang_cmd = NULL;
+
         char* error_msg = NULL;
         LLVMMemoryBufferRef memory_buffer = NULL;
         LLVMModuleRef helper_module = NULL;
-        if (LLVMCreateMemoryBufferWithContentsOfFile(bc_name, &memory_buffer, &error_msg)) {
+        char bc_path[256] = {0};
+        snprintf(&bc_path[0], sizeof(bc_path), "%s/%s.bc", g_output_path, &dump_helper_buf[0]);
+        if (LLVMCreateMemoryBufferWithContentsOfFile(&bc_path[0], &memory_buffer, &error_msg)) {
             fprintf(stderr, "Failed to create memory buffer: %s\n", error_msg);
             LLVMDisposeMessage(error_msg);
-            return 0;
+            return NULL;
         }
         if (LLVMParseBitcode2(memory_buffer, &helper_module)) {
             fprintf(stderr, "Failed to parse bitcode\n");
             LLVMDisposeMemoryBuffer(memory_buffer);
-            return 0;
+            return NULL;
         }
         LLVMLinkModules2(g_module, helper_module);
         LLVMDisposeMemoryBuffer(memory_buffer);
-        return 1;
+        F = LLVMGetNamedFunction(g_module, &dump_helper_buf[0]);
+        assert(F);
     }
-    return 0;
-    */
+    return F;
 }
 
 LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVMValueRef PointerVal, unsigned Bytes, TagType tag_ty) {
@@ -569,31 +568,47 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F, FuncInstrList *
                     break;
                 }
             }
-            assert(u);
+            if (!u) {
+                continue;
+            }
+            LLVMTypeRef arg_types[XREG_MAX + 2 * XMM_COUNT_MAX + 1/*CPU*/ + MAX_ADDED_ARGS] = {NULL};
+            int arg_cnt = 0;
+            for (int j = 0; j < (XREG_MAX + 2 * XMM_COUNT_MAX); ++j) {
+                arg_types[arg_cnt++] = get_llvm_type(qemuaot_default_param_type[j]);
+            }
+            arg_types[arg_cnt++] = LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0);
+            LLVMTypeRef f_type = NULL;
             if (u->operands[1].kind == OP_IMM) {
                 assert(u->operands[2].kind == OP_IMM);
                 int sub_func_idx = (int)u->operands[2].imm.val;
-                LLVMTypeRef arg_types[XREG_MAX + 2 * XMM_COUNT_MAX + 1/*CPU*/ + MAX_ADDED_ARGS] = {NULL};
-                int arg_cnt = 0;
-                for (int j = 0; j < (XREG_MAX + 2 * XMM_COUNT_MAX); ++j) {
-                    arg_types[arg_cnt++] = get_llvm_type(qemuaot_default_param_type[j]);
-                }
-                arg_types[arg_cnt++] = LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0);
                 if (u->operands[1].imm.val == ctx->hex_offset) {
                     FuncInstrList *sub_f = &(ctx->llvm_func_set.lists[sub_func_idx]);
                     for (int j = 0; j < sub_f->added_param_count; ++j) {
                         arg_types[arg_cnt++] = get_llvm_type(sub_f->added_param_type[j]);
                     }
                 }
-                LLVMTypeRef f_type = LLVMFunctionType(LLVMVoidType(), arg_types, arg_cnt, 0);
-                stack->tmp.llvm_ty[i] = f_type;
-                stack->tmp.alloca[i] = LLVMBuildAlloca(g_builder,
-                                      LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0), tmp_alloca_name);
-                stack->tmp.align[i] = 8;
-                LLVMSetAlignment(stack->tmp.alloca[i], stack->tmp.align[i]);
+                f_type = LLVMFunctionType(LLVMVoidType(), arg_types, arg_cnt, 0);
             } else {
-
+                assert(u->operands[1].kind == OP_SYMBOL);
+                HelperType h = u->operands[1].symbol;
+                for (int i = 0; i < MAX_ADDED_ARGS; ++i) {
+                    if (helper_template_arg_type[h][i] != LLVMInvalidType) {
+                        arg_types[arg_cnt++] = get_llvm_type(helper_template_arg_type[h][i]);
+                    }
+                }
+                if (!(h > NOSPLIT_BEGIN && h < NOSPLIT_END)) {
+                    arg_types[arg_cnt++] = get_llvm_type(LLVMInt64);
+                    if (helper_require_exception_path[h]) {
+                        arg_types[arg_cnt++] = get_llvm_type(LLVMInt64);
+                    }
+                }
+                f_type = LLVMFunctionType((h > NOSPLIT_BEGIN && h < NOSPLIT_END) ? get_llvm_type(helper_return_type[h]) : LLVMVoidType(), arg_types, arg_cnt, 0);
             }
+            stack->tmp.llvm_ty[i] = f_type;
+            stack->tmp.alloca[i] = LLVMBuildAlloca(g_builder,
+                                  LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0), tmp_alloca_name);
+            stack->tmp.align[i] = 8;
+            LLVMSetAlignment(stack->tmp.alloca[i], stack->tmp.align[i]);
         }
     }
     if (ctx->carry_on) {
@@ -628,7 +643,8 @@ static void release_stack(StackAlloca *stack) {
     free(stack);
 }
 
-void translate_to_llvm_func(TcgContext *ctx, const char *name, FuncInstrList *f, int is_external) {
+int translate_to_llvm_func(TcgContext *ctx, const char *name, FuncInstrList *f, int is_external) {
+    int rc = 0;
     LLVMValueRef F = NULL;
     F = get_or_add_func_with_qemuaot_cc(name, f);
     if (is_external == 0) {
@@ -645,9 +661,10 @@ void translate_to_llvm_func(TcgContext *ctx, const char *name, FuncInstrList *f,
     // One-to-one mapping from TCG-ops to LLVM-IR
     // FIXME: setup g_ctx for get_func_name
     g_ctx = ctx;
-    translate_batch(g_module, g_builder, F, stack, f);
+    rc = translate_batch(g_module, g_builder, F, stack, f);
     g_ctx = NULL;
     release_stack(stack);
+    return rc;
 }
 
 char *get_func_name(unsigned long hex_offset, int sub_idx, char *buf, int buf_size) {
@@ -667,8 +684,9 @@ char *get_func_name(unsigned long hex_offset, int sub_idx, char *buf, int buf_si
     return fname;
 }
 
-void handle_func(TcgContext *ctx, int is_external) {
-    for (int i = 0; i < ctx->llvm_func_set.num_lists; ++i) {
+int handle_func(TcgContext *ctx, int is_external) {
+    int rc = 0;
+    for (int i = 0; i < ctx->llvm_func_set.num_lists && !rc; ++i) {
         char *func_name = NULL;
         char fhex_name[32] = {0};
         if (ctx->llvm_func_set.lists[i].trampoline_name[0]) {
@@ -681,8 +699,9 @@ void handle_func(TcgContext *ctx, int is_external) {
             }
             func_name = &fhex_name[0];
         }
-        translate_to_llvm_func(ctx, func_name, &(ctx->llvm_func_set.lists[i]), is_external);
+        rc = translate_to_llvm_func(ctx, func_name, &(ctx->llvm_func_set.lists[i]), is_external);
     }
+    return rc;
 }
 
 void print_usage(const char *progname) {
@@ -692,23 +711,24 @@ void print_usage(const char *progname) {
     fprintf(stderr, "  -h    Print this help message\n");
 }
 
-void parse_tcg_instructions(const char *filename) {
+int parse_tcg_instructions(const char *filename) {
+    int rc = 0;
     FILE *source_file = fopen(filename, "r");
     if (!source_file) {
         perror("Error opening source file");
-        return;
+        return 1;
     }
     TcgContext ctx;
     tcg_context_init(&ctx);
     yyscan_t scanner;
     yylex_init(&scanner);
     yyset_in(source_file, scanner);
-    yyparse(scanner, &ctx);
+    rc = yyparse(scanner, &ctx);
     yylex_destroy(scanner);
     free(lineptr);
     fclose(source_file);
     tcg_context_destroy(&ctx);
-    return;
+    return rc;
 }
 
 static void make_tbaa(LLVMContextRef C) {
@@ -978,7 +998,10 @@ int main(int argc, char *argv[]) {
     }
 
     // Parse/Expand/Map TCG-ops into LLVM-IR
-    parse_tcg_instructions(input_file);
+    rc = parse_tcg_instructions(input_file);
+    if (rc != 0) {
+        goto exit;
+    }
 
     // Invoke LLVM pipeline to produce object file
     rc = fini_llvm(output_file);

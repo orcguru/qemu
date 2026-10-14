@@ -105,6 +105,12 @@ struct TcgContext {
      * Carry/borrow bit flag
      */
     bool carry_on, borrow_on;
+
+    /*
+     * Error handling for tcg2llvm
+     */
+    int err;          /* 0 = ok, otherwise abort translation */
+    uint64_t err_scope;
 };
 
 void tcg_context_init(TcgContext *ctx);
