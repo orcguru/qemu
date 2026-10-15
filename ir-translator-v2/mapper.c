@@ -258,10 +258,10 @@ static void add_stack_alloca_force_update(AllocaWithState *as, int idx, LLVMType
     op_env_load.kind = OP_ENV;
     op_env_load.env.offset = env_offset;
     op_env_load.env.op_type = as->tcg_ty[idx];
-    do_store(op, get_input_val_for_operand(&op_env_load, stack, prefix), stack, prefix);
+    do_store(op, get_input_val_for_operand(&op_env_load, stack, prefix), stack, prefix, true);
 }
 
-void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const char *prefix) {
+void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const char *prefix, bool skip_env_check) {
     char var_name[32] = {0};
     if ((op->kind == OP_SLOT && op->slot.type == SUB_SLOT_TMP) || op->kind == OP_VEC) {
         LLVMType val_ty = get_operand_type(op);
@@ -300,7 +300,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
                 op_env_offset.kind = OP_ENV;
                 op_env_offset.env.offset = get_vec_offset(op->vec.idx) + op->vec.offset;
                 op_env_offset.env.op_type = op->vec.op_type;
-                return do_store(&op_env_offset, val, stack, prefix);
+                return do_store(&op_env_offset, val, stack, prefix, false);
             }
         } else if (val_ty > LLVMInt64 && stack_ty > LLVMInt64 && val_ty != stack_ty) {
             assert((llvm_vector_elem_bit_counts[val_ty * 2] * llvm_vector_elem_bit_counts[val_ty * 2 + 1]) ==
@@ -321,7 +321,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
         LLVMType op_ty = op->kind == OP_SLOT ? op->slot.op_type : op->env.op_type;
 
         // Latest copy of xreg/vector need write back before store overwrite xreg/vector states
-        if (op->kind == OP_ENV) {
+        if (!skip_env_check && op->kind == OP_ENV) {
             int byte_cnt = (llvm_vector_elem_bit_counts[2 * op_ty] * llvm_vector_elem_bit_counts[2 * op_ty + 1]) / 8;
             int overlap_begin = op->env.offset;
             int overlap_end = overlap_begin + byte_cnt;
@@ -360,7 +360,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
         build_store_with_alignment(g_builder, val, ptr, GET_ALIGNMENT_FROM_OFFSET(op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset), CPU_TAG);
 
         // Check possibility of alias with xreg/vector
-        if (op->kind == OP_ENV) {
+        if (!skip_env_check && op->kind == OP_ENV) {
             int byte_cnt = (llvm_vector_elem_bit_counts[2 * op_ty] * llvm_vector_elem_bit_counts[2 * op_ty + 1]) / 8;
             int overlap_begin = op->env.offset;
             int overlap_end = overlap_begin + byte_cnt;

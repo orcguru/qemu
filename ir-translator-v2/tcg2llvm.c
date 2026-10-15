@@ -9,6 +9,7 @@
 #include <assert.h>
 #include "tcg_llvm_tag.h"
 #include "operand_static_types.h"
+#include "i386_cpu.h"
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 
@@ -17,12 +18,12 @@ void translate_common(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca
     LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
     LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
     LLVMValueRef out = llvm_api(builder, in1, in2, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "out"));
-    do_store(&u->operands[0], out, stack, prefix);
+    do_store(&u->operands[0], out, stack, prefix, false);
 }
 
 void translate_mov(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
-    do_store(&u->operands[0], in, stack, prefix);
+    do_store(&u->operands[0], in, stack, prefix, false);
 }
 
 void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
@@ -33,7 +34,7 @@ void translate_addci(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
     LLVMValueRef ca = build_load_with_alignment(builder, LLVMInt1Type(), stack->carry, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "carry"), 8, SPILL_TAG);
     LLVMValueRef ca_ext = LLVMBuildZExt(builder, ca, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&name_buf[0], sizeof(name_buf), LLVMGetValueName(ca), "zext"));
     LLVMValueRef out = LLVMBuildAdd(builder, sum, ca_ext, assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "out"));
-    do_store(&u->operands[0], out, stack, prefix);
+    do_store(&u->operands[0], out, stack, prefix, false);
 }
 
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
@@ -83,7 +84,7 @@ void translate_ld_zext(LLVMBuilderRef builder, StackAlloca *stack, const Unified
         in = get_input_val_for_operand(&op_vec_offset, stack, prefix);
     }
     LLVMValueRef out = LLVMBuildZExt(builder, in, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "out"));
-    do_store(&u->operands[0], out, stack, prefix);
+    do_store(&u->operands[0], out, stack, prefix, false);
 }
 
 void translate_ld_sext(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
@@ -99,7 +100,7 @@ void translate_ld_sext(LLVMBuilderRef builder, StackAlloca *stack, const Unified
         in = get_input_val_for_operand(&op_vec_offset, stack, prefix);
     }
     LLVMValueRef out = LLVMBuildSExt(builder, in, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&name_buf[0], sizeof(name_buf), prefix, "out"));
-    do_store(&u->operands[0], out, stack, prefix);
+    do_store(&u->operands[0], out, stack, prefix, false);
 }
 
 void translate_ld(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
@@ -113,7 +114,7 @@ void translate_ld(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr
         op_vec_offset.vec.offset = u->operands[2].imm.val;
         in = get_input_val_for_operand(&op_vec_offset, stack, prefix);
     }
-    do_store(&u->operands[0], in, stack, prefix);
+    do_store(&u->operands[0], in, stack, prefix, false);
 }
 
 void translate_ld_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
@@ -137,7 +138,7 @@ void translate_ld_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const Un
     if (u->operands[1].slot.op_type > get_operand_type(&u->operands[0])) {
         val = LLVMBuildTrunc(builder, val, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "trunc"));
     }
-    do_store(&u->operands[0], val, stack, prefix);
+    do_store(&u->operands[0], val, stack, prefix, false);
 }
 
 void translate_ld2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
@@ -152,9 +153,9 @@ void translate_ld2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
     LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(LLVMVector2xi64), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
     LLVMValueRef val = build_load_with_alignment(builder, get_llvm_type(LLVMVector2xi64), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld"), alignment_from_attr(u->operands[3].attr_info, LLVMVector2xi64), GUEST_TAG);
     LLVMValueRef elem0 = LLVMBuildExtractElement(builder, val, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ee"));
-    do_store(&u->operands[0], elem0, stack, prefix);
+    do_store(&u->operands[0], elem0, stack, prefix, false);
     LLVMValueRef elem1 = LLVMBuildExtractElement(builder, val, LLVMConstInt(get_llvm_type(LLVMInt64), 1, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ee"));
-    do_store(&u->operands[1], elem1, stack, prefix);
+    do_store(&u->operands[1], elem1, stack, prefix, false);
 }
 
 void translate_st(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
@@ -169,7 +170,13 @@ void translate_st(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr
     if (get_operand_type(&u->operands[0]) > get_operand_type(&u->operands[1])) {
         val = LLVMBuildTrunc(builder, val, get_llvm_type(get_operand_type(&u->operands[1])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "trunc"));
     }
-    do_store(&out, val, stack, prefix);
+    bool skip_env_check = false;
+    if (u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_XREG && u->operands[1].kind == OP_ENV && env_regs_offset[u->operands[0].slot.idx] == u->operands[1].env.offset) {
+        skip_env_check = true;
+    } else if (u->operands[0].kind == OP_VEC && u->operands[1].kind == OP_ENV && get_vec_offset(u->operands[0].vec.idx) == u->operands[1].env.offset) {
+        skip_env_check = true;
+    }
+    do_store(&out, val, stack, prefix, skip_env_check);
 }
 
 void translate_st_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
@@ -299,7 +306,6 @@ void translate_tail_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAl
         if (u->operands[i].kind == OP_ENV && u->operands[i].env.offset == 0) {
             call_args[arg_cnt++] = LLVMBuildPtrToInt(builder, stack->env, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "env"));
         } else if (u->operands[i].kind == OP_ARG) {
-            printf("count:%d\n", LLVMCountParams(F));
             if (u->operands[i].argidx == -1) {
                 assert(LLVMCountParams(F) > (XREG_MAX + 2 * XMM_COUNT + 1));
                 call_args[arg_cnt++] = LLVMGetParam(F, (LLVMCountParams(F) - 1));
