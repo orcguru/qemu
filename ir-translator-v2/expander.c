@@ -184,9 +184,10 @@ void expand_ret(TcgContext *ctx) {
 
     // - LOOKUP return address
     // set_label L0
-    // call jmp_ind,0x1,0,op0
+    // call jmp_ind,0x1,0,env,op0
     EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, set_label, 0, 0, LABEL_OP(0));
-    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, call, 0, 0, SYMBOL_OP(helper_jmp_ind), IMM_OP(0x1), IMM_OP(0), SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, call, 0, 0, SYMBOL_OP(helper_jmp_ind), IMM_OP(0x1), IMM_OP(0),
+                      ENV_OP(0), SLOT_OP_EXTRA(u->operands[0].slot.type, u->operands[0].slot.idx, u->operands[0].slot.op_type));
 
     instr_list_remove_and_free(&ctx->instr_head, &ctx->instr_tail, u);
 }
@@ -1307,29 +1308,13 @@ int create_trampoline_for_runtime(TcgContext *ctx,
     } else {
         nc->opc = tail_call_default;
     }
-    int argc = 0;
     if (u->operands[0].symbol == helper_jmp_ind) {
-        free(nc);
-        size_t sz = sizeof(UnifiedInstr) + (u->operand_count + 1) * sizeof(Operand);
-        nc = calloc(1, sz);
-        nc->opc = tail_call_default;
-        nc->operand_count = u->operand_count + 1;
-        for (int i = 0; i < TCG_CALL_PREFIX_COUNT; ++i) {
-            nc->operands[i] = u->operands[i];
-        }
-        nc->operands[TCG_CALL_PREFIX_COUNT].kind = OP_ARG;
-        nc->operands[TCG_CALL_PREFIX_COUNT].argidx = 0;
-        nc->operands[TCG_CALL_PREFIX_COUNT + 1].kind = OP_ARG;
-        nc->operands[TCG_CALL_PREFIX_COUNT + 1].argidx = 1;
         nc->operands[0].symbol = helper_jit;
-        argc = 2;
-    } else {
-        int arg_idx = 0;
-        for (int i = get_first_input_idx_on_call(u); i < nc->operand_count; ++i) {
-            nc->operands[i].kind = OP_ARG;
-            nc->operands[i].argidx = arg_idx++;
-            argc += 1;
-        }
+    }
+    int argc = 0;
+    for (int i = get_first_input_idx_on_call(u); i < nc->operand_count; ++i) {
+        nc->operands[i].kind = OP_ARG;
+        nc->operands[i].argidx = argc++;
     }
 
     // Emit call fixed native helper

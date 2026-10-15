@@ -17,4 +17,4 @@ XMM15:$0x720
 XMM_t0:$0xb60
 
 EXTERNAL:$0x55aa:
-call jmp_ind,$0x1,$0,rip
+call jmp_ind,$0x1,$0,env,rip

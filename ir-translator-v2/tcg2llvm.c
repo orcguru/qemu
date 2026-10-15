@@ -265,8 +265,9 @@ void translate_tail_call_qemuaot(LLVMBuilderRef builder, LLVMValueRef F, StackAl
     }
     call_args[arg_cnt++] = LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT));
     for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
-        assert(u->operands[i].kind != OP_ENV);
-        if (u->operands[i].kind == OP_ARG) {
+        if (u->operands[i].kind == OP_ENV && u->operands[i].env.offset == 0) {
+            call_args[arg_cnt++] = LLVMBuildPtrToInt(builder, stack->env, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "env"));
+        } else if (u->operands[i].kind == OP_ARG) {
             if (u->operands[i].argidx == -1) {
                 call_args[arg_cnt++] = LLVMGetParam(F, (LLVMCountParams(F) - 1));
             } else {

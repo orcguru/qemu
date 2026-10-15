@@ -439,6 +439,22 @@ LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, unsigned long hex
     return F;
 }
 
+static int setup_helper_template_arg_type(LLVMTypeRef *arg_types, int arg_cnt, HelperType h) {
+    for (int i = 0; i < MAX_ADDED_ARGS; ++i) {
+        if (helper_template_arg_type[h][i] != LLVMInvalidType) {
+            arg_types[arg_cnt++] = get_llvm_type(helper_template_arg_type[h][i]);
+        }
+    }
+    if (!(h > NOSPLIT_BEGIN && h < NOSPLIT_END)) {
+        // Type for the next call pointer
+        arg_types[arg_cnt++] = get_llvm_type(LLVMInt64);
+        if (helper_require_exception_path[h]) {
+            arg_types[arg_cnt++] = get_llvm_type(LLVMInt64);
+        }
+    }
+    return arg_cnt;
+}
+
 LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr *u) {
     SBuf bh;
     char dump_helper_buf[128] = {0};
@@ -452,17 +468,13 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
     if (!F) {
         if (h == helper_jmp_ind) {
             // helper_jmp_ind is defined in QEMU-runtime
-            // FIXME: additional arguments:
-            // unsigned long target_addr, unsigned long jmp_ind_callback, unsigned long trampoline_helper_jit
             LLVMTypeRef arg_types[XREG_MAX + 2 * XMM_COUNT + 1/*CPU*/ + MAX_ADDED_ARGS] = {NULL};
             int arg_cnt = 0;
             for (int i = 0; i < (XREG_MAX + 2 * XMM_COUNT); ++i) {
                 arg_types[arg_cnt++] = get_llvm_type(qemuaot_default_param_type[i]);
             }
             arg_types[arg_cnt++] = LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0);
-            for (int i = 0; i < 3; ++i) {
-                arg_types[arg_cnt++] = get_llvm_type(LLVMInt64);
-            }
+            arg_cnt = setup_helper_template_arg_type(arg_types, arg_cnt, h);
             LLVMTypeRef f_type = LLVMFunctionType(LLVMVoidType(), arg_types, arg_cnt, 0);
             F = LLVMAddFunction(g_module, helper_str[h], f_type);
             LLVMAddAttributeAtIndex(F, -1, g_attr_target_features);
@@ -633,17 +645,7 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F, FuncInstrList *
             } else {
                 assert(u->operands[1].kind == OP_SYMBOL);
                 HelperType h = u->operands[1].symbol;
-                for (int i = 0; i < MAX_ADDED_ARGS; ++i) {
-                    if (helper_template_arg_type[h][i] != LLVMInvalidType) {
-                        arg_types[arg_cnt++] = get_llvm_type(helper_template_arg_type[h][i]);
-                    }
-                }
-                if (!(h > NOSPLIT_BEGIN && h < NOSPLIT_END)) {
-                    arg_types[arg_cnt++] = get_llvm_type(LLVMInt64);
-                    if (helper_require_exception_path[h]) {
-                        arg_types[arg_cnt++] = get_llvm_type(LLVMInt64);
-                    }
-                }
+                arg_cnt = setup_helper_template_arg_type(arg_types, arg_cnt, h);
                 f_type = LLVMFunctionType((h > NOSPLIT_BEGIN && h < NOSPLIT_END) ? get_llvm_type(helper_return_type[h]) : LLVMVoidType(), arg_types, arg_cnt, 0);
             }
             stack->tmp.llvm_ty[i] = f_type;

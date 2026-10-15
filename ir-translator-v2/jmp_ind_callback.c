@@ -1,5 +1,3 @@
-#define QEMU_CPUARCHSTATE_OFFSET                0x2cd0ULL
-
 typedef struct CodeFragment {
     unsigned long target_addr;
     unsigned long host_addr;
@@ -12,9 +10,8 @@ typedef __attribute__((qemuaot,nothrow)) void (*FuncPtrType1)(unsigned long rax,
 
 typedef __attribute__((qemuaot,nothrow)) void (*FuncPtrType2)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip XMM_PARAM_DECLARE_COMMON, unsigned long cpu_param, unsigned long env, unsigned long target);
 
-__attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip XMM_PARAM_DECLARE_COMMON, unsigned long cpu_param, unsigned long target_addr, CodeFragment *list_ptr, unsigned long trampoline_helper_jit)
+__attribute__((qemuaot,weak,nothrow)) void jmp_ind_callback(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip XMM_PARAM_DECLARE_COMMON, unsigned long cpu_param, unsigned long env, unsigned long target_addr, CodeFragment *list_ptr, unsigned long trampoline_helper_jit)
 {
-    unsigned long env = cpu_param + QEMU_CPUARCHSTATE_OFFSET;
     unsigned long host_addr = 0;
     while (list_ptr) {
         if (list_ptr->target_addr == target_addr) {

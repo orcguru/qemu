@@ -12,7 +12,7 @@ set_label L0
 func_addr t3,helper_jmp_ind
 func_addr t4,jmp_ind_callback
 func_addr t5,0x55aa,0x1
-tail_call_qemuaot t3,rip,t5,t4 VEC_ARGS:
+tail_call_qemuaot t3,env,rip,t5,t4 VEC_ARGS:
 
 FUNC:trampoline_helper_jit N1
 st_i64 rax,env

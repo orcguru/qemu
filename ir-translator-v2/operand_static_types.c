@@ -349,7 +349,7 @@ const LLVMType helper_template_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_crc32] = {LLVMInt32, LLVMInt64, LLVMInt32},
     [helper_extrq_i] = {LLVMInt32, LLVMInt32},
     [helper_insertq_i] = {LLVMInt32, LLVMInt32},
-    [helper_jmp_ind] = {LLVMInt64},
+    [helper_jmp_ind] = {LLVMInt64, LLVMInt64},
 };
 
 const char *helper_template_arg_name[HELPER_MAX][MAX_ADDED_ARGS] = {
