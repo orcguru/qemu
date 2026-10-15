@@ -226,8 +226,24 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
         }
         val = load_from_stack_as_type(op->slot.type == SUB_SLOT_TMP ? &stack->tmp : &stack->xreg, op->slot.idx, op->slot.op_type, prefix, p_name);
         return val;
+    } else if (op->kind == OP_ARG && op->argidx == -1) {
+        return stack->arg_last;
     }
     assert(0);
+}
+
+static void create_stack_alloca(AllocaWithState *as, int idx, LLVMType default_ty, const char *default_name) {
+    assert(as->tcg_ty[idx] == LLVMInvalidType);
+    LLVMBasicBlockRef current = LLVMGetInsertBlock(g_builder);
+    LLVMValueRef parent_fn  = LLVMGetBasicBlockParent(current);
+    LLVMBasicBlockRef init = LLVMGetFirstBasicBlock(parent_fn);
+    LLVMPositionBuilder(g_builder, init, LLVMGetFirstInstruction(init));
+    as->tcg_ty[idx] = default_ty;
+    as->llvm_ty[idx] = get_llvm_type(as->tcg_ty[idx]);
+    as->alloca[idx] = LLVMBuildAlloca(g_builder, as->llvm_ty[idx], default_name);
+    as->align[idx] = GET_ALIGNMENT_FROM_TYPE(as->tcg_ty[idx]);
+    LLVMSetAlignment(as->alloca[idx], as->align[idx]);
+    LLVMPositionBuilderAtEnd(g_builder, current);
 }
 
 static void add_stack_alloca_force_writeback(AllocaWithState *as, int idx, LLVMType default_ty, int param_idx, const char *default_name, int env_offset, const Operand *op, StackAlloca *stack, const char *prefix) {
@@ -265,6 +281,9 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
     char var_name[32] = {0};
     if ((op->kind == OP_SLOT && op->slot.type == SUB_SLOT_TMP) || op->kind == OP_VEC) {
         LLVMType val_ty = get_operand_type(op);
+        if (op->kind == OP_VEC && stack->vector.alloca[op->vec.idx] == NULL) {
+            create_stack_alloca(&stack->vector, op->vec.idx, qemuaot_default_param_type[XREG_MAX + op->vec.idx], qemuaot_default_stack_alloca_name[XREG_MAX + op->vec.idx]);
+        }
         LLVMType stack_ty = op->kind == OP_SLOT ? stack->tmp.tcg_ty[op->slot.idx] : stack->vector.tcg_ty[op->vec.idx];
         assert(val_ty != LLVMInvalidType && stack_ty != LLVMInvalidType);
         assert((val_ty <= LLVMInt64 && stack_ty <= LLVMInt64 && val_ty <= stack_ty) ||
@@ -312,6 +331,9 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
         return;
     }
     if (op->kind == OP_SLOT && op->slot.type == SUB_SLOT_XREG) {
+        if (stack->xreg.alloca[op->slot.idx] == NULL) {
+            create_stack_alloca(&stack->xreg, op->slot.idx, qemuaot_default_param_type[op->slot.idx], qemuaot_default_stack_alloca_name[op->slot.idx]);
+        }
         build_store_with_alignment(g_builder, val, stack->xreg.alloca[op->slot.idx], stack->xreg.align[op->slot.idx], SPILL_TAG);
         return;
     }
@@ -533,10 +555,14 @@ LLVMValueRef get_or_add_func_with_default_cc(HelperType h, const UnifiedInstr *u
     if (!TF) {
         LLVMTypeRef arg_types[MAX_ADDED_ARGS] = {NULL};
         int arg_cnt = 0;
-        for (int i = TCG_CALL_PREFIX_COUNT; i < u->operand_count; ++i) {
+        assert(u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
+        assert(u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val == 0 || u->operands[TCG_CALL_PREFIX_COUNT].kind == OP_SLOT);
+        for (int i = (u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? (TCG_CALL_PREFIX_COUNT + 1) : TCG_CALL_PREFIX_COUNT);
+             i < u->operand_count; ++i) {
             arg_types[arg_cnt++] = get_llvm_type(LLVMInt64);
         }
-        LLVMTypeRef f_type = LLVMFunctionType(LLVMVoidType(), arg_types, arg_cnt, 0);
+        assert(u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val == 0 || u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type == helper_return_type[h]);
+        LLVMTypeRef f_type = LLVMFunctionType((helper_return_type[h] ? get_llvm_type(helper_return_type[h]) : LLVMVoidType()), arg_types, arg_cnt, 0);
         TF = LLVMAddFunction(g_module, helper_str[h], f_type);
     }
     return TF;
@@ -664,6 +690,7 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F, FuncInstrList *
         LLVMSetAlignment(stack->borrow, 8);
     }
     stack->env = get_env(F);
+    stack->arg_last = LLVMGetParam(F, (LLVMCountParams(F) - 1));
     return stack;
 }
 

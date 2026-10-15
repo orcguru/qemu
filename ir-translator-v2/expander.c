@@ -1043,7 +1043,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
             // add_i64 tmp_N2,env,offset
             EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
                 SLOT_OP(SUB_SLOT_TMP, tmp2),
-                ENV_OP(0), IMM_OP(off));
+                ENV_OP(0), IMM_OP(0), IMM_OP(off));
             nc->operands[i].kind = OP_SLOT;
             nc->operands[i].slot.type = SUB_SLOT_TMP;
             nc->operands[i].slot.idx = tmp2;
@@ -1061,7 +1061,7 @@ int create_trampoline_for_inline_exception(TcgContext *ctx,
                 // add_i64 tmp_N2,env,env.offset
                 EMIT_INSTR_APPEND_LIST(ctx, &result, add_i64, 0, 0,
                     SLOT_OP(SUB_SLOT_TMP, tmp2),
-                    ENV_OP(0), IMM_OP(nc->operands[i].env.offset));
+                    ENV_OP(0), IMM_OP(0), IMM_OP(nc->operands[i].env.offset));
                 nc->operands[i].kind = OP_SLOT;
                 nc->operands[i].slot.type = SUB_SLOT_TMP;
                 nc->operands[i].slot.idx = tmp2;
@@ -1429,7 +1429,7 @@ void expand_call_runtime(TcgContext *ctx) {
                     // add_i64 tmp_N2,env,offset
                     EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, add_i64, 0, 0,
                         SLOT_OP(SUB_SLOT_TMP, tmp2),
-                        ENV_OP(0), IMM_OP(off));
+                        ENV_OP(0), IMM_OP(0), IMM_OP(off));
                     uu->operands[i].kind = OP_SLOT;
                     uu->operands[i].slot.type = SUB_SLOT_TMP;
                     uu->operands[i].slot.idx = tmp2;

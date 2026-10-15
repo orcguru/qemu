@@ -60,8 +60,8 @@ st_vec v128,e8,v26,env:0x6a0
 st_vec v128,e8,v27,env:0x6b0
 st_vec v128,e8,v28,env:0x6e0
 st_vec v128,e8,v29,env:0x6f0
-add_i64 [t5],env:0x4a0
-add_i64 [t6],env:0x4e0
+add_i64 [t5],env,0x4a0
+add_i64 [t6],env,0x4e0
 call_default helper_cmpltps_xmm,env,t5,t6
 ld_i64 [rax],env
 ld_i64 [rcx],env:0x8

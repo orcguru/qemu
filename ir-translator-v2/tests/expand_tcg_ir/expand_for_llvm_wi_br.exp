@@ -61,8 +61,8 @@ sub_i64 [t13],t12,0x40
 qemu_st_i64 t7,t13,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC8B
 func_addr t18,0x0,0x2
 func_addr t19,0x0,0x1
-add_i64 [t20],env:0x4a0
-add_i64 [t21],env:0x4a0
+add_i64 [t20],env,0x4a0
+add_i64 [t21],env,0x4a0
 tail_call_qemuaot t18,t20,t21,env:0xb60,t19 VEC_ARGS:
 set_label L2
 add_i64 [rip],rip,0x3b

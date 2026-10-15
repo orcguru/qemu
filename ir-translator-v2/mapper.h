@@ -21,6 +21,7 @@ typedef struct StackAlloca {
     LLVMValueRef carry;
     LLVMValueRef borrow;
     LLVMValueRef env;
+    LLVMValueRef arg_last;
 } StackAlloca;
 
 typedef enum TagType {

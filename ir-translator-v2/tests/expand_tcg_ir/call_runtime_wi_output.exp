@@ -2,7 +2,7 @@ FINAL:0x0 EXT:
 FUNC:0 N0
 func_addr t3,0x0,0x2
 func_addr t4,0x0,0x1
-add_i64 [t5],env:0x4a0
+add_i64 [t5],env,0x4a0
 tail_call_qemuaot t3,env,t5,0x42,t4 VEC_ARGS:
 
 FUNC:0 N1
