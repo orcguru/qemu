@@ -399,7 +399,7 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
     assert(0);
 }
 
-LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, FuncInstrList *f, unsigned long hex_offset, int sub_idx) {
+LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, unsigned long hex_offset, int sub_idx) {
     // Trampoline may have already been defined
     LLVMValueRef F = LLVMGetNamedFunction(g_module, name);
     if (!F) {
@@ -409,11 +409,7 @@ LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, FuncInstrList *f,
             arg_types[arg_cnt++] = get_llvm_type(qemuaot_default_param_type[i]);
         }
         arg_types[arg_cnt++] = LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0);
-        if (f) {
-            for (int i = 0; i < f->added_param_count; ++i) {
-                arg_types[arg_cnt++] = get_llvm_type(f->added_param_type[i]);
-            }
-        } else if (g_ctx != NULL && g_ctx->hex_offset == hex_offset && sub_idx < g_ctx->llvm_func_set.num_lists) {
+        if (g_ctx != NULL && g_ctx->hex_offset == hex_offset && sub_idx < g_ctx->llvm_func_set.num_lists) {
             for (int i = 0; i < g_ctx->llvm_func_set.lists[sub_idx].added_param_count; ++i) {
                 arg_types[arg_cnt++] = get_llvm_type(g_ctx->llvm_func_set.lists[sub_idx].added_param_type[i]);
             }
@@ -434,9 +430,9 @@ LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, FuncInstrList *f,
         LLVMSetParamAlignment(LLVMGetParam(F, cpu_pos), 8);
         LLVMAttributeIndex idx = (LLVMAttributeIndex)(cpu_pos + 1);
         LLVMAddAttributeAtIndex(F, idx, LLVMCreateEnumAttribute(LLVMGetModuleContext(g_module), LLVMGetEnumAttributeKindForName("dereferenceable", strlen("dereferenceable")), QEMU_CPUSTATE_CPUARCHSTATE_TOTAL_SIZE));
-        if (f) {
-            for (int i = 0, arg_idx = (XREG_MAX + 2 * XMM_COUNT + 1); i < f->added_param_count; ++i, ++arg_idx) {
-                LLVMSetValueName(LLVMGetParam(F, arg_idx), f->added_param_name[i]);
+        if (g_ctx != NULL && g_ctx->hex_offset == hex_offset && sub_idx < g_ctx->llvm_func_set.num_lists) {
+            for (int i = 0, arg_idx = (XREG_MAX + 2 * XMM_COUNT + 1); i < g_ctx->llvm_func_set.lists[sub_idx].added_param_count; ++i, ++arg_idx) {
+                LLVMSetValueName(LLVMGetParam(F, arg_idx), g_ctx->llvm_func_set.lists[sub_idx].added_param_name[i]);
             }
         }
     }
@@ -695,7 +691,9 @@ static void release_stack(StackAlloca *stack) {
 int translate_to_llvm_func(TcgContext *ctx, const char *name, FuncInstrList *f, int is_external) {
     int rc = 0;
     LLVMValueRef F = NULL;
-    F = get_or_add_func_with_qemuaot_cc(name, f, 0, 0);
+    // FIXME: setup g_ctx for get_func_name/get_or_add_func_with_qemuaot_cc
+    g_ctx = ctx;
+    F = get_or_add_func_with_qemuaot_cc(name, ctx->hex_offset, 0);
     if (is_external == 0) {
         LLVMSetLinkage(F, LLVMInternalLinkage);
         LLVMAddAttributeAtIndex(F, -1, g_attr_alwaysinline);
@@ -708,8 +706,6 @@ int translate_to_llvm_func(TcgContext *ctx, const char *name, FuncInstrList *f, 
     LLVMPositionBuilderAtEnd(g_builder, entry);
     StackAlloca *stack = setup_stack(ctx, F, f);
     // One-to-one mapping from TCG-ops to LLVM-IR
-    // FIXME: setup g_ctx for get_func_name
-    g_ctx = ctx;
     rc = translate_batch(g_module, g_builder, F, stack, f);
     g_ctx = NULL;
     release_stack(stack);

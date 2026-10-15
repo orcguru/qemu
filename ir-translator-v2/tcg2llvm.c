@@ -224,7 +224,7 @@ int translate_func_addr(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *sta
     LLVMValueRef TF = NULL;
     if (u->operands[1].kind == OP_IMM) {
         assert(u->operands[2].kind == OP_IMM);
-        TF = get_or_add_func_with_qemuaot_cc(get_func_name(u->operands[1].imm.val, (int)u->operands[2].imm.val, &fname[0], sizeof(fname)), NULL, u->operands[1].imm.val, (int)u->operands[2].imm.val);
+        TF = get_or_add_func_with_qemuaot_cc(get_func_name(u->operands[1].imm.val, (int)u->operands[2].imm.val, &fname[0], sizeof(fname)), u->operands[1].imm.val, (int)u->operands[2].imm.val);
     } else {
         assert(u->operands[1].kind == OP_SYMBOL);
         TF = get_or_add_helper_with_qemuaot_cc(u->operands[1].symbol, u);
