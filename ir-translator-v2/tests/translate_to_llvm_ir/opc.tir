@@ -37,6 +37,7 @@ subb1o_i32 loc0,loc1,loc2
 subb1o_i64 loc0,loc1,loc2
 add_i32 loc0,loc1,loc2
 add_i64 loc0,loc1,loc2
+ld_vec v128,e8,tmp24,env,$0x360
 ld_vec v128,e8,tmp25,env,$0x360
 ld_vec v128,e8,tmp26,env,$0x5e0
 add_vec v128,e8,tmp27,tmp25,tmp26
@@ -50,5 +51,6 @@ mov_i32 loc0,loc1
 mov_i64 loc0,loc1
 mov_vec v128,e8,tmp27,tmp25
 abs_vec v128,e8,tmp27,tmp25
+bitsel_vec v128,e8,tmp27,tmp24,tmp25,tmp26
 
 jmp_direct $0x55aa
