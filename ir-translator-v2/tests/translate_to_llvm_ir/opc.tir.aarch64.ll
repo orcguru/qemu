@@ -399,19 +399,159 @@ entry:
   %T53.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !56
   %T53.out = urem i64 %T53.tmp0, %T53.tmp1, !tcg.op !56
   store i64 %T53.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !56
-; ======== TCG [54] func_addr t9,0x55aa,0x0 ========
-  store ptr @Fx55aa, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !57
-; ======== TCG [55] tail_call_qemuaot t9 VEC_ARGS: ========
-  %T55.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !58
-  %T55.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !58
-  %T55.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !58
-  %T55.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !58
-  %T55.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !58
-  %T55.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !58
-  %T55.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !58
-  %T55.loaded_fn = load ptr, ptr %tmp9.stack, align 8, !tcg.op !58
-  tail call qemuaot void %T55.loaded_fn(i64 %T55.rax.stack, i64 %T55.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %T55.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T55.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T55.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T55.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T55.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !58
-  ret void, !tcg.op !58
+; ======== TCG [54] sar_i32 [t2],t0,t1 ========
+  %T54.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !57
+  %T54.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !57
+  %T54.out = ashr i32 %T54.tmp0, %T54.tmp1, !tcg.op !57
+  store i32 %T54.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !57
+; ======== TCG [55] sar_i64 [t2],t0,t1 ========
+  %T55.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !58
+  %T55.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !58
+  %T55.out = ashr i64 %T55.tmp0, %T55.tmp1, !tcg.op !58
+  store i64 %T55.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !58
+; ======== TCG [56] and_i32 [t2],t0,t1 ========
+  %T56.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !59
+  %T56.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !59
+  %T56.out = and i32 %T56.tmp0, %T56.tmp1, !tcg.op !59
+  store i32 %T56.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !59
+; ======== TCG [57] and_i64 [t2],t0,t1 ========
+  %T57.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !60
+  %T57.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !60
+  %T57.out = and i64 %T57.tmp0, %T57.tmp1, !tcg.op !60
+  store i64 %T57.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !60
+; ======== TCG [58] mul_i32 [t2],t0,t1 ========
+  %T58.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !61
+  %T58.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !61
+  %T58.out = mul i32 %T58.tmp0, %T58.tmp1, !tcg.op !61
+  store i32 %T58.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !61
+; ======== TCG [59] mul_i64 [t2],t0,t1 ========
+  %T59.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !62
+  %T59.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !62
+  %T59.out = mul i64 %T59.tmp0, %T59.tmp1, !tcg.op !62
+  store i64 %T59.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !62
+; ======== TCG [60] or_i32 [t2],t0,t1 ========
+  %T60.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !63
+  %T60.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !63
+  %T60.out = or i32 %T60.tmp0, %T60.tmp1, !tcg.op !63
+  store i32 %T60.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !63
+; ======== TCG [61] or_i64 [t2],t0,t1 ========
+  %T61.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !64
+  %T61.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !64
+  %T61.out = or i64 %T61.tmp0, %T61.tmp1, !tcg.op !64
+  store i64 %T61.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !64
+; ======== TCG [62] shl_i32 [t2],t0,t1 ========
+  %T62.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !65
+  %T62.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !65
+  %T62.out = shl i32 %T62.tmp0, %T62.tmp1, !tcg.op !65
+  store i32 %T62.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !65
+; ======== TCG [63] shl_i64 [t2],t0,t1 ========
+  %T63.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !66
+  %T63.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !66
+  %T63.out = shl i64 %T63.tmp0, %T63.tmp1, !tcg.op !66
+  store i64 %T63.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !66
+; ======== TCG [64] shr_i32 [t2],t0,t1 ========
+  %T64.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !67
+  %T64.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !67
+  %T64.out = lshr i32 %T64.tmp0, %T64.tmp1, !tcg.op !67
+  store i32 %T64.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !67
+; ======== TCG [65] shr_i64 [t2],t0,t1 ========
+  %T65.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !68
+  %T65.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !68
+  %T65.out = lshr i64 %T65.tmp0, %T65.tmp1, !tcg.op !68
+  store i64 %T65.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !68
+; ======== TCG [66] xor_i32 [t2],t0,t1 ========
+  %T66.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !69
+  %T66.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !69
+  %T66.out = xor i32 %T66.tmp0, %T66.tmp1, !tcg.op !69
+  store i32 %T66.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !69
+; ======== TCG [67] xor_i64 [t2],t0,t1 ========
+  %T67.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !70
+  %T67.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !70
+  %T67.out = xor i64 %T67.tmp0, %T67.tmp1, !tcg.op !70
+  store i64 %T67.out, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !70
+; ======== TCG [68] sarv_vec v128,e8,[t8],t3,t4 ========
+  %T68.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !71
+  %T68.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !71
+  %T68.out = ashr <16 x i8> %T68.tmp3, %T68.tmp4, !tcg.op !71
+  store <16 x i8> %T68.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !71
+; ======== TCG [69] sarv_vec v128,e32,[t8],t3,t4 ========
+  %T69.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !72
+  %T69.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !72
+  %T69.out = ashr <4 x i32> %T69.tmp3, %T69.tmp4, !tcg.op !72
+  store <4 x i32> %T69.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !72
+; ======== TCG [70] shlv_vec v128,e8,[t8],t3,t4 ========
+  %T70.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !73
+  %T70.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !73
+  %T70.out = shl <16 x i8> %T70.tmp3, %T70.tmp4, !tcg.op !73
+  store <16 x i8> %T70.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !73
+; ======== TCG [71] shlv_vec v128,e32,[t8],t3,t4 ========
+  %T71.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !74
+  %T71.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !74
+  %T71.out = shl <4 x i32> %T71.tmp3, %T71.tmp4, !tcg.op !74
+  store <4 x i32> %T71.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !74
+; ======== TCG [72] shrv_vec v128,e8,[t8],t3,t4 ========
+  %T72.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !75
+  %T72.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !75
+  %T72.out = lshr <16 x i8> %T72.tmp3, %T72.tmp4, !tcg.op !75
+  store <16 x i8> %T72.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !75
+; ======== TCG [73] shrv_vec v128,e32,[t8],t3,t4 ========
+  %T73.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !76
+  %T73.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !76
+  %T73.out = lshr <4 x i32> %T73.tmp3, %T73.tmp4, !tcg.op !76
+  store <4 x i32> %T73.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !76
+; ======== TCG [74] and_vec v128,e8,[t8],t3,t4 ========
+  %T74.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !77
+  %T74.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !77
+  %T74.out = and <16 x i8> %T74.tmp3, %T74.tmp4, !tcg.op !77
+  store <16 x i8> %T74.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !77
+; ======== TCG [75] and_vec v128,e32,[t8],t3,t4 ========
+  %T75.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !78
+  %T75.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !78
+  %T75.out = and <4 x i32> %T75.tmp3, %T75.tmp4, !tcg.op !78
+  store <4 x i32> %T75.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !78
+; ======== TCG [76] mul_vec v128,e8,[t8],t3,t4 ========
+  %T76.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !79
+  %T76.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !79
+  %T76.out = mul <16 x i8> %T76.tmp3, %T76.tmp4, !tcg.op !79
+  store <16 x i8> %T76.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !79
+; ======== TCG [77] mul_vec v128,e32,[t8],t3,t4 ========
+  %T77.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !80
+  %T77.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !80
+  %T77.out = mul <4 x i32> %T77.tmp3, %T77.tmp4, !tcg.op !80
+  store <4 x i32> %T77.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !80
+; ======== TCG [78] or_vec v128,e8,[t8],t3,t4 ========
+  %T78.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !81
+  %T78.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !81
+  %T78.out = or <16 x i8> %T78.tmp3, %T78.tmp4, !tcg.op !81
+  store <16 x i8> %T78.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !81
+; ======== TCG [79] or_vec v128,e32,[t8],t3,t4 ========
+  %T79.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !82
+  %T79.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !82
+  %T79.out = or <4 x i32> %T79.tmp3, %T79.tmp4, !tcg.op !82
+  store <4 x i32> %T79.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !82
+; ======== TCG [80] xor_vec v128,e8,[t8],t3,t4 ========
+  %T80.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !83
+  %T80.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !83
+  %T80.out = xor <16 x i8> %T80.tmp3, %T80.tmp4, !tcg.op !83
+  store <16 x i8> %T80.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !83
+; ======== TCG [81] xor_vec v128,e32,[t8],t3,t4 ========
+  %T81.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !84
+  %T81.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !84
+  %T81.out = xor <4 x i32> %T81.tmp3, %T81.tmp4, !tcg.op !84
+  store <4 x i32> %T81.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !84
+; ======== TCG [82] func_addr t9,0x55aa,0x0 ========
+  store ptr @Fx55aa, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !85
+; ======== TCG [83] tail_call_qemuaot t9 VEC_ARGS: ========
+  %T83.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !86
+  %T83.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !86
+  %T83.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !86
+  %T83.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !86
+  %T83.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !86
+  %T83.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !86
+  %T83.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !86
+  %T83.loaded_fn = load ptr, ptr %tmp9.stack, align 8, !tcg.op !86
+  tail call qemuaot void %T83.loaded_fn(i64 %T83.rax.stack, i64 %T83.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %T83.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T83.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T83.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T83.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T83.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !86
+  ret void, !tcg.op !86
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
@@ -502,5 +642,33 @@ attributes #2 = { nounwind "target-features"="+neon" }
 !54 = !{!"[51] rems_i64 [t2],t0,t1"}
 !55 = !{!"[52] remu_i32 [t2],t0,t1"}
 !56 = !{!"[53] remu_i64 [t2],t0,t1"}
-!57 = !{!"[54] func_addr t9,0x55aa,0x0"}
-!58 = !{!"[55] tail_call_qemuaot t9 VEC_ARGS:"}
+!57 = !{!"[54] sar_i32 [t2],t0,t1"}
+!58 = !{!"[55] sar_i64 [t2],t0,t1"}
+!59 = !{!"[56] and_i32 [t2],t0,t1"}
+!60 = !{!"[57] and_i64 [t2],t0,t1"}
+!61 = !{!"[58] mul_i32 [t2],t0,t1"}
+!62 = !{!"[59] mul_i64 [t2],t0,t1"}
+!63 = !{!"[60] or_i32 [t2],t0,t1"}
+!64 = !{!"[61] or_i64 [t2],t0,t1"}
+!65 = !{!"[62] shl_i32 [t2],t0,t1"}
+!66 = !{!"[63] shl_i64 [t2],t0,t1"}
+!67 = !{!"[64] shr_i32 [t2],t0,t1"}
+!68 = !{!"[65] shr_i64 [t2],t0,t1"}
+!69 = !{!"[66] xor_i32 [t2],t0,t1"}
+!70 = !{!"[67] xor_i64 [t2],t0,t1"}
+!71 = !{!"[68] sarv_vec v128,e8,[t8],t3,t4"}
+!72 = !{!"[69] sarv_vec v128,e32,[t8],t3,t4"}
+!73 = !{!"[70] shlv_vec v128,e8,[t8],t3,t4"}
+!74 = !{!"[71] shlv_vec v128,e32,[t8],t3,t4"}
+!75 = !{!"[72] shrv_vec v128,e8,[t8],t3,t4"}
+!76 = !{!"[73] shrv_vec v128,e32,[t8],t3,t4"}
+!77 = !{!"[74] and_vec v128,e8,[t8],t3,t4"}
+!78 = !{!"[75] and_vec v128,e32,[t8],t3,t4"}
+!79 = !{!"[76] mul_vec v128,e8,[t8],t3,t4"}
+!80 = !{!"[77] mul_vec v128,e32,[t8],t3,t4"}
+!81 = !{!"[78] or_vec v128,e8,[t8],t3,t4"}
+!82 = !{!"[79] or_vec v128,e32,[t8],t3,t4"}
+!83 = !{!"[80] xor_vec v128,e8,[t8],t3,t4"}
+!84 = !{!"[81] xor_vec v128,e32,[t8],t3,t4"}
+!85 = !{!"[82] func_addr t9,0x55aa,0x0"}
+!86 = !{!"[83] tail_call_qemuaot t9 VEC_ARGS:"}

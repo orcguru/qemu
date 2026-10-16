@@ -733,7 +733,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(cmpsel_vec, translate_cmpsel_vec);
             CASE(ctpop_i32, translate_ctpop);
             CASE(ctpop_i64, translate_ctpop);
-
             CASE_COMMON(divs_i32, LLVMBuildSDiv);
             CASE_COMMON(divs_i64, LLVMBuildSDiv);
             CASE_COMMON(divu_i32, LLVMBuildUDiv);
@@ -742,8 +741,33 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_COMMON(rems_i64, LLVMBuildSRem);
             CASE_COMMON(remu_i32, LLVMBuildURem);
             CASE_COMMON(remu_i64, LLVMBuildURem);
+            CASE_COMMON(sarv_vec, LLVMBuildAShr);
+            CASE_COMMON(shlv_vec, LLVMBuildShl);
+            CASE_COMMON(shrv_vec, LLVMBuildLShr);
+            CASE_COMMON(sar_i32, LLVMBuildAShr);
+            CASE_COMMON(sar_i64, LLVMBuildAShr);
+            CASE_COMMON(and_i32, LLVMBuildAnd);
+            CASE_COMMON(and_i64, LLVMBuildAnd);
+            CASE_COMMON(and_vec, LLVMBuildAnd);
+            CASE_COMMON(mul_i32, LLVMBuildMul);
+            CASE_COMMON(mul_i64, LLVMBuildMul);
+            CASE_COMMON(mul_vec, LLVMBuildMul);
+            CASE_COMMON(or_i32, LLVMBuildOr);
+            CASE_COMMON(or_i64, LLVMBuildOr);
+            CASE_COMMON(or_vec, LLVMBuildOr);
+            CASE_COMMON(shl_i32, LLVMBuildShl);
+            CASE_COMMON(shl_i64, LLVMBuildShl);
+            CASE_COMMON(shr_i32, LLVMBuildLShr);
+            CASE_COMMON(shr_i64, LLVMBuildLShr);
+            CASE_COMMON(xor_i32, LLVMBuildXor);
+            CASE_COMMON(xor_i64, LLVMBuildXor);
+            CASE_COMMON(xor_vec, LLVMBuildXor);
 
 #if 0
+            case rotl_i32:
+            case rotl_i64:
+                translate_rotl(opc, u);
+                break;
             case rotli_vec:
             case rotls_vec:
                 translate_rotl_vec(opc, u);
@@ -751,22 +775,20 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             case rotlv_vec:
                 translate_rotlv_vec(opc, u);
                 break;
+
+            case rotr_i32:
+            case rotr_i64:
+                translate_rotr(opc, u);
+                break;
             case rotrv_vec:
                 translate_rotrv_vec(opc, u);
                 break;
+
             case sari_vec:
             case sars_vec:
                 translate_binary_splat_immediate(opc, u, LLVMBuildAShr);
                 break;
-            case sarv_vec:
-                translate_binary(opc, u, LLVMBuildAShr);
-                break;
-            case shlv_vec:
-                translate_binary(opc, u, LLVMBuildShl);
-                break;
-            case shrv_vec:
-                translate_binary(opc, u, LLVMBuildLShr);
-                break;
+
             case smax_vec:
                 translate_binary_intrinsic(opc, u, "llvm.smax");
                 break;
@@ -791,11 +813,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             case andc_i64:
             case andc_vec:
                 translate_andc(opc, u);
-                break;
-            case and_i32:
-            case and_i64:
-            case and_vec:
-                translate_binary(opc, u, LLVMBuildAnd);
                 break;
             case nor_i32:
             case nor_i64:
@@ -873,11 +890,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             case movcond_vec:
                 translate_movcond(opc, u);
                 break;
-            case mul_i32:
-            case mul_i64:
-            case mul_vec:
-                translate_binary(opc, u, LLVMBuildMul);
-                break;
             case mulsh_i32:
             case mulsh_i64:
                 translate_mulxh(opc, u, LLVMBuildSExt);
@@ -908,13 +920,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             case not_vec:
                 translate_not(opc, u);
                 break;
-            case or_i32:
-            case or_i64:
-                translate_binary(opc, u, LLVMBuildOr);
-                break;
-            case or_vec:
-                translate_binary(opc, u, LLVMBuildOr);
-                break;
 #endif
             CASE(ld8u_i32, translate_ld_zext);
             CASE(ld8u_i64, translate_ld_zext);
@@ -944,18 +949,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(qemu_st_i64, translate_st_with_attr);
             CASE(qemu_st2_i128, translate_st2_with_attr);
 #if 0
-            case rotr_i32:
-            case rotr_i64:
-                translate_rotr(opc, u);
-                break;
-            case rotl_i32:
-            case rotl_i64:
-                translate_rotl(opc, u);
-                break;
-            case sar_i32:
-            case sar_i64:
-                translate_binary(opc, u, LLVMBuildAShr);
-                break;
             case setcond_i32:
             case setcond_i64:
                 translate_setcond(opc, u);
@@ -963,10 +956,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             case sextract_i32:
             case sextract_i64:
                 translate_sextract(opc, u);
-                break;
-            case shl_i32:
-            case shl_i64:
-                translate_binary(opc, u, LLVMBuildShl);
                 break;
             case shli_vec:
             case shls_vec:
@@ -976,19 +965,11 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             case shrs_vec:
                 translate_binary_splat_immediate(opc, u, LLVMBuildLShr);
                 break;
-            case shr_i32:
-            case shr_i64:
-                translate_binary(opc, u, LLVMBuildLShr);
-                break;
             case umax_vec:
                 translate_maxmin_vec(opc, u, gtu);
                 break;
             case umin_vec:
                 translate_maxmin_vec(opc, u, ltu);
-                break;
-            case xor_i32:
-            case xor_i64:
-            case xor_vec: translate_binary(opc, u, LLVMBuildXor);
                 break;
 #endif
             CASE_FUNC(set_label, translate_set_label);
