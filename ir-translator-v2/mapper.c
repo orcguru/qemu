@@ -96,6 +96,12 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
     return ty;
 }
 
+LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *intrinsic_types, int cnt) {
+    unsigned id = LLVMLookupIntrinsicID(intrinsic_name, strlen(intrinsic_name));
+    assert(id != 0);
+    return LLVMGetIntrinsicDeclaration(g_module, id, intrinsic_types, cnt);
+}
+
 LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name) {
     char var_name[32] = {0};
     if (as->tcg_ty[idx] == LLVMInvalidType) {
