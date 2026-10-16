@@ -731,31 +731,19 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(bitsel_vec, translate_bitsel_vec);
             CASE(cmp_vec, translate_cmp_vec);
             CASE(cmpsel_vec, translate_cmpsel_vec);
-
             CASE(ctpop_i32, translate_ctpop);
             CASE(ctpop_i64, translate_ctpop);
 
+            CASE_COMMON(divs_i32, LLVMBuildSDiv);
+            CASE_COMMON(divs_i64, LLVMBuildSDiv);
+            CASE_COMMON(divu_i32, LLVMBuildUDiv);
+            CASE_COMMON(divu_i64, LLVMBuildUDiv);
+            CASE_COMMON(rems_i32, LLVMBuildSRem);
+            CASE_COMMON(rems_i64, LLVMBuildSRem);
+            CASE_COMMON(remu_i32, LLVMBuildURem);
+            CASE_COMMON(remu_i64, LLVMBuildURem);
+
 #if 0
-            case ctpop_i32:
-            case ctpop_i64:
-                translate_ctpop(opc, u);
-                break;
-            case divs_i32:
-            case divs_i64:
-                translate_binary(opc, u, LLVMBuildSDiv);
-                break;
-            case divu_i32:
-            case divu_i64:
-                translate_binary(opc, u, LLVMBuildUDiv);
-                break;
-            case rems_i32:
-            case rems_i64:
-                translate_binary(opc, u, LLVMBuildSRem);
-                break;
-            case remu_i32:
-            case remu_i64:
-                translate_binary(opc, u, LLVMBuildURem);
-                break;
             case rotli_vec:
             case rotls_vec:
                 translate_rotl_vec(opc, u);

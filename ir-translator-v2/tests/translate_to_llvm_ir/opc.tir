@@ -63,5 +63,13 @@ cmpsel_vec v128,e8,tmp27,tmp24,tmp25,tmp28,tmp29,gt
 cmpsel_vec v128,e32,tmp27,tmp24,tmp25,tmp28,tmp29,gt
 ctpop_i32 loc0,loc0
 ctpop_i64 loc0,loc0
+divs_i32 loc0,loc1,loc2
+divs_i64 loc0,loc1,loc2
+divu_i32 loc0,loc1,loc2
+divu_i64 loc0,loc1,loc2
+rems_i32 loc0,loc1,loc2
+rems_i64 loc0,loc1,loc2
+remu_i32 loc0,loc1,loc2
+remu_i64 loc0,loc1,loc2
 
 jmp_direct $0x55aa
