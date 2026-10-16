@@ -158,6 +158,25 @@ void translate_cmpsel_vec(LLVMBuilderRef builder, StackAlloca *stack, const Unif
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_ctpop(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
+    LLVMTypeRef intrinsic_types[] = {llvm_ty};
+    char intrinsic_func[128] = {0};
+    if (tcg_ty <= LLVMInt64) {
+        sprintf(intrinsic_func, "llvm.ctpop.i%d", llvm_vector_elem_bit_counts[tcg_ty * 2 + 1]);
+    } else {
+        sprintf(intrinsic_func, "llvm.ctpop.v%di%d", llvm_vector_elem_bit_counts[tcg_ty * 2], llvm_vector_elem_bit_counts[tcg_ty * 2 + 1]);
+    }
+    LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func, intrinsic_types, 1);
+    LLVMTypeRef fn_type  = LLVMFunctionType(llvm_ty, intrinsic_types, 1, 0);
+    LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef intrinsic_call_args[] = {in};
+    LLVMValueRef pop = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call_args, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "pop"));
+    do_store(&u->operands[0], pop, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -710,17 +729,13 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(mov_vec, translate_mov);
             CASE(abs_vec, translate_abs_vec);
             CASE(bitsel_vec, translate_bitsel_vec);
-
             CASE(cmp_vec, translate_cmp_vec);
             CASE(cmpsel_vec, translate_cmpsel_vec);
 
+            CASE(ctpop_i32, translate_ctpop);
+            CASE(ctpop_i64, translate_ctpop);
+
 #if 0
-            case cmp_vec:
-                translate_cmp_vec(opc, u);
-                break;
-            case cmpsel_vec:
-                translate_cmpsel_vec(opc, u);
-                break;
             case ctpop_i32:
             case ctpop_i64:
                 translate_ctpop(opc, u);
