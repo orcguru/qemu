@@ -87,6 +87,22 @@ void translate_addc_subb(LLVMBuilderRef builder, StackAlloca *stack, const Unifi
     build_store_with_alignment(builder, co, is_add ? stack->carry : stack->borrow, 8, SPILL_TAG);
 }
 
+void translate_abs_vec(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
+    LLVMTypeRef intrinsic_types[] = {llvm_ty, LLVMInt1Type()};
+    char intrinsic_func[128] = {0};
+    sprintf(intrinsic_func, "llvm.abs.v%di%d", llvm_vector_elem_bit_counts[tcg_ty * 2], llvm_vector_elem_bit_counts[tcg_ty * 2 + 1]);
+    LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func, intrinsic_types, 2);
+    LLVMTypeRef fn_type  = LLVMFunctionType(llvm_ty, intrinsic_types, 2, 0);
+    LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef is_int_min_poison = LLVMConstInt(LLVMInt1Type(), 0, 0);
+    LLVMValueRef intrinsic_call_args[] = {in, is_int_min_poison};
+    LLVMValueRef abs = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "abs"));
+    do_store(&u->operands[0], abs, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -646,10 +662,8 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(mov_i64, translate_mov);
             CASE(mov_vec, translate_mov);
 
+            CASE(abs_vec, translate_abs_vec);
 #if 0
-            case abs_vec:
-                translate_abs_vec(opc, u);
-                break;
             case bitsel_vec:
                 translate_bitsel_vec(opc, u);
                 break;

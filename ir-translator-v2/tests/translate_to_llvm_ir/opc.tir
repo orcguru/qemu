@@ -49,5 +49,6 @@ extrl_i64_i32 loc0,loc1
 mov_i32 loc0,loc1
 mov_i64 loc0,loc1
 mov_vec v128,e8,tmp27,tmp25
+abs_vec v128,e8,tmp27,tmp25
 
 jmp_direct $0x55aa

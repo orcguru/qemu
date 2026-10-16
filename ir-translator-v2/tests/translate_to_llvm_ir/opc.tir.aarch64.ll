@@ -268,16 +268,20 @@ entry:
 ; ======== TCG [31] mov_vec v128,e8,[t5],t3 ========
   %T31.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !34
   store <16 x i8> %T31.tmp3, ptr %tmp5.stack, align 16, !tbaa !0, !tcg.op !34
-; ======== TCG [32] func_addr t6,0x55aa,0x0 ========
-  store ptr @Fx55aa, ptr %tmp6.stack, align 8, !tbaa !0, !tcg.op !35
-; ======== TCG [33] tail_call_qemuaot t6 VEC_ARGS: ========
-  %T33.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !36
-  %T33.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !36
-  %T33.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !36
-  %T33.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !36
-  %T33.loaded_fn = load ptr, ptr %tmp6.stack, align 8, !tcg.op !36
-  tail call qemuaot void %T33.loaded_fn(i64 %T33.rax.stack, i64 %T33.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %T33.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T33.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !36
-  ret void, !tcg.op !36
+; ======== TCG [32] abs_vec v128,e8,[t5],t3 ========
+  %T32.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !35
+  %T32.abs = call <16 x i8> @llvm.abs.v16i8.i1(<16 x i8> %T32.tmp3, i1 false), !tcg.op !35
+  store <16 x i8> %T32.abs, ptr %tmp5.stack, align 16, !tbaa !0, !tcg.op !35
+; ======== TCG [33] func_addr t6,0x55aa,0x0 ========
+  store ptr @Fx55aa, ptr %tmp6.stack, align 8, !tbaa !0, !tcg.op !36
+; ======== TCG [34] tail_call_qemuaot t6 VEC_ARGS: ========
+  %T34.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !37
+  %T34.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !37
+  %T34.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !37
+  %T34.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !37
+  %T34.loaded_fn = load ptr, ptr %tmp6.stack, align 8, !tcg.op !37
+  tail call qemuaot void %T34.loaded_fn(i64 %T34.rax.stack, i64 %T34.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %T34.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T34.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !37
+  ret void, !tcg.op !37
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
@@ -291,6 +295,9 @@ declare { i32, i1 } @llvm.usub.with.overflow.i32.i32(i32, i32) #1
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
 declare { i64, i1 } @llvm.usub.with.overflow.i64.i64(i64, i64) #1
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare <16 x i8> @llvm.abs.v16i8.i1(<16 x i8>, i1 immarg) #1
 
 ; Function Attrs: nounwind
 declare qemuaot void @Fx55aa(i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32, i64, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, ptr align 8 dereferenceable(26528)) #2 section ".text.Fx55aa"
@@ -334,5 +341,6 @@ attributes #2 = { nounwind "target-features"="+neon" }
 !32 = !{!"[29] mov_i32 [t2],t0"}
 !33 = !{!"[30] mov_i64 [t2],t0"}
 !34 = !{!"[31] mov_vec v128,e8,[t5],t3"}
-!35 = !{!"[32] func_addr t6,0x55aa,0x0"}
-!36 = !{!"[33] tail_call_qemuaot t6 VEC_ARGS:"}
+!35 = !{!"[32] abs_vec v128,e8,[t5],t3"}
+!36 = !{!"[33] func_addr t6,0x55aa,0x0"}
+!37 = !{!"[34] tail_call_qemuaot t6 VEC_ARGS:"}
