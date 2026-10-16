@@ -163,18 +163,67 @@ void translate_ctpop(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
     LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
     LLVMTypeRef intrinsic_types[] = {llvm_ty};
-    char intrinsic_func[128] = {0};
-    if (tcg_ty <= LLVMInt64) {
-        sprintf(intrinsic_func, "llvm.ctpop.i%d", llvm_vector_elem_bit_counts[tcg_ty * 2 + 1]);
-    } else {
-        sprintf(intrinsic_func, "llvm.ctpop.v%di%d", llvm_vector_elem_bit_counts[tcg_ty * 2], llvm_vector_elem_bit_counts[tcg_ty * 2 + 1]);
-    }
-    LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func, intrinsic_types, 1);
+    LLVMValueRef fn = get_intrinsic_declaration("llvm.ctpop", intrinsic_types, 1);
     LLVMTypeRef fn_type  = LLVMFunctionType(llvm_ty, intrinsic_types, 1, 0);
     LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
     LLVMValueRef intrinsic_call_args[] = {in};
     LLVMValueRef pop = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call_args, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "pop"));
     do_store(&u->operands[0], pop, stack, prefix, false);
+}
+
+void translate_ct_intrinsic(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, const char *intrinsic) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    LLVMValueRef b = LLVMBuildICmp(builder, LLVMIntEQ, in1, LLVMConstInt(get_llvm_type(tcg_ty), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "eqz"));
+    LLVMBasicBlockRef bb_ctz_is_zero = LLVMAppendBasicBlock(F, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "z"));
+    LLVMBasicBlockRef bb_ctz_not_zero = LLVMAppendBasicBlock(F, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "nz"));
+    LLVMBasicBlockRef bb_ctz_merge = LLVMAppendBasicBlock(F, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "merge"));
+    LLVMBuildCondBr(builder, b, bb_ctz_is_zero, bb_ctz_not_zero);
+    LLVMPositionBuilderAtEnd(builder, bb_ctz_is_zero);
+    LLVMBuildBr(builder, bb_ctz_merge);
+    // FIXME: aarch64 requires single argument
+    //LLVMTypeRef intrinsic_types[] = {llvm_ty, LLVMInt1Type()};
+    LLVMTypeRef intrinsic_types[] = {llvm_ty};
+    char intrinsic_func[128] = {0};
+    if (tcg_ty <= LLVMInt64) {
+        snprintf(intrinsic_func, sizeof(intrinsic_func), "%s.i%d", intrinsic, llvm_vector_elem_bit_counts[tcg_ty * 2 + 1]);
+    } else {
+        snprintf(intrinsic_func, sizeof(intrinsic_func), "%s.v%di%d", intrinsic, llvm_vector_elem_bit_counts[tcg_ty * 2], llvm_vector_elem_bit_counts[tcg_ty * 2 + 1]);
+    }
+    LLVMValueRef fn = create_intrinsic_declaration(intrinsic_func, llvm_ty, intrinsic_types, 1);
+    LLVMTypeRef fn_type  = LLVMFunctionType(llvm_ty, intrinsic_types, 1, 0);
+
+    LLVMPositionBuilderAtEnd(builder, bb_ctz_not_zero);
+    // FIXME: aarch64 requires single argument
+    //LLVMValueRef false_val = LLVMConstInt(LLVMInt1Type(), 0, 0);
+    //LLVMValueRef call_args[] = {in1, false_val};
+    LLVMValueRef call_args[] = {in1};
+    LLVMValueRef call_result = LLVMBuildCall2(builder, fn_type, fn, call_args, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ctval"));
+    LLVMBuildBr(builder, bb_ctz_merge);
+
+    LLVMPositionBuilderAtEnd(builder, bb_ctz_merge);
+    LLVMValueRef phi = LLVMBuildPhi(builder, llvm_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "phi"));
+    LLVMValueRef phi_incoming_values[] = {in2, call_result};
+    LLVMBasicBlockRef phi_incoming_blocks[] = {bb_ctz_is_zero, bb_ctz_not_zero};
+    LLVMAddIncoming(phi, phi_incoming_values, phi_incoming_blocks, 2);
+    do_store(&u->operands[0], phi, stack, prefix, false);
+}
+
+void translate_binary_intrinsic(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, const char *intrinsic_func) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
+    LLVMTypeRef intrinsic_types[] = {llvm_ty, llvm_ty};
+    LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func, intrinsic_types, 2);
+    LLVMTypeRef fn_type  = LLVMFunctionType(llvm_ty, intrinsic_types, 2, 0);
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    LLVMValueRef intrinsic_call_args[] = {in1, in2};
+    LLVMValueRef out = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    do_store(&u->operands[0], out, stack, prefix, false);
 }
 
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
@@ -670,6 +719,16 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
             rc = entry(builder, F, stack, u, &prefix[0]);\
             break
 
+#define CASE_CT_INTRINSIC(opc, intrinsic)           \
+        case opc:                                   \
+            translate_ct_intrinsic(builder, F, stack, u, &prefix[0], intrinsic);   \
+            break
+
+#define CASE_BINARY_INTRINSIC(opc, intrinsic)        \
+        case opc:                                   \
+            translate_binary_intrinsic(builder, stack, u, &prefix[0], intrinsic);   \
+            break
+
 int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, FuncInstrList *f) {
     int rc = 0;
     int idx = 0;
@@ -762,6 +821,16 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_COMMON(xor_i32, LLVMBuildXor);
             CASE_COMMON(xor_i64, LLVMBuildXor);
             CASE_COMMON(xor_vec, LLVMBuildXor);
+            CASE_CT_INTRINSIC(clz_i32, "llvm.ctlz.i32");
+            CASE_CT_INTRINSIC(clz_i64, "llvm.ctlz.i64");
+            CASE_CT_INTRINSIC(ctz_i32, "llvm.cttz.i32");
+            CASE_CT_INTRINSIC(ctz_i64, "llvm.cttz.i64");
+            CASE_BINARY_INTRINSIC(smax_vec, "llvm.smax");
+            CASE_BINARY_INTRINSIC(smin_vec, "llvm.smin");
+            CASE_BINARY_INTRINSIC(ssadd_vec, "llvm.sadd.sat");
+            CASE_BINARY_INTRINSIC(sssub_vec, "llvm.ssub.sat");
+            CASE_BINARY_INTRINSIC(usadd_vec, "llvm.uadd.sat");
+            CASE_BINARY_INTRINSIC(ussub_vec, "llvm.usub.sat");
 
 #if 0
             case rotl_i32:
@@ -789,26 +858,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
                 translate_binary_splat_immediate(opc, u, LLVMBuildAShr);
                 break;
 
-            case smax_vec:
-                translate_binary_intrinsic(opc, u, "llvm.smax");
-                break;
-            case smin_vec:
-                translate_binary_intrinsic(opc, u, "llvm.smin");
-                break;
-            case ssadd_vec:
-                translate_binary_intrinsic(opc, u, "llvm.sadd.sat");
-                break;
-            case sssub_vec:
-                translate_binary_intrinsic(opc, u, "llvm.ssub.sat");
-                break;
-            case usadd_vec:
-                translate_binary_intrinsic(opc, u, "llvm.uadd.sat");
-                break;
-            case ussub_vec:
-                translate_binary_intrinsic(opc, u, "llvm.usub.sat");
-                break;
-#endif
-#if 0
             case andc_i32:
             case andc_i64:
             case andc_vec:
@@ -848,18 +897,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
                 break;
             case bswap64_i64:
                 translate_bswap64_i64(opc, u);
-                break;
-            case clz_i32:
-                translate_count_zero(opc, u, "llvm.ctlz.i32");
-                break;
-            case clz_i64:
-                translate_count_zero(opc, u, "llvm.ctlz.i64");
-                break;
-            case ctz_i32:
-                translate_count_zero(opc, u, "llvm.cttz.i32");
-                break;
-            case ctz_i64:
-                translate_count_zero(opc, u, "llvm.cttz.i64");
                 break;
             case deposit_i32:
             case deposit_i64:

@@ -99,5 +99,21 @@ or_vec v128,e8,tmp27,tmp24,tmp25
 or_vec v128,e32,tmp27,tmp24,tmp25
 xor_vec v128,e8,tmp27,tmp24,tmp25
 xor_vec v128,e32,tmp27,tmp24,tmp25
+clz_i32 loc0,loc0,loc1
+clz_i64 loc0,loc0,loc1
+ctz_i32 loc0,loc0,loc1
+ctz_i64 loc0,loc0,loc1
+smax_vec v128,e8,tmp27,tmp24,tmp25
+smax_vec v128,e32,tmp27,tmp24,tmp25
+smin_vec v128,e8,tmp27,tmp24,tmp25
+smin_vec v128,e32,tmp27,tmp24,tmp25
+ssadd_vec v128,e8,tmp27,tmp24,tmp25
+ssadd_vec v128,e32,tmp27,tmp24,tmp25
+sssub_vec v128,e8,tmp27,tmp24,tmp25
+sssub_vec v128,e32,tmp27,tmp24,tmp25
+usadd_vec v128,e8,tmp27,tmp24,tmp25
+usadd_vec v128,e32,tmp27,tmp24,tmp25
+ussub_vec v128,e8,tmp27,tmp24,tmp25
+ussub_vec v128,e32,tmp27,tmp24,tmp25
 
 jmp_direct $0x55aa

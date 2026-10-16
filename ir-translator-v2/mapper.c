@@ -96,6 +96,15 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
     return ty;
 }
 
+LLVMValueRef create_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef ret_ty, LLVMTypeRef *arg_types, int cnt) {
+    LLVMValueRef func = LLVMGetNamedFunction(g_module, intrinsic_name);
+    if (!func) {
+        LLVMTypeRef fn_type = LLVMFunctionType(ret_ty, arg_types, cnt, 0);
+        func = LLVMAddFunction(g_module, intrinsic_name, fn_type);
+    }
+    return func;
+}
+
 LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *intrinsic_types, int cnt) {
     unsigned id = LLVMLookupIntrinsicID(intrinsic_name, strlen(intrinsic_name));
     assert(id != 0);

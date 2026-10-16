@@ -38,6 +38,7 @@ typedef struct {
 } TBAA;
 
 LLVMTypeRef get_llvm_type(LLVMType type);
+LLVMValueRef create_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef ret_ty, LLVMTypeRef *arg_types, int cnt);
 LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *intrinsic_types, int cnt);
 LLVMValueRef get_const_vector(unsigned long c, LLVMType ty);
 LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVMValueRef PointerVal, unsigned Bytes, TagType tag_ty);
