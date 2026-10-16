@@ -103,17 +103,58 @@ void translate_abs_vec(LLVMBuilderRef builder, StackAlloca *stack, const Unified
     do_store(&u->operands[0], abs, stack, prefix, false);
 }
 
-void translate_bitsel_vec(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+static LLVMValueRef do_bitsel_vec(LLVMBuilderRef builder, LLVMValueRef sel, LLVMValueRef a, LLVMValueRef b, const char *prefix) {
     char var_name[32] = {0};
-    LLVMValueRef out = LLVMBuildOr(builder,
-                          LLVMBuildAnd(builder, get_input_val_for_operand(&u->operands[2], stack, prefix),
-                                                get_input_val_for_operand(&u->operands[1], stack, prefix),
-                                                assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_2_1")),
-                          LLVMBuildAnd(builder, get_input_val_for_operand(&u->operands[3], stack, prefix),
-                              LLVMBuildNot(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
-                                                assemble_name_2(&var_name[0], sizeof(var_name), prefix, "n1")),
-                                                assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_3_n1")),
+    return LLVMBuildOr(builder,
+                          LLVMBuildAnd(builder, a, sel, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_a_sel")),
+                          LLVMBuildAnd(builder, b,
+                              LLVMBuildNot(builder, sel, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "nsel")),
+                                          assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_b_nsel")),
                           assemble_name_2(&var_name[0], sizeof(var_name), prefix, "or"));
+}
+
+void translate_bitsel_vec(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    LLVMValueRef out = do_bitsel_vec(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                                    get_input_val_for_operand(&u->operands[2], stack, prefix),
+                                    get_input_val_for_operand(&u->operands[3], stack, prefix), prefix);
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
+static LLVMValueRef do_cond(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueRef in2, RelopType r, LLVMType ty, const char *prefix) {
+    char var_name[32] = {0};
+    if (r == tsteq || r == tstne) {
+        r -= (tsteq - eq);
+        in1 = LLVMBuildAnd(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tst"));
+        in2 = LLVMConstInt(get_llvm_type(ty), 0, 0);
+    }
+    assert(r < RELOP_MAX && llvm_predicate[r]);
+    return LLVMBuildICmp(builder, llvm_predicate[r], in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "bool"));
+}
+
+static LLVMValueRef do_cmp_vec(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueRef in2, RelopType r, LLVMType ty, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMValueRef bv = do_cond(builder, in1, in2, r, ty, prefix);
+    LLVMValueRef v_one = get_const_vector(-1UL, ty);
+    LLVMValueRef v_zero = get_const_vector(0, ty);
+    return LLVMBuildSelect(builder, bv, v_one, v_zero, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "predicate"));
+}
+
+void translate_cmp_vec(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    assert(u->operands[3].kind == OP_RELOP);
+    LLVMValueRef out = do_cmp_vec(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                        get_input_val_for_operand(&u->operands[2], stack, prefix),
+                        u->operands[3].relop, get_operand_type(&u->operands[0]), prefix);
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
+void translate_cmpsel_vec(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    assert(u->operands[5].kind == OP_RELOP);
+    LLVMValueRef select = do_cmp_vec(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                        get_input_val_for_operand(&u->operands[2], stack, prefix),
+                        u->operands[5].relop, get_operand_type(&u->operands[0]), prefix);
+    LLVMValueRef out = do_bitsel_vec(builder, select,
+                                    get_input_val_for_operand(&u->operands[3], stack, prefix),
+                                    get_input_val_for_operand(&u->operands[4], stack, prefix), prefix);
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
@@ -443,18 +484,10 @@ void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
 }
 
 void translate_brcond(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
-    char var_name[32] = {0};
-    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[0], stack, prefix);
-    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[1], stack, prefix);
     assert(u->operands[2].kind == OP_RELOP);
-    RelopType r = u->operands[2].relop;
-    if (r == tsteq || r == tstne) {
-        r -= (tsteq - eq);
-        in1 = LLVMBuildAnd(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tst"));
-        in2 = LLVMConstInt(get_llvm_type(u->opc == brcond_i64 ? LLVMInt64 : LLVMInt32), 0, 0);
-    }
-    assert(r < RELOP_MAX && llvm_predicate[r]);
-    LLVMValueRef bv = LLVMBuildICmp(builder, llvm_predicate[r], in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "bool"));
+    LLVMValueRef bv = do_cond(builder, get_input_val_for_operand(&u->operands[0], stack, prefix),
+                              get_input_val_for_operand(&u->operands[1], stack, prefix),
+                              u->operands[2].relop, (u->opc == brcond_i64 ? LLVMInt64 : LLVMInt32), prefix);
     //LLVMBasicBlockRef cur = LLVMGetInsertBlock(builder);
     LLVMBasicBlockRef bb_false = LLVMAppendBasicBlock(F, "bb_false");
     assert(u->operands[3].kind == OP_LABEL);
@@ -676,11 +709,14 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(mov_i64, translate_mov);
             CASE(mov_vec, translate_mov);
             CASE(abs_vec, translate_abs_vec);
-
             CASE(bitsel_vec, translate_bitsel_vec);
+
+            CASE(cmp_vec, translate_cmp_vec);
+            CASE(cmpsel_vec, translate_cmpsel_vec);
+
 #if 0
-            case bitsel_vec:
-                translate_bitsel_vec(opc, u);
+            case cmp_vec:
+                translate_cmp_vec(opc, u);
                 break;
             case cmpsel_vec:
                 translate_cmpsel_vec(opc, u);
@@ -798,9 +834,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
                 break;
             case clz_i64:
                 translate_count_zero(opc, u, "llvm.ctlz.i64");
-                break;
-            case cmp_vec:
-                translate_cmp_vec(opc, u);
                 break;
             case ctz_i32:
                 translate_count_zero(opc, u, "llvm.cttz.i32");

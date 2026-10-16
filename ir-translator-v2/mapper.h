@@ -39,6 +39,7 @@ typedef struct {
 
 LLVMTypeRef get_llvm_type(LLVMType type);
 LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *intrinsic_types, int cnt);
+LLVMValueRef get_const_vector(unsigned long c, LLVMType ty);
 LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVMValueRef PointerVal, unsigned Bytes, TagType tag_ty);
 LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMValueRef PointerVal, const char *Name, unsigned Bytes, TagType tag_ty);
 LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, const char *prefix);

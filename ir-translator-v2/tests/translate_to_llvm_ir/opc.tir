@@ -37,9 +37,11 @@ subb1o_i32 loc0,loc1,loc2
 subb1o_i64 loc0,loc1,loc2
 add_i32 loc0,loc1,loc2
 add_i64 loc0,loc1,loc2
-ld_vec v128,e8,tmp24,env,$0x360
+ld_vec v128,e8,tmp24,env,$0x3e0
 ld_vec v128,e8,tmp25,env,$0x360
 ld_vec v128,e8,tmp26,env,$0x5e0
+ld_vec v128,e8,tmp28,env,$0x620
+ld_vec v128,e8,tmp29,env,$0x660
 add_vec v128,e8,tmp27,tmp25,tmp26
 add_vec v128,e32,tmp27,tmp25,tmp26
 sub_i32 loc0,loc1,loc2
@@ -50,7 +52,14 @@ extrl_i64_i32 loc0,loc1
 mov_i32 loc0,loc1
 mov_i64 loc0,loc1
 mov_vec v128,e8,tmp27,tmp25
+mov_vec v128,e32,tmp27,tmp25
 abs_vec v128,e8,tmp27,tmp25
+abs_vec v128,e32,tmp27,tmp25
 bitsel_vec v128,e8,tmp27,tmp24,tmp25,tmp26
+bitsel_vec v128,e32,tmp27,tmp24,tmp25,tmp26
+cmp_vec v128,e8,tmp27,tmp24,tmp25,gt
+cmp_vec v128,e32,tmp27,tmp24,tmp25,gt
+cmpsel_vec v128,e8,tmp27,tmp24,tmp25,tmp28,tmp29,gt
+cmpsel_vec v128,e32,tmp27,tmp24,tmp25,tmp28,tmp29,gt
 
 jmp_direct $0x55aa

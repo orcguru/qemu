@@ -102,6 +102,15 @@ LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *
     return LLVMGetIntrinsicDeclaration(g_module, id, intrinsic_types, cnt);
 }
 
+LLVMValueRef get_const_vector(unsigned long c, LLVMType ty) {
+    LLVMValueRef constants[16];
+    int elem_cnt = llvm_vector_elem_bit_counts[ty * 2];
+    for (int i = 0; i < elem_cnt; i++) {
+        constants[i] = LLVMConstInt(get_llvm_type(OPC_VECTOR_TO_FIXED(ty)), c, 0);
+    }
+    return LLVMConstVector(constants, elem_cnt);
+}
+
 LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name) {
     char var_name[32] = {0};
     if (as->tcg_ty[idx] == LLVMInvalidType) {
