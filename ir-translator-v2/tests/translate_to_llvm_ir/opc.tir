@@ -115,5 +115,13 @@ usadd_vec v128,e8,tmp27,tmp24,tmp25
 usadd_vec v128,e32,tmp27,tmp24,tmp25
 ussub_vec v128,e8,tmp27,tmp24,tmp25
 ussub_vec v128,e32,tmp27,tmp24,tmp25
+rotl_i32 loc0,loc0,loc1
+rotl_i64 loc0,loc0,loc1
+rotl_i32 loc0,loc0,$0x4
+rotl_i64 loc0,loc0,$0x100
+rotli_vec v128,e32,tmp27,tmp24,$0x2
+rotli_vec v128,e32,tmp27,tmp24,$0x201
+rotls_vec v128,e32,tmp27,tmp24,loc0
+rotlv_vec v128,e32,tmp27,tmp24,tmp25
 
 jmp_direct $0x55aa

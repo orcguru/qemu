@@ -226,6 +226,48 @@ void translate_binary_intrinsic(LLVMBuilderRef builder, StackAlloca *stack, cons
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+static LLVMValueRef do_rotl(LLVMBuilderRef builder, LLVMValueRef a, LLVMValueRef shift_l, LLVMValueRef shift_r, const char *prefix) {
+    char var_name[32] = {0};
+    return LLVMBuildOr(builder,
+                          LLVMBuildShl(builder, a, shift_l, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shl_a")),
+                          LLVMBuildLShr(builder, a, shift_r, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "lshr_a")),
+                          assemble_name_2(&var_name[0], sizeof(var_name), prefix, "or"));
+}
+
+void translate_rotl(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    bool is_vec = tcg_ty > LLVMInt64;
+    LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
+    LLVMValueRef shift_amount = NULL;
+    if (u->opc == rotlv_vec || !is_vec) {
+        shift_amount = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    } else {
+        // Hack op_type for rotli/s_vec
+        if (u->operands[2].kind == OP_SLOT) {
+            assert(u->operands[2].slot.type == SUB_SLOT_TMP);
+            int tidx = u->operands[2].slot.idx;
+            assert(stack->tmp.alloca[tidx]);
+            LLVMValueRef elem = build_load_with_alignment(builder, get_llvm_type(OPC_VECTOR_TO_FIXED(tcg_ty)), stack->tmp.alloca[tidx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, "s"), stack->tmp.align[tidx], SPILL_TAG);
+            shift_amount = get_const_vector(0, tcg_ty);
+            int elem_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2];
+            for (int i = 0; i < elem_cnt; ++i) {
+                shift_amount = LLVMBuildInsertElement(builder, shift_amount, elem, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "shift", "ie"));
+            }
+        } else {
+            assert(u->operands[2].kind == OP_IMM);
+            shift_amount = get_const_vector(u->operands[2].imm.val, tcg_ty);
+        }
+    }
+    int bc = tcg_ty == LLVMInt32 ? 32 : 64;
+    LLVMValueRef bit_count = is_vec ? get_const_vector(bc, tcg_ty) : LLVMConstInt(llvm_ty, bc, 0);
+    LLVMValueRef shift_mask = is_vec ? get_const_vector((bc - 1), tcg_ty) : LLVMConstInt(llvm_ty, (bc - 1), 0);
+    LLVMValueRef shift_l = LLVMBuildAnd(builder, shift_amount, shift_mask, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shift_l"));
+    LLVMValueRef shift_r = LLVMBuildSub(builder, bit_count, shift_l, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shift_r"));
+    LLVMValueRef out = do_rotl(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), shift_l, shift_r, prefix);
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -831,20 +873,13 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_BINARY_INTRINSIC(sssub_vec, "llvm.ssub.sat");
             CASE_BINARY_INTRINSIC(usadd_vec, "llvm.uadd.sat");
             CASE_BINARY_INTRINSIC(ussub_vec, "llvm.usub.sat");
+            CASE(rotl_i32, translate_rotl);
+            CASE(rotl_i64, translate_rotl);
+            CASE(rotli_vec, translate_rotl);
+            CASE(rotls_vec, translate_rotl);
+            CASE(rotlv_vec, translate_rotl);
 
 #if 0
-            case rotl_i32:
-            case rotl_i64:
-                translate_rotl(opc, u);
-                break;
-            case rotli_vec:
-            case rotls_vec:
-                translate_rotl_vec(opc, u);
-                break;
-            case rotlv_vec:
-                translate_rotlv_vec(opc, u);
-                break;
-
             case rotr_i32:
             case rotr_i64:
                 translate_rotr(opc, u);
