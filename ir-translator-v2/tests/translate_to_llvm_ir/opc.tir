@@ -119,8 +119,12 @@ rotl_i32 loc0,loc0,loc1
 rotl_i64 loc0,loc0,loc1
 rotl_i32 loc0,loc0,$0x4
 rotl_i64 loc0,loc0,$0x100
-rotli_vec v128,e32,tmp27,tmp24,$0x2
-rotli_vec v128,e32,tmp27,tmp24,$0x201
+rotli_vec v128,e8,tmp27,tmp24,$0x2
+rotli_vec v128,e8,tmp27,tmp24,$0x8
+rotli_vec v128,e8,tmp27,tmp24,$0x9
+rotli_vec v128,e16,tmp27,tmp24,$0x12
+rotli_vec v128,e32,tmp27,tmp24,$0x21
+rotli_vec v128,e64,tmp27,tmp24,$0x42
 rotls_vec v128,e32,tmp27,tmp24,loc0
 rotlv_vec v128,e32,tmp27,tmp24,tmp25
 rotr_i32 loc0,loc0,loc1
@@ -128,5 +132,15 @@ rotr_i64 loc0,loc0,loc1
 rotr_i32 loc0,loc0,$0x4
 rotr_i64 loc0,loc0,$0x100
 rotrv_vec v128,e32,tmp27,tmp24,tmp25
+shli_vec v128,e8,tmp27,tmp24,$0x2
+shli_vec v128,e8,tmp27,tmp24,$0x9
+shli_vec v128,e16,tmp27,tmp24,$0x11
+shli_vec v128,e32,tmp27,tmp24,$0x21
+shli_vec v128,e64,tmp27,tmp24,$0x42
+shls_vec v128,e32,tmp27,tmp24,loc0
+shri_vec v128,e32,tmp27,tmp24,$0x2
+shrs_vec v128,e32,tmp27,tmp24,loc0
+sari_vec v128,e32,tmp27,tmp24,$0x2
+sars_vec v128,e32,tmp27,tmp24,loc0
 
 jmp_direct $0x55aa
