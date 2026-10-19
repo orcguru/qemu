@@ -226,7 +226,7 @@ void translate_binary_intrinsic(LLVMBuilderRef builder, StackAlloca *stack, cons
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
-static LLVMValueRef do_rotl(LLVMBuilderRef builder, LLVMValueRef a, LLVMValueRef shift_l, LLVMValueRef shift_r, const char *prefix) {
+static LLVMValueRef do_rotate(LLVMBuilderRef builder, LLVMValueRef a, LLVMValueRef shift_l, LLVMValueRef shift_r, const char *prefix) {
     char var_name[32] = {0};
     return LLVMBuildOr(builder,
                           LLVMBuildShl(builder, a, shift_l, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shl_a")),
@@ -234,13 +234,13 @@ static LLVMValueRef do_rotl(LLVMBuilderRef builder, LLVMValueRef a, LLVMValueRef
                           assemble_name_2(&var_name[0], sizeof(var_name), prefix, "or"));
 }
 
-void translate_rotl(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+void translate_rotate(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, bool left) {
     char var_name[32] = {0};
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
     bool is_vec = tcg_ty > LLVMInt64;
     LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
     LLVMValueRef shift_amount = NULL;
-    if (u->opc == rotlv_vec || !is_vec) {
+    if (u->opc == rotlv_vec || u->opc == rotrv_vec || !is_vec) {
         shift_amount = get_input_val_for_operand(&u->operands[2], stack, prefix);
     } else {
         // Hack op_type for rotli/s_vec
@@ -262,9 +262,9 @@ void translate_rotl(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIns
     int bc = tcg_ty == LLVMInt32 ? 32 : 64;
     LLVMValueRef bit_count = is_vec ? get_const_vector(bc, tcg_ty) : LLVMConstInt(llvm_ty, bc, 0);
     LLVMValueRef shift_mask = is_vec ? get_const_vector((bc - 1), tcg_ty) : LLVMConstInt(llvm_ty, (bc - 1), 0);
-    LLVMValueRef shift_l = LLVMBuildAnd(builder, shift_amount, shift_mask, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shift_l"));
-    LLVMValueRef shift_r = LLVMBuildSub(builder, bit_count, shift_l, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shift_r"));
-    LLVMValueRef out = do_rotl(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), shift_l, shift_r, prefix);
+    LLVMValueRef shift_a = LLVMBuildAnd(builder, shift_amount, shift_mask, assemble_name_2(&var_name[0], sizeof(var_name), prefix, left ? "shift_l" : "shift_r"));
+    LLVMValueRef shift_b = LLVMBuildSub(builder, bit_count, shift_a, assemble_name_2(&var_name[0], sizeof(var_name), prefix, left ? "shift_r" : "shift_l"));
+    LLVMValueRef out = do_rotate(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), (left ? shift_a : shift_b), (left ? shift_b : shift_a), prefix);
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
@@ -746,6 +746,11 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
             entry(builder, stack, u, &prefix[0]);   \
             break
 
+#define CASE_BOOL(opc, entry, b)                    \
+        case opc:                                   \
+            entry(builder, stack, u, &prefix[0], b);\
+            break
+
 #define CASE_COMMON(opc, llvm_api)                                      \
         case opc:                                                       \
             translate_common(builder, llvm_api, stack, u, &prefix[0]);  \
@@ -873,20 +878,16 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_BINARY_INTRINSIC(sssub_vec, "llvm.ssub.sat");
             CASE_BINARY_INTRINSIC(usadd_vec, "llvm.uadd.sat");
             CASE_BINARY_INTRINSIC(ussub_vec, "llvm.usub.sat");
-            CASE(rotl_i32, translate_rotl);
-            CASE(rotl_i64, translate_rotl);
-            CASE(rotli_vec, translate_rotl);
-            CASE(rotls_vec, translate_rotl);
-            CASE(rotlv_vec, translate_rotl);
+            CASE_BOOL(rotl_i32, translate_rotate, true);
+            CASE_BOOL(rotl_i64, translate_rotate, true);
+            CASE_BOOL(rotli_vec, translate_rotate, true);
+            CASE_BOOL(rotls_vec, translate_rotate, true);
+            CASE_BOOL(rotlv_vec, translate_rotate, true);
+            CASE_BOOL(rotr_i32, translate_rotate, false);
+            CASE_BOOL(rotr_i64, translate_rotate, false);
+            CASE_BOOL(rotrv_vec, translate_rotate, false);
 
 #if 0
-            case rotr_i32:
-            case rotr_i64:
-                translate_rotr(opc, u);
-                break;
-            case rotrv_vec:
-                translate_rotrv_vec(opc, u);
-                break;
 
             case sari_vec:
             case sars_vec:
