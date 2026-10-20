@@ -365,6 +365,16 @@ void translate_eqv(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInst
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_neg(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    bool is_vec = tcg_ty > LLVMInt64;
+    LLVMValueRef out = LLVMBuildSub(builder, (is_vec ? get_const_vector(0, tcg_ty) : LLVMConstInt(get_llvm_type(tcg_ty), 0, 0)),
+                                    get_input_val_for_operand(&u->operands[1], stack, prefix),
+                                    assemble_name_2(&var_name[0], sizeof(var_name), prefix, "sub_zero_a"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -1006,18 +1016,21 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(nand_i32, translate_nand);
             CASE(nand_i64, translate_nand);
             CASE(nand_vec, translate_nand);
-
             CASE(eqv_i32, translate_eqv);
             CASE(eqv_i64, translate_eqv);
             CASE(eqv_vec, translate_eqv);
+            CASE(neg_i32, translate_neg);
+            CASE(neg_i64, translate_neg);
+            CASE(neg_vec, translate_neg);
 
 #if 0
 
-            case eqv_i32:
-            case eqv_i64:
-            case eqv_vec:
-                translate_eqv(opc, u);
+            case not_i32:
+            case not_i64:
+            case not_vec:
+                translate_not(opc, u);
                 break;
+
             case bswap16_i32:
                 translate_bswap16_i32(opc, u);
                 break;
@@ -1078,19 +1091,9 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             case mulu2_i64:
                 translate_mulu2(opc, u);
                 break;
-            case neg_i32:
-            case neg_i64:
-            case neg_vec:
-                translate_neg(opc, u);
-                break;
             case negsetcond_i32:
             case negsetcond_i64:
                 translate_negsetcond(opc, u);
-                break;
-            case not_i32:
-            case not_i64:
-            case not_vec:
-                translate_not(opc, u);
                 break;
 #endif
             CASE(ld8u_i32, translate_ld_zext);
