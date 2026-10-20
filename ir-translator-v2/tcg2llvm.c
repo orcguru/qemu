@@ -317,6 +317,15 @@ void translate_shift(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca 
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_andc(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMValueRef out = LLVMBuildAnd(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                              LLVMBuildNot(builder, get_input_val_for_operand(&u->operands[2], stack, prefix),
+                                           assemble_name_2(&var_name[0], sizeof(var_name), prefix, "notb")),
+                              assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_a_notb"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -946,14 +955,12 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_SHIFT(shrs_vec, LLVMBuildLShr);
             CASE_SHIFT(sari_vec, LLVMBuildAShr);
             CASE_SHIFT(sars_vec, LLVMBuildAShr);
+            CASE(andc_i32, translate_andc);
+            CASE(andc_i64, translate_andc);
+            CASE(andc_vec, translate_andc);
 
 #if 0
 
-            case andc_i32:
-            case andc_i64:
-            case andc_vec:
-                translate_andc(opc, u);
-                break;
             case nor_i32:
             case nor_i64:
             case nor_vec:

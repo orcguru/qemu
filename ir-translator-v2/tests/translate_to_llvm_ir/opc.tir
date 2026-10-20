@@ -142,5 +142,8 @@ shri_vec v128,e32,tmp27,tmp24,$0x2
 shrs_vec v128,e32,tmp27,tmp24,loc0
 sari_vec v128,e32,tmp27,tmp24,$0x2
 sars_vec v128,e32,tmp27,tmp24,loc0
+andc_i32 loc0,loc0,loc1
+andc_i64 loc0,loc0,loc1
+andc_vec v128,e32,tmp27,tmp24,tmp25
 
 jmp_direct $0x55aa
