@@ -375,6 +375,13 @@ void translate_neg(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInst
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_not(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMValueRef out = LLVMBuildNot(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                                    assemble_name_2(&var_name[0], sizeof(var_name), prefix, "not"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -1022,6 +1029,9 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(neg_i32, translate_neg);
             CASE(neg_i64, translate_neg);
             CASE(neg_vec, translate_neg);
+            CASE(not_i32, translate_not);
+            CASE(not_i64, translate_not);
+            CASE(not_vec, translate_not);
 
 #if 0
 
