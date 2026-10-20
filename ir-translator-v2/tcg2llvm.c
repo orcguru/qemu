@@ -36,7 +36,7 @@ void translate_mov(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInst
     char var_name[32] = {0};
     LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
     if (get_operand_type(&u->operands[1]) > get_operand_type(&u->operands[0])) {
-        in = LLVMBuildTrunc(builder, in, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(in), "trunc"));
+        in = LLVMBuildTrunc(builder, in, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(in), "tr"));
     }
     do_store(&u->operands[0], in, stack, prefix, false);
 }
@@ -73,7 +73,7 @@ void translate_addc_subb(LLVMBuilderRef builder, StackAlloca *stack, const Unifi
                       u->opc == subb1o_i32 || u->opc == subb1o_i64) ?
                     LLVMConstInt(LLVMInt1Type(), 1, 0) :
                     build_load_with_alignment(builder, LLVMInt1Type(), is_add ? stack->carry : stack->borrow, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ci"), 8, SPILL_TAG);
-    LLVMValueRef ci_ext = LLVMBuildZExt(builder, ci, llvm_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ci_ext"));
+    LLVMValueRef ci_ext = LLVMBuildZExt(builder, ci, llvm_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ze_ci"));
     LLVMValueRef intrinsic_call2_args[] = {s1, ci_ext};
     LLVMValueRef call2 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call2_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r2"));
     LLVMValueRef s2 = LLVMBuildExtractValue(builder, call2, 0, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "s2"));
@@ -108,8 +108,8 @@ static LLVMValueRef do_bitsel_vec(LLVMBuilderRef builder, LLVMValueRef sel, LLVM
     return LLVMBuildOr(builder,
                           LLVMBuildAnd(builder, a, sel, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_a_sel")),
                           LLVMBuildAnd(builder, b,
-                              LLVMBuildNot(builder, sel, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "nsel")),
-                                          assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_b_nsel")),
+                              LLVMBuildNot(builder, sel, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "not_sel")),
+                                          assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_b_not_sel")),
                           assemble_name_2(&var_name[0], sizeof(var_name), prefix, "or"));
 }
 
@@ -124,7 +124,7 @@ static LLVMValueRef do_cond(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueR
     char var_name[32] = {0};
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
-        in1 = LLVMBuildAnd(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tst"));
+        in1 = LLVMBuildAnd(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_a_b"));
         in2 = LLVMConstInt(get_llvm_type(ty), 0, 0);
     }
     assert(r < RELOP_MAX && llvm_predicate[r]);
@@ -177,7 +177,7 @@ void translate_ct_intrinsic(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
     LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
     LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
-    LLVMValueRef b = LLVMBuildICmp(builder, LLVMIntEQ, in1, LLVMConstInt(get_llvm_type(tcg_ty), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "eqz"));
+    LLVMValueRef b = LLVMBuildICmp(builder, LLVMIntEQ, in1, LLVMConstInt(get_llvm_type(tcg_ty), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "icmp_eq_zero"));
     LLVMBasicBlockRef bb_ctz_is_zero = LLVMAppendBasicBlock(F, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "z"));
     LLVMBasicBlockRef bb_ctz_not_zero = LLVMAppendBasicBlock(F, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "nz"));
     LLVMBasicBlockRef bb_ctz_merge = LLVMAppendBasicBlock(F, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "merge"));
@@ -201,7 +201,7 @@ void translate_ct_intrinsic(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     //LLVMValueRef false_val = LLVMConstInt(LLVMInt1Type(), 0, 0);
     //LLVMValueRef call_args[] = {in1, false_val};
     LLVMValueRef call_args[] = {in1};
-    LLVMValueRef call_result = LLVMBuildCall2(builder, fn_type, fn, call_args, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ctval"));
+    LLVMValueRef call_result = LLVMBuildCall2(builder, fn_type, fn, call_args, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ct_result"));
     LLVMBuildBr(builder, bb_ctz_merge);
 
     LLVMPositionBuilderAtEnd(builder, bb_ctz_merge);
@@ -229,8 +229,8 @@ void translate_binary_intrinsic(LLVMBuilderRef builder, StackAlloca *stack, cons
 static LLVMValueRef do_rotate(LLVMBuilderRef builder, LLVMValueRef a, LLVMValueRef shift_l, LLVMValueRef shift_r, const char *prefix) {
     char var_name[32] = {0};
     return LLVMBuildOr(builder,
-                          LLVMBuildShl(builder, a, shift_l, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shl_a")),
-                          LLVMBuildLShr(builder, a, shift_r, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "lshr_a")),
+                          LLVMBuildShl(builder, a, shift_l, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shl")),
+                          LLVMBuildLShr(builder, a, shift_r, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "lshr")),
                           assemble_name_2(&var_name[0], sizeof(var_name), prefix, "or"));
 }
 
@@ -321,8 +321,8 @@ void translate_andc(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIns
     char var_name[32] = {0};
     LLVMValueRef out = LLVMBuildAnd(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
                               LLVMBuildNot(builder, get_input_val_for_operand(&u->operands[2], stack, prefix),
-                                           assemble_name_2(&var_name[0], sizeof(var_name), prefix, "notb")),
-                              assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_a_notb"));
+                                           assemble_name_2(&var_name[0], sizeof(var_name), prefix, "not")),
+                              assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_a_not_b"));
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
@@ -332,7 +332,16 @@ void translate_nor(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInst
                                     LLVMBuildOr(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
                                                 get_input_val_for_operand(&u->operands[2], stack, prefix),
                                                 assemble_name_2(&var_name[0], sizeof(var_name), prefix, "or")),
-                                    assemble_name_2(&var_name[0], sizeof(var_name), prefix, "not_or"));
+                                    assemble_name_2(&var_name[0], sizeof(var_name), prefix, "not_or_a_b"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
+void translate_orc(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMValueRef out = LLVMBuildOr(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                              LLVMBuildNot(builder, get_input_val_for_operand(&u->operands[2], stack, prefix),
+                                           assemble_name_2(&var_name[0], sizeof(var_name), prefix, "not")),
+                              assemble_name_2(&var_name[0], sizeof(var_name), prefix, "or_a_not_b"));
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
@@ -435,7 +444,7 @@ void translate_ld_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const Un
         }
     }
     if (get_operand_type(&u->operands[1]) > get_operand_type(&u->operands[0])) {
-        val = LLVMBuildTrunc(builder, val, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "trunc"));
+        val = LLVMBuildTrunc(builder, val, get_llvm_type(get_operand_type(&u->operands[0])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "tr"));
     }
     do_store(&u->operands[0], val, stack, prefix, false);
 }
@@ -467,7 +476,7 @@ void translate_st(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr
         out.vec.offset = u->operands[2].imm.val;
     }
     if (get_operand_type(&u->operands[0]) > get_operand_type(&u->operands[1])) {
-        val = LLVMBuildTrunc(builder, val, get_llvm_type(get_operand_type(&u->operands[1])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "trunc"));
+        val = LLVMBuildTrunc(builder, val, get_llvm_type(get_operand_type(&u->operands[1])), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "tr"));
     }
     bool skip_env_check = false;
     if (u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_XREG && u->operands[1].kind == OP_ENV && env_regs_offset[u->operands[0].slot.idx] == u->operands[1].env.offset) {
@@ -972,13 +981,12 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(nor_i64, translate_nor);
             CASE(nor_vec, translate_nor);
 
+            CASE(orc_i32, translate_orc);
+            CASE(orc_i64, translate_orc);
+            CASE(orc_vec, translate_orc);
+
 #if 0
 
-            case nor_i32:
-            case nor_i64:
-            case nor_vec:
-                translate_nor(opc, u);
-                break;
             case orc_i32:
             case orc_i64:
             case orc_vec:

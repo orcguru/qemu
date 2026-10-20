@@ -148,5 +148,8 @@ andc_vec v128,e32,tmp27,tmp24,tmp25
 nor_i32 loc0,loc0,loc1
 nor_i64 loc0,loc0,loc1
 nor_vec v128,e32,tmp27,tmp24,tmp25
+orc_i32 loc0,loc0,loc1
+orc_i64 loc0,loc0,loc1
+orc_vec v128,e32,tmp27,tmp24,tmp25
 
 jmp_direct $0x55aa

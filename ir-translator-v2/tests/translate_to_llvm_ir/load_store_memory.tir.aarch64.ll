@@ -280,8 +280,8 @@ entry:
   %T45.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !52
   %T45.tmp7.ptr = inttoptr i64 %T45.tmp7 to ptr, !tcg.op !52
   %T45.ld = load i64, ptr %T45.tmp7.ptr, align 1, !tbaa !24, !tcg.op !52
-  %T45.ld.trunc = trunc i64 %T45.ld to i32, !tcg.op !52
-  store i32 %T45.ld.trunc, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !52
+  %T45.ld.tr = trunc i64 %T45.ld to i32, !tcg.op !52
+  store i32 %T45.ld.tr, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !52
 ; ======== TCG [46] qemu_ld_i64 [t8],t7,attr-stg:ATOM_NONE:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
   %T46.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !53
   %T46.tmp7.ptr = inttoptr i64 %T46.tmp7 to ptr, !tcg.op !53
@@ -325,29 +325,29 @@ entry:
   store i64 %T52.ld.ee3, ptr %tmp11.stack, align 8, !tbaa !0, !tcg.op !59
 ; ======== TCG [53] st8_i32 t0,env:0xac ========
   %T53.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !60
-  %T53.tmp0.trunc = trunc i32 %T53.tmp0 to i8, !tcg.op !60
+  %T53.tmp0.tr = trunc i32 %T53.tmp0 to i8, !tcg.op !60
   %T53.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !60
-  store i8 %T53.tmp0.trunc, ptr %T53.envptr, align 4, !tbaa !4, !tcg.op !60
+  store i8 %T53.tmp0.tr, ptr %T53.envptr, align 4, !tbaa !4, !tcg.op !60
 ; ======== TCG [54] st8_i64 t0,env:0xac ========
   %T54.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !61
-  %T54.tmp0.trunc = trunc i64 %T54.tmp0 to i8, !tcg.op !61
+  %T54.tmp0.tr = trunc i64 %T54.tmp0 to i8, !tcg.op !61
   %T54.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !61
-  store i8 %T54.tmp0.trunc, ptr %T54.envptr, align 4, !tbaa !4, !tcg.op !61
+  store i8 %T54.tmp0.tr, ptr %T54.envptr, align 4, !tbaa !4, !tcg.op !61
 ; ======== TCG [55] st16_i32 t0,env:0xac ========
   %T55.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !62
-  %T55.tmp0.trunc = trunc i32 %T55.tmp0 to i16, !tcg.op !62
+  %T55.tmp0.tr = trunc i32 %T55.tmp0 to i16, !tcg.op !62
   %T55.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !62
-  store i16 %T55.tmp0.trunc, ptr %T55.envptr, align 4, !tbaa !4, !tcg.op !62
+  store i16 %T55.tmp0.tr, ptr %T55.envptr, align 4, !tbaa !4, !tcg.op !62
 ; ======== TCG [56] st16_i64 t0,env:0xac ========
   %T56.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !63
-  %T56.tmp0.trunc = trunc i64 %T56.tmp0 to i16, !tcg.op !63
+  %T56.tmp0.tr = trunc i64 %T56.tmp0 to i16, !tcg.op !63
   %T56.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !63
-  store i16 %T56.tmp0.trunc, ptr %T56.envptr, align 4, !tbaa !4, !tcg.op !63
+  store i16 %T56.tmp0.tr, ptr %T56.envptr, align 4, !tbaa !4, !tcg.op !63
 ; ======== TCG [57] st32_i64 t0,env:0xac ========
   %T57.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !64
-  %T57.tmp0.trunc = trunc i64 %T57.tmp0 to i32, !tcg.op !64
+  %T57.tmp0.tr = trunc i64 %T57.tmp0 to i32, !tcg.op !64
   %T57.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !64
-  store i32 %T57.tmp0.trunc, ptr %T57.envptr, align 4, !tbaa !4, !tcg.op !64
+  store i32 %T57.tmp0.tr, ptr %T57.envptr, align 4, !tbaa !4, !tcg.op !64
 ; ======== TCG [58] st_i32 t0,env:0xac ========
   %T58.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !65
   %T58.envptr = getelementptr i8, ptr %env, i64 172, !tcg.op !65
@@ -358,18 +358,18 @@ entry:
   store i64 %T59.tmp0, ptr %T59.envptr, align 4, !tbaa !4, !tcg.op !66
 ; ======== TCG [60] st32_i64 t2,v18,0x4 ========
   %T60.tmp2 = load i64, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !67
-  %T60.tmp2.trunc = trunc i64 %T60.tmp2 to i32, !tcg.op !67
+  %T60.tmp2.tr = trunc i64 %T60.tmp2 to i32, !tcg.op !67
   %T60.v18 = load <4 x i32>, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !67
-  %T60.tmp2.trunc.ie = insertelement <4 x i32> %T60.v18, i32 %T60.tmp2.trunc, i64 1, !tcg.op !67
-  store <4 x i32> %T60.tmp2.trunc.ie, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !67
+  %T60.tmp2.tr.ie = insertelement <4 x i32> %T60.v18, i32 %T60.tmp2.tr, i64 1, !tcg.op !67
+  store <4 x i32> %T60.tmp2.tr.ie, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !67
 ; ======== TCG [61] st32_i64 t2,v18,0x2 ========
   %T61.tmp2 = load i64, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !68
-  %T61.tmp2.trunc = trunc i64 %T61.tmp2 to i32, !tcg.op !68
+  %T61.tmp2.tr = trunc i64 %T61.tmp2 to i32, !tcg.op !68
   %T61.envptr = getelementptr i8, ptr %env, i64 1442, !tcg.op !68
   %T61.envptr4 = getelementptr i8, ptr %env, i64 1440, !tcg.op !68
   %T61.v18 = load <2 x i64>, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !68
   store <2 x i64> %T61.v18, ptr %T61.envptr4, align 16, !tbaa !4, !tcg.op !68
-  store i32 %T61.tmp2.trunc, ptr %T61.envptr, align 2, !tbaa !4, !tcg.op !68
+  store i32 %T61.tmp2.tr, ptr %T61.envptr, align 2, !tbaa !4, !tcg.op !68
   %T61.envptr5 = getelementptr i8, ptr %env, i64 1440, !tcg.op !68
   %T61.envval = load <2 x i64>, ptr %T61.envptr5, align 16, !tbaa !4, !tcg.op !68
   store <2 x i64> %T61.envval, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !68
@@ -432,28 +432,28 @@ entry:
   store i64 %T66.envval20, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !73
 ; ======== TCG [67] st32_i64 t2,v18 ========
   %T67.tmp2 = load i64, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !74
-  %T67.tmp2.trunc = trunc i64 %T67.tmp2 to i32, !tcg.op !74
-  store i32 %T67.tmp2.trunc, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !74
+  %T67.tmp2.tr = trunc i64 %T67.tmp2 to i32, !tcg.op !74
+  store i32 %T67.tmp2.tr, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !74
 ; ======== TCG [68] st32_i64 t2,v18,0x1 ========
   %T68.tmp2 = load i64, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !75
-  %T68.tmp2.trunc = trunc i64 %T68.tmp2 to i32, !tcg.op !75
+  %T68.tmp2.tr = trunc i64 %T68.tmp2 to i32, !tcg.op !75
   %T68.envptr = getelementptr i8, ptr %env, i64 1441, !tcg.op !75
   %T68.envptr21 = getelementptr i8, ptr %env, i64 1440, !tcg.op !75
   %T68.v18 = load <2 x i64>, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !75
   store <2 x i64> %T68.v18, ptr %T68.envptr21, align 16, !tbaa !4, !tcg.op !75
-  store i32 %T68.tmp2.trunc, ptr %T68.envptr, align 1, !tbaa !4, !tcg.op !75
+  store i32 %T68.tmp2.tr, ptr %T68.envptr, align 1, !tbaa !4, !tcg.op !75
   %T68.envptr22 = getelementptr i8, ptr %env, i64 1440, !tcg.op !75
   %T68.envval = load <2 x i64>, ptr %T68.envptr22, align 16, !tbaa !4, !tcg.op !75
   store <2 x i64> %T68.envval, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !75
 ; ======== TCG [69] st32_i64 t2,v18,0x4 ========
   %T69.tmp2 = load i64, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !76
-  %T69.tmp2.trunc = trunc i64 %T69.tmp2 to i32, !tcg.op !76
+  %T69.tmp2.tr = trunc i64 %T69.tmp2 to i32, !tcg.op !76
   %T69.v18 = load <4 x i32>, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !76
-  %T69.tmp2.trunc.ie = insertelement <4 x i32> %T69.v18, i32 %T69.tmp2.trunc, i64 1, !tcg.op !76
-  store <4 x i32> %T69.tmp2.trunc.ie, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !76
+  %T69.tmp2.tr.ie = insertelement <4 x i32> %T69.v18, i32 %T69.tmp2.tr, i64 1, !tcg.op !76
+  store <4 x i32> %T69.tmp2.tr.ie, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !76
 ; ======== TCG [70] st32_i64 t2,v18,0xd ========
   %T70.tmp2 = load i64, ptr %tmp2.stack, align 8, !tbaa !0, !tcg.op !77
-  %T70.tmp2.trunc = trunc i64 %T70.tmp2 to i32, !tcg.op !77
+  %T70.tmp2.tr = trunc i64 %T70.tmp2 to i32, !tcg.op !77
   %T70.envptr = getelementptr i8, ptr %env, i64 1453, !tcg.op !77
   %T70.envptr23 = getelementptr i8, ptr %env, i64 1440, !tcg.op !77
   %T70.v18 = load <2 x i64>, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !77
@@ -461,7 +461,7 @@ entry:
   %T70.envptr24 = getelementptr i8, ptr %env, i64 1456, !tcg.op !77
   %T70.v19 = load <2 x i64>, ptr %v19.stack, align 16, !tbaa !0, !tcg.op !77
   store <2 x i64> %T70.v19, ptr %T70.envptr24, align 16, !tbaa !4, !tcg.op !77
-  store i32 %T70.tmp2.trunc, ptr %T70.envptr, align 1, !tbaa !4, !tcg.op !77
+  store i32 %T70.tmp2.tr, ptr %T70.envptr, align 1, !tbaa !4, !tcg.op !77
   %T70.envptr25 = getelementptr i8, ptr %env, i64 1440, !tcg.op !77
   %T70.envval = load <2 x i64>, ptr %T70.envptr25, align 16, !tbaa !4, !tcg.op !77
   store <2 x i64> %T70.envval, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !77

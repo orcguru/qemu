@@ -61,8 +61,8 @@ entry:
   %T4.s1 = extractvalue { i32, i1 } %T4.r1, 0, !tcg.op !7
   %T4.c1 = extractvalue { i32, i1 } %T4.r1, 1, !tcg.op !7
   %T4.ci = load i1, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !7
-  %T4.ci_ext = zext i1 %T4.ci to i32, !tcg.op !7
-  %T4.r2 = call { i32, i1 } @llvm.uadd.with.overflow.i32.i32(i32 %T4.s1, i32 %T4.ci_ext), !tcg.op !7
+  %T4.ze_ci = zext i1 %T4.ci to i32, !tcg.op !7
+  %T4.r2 = call { i32, i1 } @llvm.uadd.with.overflow.i32.i32(i32 %T4.s1, i32 %T4.ze_ci), !tcg.op !7
   %T4.s2 = extractvalue { i32, i1 } %T4.r2, 0, !tcg.op !7
   store i32 %T4.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !7
 ; ======== TCG [5] addci_i64 [t2],t0,t1 ========
@@ -72,8 +72,8 @@ entry:
   %T5.s1 = extractvalue { i64, i1 } %T5.r1, 0, !tcg.op !8
   %T5.c1 = extractvalue { i64, i1 } %T5.r1, 1, !tcg.op !8
   %T5.ci = load i1, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !8
-  %T5.ci_ext = zext i1 %T5.ci to i64, !tcg.op !8
-  %T5.r2 = call { i64, i1 } @llvm.uadd.with.overflow.i64.i64(i64 %T5.s1, i64 %T5.ci_ext), !tcg.op !8
+  %T5.ze_ci = zext i1 %T5.ci to i64, !tcg.op !8
+  %T5.r2 = call { i64, i1 } @llvm.uadd.with.overflow.i64.i64(i64 %T5.s1, i64 %T5.ze_ci), !tcg.op !8
   %T5.s2 = extractvalue { i64, i1 } %T5.r2, 0, !tcg.op !8
   store i64 %T5.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !8
 ; ======== TCG [6] addcio_i32 [t2],t0,t1 ========
@@ -83,8 +83,8 @@ entry:
   %T6.s1 = extractvalue { i32, i1 } %T6.r1, 0, !tcg.op !9
   %T6.c1 = extractvalue { i32, i1 } %T6.r1, 1, !tcg.op !9
   %T6.ci = load i1, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !9
-  %T6.ci_ext = zext i1 %T6.ci to i32, !tcg.op !9
-  %T6.r2 = call { i32, i1 } @llvm.uadd.with.overflow.i32.i32(i32 %T6.s1, i32 %T6.ci_ext), !tcg.op !9
+  %T6.ze_ci = zext i1 %T6.ci to i32, !tcg.op !9
+  %T6.r2 = call { i32, i1 } @llvm.uadd.with.overflow.i32.i32(i32 %T6.s1, i32 %T6.ze_ci), !tcg.op !9
   %T6.s2 = extractvalue { i32, i1 } %T6.r2, 0, !tcg.op !9
   store i32 %T6.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !9
   %T6.c2 = extractvalue { i32, i1 } %T6.r2, 1, !tcg.op !9
@@ -97,8 +97,8 @@ entry:
   %T7.s1 = extractvalue { i64, i1 } %T7.r1, 0, !tcg.op !10
   %T7.c1 = extractvalue { i64, i1 } %T7.r1, 1, !tcg.op !10
   %T7.ci = load i1, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !10
-  %T7.ci_ext = zext i1 %T7.ci to i64, !tcg.op !10
-  %T7.r2 = call { i64, i1 } @llvm.uadd.with.overflow.i64.i64(i64 %T7.s1, i64 %T7.ci_ext), !tcg.op !10
+  %T7.ze_ci = zext i1 %T7.ci to i64, !tcg.op !10
+  %T7.r2 = call { i64, i1 } @llvm.uadd.with.overflow.i64.i64(i64 %T7.s1, i64 %T7.ze_ci), !tcg.op !10
   %T7.s2 = extractvalue { i64, i1 } %T7.r2, 0, !tcg.op !10
   store i64 %T7.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !10
   %T7.c2 = extractvalue { i64, i1 } %T7.r2, 1, !tcg.op !10
@@ -127,8 +127,8 @@ entry:
   %T10.s1 = extractvalue { i32, i1 } %T10.r1, 0, !tcg.op !13
   %T10.c1 = extractvalue { i32, i1 } %T10.r1, 1, !tcg.op !13
   %T10.ci = load i1, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !13
-  %T10.ci_ext = zext i1 %T10.ci to i32, !tcg.op !13
-  %T10.r2 = call { i32, i1 } @llvm.usub.with.overflow.i32.i32(i32 %T10.s1, i32 %T10.ci_ext), !tcg.op !13
+  %T10.ze_ci = zext i1 %T10.ci to i32, !tcg.op !13
+  %T10.r2 = call { i32, i1 } @llvm.usub.with.overflow.i32.i32(i32 %T10.s1, i32 %T10.ze_ci), !tcg.op !13
   %T10.s2 = extractvalue { i32, i1 } %T10.r2, 0, !tcg.op !13
   store i32 %T10.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !13
 ; ======== TCG [11] subbi_i64 [t2],t0,t1 ========
@@ -138,8 +138,8 @@ entry:
   %T11.s1 = extractvalue { i64, i1 } %T11.r1, 0, !tcg.op !14
   %T11.c1 = extractvalue { i64, i1 } %T11.r1, 1, !tcg.op !14
   %T11.ci = load i1, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !14
-  %T11.ci_ext = zext i1 %T11.ci to i64, !tcg.op !14
-  %T11.r2 = call { i64, i1 } @llvm.usub.with.overflow.i64.i64(i64 %T11.s1, i64 %T11.ci_ext), !tcg.op !14
+  %T11.ze_ci = zext i1 %T11.ci to i64, !tcg.op !14
+  %T11.r2 = call { i64, i1 } @llvm.usub.with.overflow.i64.i64(i64 %T11.s1, i64 %T11.ze_ci), !tcg.op !14
   %T11.s2 = extractvalue { i64, i1 } %T11.r2, 0, !tcg.op !14
   store i64 %T11.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !14
 ; ======== TCG [12] subbio_i32 [t2],t0,t1 ========
@@ -149,8 +149,8 @@ entry:
   %T12.s1 = extractvalue { i32, i1 } %T12.r1, 0, !tcg.op !15
   %T12.c1 = extractvalue { i32, i1 } %T12.r1, 1, !tcg.op !15
   %T12.ci = load i1, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !15
-  %T12.ci_ext = zext i1 %T12.ci to i32, !tcg.op !15
-  %T12.r2 = call { i32, i1 } @llvm.usub.with.overflow.i32.i32(i32 %T12.s1, i32 %T12.ci_ext), !tcg.op !15
+  %T12.ze_ci = zext i1 %T12.ci to i32, !tcg.op !15
+  %T12.r2 = call { i32, i1 } @llvm.usub.with.overflow.i32.i32(i32 %T12.s1, i32 %T12.ze_ci), !tcg.op !15
   %T12.s2 = extractvalue { i32, i1 } %T12.r2, 0, !tcg.op !15
   store i32 %T12.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !15
   %T12.c2 = extractvalue { i32, i1 } %T12.r2, 1, !tcg.op !15
@@ -163,8 +163,8 @@ entry:
   %T13.s1 = extractvalue { i64, i1 } %T13.r1, 0, !tcg.op !16
   %T13.c1 = extractvalue { i64, i1 } %T13.r1, 1, !tcg.op !16
   %T13.ci = load i1, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !16
-  %T13.ci_ext = zext i1 %T13.ci to i64, !tcg.op !16
-  %T13.r2 = call { i64, i1 } @llvm.usub.with.overflow.i64.i64(i64 %T13.s1, i64 %T13.ci_ext), !tcg.op !16
+  %T13.ze_ci = zext i1 %T13.ci to i64, !tcg.op !16
+  %T13.r2 = call { i64, i1 } @llvm.usub.with.overflow.i64.i64(i64 %T13.s1, i64 %T13.ze_ci), !tcg.op !16
   %T13.s2 = extractvalue { i64, i1 } %T13.r2, 0, !tcg.op !16
   store i64 %T13.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !16
   %T13.c2 = extractvalue { i64, i1 } %T13.r2, 1, !tcg.op !16
@@ -275,8 +275,8 @@ entry:
   store <4 x i32> %T30.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !33
 ; ======== TCG [31] extrl_i64_i32 [t2],t0 ========
   %T31.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !34
-  %T31.tmp0.trunc = trunc i64 %T31.tmp0 to i32, !tcg.op !34
-  store i32 %T31.tmp0.trunc, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !34
+  %T31.tmp0.tr = trunc i64 %T31.tmp0 to i32, !tcg.op !34
+  store i32 %T31.tmp0.tr, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !34
 ; ======== TCG [32] mov_i32 [t2],t0 ========
   %T32.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !35
   store i32 %T32.tmp0, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !35
@@ -302,18 +302,18 @@ entry:
   %T38.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !41
   %T38.tmp5 = load <16 x i8>, ptr %tmp5.stack, align 16, !tbaa !0, !tcg.op !41
   %T38.and_a_sel = and <16 x i8> %T38.tmp4, %T38.tmp3, !tcg.op !41
-  %T38.nsel = xor <16 x i8> %T38.tmp3, splat (i8 -1), !tcg.op !41
-  %T38.and_b_nsel = and <16 x i8> %T38.tmp5, %T38.nsel, !tcg.op !41
-  %T38.or = or <16 x i8> %T38.and_a_sel, %T38.and_b_nsel, !tcg.op !41
+  %T38.not_sel = xor <16 x i8> %T38.tmp3, splat (i8 -1), !tcg.op !41
+  %T38.and_b_not_sel = and <16 x i8> %T38.tmp5, %T38.not_sel, !tcg.op !41
+  %T38.or = or <16 x i8> %T38.and_a_sel, %T38.and_b_not_sel, !tcg.op !41
   store <16 x i8> %T38.or, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !41
 ; ======== TCG [39] bitsel_vec v128,e32,[t8],t3,t4,t5 ========
   %T39.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !42
   %T39.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !42
   %T39.tmp5 = load <4 x i32>, ptr %tmp5.stack, align 16, !tbaa !0, !tcg.op !42
   %T39.and_a_sel = and <4 x i32> %T39.tmp4, %T39.tmp3, !tcg.op !42
-  %T39.nsel = xor <4 x i32> %T39.tmp3, splat (i32 -1), !tcg.op !42
-  %T39.and_b_nsel = and <4 x i32> %T39.tmp5, %T39.nsel, !tcg.op !42
-  %T39.or = or <4 x i32> %T39.and_a_sel, %T39.and_b_nsel, !tcg.op !42
+  %T39.not_sel = xor <4 x i32> %T39.tmp3, splat (i32 -1), !tcg.op !42
+  %T39.and_b_not_sel = and <4 x i32> %T39.tmp5, %T39.not_sel, !tcg.op !42
+  %T39.or = or <4 x i32> %T39.and_a_sel, %T39.and_b_not_sel, !tcg.op !42
   store <4 x i32> %T39.or, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !42
 ; ======== TCG [40] cmp_vec v128,e8,[t8],t3,t4,gt ========
   %T40.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !43
@@ -335,9 +335,9 @@ entry:
   %T42.tmp6 = load <16 x i8>, ptr %tmp6.stack, align 16, !tbaa !0, !tcg.op !45
   %T42.tmp7 = load <16 x i8>, ptr %tmp7.stack, align 16, !tbaa !0, !tcg.op !45
   %T42.and_a_sel = and <16 x i8> %T42.tmp6, %T42.predicate, !tcg.op !45
-  %T42.nsel = xor <16 x i8> %T42.predicate, splat (i8 -1), !tcg.op !45
-  %T42.and_b_nsel = and <16 x i8> %T42.tmp7, %T42.nsel, !tcg.op !45
-  %T42.or = or <16 x i8> %T42.and_a_sel, %T42.and_b_nsel, !tcg.op !45
+  %T42.not_sel = xor <16 x i8> %T42.predicate, splat (i8 -1), !tcg.op !45
+  %T42.and_b_not_sel = and <16 x i8> %T42.tmp7, %T42.not_sel, !tcg.op !45
+  %T42.or = or <16 x i8> %T42.and_a_sel, %T42.and_b_not_sel, !tcg.op !45
   store <16 x i8> %T42.or, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !45
 ; ======== TCG [43] cmpsel_vec v128,e32,[t8],t3,t4,t6,t7,gt ========
   %T43.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !46
@@ -347,9 +347,9 @@ entry:
   %T43.tmp6 = load <4 x i32>, ptr %tmp6.stack, align 16, !tbaa !0, !tcg.op !46
   %T43.tmp7 = load <4 x i32>, ptr %tmp7.stack, align 16, !tbaa !0, !tcg.op !46
   %T43.and_a_sel = and <4 x i32> %T43.tmp6, %T43.predicate, !tcg.op !46
-  %T43.nsel = xor <4 x i32> %T43.predicate, splat (i32 -1), !tcg.op !46
-  %T43.and_b_nsel = and <4 x i32> %T43.tmp7, %T43.nsel, !tcg.op !46
-  %T43.or = or <4 x i32> %T43.and_a_sel, %T43.and_b_nsel, !tcg.op !46
+  %T43.not_sel = xor <4 x i32> %T43.predicate, splat (i32 -1), !tcg.op !46
+  %T43.and_b_not_sel = and <4 x i32> %T43.tmp7, %T43.not_sel, !tcg.op !46
+  %T43.or = or <4 x i32> %T43.and_a_sel, %T43.and_b_not_sel, !tcg.op !46
   store <4 x i32> %T43.or, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !46
 ; ======== TCG [44] ctpop_i32 [t2],t2 ========
   %T44.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !47
@@ -542,66 +542,66 @@ entry:
 ; ======== TCG [82] clz_i32 [t2],t2,t0 ========
   %T82.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !85
   %T82.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !85
-  %T82.eqz = icmp eq i32 %T82.tmp2, 0, !tcg.op !85
-  br i1 %T82.eqz, label %T82.z, label %T82.nz, !tcg.op !85
+  %T82.icmp_eq_zero = icmp eq i32 %T82.tmp2, 0, !tcg.op !85
+  br i1 %T82.icmp_eq_zero, label %T82.z, label %T82.nz, !tcg.op !85
 
 T82.z:                                            ; preds = %entry
   br label %T82.merge, !tcg.op !85
 
 T82.nz:                                           ; preds = %entry
-  %T82.ctval = call i32 @llvm.ctlz.i32.i32(i32 %T82.tmp2), !tcg.op !85
+  %T82.ct_result = call i32 @llvm.ctlz.i32.i32(i32 %T82.tmp2), !tcg.op !85
   br label %T82.merge, !tcg.op !85
 
 T82.merge:                                        ; preds = %T82.nz, %T82.z
-  %T82.phi = phi i32 [ %T82.tmp0, %T82.z ], [ %T82.ctval, %T82.nz ], !tcg.op !85
+  %T82.phi = phi i32 [ %T82.tmp0, %T82.z ], [ %T82.ct_result, %T82.nz ], !tcg.op !85
   store i32 %T82.phi, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !85
 ; ======== TCG [83] clz_i64 [t2],t2,t0 ========
   %T83.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !86
   %T83.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !86
-  %T83.eqz = icmp eq i64 %T83.tmp2, 0, !tcg.op !86
-  br i1 %T83.eqz, label %T83.z, label %T83.nz, !tcg.op !86
+  %T83.icmp_eq_zero = icmp eq i64 %T83.tmp2, 0, !tcg.op !86
+  br i1 %T83.icmp_eq_zero, label %T83.z, label %T83.nz, !tcg.op !86
 
 T83.z:                                            ; preds = %T82.merge
   br label %T83.merge, !tcg.op !86
 
 T83.nz:                                           ; preds = %T82.merge
-  %T83.ctval = call i64 @llvm.ctlz.i64.i64(i64 %T83.tmp2), !tcg.op !86
+  %T83.ct_result = call i64 @llvm.ctlz.i64.i64(i64 %T83.tmp2), !tcg.op !86
   br label %T83.merge, !tcg.op !86
 
 T83.merge:                                        ; preds = %T83.nz, %T83.z
-  %T83.phi = phi i64 [ %T83.tmp0, %T83.z ], [ %T83.ctval, %T83.nz ], !tcg.op !86
+  %T83.phi = phi i64 [ %T83.tmp0, %T83.z ], [ %T83.ct_result, %T83.nz ], !tcg.op !86
   store i64 %T83.phi, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !86
 ; ======== TCG [84] ctz_i32 [t2],t2,t0 ========
   %T84.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !87
   %T84.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !87
-  %T84.eqz = icmp eq i32 %T84.tmp2, 0, !tcg.op !87
-  br i1 %T84.eqz, label %T84.z, label %T84.nz, !tcg.op !87
+  %T84.icmp_eq_zero = icmp eq i32 %T84.tmp2, 0, !tcg.op !87
+  br i1 %T84.icmp_eq_zero, label %T84.z, label %T84.nz, !tcg.op !87
 
 T84.z:                                            ; preds = %T83.merge
   br label %T84.merge, !tcg.op !87
 
 T84.nz:                                           ; preds = %T83.merge
-  %T84.ctval = call i32 @llvm.cttz.i32.i32(i32 %T84.tmp2), !tcg.op !87
+  %T84.ct_result = call i32 @llvm.cttz.i32.i32(i32 %T84.tmp2), !tcg.op !87
   br label %T84.merge, !tcg.op !87
 
 T84.merge:                                        ; preds = %T84.nz, %T84.z
-  %T84.phi = phi i32 [ %T84.tmp0, %T84.z ], [ %T84.ctval, %T84.nz ], !tcg.op !87
+  %T84.phi = phi i32 [ %T84.tmp0, %T84.z ], [ %T84.ct_result, %T84.nz ], !tcg.op !87
   store i32 %T84.phi, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !87
 ; ======== TCG [85] ctz_i64 [t2],t2,t0 ========
   %T85.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !88
   %T85.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !88
-  %T85.eqz = icmp eq i64 %T85.tmp2, 0, !tcg.op !88
-  br i1 %T85.eqz, label %T85.z, label %T85.nz, !tcg.op !88
+  %T85.icmp_eq_zero = icmp eq i64 %T85.tmp2, 0, !tcg.op !88
+  br i1 %T85.icmp_eq_zero, label %T85.z, label %T85.nz, !tcg.op !88
 
 T85.z:                                            ; preds = %T84.merge
   br label %T85.merge, !tcg.op !88
 
 T85.nz:                                           ; preds = %T84.merge
-  %T85.ctval = call i64 @llvm.cttz.i64.i64(i64 %T85.tmp2), !tcg.op !88
+  %T85.ct_result = call i64 @llvm.cttz.i64.i64(i64 %T85.tmp2), !tcg.op !88
   br label %T85.merge, !tcg.op !88
 
 T85.merge:                                        ; preds = %T85.nz, %T85.z
-  %T85.phi = phi i64 [ %T85.tmp0, %T85.z ], [ %T85.ctval, %T85.nz ], !tcg.op !88
+  %T85.phi = phi i64 [ %T85.tmp0, %T85.z ], [ %T85.ct_result, %T85.nz ], !tcg.op !88
   store i64 %T85.phi, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !88
 ; ======== TCG [86] smax_vec v128,e8,[t8],t3,t4 ========
   %T86.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !89
@@ -669,9 +669,9 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T98.shift_l = and i32 %T98.tmp0, 31, !tcg.op !101
   %T98.shift_r = sub i32 32, %T98.shift_l, !tcg.op !101
   %T98.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !101
-  %T98.shl_a = shl i32 %T98.tmp2, %T98.shift_l, !tcg.op !101
-  %T98.lshr_a = lshr i32 %T98.tmp2, %T98.shift_r, !tcg.op !101
-  %T98.or = or i32 %T98.shl_a, %T98.lshr_a, !tcg.op !101
+  %T98.shl = shl i32 %T98.tmp2, %T98.shift_l, !tcg.op !101
+  %T98.lshr = lshr i32 %T98.tmp2, %T98.shift_r, !tcg.op !101
+  %T98.or = or i32 %T98.shl, %T98.lshr, !tcg.op !101
   %T98.bool = icmp eq i32 %T98.shift_value_masked, 0, !tcg.op !101
   %T98.tmp21 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !101
   %T98.avoid_poison = select i1 %T98.bool, i32 %T98.tmp21, i32 %T98.or, !tcg.op !101
@@ -682,74 +682,74 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T99.shift_l = and i64 %T99.tmp0, 63, !tcg.op !102
   %T99.shift_r = sub i64 64, %T99.shift_l, !tcg.op !102
   %T99.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !102
-  %T99.shl_a = shl i64 %T99.tmp2, %T99.shift_l, !tcg.op !102
-  %T99.lshr_a = lshr i64 %T99.tmp2, %T99.shift_r, !tcg.op !102
-  %T99.or = or i64 %T99.shl_a, %T99.lshr_a, !tcg.op !102
+  %T99.shl = shl i64 %T99.tmp2, %T99.shift_l, !tcg.op !102
+  %T99.lshr = lshr i64 %T99.tmp2, %T99.shift_r, !tcg.op !102
+  %T99.or = or i64 %T99.shl, %T99.lshr, !tcg.op !102
   %T99.bool = icmp eq i64 %T99.shift_value_masked, 0, !tcg.op !102
   %T99.tmp22 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !102
   %T99.avoid_poison = select i1 %T99.bool, i64 %T99.tmp22, i64 %T99.or, !tcg.op !102
   store i64 %T99.avoid_poison, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !102
 ; ======== TCG [100] rotl_i32 [t2],t2,0x4 ========
   %T100.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !103
-  %T100.shl_a = shl i32 %T100.tmp2, 4, !tcg.op !103
-  %T100.lshr_a = lshr i32 %T100.tmp2, 28, !tcg.op !103
-  %T100.or = or i32 %T100.shl_a, %T100.lshr_a, !tcg.op !103
+  %T100.shl = shl i32 %T100.tmp2, 4, !tcg.op !103
+  %T100.lshr = lshr i32 %T100.tmp2, 28, !tcg.op !103
+  %T100.or = or i32 %T100.shl, %T100.lshr, !tcg.op !103
   %T100.tmp23 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !103
   %T100.avoid_poison = select i1 false, i32 %T100.tmp23, i32 %T100.or, !tcg.op !103
   store i32 %T100.avoid_poison, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !103
 ; ======== TCG [101] rotl_i64 [t2],t2,0x100 ========
   %T101.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !104
-  %T101.shl_a = shl i64 %T101.tmp2, 0, !tcg.op !104
-  %T101.lshr_a = lshr i64 %T101.tmp2, 64, !tcg.op !104
-  %T101.or = or i64 %T101.shl_a, %T101.lshr_a, !tcg.op !104
+  %T101.shl = shl i64 %T101.tmp2, 0, !tcg.op !104
+  %T101.lshr = lshr i64 %T101.tmp2, 64, !tcg.op !104
+  %T101.or = or i64 %T101.shl, %T101.lshr, !tcg.op !104
   %T101.tmp24 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !104
   %T101.avoid_poison = select i1 true, i64 %T101.tmp24, i64 %T101.or, !tcg.op !104
   store i64 %T101.avoid_poison, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !104
 ; ======== TCG [102] rotli_vec v128,e8,[t8],t3,0x2 ========
   %T102.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !105
-  %T102.shl_a = shl <16 x i8> %T102.tmp3, splat (i8 2), !tcg.op !105
-  %T102.lshr_a = lshr <16 x i8> %T102.tmp3, splat (i8 6), !tcg.op !105
-  %T102.or = or <16 x i8> %T102.shl_a, %T102.lshr_a, !tcg.op !105
+  %T102.shl = shl <16 x i8> %T102.tmp3, splat (i8 2), !tcg.op !105
+  %T102.lshr = lshr <16 x i8> %T102.tmp3, splat (i8 6), !tcg.op !105
+  %T102.or = or <16 x i8> %T102.shl, %T102.lshr, !tcg.op !105
   %T102.tmp35 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !105
   %T102.avoid_poison = select i1 false, <16 x i8> %T102.tmp35, <16 x i8> %T102.or, !tcg.op !105
   store <16 x i8> %T102.avoid_poison, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !105
 ; ======== TCG [103] rotli_vec v128,e8,[t8],t3,0x8 ========
   %T103.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !106
-  %T103.shl_a = shl <16 x i8> %T103.tmp3, zeroinitializer, !tcg.op !106
-  %T103.lshr_a = lshr <16 x i8> %T103.tmp3, splat (i8 8), !tcg.op !106
-  %T103.or = or <16 x i8> %T103.shl_a, %T103.lshr_a, !tcg.op !106
+  %T103.shl = shl <16 x i8> %T103.tmp3, zeroinitializer, !tcg.op !106
+  %T103.lshr = lshr <16 x i8> %T103.tmp3, splat (i8 8), !tcg.op !106
+  %T103.or = or <16 x i8> %T103.shl, %T103.lshr, !tcg.op !106
   %T103.tmp36 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !106
   %T103.avoid_poison = select i1 true, <16 x i8> %T103.tmp36, <16 x i8> %T103.or, !tcg.op !106
   store <16 x i8> %T103.avoid_poison, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !106
 ; ======== TCG [104] rotli_vec v128,e8,[t8],t3,0x9 ========
   %T104.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !107
-  %T104.shl_a = shl <16 x i8> %T104.tmp3, splat (i8 1), !tcg.op !107
-  %T104.lshr_a = lshr <16 x i8> %T104.tmp3, splat (i8 7), !tcg.op !107
-  %T104.or = or <16 x i8> %T104.shl_a, %T104.lshr_a, !tcg.op !107
+  %T104.shl = shl <16 x i8> %T104.tmp3, splat (i8 1), !tcg.op !107
+  %T104.lshr = lshr <16 x i8> %T104.tmp3, splat (i8 7), !tcg.op !107
+  %T104.or = or <16 x i8> %T104.shl, %T104.lshr, !tcg.op !107
   %T104.tmp37 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !107
   %T104.avoid_poison = select i1 false, <16 x i8> %T104.tmp37, <16 x i8> %T104.or, !tcg.op !107
   store <16 x i8> %T104.avoid_poison, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !107
 ; ======== TCG [105] rotli_vec v128,e16,[t8],t3,0x12 ========
   %T105.tmp3 = load <8 x i16>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !108
-  %T105.shl_a = shl <8 x i16> %T105.tmp3, splat (i16 2), !tcg.op !108
-  %T105.lshr_a = lshr <8 x i16> %T105.tmp3, splat (i16 14), !tcg.op !108
-  %T105.or = or <8 x i16> %T105.shl_a, %T105.lshr_a, !tcg.op !108
+  %T105.shl = shl <8 x i16> %T105.tmp3, splat (i16 2), !tcg.op !108
+  %T105.lshr = lshr <8 x i16> %T105.tmp3, splat (i16 14), !tcg.op !108
+  %T105.or = or <8 x i16> %T105.shl, %T105.lshr, !tcg.op !108
   %T105.tmp38 = load <8 x i16>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !108
   %T105.avoid_poison = select i1 false, <8 x i16> %T105.tmp38, <8 x i16> %T105.or, !tcg.op !108
   store <8 x i16> %T105.avoid_poison, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !108
 ; ======== TCG [106] rotli_vec v128,e32,[t8],t3,0x21 ========
   %T106.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !109
-  %T106.shl_a = shl <4 x i32> %T106.tmp3, splat (i32 1), !tcg.op !109
-  %T106.lshr_a = lshr <4 x i32> %T106.tmp3, splat (i32 31), !tcg.op !109
-  %T106.or = or <4 x i32> %T106.shl_a, %T106.lshr_a, !tcg.op !109
+  %T106.shl = shl <4 x i32> %T106.tmp3, splat (i32 1), !tcg.op !109
+  %T106.lshr = lshr <4 x i32> %T106.tmp3, splat (i32 31), !tcg.op !109
+  %T106.or = or <4 x i32> %T106.shl, %T106.lshr, !tcg.op !109
   %T106.tmp39 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !109
   %T106.avoid_poison = select i1 false, <4 x i32> %T106.tmp39, <4 x i32> %T106.or, !tcg.op !109
   store <4 x i32> %T106.avoid_poison, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !109
 ; ======== TCG [107] rotli_vec v128,e64,[t8],t3,0x42 ========
   %T107.tmp3 = load <2 x i64>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !110
-  %T107.shl_a = shl <2 x i64> %T107.tmp3, splat (i64 2), !tcg.op !110
-  %T107.lshr_a = lshr <2 x i64> %T107.tmp3, splat (i64 62), !tcg.op !110
-  %T107.or = or <2 x i64> %T107.shl_a, %T107.lshr_a, !tcg.op !110
+  %T107.shl = shl <2 x i64> %T107.tmp3, splat (i64 2), !tcg.op !110
+  %T107.lshr = lshr <2 x i64> %T107.tmp3, splat (i64 62), !tcg.op !110
+  %T107.or = or <2 x i64> %T107.shl, %T107.lshr, !tcg.op !110
   %T107.tmp310 = load <2 x i64>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !110
   %T107.avoid_poison = select i1 false, <2 x i64> %T107.tmp310, <2 x i64> %T107.or, !tcg.op !110
   store <2 x i64> %T107.avoid_poison, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !110
@@ -763,9 +763,9 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T108.shift_l = and <4 x i32> %T108.shift.ie13, splat (i32 31), !tcg.op !111
   %T108.shift_r = sub <4 x i32> splat (i32 32), %T108.shift_l, !tcg.op !111
   %T108.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !111
-  %T108.shl_a = shl <4 x i32> %T108.tmp3, %T108.shift_l, !tcg.op !111
-  %T108.lshr_a = lshr <4 x i32> %T108.tmp3, %T108.shift_r, !tcg.op !111
-  %T108.or = or <4 x i32> %T108.shl_a, %T108.lshr_a, !tcg.op !111
+  %T108.shl = shl <4 x i32> %T108.tmp3, %T108.shift_l, !tcg.op !111
+  %T108.lshr = lshr <4 x i32> %T108.tmp3, %T108.shift_r, !tcg.op !111
+  %T108.or = or <4 x i32> %T108.shl, %T108.lshr, !tcg.op !111
   %T108.bool = icmp eq i32 %T108.shift_value_masked, 0, !tcg.op !111
   %T108.tmp314 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !111
   %T108.avoid_poison = select i1 %T108.bool, <4 x i32> %T108.tmp314, <4 x i32> %T108.or, !tcg.op !111
@@ -775,9 +775,9 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T109.shift_l = and <4 x i32> %T109.tmp4, splat (i32 31), !tcg.op !112
   %T109.shift_r = sub <4 x i32> splat (i32 32), %T109.shift_l, !tcg.op !112
   %T109.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !112
-  %T109.shl_a = shl <4 x i32> %T109.tmp3, %T109.shift_l, !tcg.op !112
-  %T109.lshr_a = lshr <4 x i32> %T109.tmp3, %T109.shift_r, !tcg.op !112
-  %T109.or = or <4 x i32> %T109.shl_a, %T109.lshr_a, !tcg.op !112
+  %T109.shl = shl <4 x i32> %T109.tmp3, %T109.shift_l, !tcg.op !112
+  %T109.lshr = lshr <4 x i32> %T109.tmp3, %T109.shift_r, !tcg.op !112
+  %T109.or = or <4 x i32> %T109.shl, %T109.lshr, !tcg.op !112
   store <4 x i32> %T109.or, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !112
 ; ======== TCG [110] rotr_i32 [t2],t2,t0 ========
   %T110.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !113
@@ -785,9 +785,9 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T110.shift_r = and i32 %T110.tmp0, 31, !tcg.op !113
   %T110.shift_l = sub i32 32, %T110.shift_r, !tcg.op !113
   %T110.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !113
-  %T110.shl_a = shl i32 %T110.tmp2, %T110.shift_l, !tcg.op !113
-  %T110.lshr_a = lshr i32 %T110.tmp2, %T110.shift_r, !tcg.op !113
-  %T110.or = or i32 %T110.shl_a, %T110.lshr_a, !tcg.op !113
+  %T110.shl = shl i32 %T110.tmp2, %T110.shift_l, !tcg.op !113
+  %T110.lshr = lshr i32 %T110.tmp2, %T110.shift_r, !tcg.op !113
+  %T110.or = or i32 %T110.shl, %T110.lshr, !tcg.op !113
   %T110.bool = icmp eq i32 %T110.shift_value_masked, 0, !tcg.op !113
   %T110.tmp215 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !113
   %T110.avoid_poison = select i1 %T110.bool, i32 %T110.tmp215, i32 %T110.or, !tcg.op !113
@@ -798,26 +798,26 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T111.shift_r = and i64 %T111.tmp0, 63, !tcg.op !114
   %T111.shift_l = sub i64 64, %T111.shift_r, !tcg.op !114
   %T111.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !114
-  %T111.shl_a = shl i64 %T111.tmp2, %T111.shift_l, !tcg.op !114
-  %T111.lshr_a = lshr i64 %T111.tmp2, %T111.shift_r, !tcg.op !114
-  %T111.or = or i64 %T111.shl_a, %T111.lshr_a, !tcg.op !114
+  %T111.shl = shl i64 %T111.tmp2, %T111.shift_l, !tcg.op !114
+  %T111.lshr = lshr i64 %T111.tmp2, %T111.shift_r, !tcg.op !114
+  %T111.or = or i64 %T111.shl, %T111.lshr, !tcg.op !114
   %T111.bool = icmp eq i64 %T111.shift_value_masked, 0, !tcg.op !114
   %T111.tmp216 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !114
   %T111.avoid_poison = select i1 %T111.bool, i64 %T111.tmp216, i64 %T111.or, !tcg.op !114
   store i64 %T111.avoid_poison, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !114
 ; ======== TCG [112] rotr_i32 [t2],t2,0x4 ========
   %T112.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !115
-  %T112.shl_a = shl i32 %T112.tmp2, 28, !tcg.op !115
-  %T112.lshr_a = lshr i32 %T112.tmp2, 4, !tcg.op !115
-  %T112.or = or i32 %T112.shl_a, %T112.lshr_a, !tcg.op !115
+  %T112.shl = shl i32 %T112.tmp2, 28, !tcg.op !115
+  %T112.lshr = lshr i32 %T112.tmp2, 4, !tcg.op !115
+  %T112.or = or i32 %T112.shl, %T112.lshr, !tcg.op !115
   %T112.tmp217 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !115
   %T112.avoid_poison = select i1 false, i32 %T112.tmp217, i32 %T112.or, !tcg.op !115
   store i32 %T112.avoid_poison, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !115
 ; ======== TCG [113] rotr_i64 [t2],t2,0x100 ========
   %T113.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !116
-  %T113.shl_a = shl i64 %T113.tmp2, 64, !tcg.op !116
-  %T113.lshr_a = lshr i64 %T113.tmp2, 0, !tcg.op !116
-  %T113.or = or i64 %T113.shl_a, %T113.lshr_a, !tcg.op !116
+  %T113.shl = shl i64 %T113.tmp2, 64, !tcg.op !116
+  %T113.lshr = lshr i64 %T113.tmp2, 0, !tcg.op !116
+  %T113.or = or i64 %T113.shl, %T113.lshr, !tcg.op !116
   %T113.tmp218 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !116
   %T113.avoid_poison = select i1 true, i64 %T113.tmp218, i64 %T113.or, !tcg.op !116
   store i64 %T113.avoid_poison, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !116
@@ -826,9 +826,9 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T114.shift_r = and <4 x i32> %T114.tmp4, splat (i32 31), !tcg.op !117
   %T114.shift_l = sub <4 x i32> splat (i32 32), %T114.shift_r, !tcg.op !117
   %T114.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !117
-  %T114.shl_a = shl <4 x i32> %T114.tmp3, %T114.shift_l, !tcg.op !117
-  %T114.lshr_a = lshr <4 x i32> %T114.tmp3, %T114.shift_r, !tcg.op !117
-  %T114.or = or <4 x i32> %T114.shl_a, %T114.lshr_a, !tcg.op !117
+  %T114.shl = shl <4 x i32> %T114.tmp3, %T114.shift_l, !tcg.op !117
+  %T114.lshr = lshr <4 x i32> %T114.tmp3, %T114.shift_r, !tcg.op !117
+  %T114.or = or <4 x i32> %T114.shl, %T114.lshr, !tcg.op !117
   store <4 x i32> %T114.or, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !117
 ; ======== TCG [115] shli_vec v128,e8,[t8],t3,0x2 ========
   %T115.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !118
@@ -891,52 +891,70 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
 ; ======== TCG [125] andc_i32 [t2],t2,t0 ========
   %T125.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !128
   %T125.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !128
-  %T125.notb = xor i32 %T125.tmp0, -1, !tcg.op !128
-  %T125.and_a_notb = and i32 %T125.tmp2, %T125.notb, !tcg.op !128
-  store i32 %T125.and_a_notb, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !128
+  %T125.not = xor i32 %T125.tmp0, -1, !tcg.op !128
+  %T125.and_a_not_b = and i32 %T125.tmp2, %T125.not, !tcg.op !128
+  store i32 %T125.and_a_not_b, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !128
 ; ======== TCG [126] andc_i64 [t2],t2,t0 ========
   %T126.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !129
   %T126.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !129
-  %T126.notb = xor i64 %T126.tmp0, -1, !tcg.op !129
-  %T126.and_a_notb = and i64 %T126.tmp2, %T126.notb, !tcg.op !129
-  store i64 %T126.and_a_notb, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !129
+  %T126.not = xor i64 %T126.tmp0, -1, !tcg.op !129
+  %T126.and_a_not_b = and i64 %T126.tmp2, %T126.not, !tcg.op !129
+  store i64 %T126.and_a_not_b, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !129
 ; ======== TCG [127] andc_vec v128,e32,[t8],t3,t4 ========
   %T127.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !130
   %T127.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !130
-  %T127.notb = xor <4 x i32> %T127.tmp4, splat (i32 -1), !tcg.op !130
-  %T127.and_a_notb = and <4 x i32> %T127.tmp3, %T127.notb, !tcg.op !130
-  store <4 x i32> %T127.and_a_notb, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !130
+  %T127.not = xor <4 x i32> %T127.tmp4, splat (i32 -1), !tcg.op !130
+  %T127.and_a_not_b = and <4 x i32> %T127.tmp3, %T127.not, !tcg.op !130
+  store <4 x i32> %T127.and_a_not_b, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !130
 ; ======== TCG [128] nor_i32 [t2],t2,t0 ========
   %T128.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !131
   %T128.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !131
   %T128.or = or i32 %T128.tmp2, %T128.tmp0, !tcg.op !131
-  %T128.not_or = xor i32 %T128.or, -1, !tcg.op !131
-  store i32 %T128.not_or, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !131
+  %T128.not_or_a_b = xor i32 %T128.or, -1, !tcg.op !131
+  store i32 %T128.not_or_a_b, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !131
 ; ======== TCG [129] nor_i64 [t2],t2,t0 ========
   %T129.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !132
   %T129.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !132
   %T129.or = or i64 %T129.tmp2, %T129.tmp0, !tcg.op !132
-  %T129.not_or = xor i64 %T129.or, -1, !tcg.op !132
-  store i64 %T129.not_or, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !132
+  %T129.not_or_a_b = xor i64 %T129.or, -1, !tcg.op !132
+  store i64 %T129.not_or_a_b, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !132
 ; ======== TCG [130] nor_vec v128,e32,[t8],t3,t4 ========
   %T130.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !133
   %T130.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !133
   %T130.or = or <4 x i32> %T130.tmp3, %T130.tmp4, !tcg.op !133
-  %T130.not_or = xor <4 x i32> %T130.or, splat (i32 -1), !tcg.op !133
-  store <4 x i32> %T130.not_or, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !133
-; ======== TCG [131] func_addr t9,0x55aa,0x0 ========
-  store ptr @Fx55aa, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !134
-; ======== TCG [132] tail_call_qemuaot t9 VEC_ARGS: ========
-  %T132.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !135
-  %T132.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !135
-  %T132.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !135
-  %T132.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !135
-  %T132.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !135
-  %T132.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !135
-  %T132.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !135
-  %T132.loaded_fn = load ptr, ptr %tmp9.stack, align 8, !tcg.op !135
-  tail call qemuaot void %T132.loaded_fn(i64 %T132.rax.stack, i64 %T132.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %T132.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T132.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T132.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T132.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T132.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !135
-  ret void, !tcg.op !135
+  %T130.not_or_a_b = xor <4 x i32> %T130.or, splat (i32 -1), !tcg.op !133
+  store <4 x i32> %T130.not_or_a_b, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !133
+; ======== TCG [131] orc_i32 [t2],t2,t0 ========
+  %T131.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !134
+  %T131.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !134
+  %T131.not = xor i32 %T131.tmp0, -1, !tcg.op !134
+  %T131.or_a_not_b = or i32 %T131.tmp2, %T131.not, !tcg.op !134
+  store i32 %T131.or_a_not_b, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !134
+; ======== TCG [132] orc_i64 [t2],t2,t0 ========
+  %T132.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !135
+  %T132.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !135
+  %T132.not = xor i64 %T132.tmp0, -1, !tcg.op !135
+  %T132.or_a_not_b = or i64 %T132.tmp2, %T132.not, !tcg.op !135
+  store i64 %T132.or_a_not_b, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !135
+; ======== TCG [133] orc_vec v128,e32,[t8],t3,t4 ========
+  %T133.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !136
+  %T133.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !136
+  %T133.not = xor <4 x i32> %T133.tmp4, splat (i32 -1), !tcg.op !136
+  %T133.or_a_not_b = or <4 x i32> %T133.tmp3, %T133.not, !tcg.op !136
+  store <4 x i32> %T133.or_a_not_b, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !136
+; ======== TCG [134] func_addr t9,0x55aa,0x0 ========
+  store ptr @Fx55aa, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !137
+; ======== TCG [135] tail_call_qemuaot t9 VEC_ARGS: ========
+  %T135.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !138
+  %T135.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !138
+  %T135.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !138
+  %T135.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !138
+  %T135.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !138
+  %T135.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !138
+  %T135.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !138
+  %T135.loaded_fn = load ptr, ptr %tmp9.stack, align 8, !tcg.op !138
+  tail call qemuaot void %T135.loaded_fn(i64 %T135.rax.stack, i64 %T135.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %T135.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T135.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T135.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T135.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T135.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !138
+  ret void, !tcg.op !138
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
@@ -1148,5 +1166,8 @@ attributes #2 = { nounwind "target-features"="+neon" }
 !131 = !{!"[128] nor_i32 [t2],t2,t0"}
 !132 = !{!"[129] nor_i64 [t2],t2,t0"}
 !133 = !{!"[130] nor_vec v128,e32,[t8],t3,t4"}
-!134 = !{!"[131] func_addr t9,0x55aa,0x0"}
-!135 = !{!"[132] tail_call_qemuaot t9 VEC_ARGS:"}
+!134 = !{!"[131] orc_i32 [t2],t2,t0"}
+!135 = !{!"[132] orc_i64 [t2],t2,t0"}
+!136 = !{!"[133] orc_vec v128,e32,[t8],t3,t4"}
+!137 = !{!"[134] func_addr t9,0x55aa,0x0"}
+!138 = !{!"[135] tail_call_qemuaot t9 VEC_ARGS:"}
