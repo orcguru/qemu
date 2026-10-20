@@ -1091,11 +1091,9 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(not_vec, translate_not);
             CASE_BSWAP(bswap16_i32, LLVMInt16);
             CASE_BSWAP(bswap16_i64, LLVMInt16);
+            CASE_BSWAP(bswap32_i32, LLVMInt32);
 
 #if 0
-            case bswap32_i32:
-                translate_bswap32_i32(opc, u);
-                break;
             case bswap32_i64:
                 translate_bswap32_i64(opc, u);
                 break;
