@@ -345,6 +345,16 @@ void translate_orc(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInst
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_nand(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMValueRef out = LLVMBuildNot(builder,
+                                    LLVMBuildAnd(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                                                get_input_val_for_operand(&u->operands[2], stack, prefix),
+                                                assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and")),
+                                    assemble_name_2(&var_name[0], sizeof(var_name), prefix, "not_and_a_b"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -980,18 +990,15 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(nor_i32, translate_nor);
             CASE(nor_i64, translate_nor);
             CASE(nor_vec, translate_nor);
-
             CASE(orc_i32, translate_orc);
             CASE(orc_i64, translate_orc);
             CASE(orc_vec, translate_orc);
+            CASE(nand_i32, translate_nand);
+            CASE(nand_i64, translate_nand);
+            CASE(nand_vec, translate_nand);
 
 #if 0
 
-            case orc_i32:
-            case orc_i64:
-            case orc_vec:
-                translate_orc(opc, u);
-                break;
             case nand_i32:
             case nand_i64:
             case nand_vec:
