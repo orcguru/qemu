@@ -154,5 +154,8 @@ orc_vec v128,e32,tmp27,tmp24,tmp25
 nand_i32 loc0,loc0,loc1
 nand_i64 loc0,loc0,loc1
 nand_vec v128,e32,tmp27,tmp24,tmp25
+eqv_i32 loc0,loc0,loc1
+eqv_i64 loc0,loc0,loc1
+eqv_vec v128,e32,tmp27,tmp24,tmp25
 
 jmp_direct $0x55aa

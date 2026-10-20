@@ -355,6 +355,16 @@ void translate_nand(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIns
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_eqv(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMValueRef out = LLVMBuildNot(builder,
+                                    LLVMBuildXor(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                                                get_input_val_for_operand(&u->operands[2], stack, prefix),
+                                                assemble_name_2(&var_name[0], sizeof(var_name), prefix, "xor")),
+                                    assemble_name_2(&var_name[0], sizeof(var_name), prefix, "not_xor_a_b"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -997,13 +1007,12 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(nand_i64, translate_nand);
             CASE(nand_vec, translate_nand);
 
+            CASE(eqv_i32, translate_eqv);
+            CASE(eqv_i64, translate_eqv);
+            CASE(eqv_vec, translate_eqv);
+
 #if 0
 
-            case nand_i32:
-            case nand_i64:
-            case nand_vec:
-                translate_nand(opc, u);
-                break;
             case eqv_i32:
             case eqv_i64:
             case eqv_vec:
