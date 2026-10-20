@@ -188,4 +188,11 @@ bswap32_i64 loc0,loc0,iz,oz
 bswap32_i64 loc0,loc0,iz,os
 bswap32_i64 loc0,loc0
 
+bswap64_i64 loc0,loc0,oz
+bswap64_i64 loc0,loc0,os
+bswap64_i64 loc0,loc0,iz
+bswap64_i64 loc0,loc0,iz,oz
+bswap64_i64 loc0,loc0,iz,os
+bswap64_i64 loc0,loc0
+
 jmp_direct $0x55aa
