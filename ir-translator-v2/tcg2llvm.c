@@ -382,6 +382,58 @@ void translate_not(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInst
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_bswap(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, LLVMType effective_ty) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
+    int effective_bit_cnt = llvm_vector_elem_bit_counts[effective_ty * 2 + 1];
+    SwapAttrType swap_flag = 0;
+    for (int i = 2; i < u->operand_count; ++i) {
+        if (u->operands[i].kind == OP_ATTR && u->operands[i].attr_info.subt == SUB_ATTR_SWAP) {
+            swap_flag |= u->operands[i].attr_info.p.swap;
+        }
+    }
+    LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef effective_in = NULL;
+    LLVMValueRef in_bc = NULL;
+    if (total_bit_cnt != effective_bit_cnt) {
+        assert(total_bit_cnt % effective_bit_cnt == 0);
+        in_bc = LLVMBuildBitCast(builder, in, LLVMVectorType(get_llvm_type(effective_ty), (total_bit_cnt / effective_bit_cnt)), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(in), "bc"));
+        effective_in = LLVMBuildExtractElement(builder, in_bc, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(in_bc), "ee"));
+    } else {
+        effective_in = in;
+    }
+    effective_in = LLVMBuildBitCast(builder, effective_in, LLVMVectorType(get_llvm_type(LLVMInt8), (effective_bit_cnt / 8)), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(effective_in), "swap_vec"));
+    LLVMValueRef constants[16];
+    int elem_cnt = (effective_bit_cnt / 8);
+    for (int i = 0; i < elem_cnt; i++) {
+        constants[i] = LLVMConstInt(get_llvm_type(LLVMInt8), 0, 0);
+    }
+    LLVMValueRef swap_out = LLVMConstVector(constants, elem_cnt);
+    for (int i = 0; i < effective_bit_cnt / 8; ++i) {
+        LLVMValueRef elem = LLVMBuildExtractElement(builder, effective_in, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(effective_in), "ee"));
+        swap_out = LLVMBuildInsertElement(builder, swap_out, elem, LLVMConstInt(get_llvm_type(LLVMInt64), ((effective_bit_cnt / 8) - 1 - i), 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "swap_out", "ie"));
+    }
+    swap_out = LLVMBuildBitCast(builder, swap_out, get_llvm_type(effective_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "swap_out"));
+    if (tcg_ty == effective_ty) {
+        do_store(&u->operands[0], swap_out, stack, prefix, false);
+        return;
+    }
+    LLVMValueRef out = NULL;
+    if (swap_flag == 0 || (((swap_flag & OZ) && (swap_flag & IZ)) ||
+                          !((swap_flag & OS) || (swap_flag & OZ)))) {
+        out = LLVMBuildInsertElement(builder, in_bc, swap_out, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    } else {
+        if (swap_flag & OS) {
+            out = LLVMBuildSExt(builder, swap_out, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+        } else if (swap_flag & OZ) {
+            out = LLVMBuildZExt(builder, swap_out, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+        }
+    }
+    do_store(&u->operands[0], out, stack, prefix, false);
+    return;
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -865,6 +917,11 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
             entry(builder, stack, u, &prefix[0], b);\
             break
 
+#define CASE_BSWAP(opc, ty)                                     \
+        case opc:                                               \
+            translate_bswap(builder, stack, u, &prefix[0], ty); \
+            break
+
 #define CASE_COMMON(opc, llvm_api)                                      \
         case opc:                                                       \
             translate_common(builder, llvm_api, stack, u, &prefix[0]);  \
@@ -1032,18 +1089,9 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(not_i32, translate_not);
             CASE(not_i64, translate_not);
             CASE(not_vec, translate_not);
+            CASE_BSWAP(bswap16_i32, LLVMInt16);
 
 #if 0
-
-            case not_i32:
-            case not_i64:
-            case not_vec:
-                translate_not(opc, u);
-                break;
-
-            case bswap16_i32:
-                translate_bswap16_i32(opc, u);
-                break;
             case bswap16_i64:
                 translate_bswap16_i64(opc, u);
                 break;
