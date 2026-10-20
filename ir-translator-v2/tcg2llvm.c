@@ -326,6 +326,16 @@ void translate_andc(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIns
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_nor(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMValueRef out = LLVMBuildNot(builder,
+                                    LLVMBuildOr(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                                                get_input_val_for_operand(&u->operands[2], stack, prefix),
+                                                assemble_name_2(&var_name[0], sizeof(var_name), prefix, "or")),
+                                    assemble_name_2(&var_name[0], sizeof(var_name), prefix, "not_or"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -958,6 +968,9 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(andc_i32, translate_andc);
             CASE(andc_i64, translate_andc);
             CASE(andc_vec, translate_andc);
+            CASE(nor_i32, translate_nor);
+            CASE(nor_i64, translate_nor);
+            CASE(nor_vec, translate_nor);
 
 #if 0
 

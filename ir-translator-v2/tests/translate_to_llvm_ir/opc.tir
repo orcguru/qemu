@@ -145,5 +145,8 @@ sars_vec v128,e32,tmp27,tmp24,loc0
 andc_i32 loc0,loc0,loc1
 andc_i64 loc0,loc0,loc1
 andc_vec v128,e32,tmp27,tmp24,tmp25
+nor_i32 loc0,loc0,loc1
+nor_i64 loc0,loc0,loc1
+nor_vec v128,e32,tmp27,tmp24,tmp25
 
 jmp_direct $0x55aa
