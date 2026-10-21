@@ -125,7 +125,11 @@ static LLVMValueRef do_cond(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueR
     if (r == tsteq || r == tstne) {
         r -= (tsteq - eq);
         in1 = LLVMBuildAnd(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "and_a_b"));
-        in2 = LLVMConstInt(get_llvm_type(ty), 0, 0);
+        if (ty <= LLVMInt64) {
+            in2 = LLVMConstInt(get_llvm_type(ty), 0, 0);
+        } else {
+            in2 = get_const_vector(0, ty);
+        }
     }
     assert(r < RELOP_MAX && llvm_predicate[r]);
     return LLVMBuildICmp(builder, llvm_predicate[r], in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "bool"));
@@ -524,6 +528,17 @@ void translate_zext(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIns
     char var_name[32] = {0};
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
     do_store(&u->operands[0], LLVMBuildZExt(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "sext")), stack, prefix, false);
+}
+
+void translate_movcond(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    assert(u->operands[5].kind == OP_RELOP);
+    LLVMValueRef bv = do_cond(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                              get_input_val_for_operand(&u->operands[2], stack, prefix),
+                              u->operands[5].relop, tcg_ty, prefix);
+    LLVMValueRef out = LLVMBuildSelect(builder, bv, get_input_val_for_operand(&u->operands[3], stack, prefix), get_input_val_for_operand(&u->operands[4], stack, prefix), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    do_store(&u->operands[0], out, stack, prefix, false);
 }
 
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
@@ -1203,13 +1218,11 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(extrh_i64_i32, translate_extrh);
             CASE(ext_i32_i64, translate_sext);
             CASE(extu_i32_i64, translate_zext);
+            CASE(movcond_i32, translate_movcond);
+            CASE(movcond_i64, translate_movcond);
+            CASE(movcond_vec, translate_movcond);
 
 #if 0
-            case movcond_i32:
-            case movcond_i64:
-            case movcond_vec:
-                translate_movcond(opc, u);
-                break;
             case mulsh_i32:
             case mulsh_i64:
                 translate_mulxh(opc, u, LLVMBuildSExt);

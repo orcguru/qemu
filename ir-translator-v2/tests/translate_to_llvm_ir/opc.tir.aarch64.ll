@@ -9,6 +9,8 @@ entry:
   store i64 %rax, ptr %rax.stack, align 8, !tbaa !0
   %rcx.stack = alloca i64, align 8
   store i64 %rcx, ptr %rcx.stack, align 8, !tbaa !0
+  %cc_dst.stack = alloca i64, align 8
+  store i64 %cc_dst, ptr %cc_dst.stack, align 8, !tbaa !0
   %v0.stack = alloca <2 x i64>, align 16
   store <2 x i64> %xmm0, ptr %v0.stack, align 16, !tbaa !0
   %v4.stack = alloca <2 x i64>, align 16
@@ -1579,19 +1581,40 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T193.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !196
   %T193.sext = zext i32 %T193.tmp0 to i64, !tcg.op !196
   store i64 %T193.sext, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !196
-; ======== TCG [194] func_addr t10,0x55aa,0x0 ========
-  store ptr @Fx55aa, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !197
-; ======== TCG [195] tail_call_qemuaot t10 VEC_ARGS: ========
-  %T195.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !198
-  %T195.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !198
-  %T195.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !198
-  %T195.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !198
-  %T195.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !198
-  %T195.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !198
-  %T195.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !198
-  %T195.loaded_fn = load ptr, ptr %tmp10.stack, align 8, !tcg.op !198
-  tail call qemuaot void %T195.loaded_fn(i64 %T195.rax.stack, i64 %T195.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %T195.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T195.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T195.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T195.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T195.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !198
-  ret void, !tcg.op !198
+; ======== TCG [194] movcond_i32 [t0],t2,0x0,0x1a,0x26,eq ========
+  %T194.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !197
+  %T194.bool = icmp eq i32 %T194.tmp2, 0, !tcg.op !197
+  %T194.out = select i1 %T194.bool, i32 26, i32 38, !tcg.op !197
+  store i32 %T194.out, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !197
+; ======== TCG [195] movcond_i64 [t2],t0,0x0,cc_dst,t2,eq ========
+  %T195.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !198
+  %T195.bool = icmp eq i64 %T195.tmp0, 0, !tcg.op !198
+  %T195.cc_dst = load i64, ptr %cc_dst.stack, align 8, !tbaa !0, !tcg.op !198
+  %T195.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !198
+  %T195.out = select i1 %T195.bool, i64 %T195.cc_dst, i64 %T195.tmp2, !tcg.op !198
+  store i64 %T195.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !198
+; ======== TCG [196] movcond_vec v128,e8,[t8],t3,t4,t3,t4,ne ========
+  %T196.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !199
+  %T196.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !199
+  %T196.bool = icmp ne <16 x i8> %T196.tmp3, %T196.tmp4, !tcg.op !199
+  %T196.tmp3224 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !199
+  %T196.tmp4225 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !199
+  %T196.out = select <16 x i1> %T196.bool, <16 x i8> %T196.tmp3224, <16 x i8> %T196.tmp4225, !tcg.op !199
+  store <16 x i8> %T196.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !199
+; ======== TCG [197] func_addr t10,0x55aa,0x0 ========
+  store ptr @Fx55aa, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !200
+; ======== TCG [198] tail_call_qemuaot t10 VEC_ARGS: ========
+  %T198.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !201
+  %T198.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !201
+  %T198.cc_dst.stack = load i64, ptr %cc_dst.stack, align 8, !tbaa !0, !tcg.op !201
+  %T198.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !201
+  %T198.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !201
+  %T198.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !201
+  %T198.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !201
+  %T198.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !201
+  %T198.loaded_fn = load ptr, ptr %tmp10.stack, align 8, !tcg.op !201
+  tail call qemuaot void %T198.loaded_fn(i64 %T198.rax.stack, i64 %T198.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %T198.cc_dst.stack, i32 %cc_op, i64 %rip, <2 x i64> %T198.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T198.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T198.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T198.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T198.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !201
+  ret void, !tcg.op !201
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
@@ -1866,5 +1889,8 @@ attributes #2 = { nounwind "target-features"="+neon" }
 !194 = !{!"[191] extrh_i64_i32 [t2],t0"}
 !195 = !{!"[192] ext_i32_i64 [t2],t0"}
 !196 = !{!"[193] extu_i32_i64 [t2],t0"}
-!197 = !{!"[194] func_addr t10,0x55aa,0x0"}
-!198 = !{!"[195] tail_call_qemuaot t10 VEC_ARGS:"}
+!197 = !{!"[194] movcond_i32 [t0],t2,0x0,0x1a,0x26,eq"}
+!198 = !{!"[195] movcond_i64 [t2],t0,0x0,cc_dst,t2,eq"}
+!199 = !{!"[196] movcond_vec v128,e8,[t8],t3,t4,t3,t4,ne"}
+!200 = !{!"[197] func_addr t10,0x55aa,0x0"}
+!201 = !{!"[198] tail_call_qemuaot t10 VEC_ARGS:"}
