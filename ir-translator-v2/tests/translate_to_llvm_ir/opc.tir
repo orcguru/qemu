@@ -222,5 +222,14 @@ muls2_i32 loc0,loc1,loc0,loc0
 muls2_i64 loc0,loc1,loc0,loc0
 mulu2_i32 loc0,loc1,loc0,loc0
 mulu2_i64 loc0,loc1,loc0,loc0
-
+setcond_i32 loc0,cc_dst,$0xffffffff,tsteq
+setcond_i64 loc0,cc_dst,$0xffffffff,tsteq
+negsetcond_i32 loc0,cc_dst,$0xffffffff,tsteq
+negsetcond_i64 loc0,cc_dst,$0xffffffff,tsteq
+umax_vec v128,e8,tmp27,tmp24,tmp25
+umax_vec v128,e32,tmp27,tmp24,tmp25
+umin_vec v128,e8,tmp27,tmp24,tmp25
+umin_vec v128,e32,tmp27,tmp24,tmp25
+discard rax
+discard loc0
 jmp_direct $0x55aa

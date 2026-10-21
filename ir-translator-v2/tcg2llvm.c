@@ -568,6 +568,17 @@ void translate_mulx2(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
     do_store(&u->operands[0], low, stack, prefix, false);
 }
 
+void translate_setcond(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, LLVM_EXT_API llvm_api) {
+    char var_name[32] = {0};
+    assert(u->operands[3].kind == OP_RELOP);
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    LLVMValueRef bv = do_cond(builder, get_input_val_for_operand(&u->operands[1], stack, prefix),
+                              get_input_val_for_operand(&u->operands[2], stack, prefix),
+                              u->operands[3].relop, tcg_ty, prefix);
+    LLVMValueRef out = llvm_api(builder, bv, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -912,6 +923,16 @@ void translate_brcond(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack
     LLVMPositionBuilderAtEnd(builder, bb_false);
 }
 
+void translate_discard(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    if (u->operands[0].kind == OP_SLOT) {
+        if (u->operands[0].slot.type == SUB_SLOT_XREG) {
+            build_store_with_alignment(builder, LLVMGetPoison(stack->xreg.llvm_ty[u->operands[0].slot.idx]), stack->xreg.alloca[u->operands[0].slot.idx], stack->xreg.align[u->operands[0].slot.idx], SPILL_TAG);
+        } else if (u->operands[0].slot.type == SUB_SLOT_TMP) {
+            build_store_with_alignment(builder, LLVMGetPoison(stack->tmp.llvm_ty[u->operands[0].slot.idx]), stack->tmp.alloca[u->operands[0].slot.idx], stack->tmp.align[u->operands[0].slot.idx], SPILL_TAG);
+        }
+    }
+}
+
 static void print_operand(const Operand *op, int is_output, SBuf *b) {
     if (is_output) {
         sbuf_putc(b, '[');
@@ -1071,6 +1092,11 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
             translate_mulx2(builder, stack, u, &prefix[0], llvm_api);   \
             break
 
+#define CASE_SETCOND(opc, llvm_api)                                       \
+        case opc:                                                       \
+            translate_setcond(builder, stack, u, &prefix[0], llvm_api);   \
+            break
+
 #define CASE_COMMON(opc, llvm_api)                                      \
         case opc:                                                       \
             translate_common(builder, llvm_api, stack, u, &prefix[0]);  \
@@ -1199,6 +1225,8 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_CT_INTRINSIC(ctz_i64, "llvm.cttz.i64");
             CASE_BINARY_INTRINSIC(smax_vec, "llvm.smax");
             CASE_BINARY_INTRINSIC(smin_vec, "llvm.smin");
+            CASE_BINARY_INTRINSIC(umax_vec, "llvm.umax");
+            CASE_BINARY_INTRINSIC(umin_vec, "llvm.umin");
             CASE_BINARY_INTRINSIC(ssadd_vec, "llvm.sadd.sat");
             CASE_BINARY_INTRINSIC(sssub_vec, "llvm.ssub.sat");
             CASE_BINARY_INTRINSIC(usadd_vec, "llvm.uadd.sat");
@@ -1266,13 +1294,10 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_MULX2(muls2_i64, LLVMBuildSExt);
             CASE_MULX2(mulu2_i32, LLVMBuildZExt);
             CASE_MULX2(mulu2_i64, LLVMBuildZExt);
-
-#if 0
-            case negsetcond_i32:
-            case negsetcond_i64:
-                translate_negsetcond(opc, u);
-                break;
-#endif
+            CASE_SETCOND(setcond_i32, LLVMBuildZExt);
+            CASE_SETCOND(setcond_i64, LLVMBuildZExt);
+            CASE_SETCOND(negsetcond_i32, LLVMBuildSExt);
+            CASE_SETCOND(negsetcond_i64, LLVMBuildSExt);
             CASE(ld8u_i32, translate_ld_zext);
             CASE(ld8u_i64, translate_ld_zext);
             CASE(ld16u_i32, translate_ld_zext);
@@ -1300,18 +1325,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(qemu_st_i32, translate_st_with_attr);
             CASE(qemu_st_i64, translate_st_with_attr);
             CASE(qemu_st2_i128, translate_st2_with_attr);
-#if 0
-            case setcond_i32:
-            case setcond_i64:
-                translate_setcond(opc, u);
-                break;
-            case umax_vec:
-                translate_maxmin_vec(opc, u, gtu);
-                break;
-            case umin_vec:
-                translate_maxmin_vec(opc, u, ltu);
-                break;
-#endif
             CASE_FUNC(set_label, translate_set_label);
             CASE_FUNC(br, translate_br);
             CASE_FUNC_WITH_RC(func_addr, translate_func_addr);
@@ -1329,11 +1342,7 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             case call_default:
                 translate_call_default(builder, F, stack, u, &prefix[0], false);
                 break;
-#if 0
-            case discard:
-                translate_discard(opc, u);
-                break;
-#endif
+            CASE(discard, translate_discard);
             default: assert(0);
         }
         tcg_tag_end(&tag);
