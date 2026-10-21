@@ -200,5 +200,7 @@ deposit_i32 loc0,loc0,loc1,$0x18,$0x18
 deposit_i64 rax,rax,loc0,$0x0,$0x8
 deposit_i64 rax,rax,loc0,$0x0,$0x0
 deposit_i64 rax,rax,loc0,$0x10,$0x0
+dupm_vec v128,e8,tmp9,env,$0x360
+dupm_vec v128,e64,tmp9,env,$0x360
 
 jmp_direct $0x55aa

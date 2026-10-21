@@ -454,6 +454,18 @@ void translate_deposit(LLVMBuilderRef builder, StackAlloca *stack, const Unified
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_dupm_vec(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    LLVMValueRef elem = LLVMBuildExtractElement(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "elem"));
+    uint8_t elem_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2];
+    LLVMValueRef out = get_const_vector(0, tcg_ty);
+    for (int i = 0; i < elem_cnt; i++) {
+        out = LLVMBuildInsertElement(builder, out, elem, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ie"));
+    }
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -1116,15 +1128,9 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_BSWAP(bswap64_i64, LLVMInt64);
             CASE(deposit_i32, translate_deposit);
             CASE(deposit_i64, translate_deposit);
+            CASE(dupm_vec, translate_dupm_vec);
 
 #if 0
-            case deposit_i32:
-            case deposit_i64:
-                translate_deposit(opc, u);
-                break;
-            case dupm_vec:
-                translate_dupm_vec(opc, u);
-                break;
             case extract2_i32:
             case extract2_i64:
                 translate_extract2(opc, u);
