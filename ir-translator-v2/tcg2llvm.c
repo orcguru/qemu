@@ -12,6 +12,7 @@
 #include "i386_cpu.h"
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
+typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
 
 void translate_common(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     char var_name[32] = {0};
@@ -541,6 +542,19 @@ void translate_movcond(LLVMBuilderRef builder, StackAlloca *stack, const Unified
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_mulxh(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, LLVM_EXT_API llvm_api) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
+    LLVMTypeRef llvm_double_ty = (u->opc == mulsh_i64 || u->opc == muluh_i64) ? LLVMInt128Type() : LLVMInt64Type();
+    LLVMValueRef in1 = llvm_api(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "double_ty"));
+    LLVMValueRef in2 = llvm_api(builder, get_input_val_for_operand(&u->operands[2], stack, prefix), llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "double_ty"));
+    LLVMValueRef out = LLVMBuildMul(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "mul"));
+    out = LLVMBuildLShr(builder, out, LLVMConstInt(llvm_double_ty, total_bit_cnt, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "lshr"));
+    out = LLVMBuildTrunc(builder, out, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tr"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -1034,6 +1048,11 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
             translate_extract(builder, stack, u, &prefix[0], sext); \
             break
 
+#define CASE_MULXH(opc, llvm_api)                                       \
+        case opc:                                                       \
+            translate_mulxh(builder, stack, u, &prefix[0], llvm_api);   \
+            break
+
 #define CASE_COMMON(opc, llvm_api)                                      \
         case opc:                                                       \
             translate_common(builder, llvm_api, stack, u, &prefix[0]);  \
@@ -1221,16 +1240,12 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(movcond_i32, translate_movcond);
             CASE(movcond_i64, translate_movcond);
             CASE(movcond_vec, translate_movcond);
+            CASE_MULXH(mulsh_i32, LLVMBuildSExt);
+            CASE_MULXH(mulsh_i64, LLVMBuildSExt);
+            CASE_MULXH(muluh_i32, LLVMBuildZExt);
+            CASE_MULXH(muluh_i64, LLVMBuildZExt);
 
 #if 0
-            case mulsh_i32:
-            case mulsh_i64:
-                translate_mulxh(opc, u, LLVMBuildSExt);
-                break;
-            case muluh_i32:
-            case muluh_i64:
-                translate_mulxh(opc, u, LLVMBuildZExt);
-                break;
             case muls2_i32:
             case muls2_i64:
                 translate_muls2(opc, u);

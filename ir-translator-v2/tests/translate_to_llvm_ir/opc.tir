@@ -214,5 +214,9 @@ extu_i32_i64 loc0,loc1
 movcond_i32 loc1,loc0,$0x0,$0x1a,$0x26,eq
 movcond_i64 loc0,loc1,$0x0,cc_dst,loc0,eq
 movcond_vec v128,e8,tmp27,tmp24,tmp25,tmp24,tmp25,ne
+mulsh_i32 loc0,loc1,loc0
+mulsh_i64 loc0,loc1,loc0
+muluh_i32 loc0,loc1,loc0
+muluh_i64 loc0,loc1,loc0
 
 jmp_direct $0x55aa
