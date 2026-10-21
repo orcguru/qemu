@@ -218,5 +218,9 @@ mulsh_i32 loc0,loc1,loc0
 mulsh_i64 loc0,loc1,loc0
 muluh_i32 loc0,loc1,loc0
 muluh_i64 loc0,loc1,loc0
+muls2_i32 loc0,loc1,loc0,loc0
+muls2_i64 loc0,loc1,loc0,loc0
+mulu2_i32 loc0,loc1,loc0,loc0
+mulu2_i64 loc0,loc1,loc0,loc0
 
 jmp_direct $0x55aa

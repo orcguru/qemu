@@ -1603,8 +1603,8 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   store <16 x i8> %T196.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !199
 ; ======== TCG [197] mulsh_i32 [t2],t0,t2 ========
   %T197.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !200
-  %T197.double_ty = sext i32 %T197.tmp0 to i64, !tcg.op !200
   %T197.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !200
+  %T197.double_ty = sext i32 %T197.tmp0 to i64, !tcg.op !200
   %T197.double_ty226 = sext i32 %T197.tmp2 to i64, !tcg.op !200
   %T197.mul = mul i64 %T197.double_ty, %T197.double_ty226, !tcg.op !200
   %T197.lshr = lshr i64 %T197.mul, 32, !tcg.op !200
@@ -1612,8 +1612,8 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   store i32 %T197.tr, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !200
 ; ======== TCG [198] mulsh_i64 [t2],t0,t2 ========
   %T198.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !201
-  %T198.double_ty = sext i64 %T198.tmp0 to i128, !tcg.op !201
   %T198.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !201
+  %T198.double_ty = sext i64 %T198.tmp0 to i128, !tcg.op !201
   %T198.double_ty227 = sext i64 %T198.tmp2 to i128, !tcg.op !201
   %T198.mul = mul i128 %T198.double_ty, %T198.double_ty227, !tcg.op !201
   %T198.lshr = lshr i128 %T198.mul, 64, !tcg.op !201
@@ -1621,8 +1621,8 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   store i64 %T198.tr, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !201
 ; ======== TCG [199] muluh_i32 [t2],t0,t2 ========
   %T199.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !202
-  %T199.double_ty = zext i32 %T199.tmp0 to i64, !tcg.op !202
   %T199.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !202
+  %T199.double_ty = zext i32 %T199.tmp0 to i64, !tcg.op !202
   %T199.double_ty228 = zext i32 %T199.tmp2 to i64, !tcg.op !202
   %T199.mul = mul i64 %T199.double_ty, %T199.double_ty228, !tcg.op !202
   %T199.lshr = lshr i64 %T199.mul, 32, !tcg.op !202
@@ -1630,27 +1630,79 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   store i32 %T199.tr, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !202
 ; ======== TCG [200] muluh_i64 [t2],t0,t2 ========
   %T200.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !203
-  %T200.double_ty = zext i64 %T200.tmp0 to i128, !tcg.op !203
   %T200.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !203
+  %T200.double_ty = zext i64 %T200.tmp0 to i128, !tcg.op !203
   %T200.double_ty229 = zext i64 %T200.tmp2 to i128, !tcg.op !203
   %T200.mul = mul i128 %T200.double_ty, %T200.double_ty229, !tcg.op !203
   %T200.lshr = lshr i128 %T200.mul, 64, !tcg.op !203
   %T200.tr = trunc i128 %T200.lshr to i64, !tcg.op !203
   store i64 %T200.tr, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !203
-; ======== TCG [201] func_addr t10,0x55aa,0x0 ========
-  store ptr @Fx55aa, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !204
-; ======== TCG [202] tail_call_qemuaot t10 VEC_ARGS: ========
-  %T202.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !205
-  %T202.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !205
-  %T202.cc_dst.stack = load i64, ptr %cc_dst.stack, align 8, !tbaa !0, !tcg.op !205
-  %T202.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !205
-  %T202.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !205
-  %T202.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !205
-  %T202.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !205
-  %T202.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !205
-  %T202.loaded_fn = load ptr, ptr %tmp10.stack, align 8, !tcg.op !205
-  tail call qemuaot void %T202.loaded_fn(i64 %T202.rax.stack, i64 %T202.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %T202.cc_dst.stack, i32 %cc_op, i64 %rip, <2 x i64> %T202.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T202.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T202.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T202.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T202.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !205
-  ret void, !tcg.op !205
+; ======== TCG [201] muls2_i32 [t2],[t0],t2,t2 ========
+  %T201.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
+  %T201.tmp2230 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
+  %T201.double_ty = sext i32 %T201.tmp2 to i64, !tcg.op !204
+  %T201.double_ty231 = sext i32 %T201.tmp2230 to i64, !tcg.op !204
+  %T201.mul = mul i64 %T201.double_ty, %T201.double_ty231, !tcg.op !204
+  %T201.lshr = lshr i64 %T201.mul, 32, !tcg.op !204
+  %T201.tr = trunc i64 %T201.lshr to i32, !tcg.op !204
+  store i32 %T201.tr, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !204
+  %T201.tmp2232 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
+  %T201.tmp2233 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
+  %T201.mul_low = mul i32 %T201.tmp2232, %T201.tmp2233, !tcg.op !204
+  store i32 %T201.mul_low, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
+; ======== TCG [202] muls2_i64 [t2],[t0],t2,t2 ========
+  %T202.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
+  %T202.tmp2234 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
+  %T202.double_ty = sext i64 %T202.tmp2 to i128, !tcg.op !205
+  %T202.double_ty235 = sext i64 %T202.tmp2234 to i128, !tcg.op !205
+  %T202.mul = mul i128 %T202.double_ty, %T202.double_ty235, !tcg.op !205
+  %T202.lshr = lshr i128 %T202.mul, 64, !tcg.op !205
+  %T202.tr = trunc i128 %T202.lshr to i64, !tcg.op !205
+  store i64 %T202.tr, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !205
+  %T202.tmp2236 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
+  %T202.tmp2237 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
+  %T202.mul_low = mul i64 %T202.tmp2236, %T202.tmp2237, !tcg.op !205
+  store i64 %T202.mul_low, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
+; ======== TCG [203] mulu2_i32 [t2],[t0],t2,t2 ========
+  %T203.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
+  %T203.tmp2238 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
+  %T203.double_ty = zext i32 %T203.tmp2 to i64, !tcg.op !206
+  %T203.double_ty239 = zext i32 %T203.tmp2238 to i64, !tcg.op !206
+  %T203.mul = mul i64 %T203.double_ty, %T203.double_ty239, !tcg.op !206
+  %T203.lshr = lshr i64 %T203.mul, 32, !tcg.op !206
+  %T203.tr = trunc i64 %T203.lshr to i32, !tcg.op !206
+  store i32 %T203.tr, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !206
+  %T203.tmp2240 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
+  %T203.tmp2241 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
+  %T203.mul_low = mul i32 %T203.tmp2240, %T203.tmp2241, !tcg.op !206
+  store i32 %T203.mul_low, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
+; ======== TCG [204] mulu2_i64 [t2],[t0],t2,t2 ========
+  %T204.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
+  %T204.tmp2242 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
+  %T204.double_ty = zext i64 %T204.tmp2 to i128, !tcg.op !207
+  %T204.double_ty243 = zext i64 %T204.tmp2242 to i128, !tcg.op !207
+  %T204.mul = mul i128 %T204.double_ty, %T204.double_ty243, !tcg.op !207
+  %T204.lshr = lshr i128 %T204.mul, 64, !tcg.op !207
+  %T204.tr = trunc i128 %T204.lshr to i64, !tcg.op !207
+  store i64 %T204.tr, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !207
+  %T204.tmp2244 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
+  %T204.tmp2245 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
+  %T204.mul_low = mul i64 %T204.tmp2244, %T204.tmp2245, !tcg.op !207
+  store i64 %T204.mul_low, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
+; ======== TCG [205] func_addr t10,0x55aa,0x0 ========
+  store ptr @Fx55aa, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !208
+; ======== TCG [206] tail_call_qemuaot t10 VEC_ARGS: ========
+  %T206.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !209
+  %T206.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !209
+  %T206.cc_dst.stack = load i64, ptr %cc_dst.stack, align 8, !tbaa !0, !tcg.op !209
+  %T206.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !209
+  %T206.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !209
+  %T206.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !209
+  %T206.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !209
+  %T206.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !209
+  %T206.loaded_fn = load ptr, ptr %tmp10.stack, align 8, !tcg.op !209
+  tail call qemuaot void %T206.loaded_fn(i64 %T206.rax.stack, i64 %T206.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %T206.cc_dst.stack, i32 %cc_op, i64 %rip, <2 x i64> %T206.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T206.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T206.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T206.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T206.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !209
+  ret void, !tcg.op !209
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
@@ -1932,5 +1984,9 @@ attributes #2 = { nounwind "target-features"="+neon" }
 !201 = !{!"[198] mulsh_i64 [t2],t0,t2"}
 !202 = !{!"[199] muluh_i32 [t2],t0,t2"}
 !203 = !{!"[200] muluh_i64 [t2],t0,t2"}
-!204 = !{!"[201] func_addr t10,0x55aa,0x0"}
-!205 = !{!"[202] tail_call_qemuaot t10 VEC_ARGS:"}
+!204 = !{!"[201] muls2_i32 [t2],[t0],t2,t2"}
+!205 = !{!"[202] muls2_i64 [t2],[t0],t2,t2"}
+!206 = !{!"[203] mulu2_i32 [t2],[t0],t2,t2"}
+!207 = !{!"[204] mulu2_i64 [t2],[t0],t2,t2"}
+!208 = !{!"[205] func_addr t10,0x55aa,0x0"}
+!209 = !{!"[206] tail_call_qemuaot t10 VEC_ARGS:"}
