@@ -506,6 +506,26 @@ void translate_extract(LLVMBuilderRef builder, StackAlloca *stack, const Unified
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
+void translate_extrh(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_in_ty = get_operand_type(&u->operands[1]);
+    LLVMType tcg_out_ty = get_operand_type(&u->operands[0]);
+    LLVMValueRef out = LLVMBuildTrunc(builder, LLVMBuildLShr(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), LLVMConstInt(get_llvm_type(tcg_in_ty), (llvm_vector_elem_bit_counts[tcg_in_ty * 2 + 1] - llvm_vector_elem_bit_counts[tcg_out_ty * 2 + 1]), 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "lshr")), get_llvm_type(tcg_out_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
+void translate_sext(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    do_store(&u->operands[0], LLVMBuildSExt(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "sext")), stack, prefix, false);
+}
+
+void translate_zext(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    do_store(&u->operands[0], LLVMBuildZExt(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "sext")), stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -1180,17 +1200,11 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_EXTRACT(extract_i64, false);
             CASE_EXTRACT(sextract_i32, true);
             CASE_EXTRACT(sextract_i64, true);
+            CASE(extrh_i64_i32, translate_extrh);
+            CASE(ext_i32_i64, translate_sext);
+            CASE(extu_i32_i64, translate_zext);
 
 #if 0
-            case extrh_i64_i32:
-                translate_extrh(opc, u);
-                break;
-            case ext_i32_i64:
-                translate_ext(opc, u, LLVMBuildSExt);
-                break;
-            case extu_i32_i64:
-                translate_ext(opc, u, LLVMBuildZExt);
-                break;
             case movcond_i32:
             case movcond_i64:
             case movcond_vec:

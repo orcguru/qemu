@@ -208,5 +208,8 @@ extract_i32 loc0,loc1,$0x8,$0x4
 extract_i64 loc0,loc1,$0x0,$0x10
 sextract_i32 loc0,loc1,$0x8,$0x4
 sextract_i64 loc0,loc1,$0x0,$0x20
+extrh_i64_i32 loc0,loc1
+ext_i32_i64 loc0,loc1
+extu_i32_i64 loc0,loc1
 
 jmp_direct $0x55aa
