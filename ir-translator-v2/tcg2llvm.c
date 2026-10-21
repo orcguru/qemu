@@ -463,10 +463,22 @@ void translate_deposit(LLVMBuilderRef builder, StackAlloca *stack, const Unified
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
-void translate_dupm_vec(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+void translate_dup_vec(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     char var_name[32] = {0};
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
-    LLVMValueRef elem = LLVMBuildExtractElement(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "elem"));
+    LLVMValueRef elem = NULL;
+    if (u->operands[1].kind == OP_SLOT) {
+        LLVMType elem_ty = OPC_VECTOR_TO_FIXED(tcg_ty);
+        if (u->operands[1].slot.type == SUB_SLOT_XREG) {
+            elem = build_load_with_alignment(builder, get_llvm_type(elem_ty), stack->xreg.alloca[u->operands[1].slot.idx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld_element"), stack->xreg.align[u->operands[1].slot.idx], SPILL_TAG);
+        } else if (u->operands[1].slot.type == SUB_SLOT_TMP) {
+            elem = build_load_with_alignment(builder, get_llvm_type(elem_ty), stack->tmp.alloca[u->operands[1].slot.idx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld_element"), stack->tmp.align[u->operands[1].slot.idx], SPILL_TAG);
+        } else {
+            assert(0);
+        }
+    } else {
+        elem = LLVMBuildExtractElement(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "elem"));
+    }
     uint8_t elem_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2];
     LLVMValueRef out = get_const_vector(0, tcg_ty);
     for (int i = 0; i < elem_cnt; i++) {
@@ -1154,7 +1166,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             case divs2_i64:
             case divu2_i32:
             case divu2_i64:
-            case dup_vec:
                 assert(0);
                 break;
 
@@ -1273,7 +1284,8 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_BSWAP(bswap64_i64, LLVMInt64);
             CASE(deposit_i32, translate_deposit);
             CASE(deposit_i64, translate_deposit);
-            CASE(dupm_vec, translate_dupm_vec);
+            CASE(dupm_vec, translate_dup_vec);
+            CASE(dup_vec, translate_dup_vec);
             CASE(extract2_i32, translate_extract2);
             CASE(extract2_i64, translate_extract2);
             CASE_EXTRACT(extract_i32, false);
