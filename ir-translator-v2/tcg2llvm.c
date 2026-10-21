@@ -434,8 +434,14 @@ void translate_bswap(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
     return;
 }
 
-void translate_deposit(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+static LLVMValueRef do_deposit(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueRef in2, int pos, int len, LLVMType tcg_ty, const char *prefix) {
     char var_name[32] = {0};
+    in1 = LLVMBuildAnd(builder, in1, LLVMBuildNot(builder, LLVMBuildShl(builder, LLVMConstInt(get_llvm_type(tcg_ty), ((1ULL << len) - 1), 0), LLVMConstInt(get_llvm_type(tcg_ty), pos, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "bits")), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "mask")), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "t1"));
+    in2 = LLVMBuildShl(builder, LLVMBuildZExt(builder, LLVMBuildTrunc(builder, in2, LLVMIntType(len), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tr")), get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "zext")), LLVMConstInt(get_llvm_type(tcg_ty), pos, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "t2"));
+    return LLVMBuildOr(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+}
+
+void translate_deposit(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
     int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
     LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
@@ -448,9 +454,7 @@ void translate_deposit(LLVMBuilderRef builder, StackAlloca *stack, const Unified
         do_store(&u->operands[0], in1, stack, prefix, false);
         return;
     }
-    in1 = LLVMBuildAnd(builder, in1, LLVMBuildNot(builder, LLVMBuildShl(builder, LLVMConstInt(get_llvm_type(tcg_ty), ((1ULL << len) - 1), 0), LLVMConstInt(get_llvm_type(tcg_ty), pos, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "bits")), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "mask")), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "t1"));
-    in2 = LLVMBuildShl(builder, LLVMBuildZExt(builder, LLVMBuildTrunc(builder, in2, LLVMIntType(len), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tr")), get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "zext")), LLVMConstInt(get_llvm_type(tcg_ty), pos, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "t2"));
-    LLVMValueRef out = LLVMBuildOr(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    LLVMValueRef out = do_deposit(builder, in1, in2, pos, len, tcg_ty, prefix);
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
@@ -462,6 +466,42 @@ void translate_dupm_vec(LLVMBuilderRef builder, StackAlloca *stack, const Unifie
     LLVMValueRef out = get_const_vector(0, tcg_ty);
     for (int i = 0; i < elem_cnt; i++) {
         out = LLVMBuildInsertElement(builder, out, elem, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ie"));
+    }
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
+void translate_extract2(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    assert(u->operands[3].kind == OP_IMM);
+    int pos = (u->operands[3].imm.val & (total_bit_cnt - 1));
+    in1 = LLVMBuildLShr(builder, in1, LLVMConstInt(get_llvm_type(tcg_ty), pos, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "lshr"));
+    LLVMValueRef out = do_deposit(builder, in1, in2, (total_bit_cnt - pos), pos, tcg_ty, prefix);
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
+void translate_extract(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, bool sext) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    assert(u->operands[2].kind == OP_IMM);
+    int pos = (u->operands[2].imm.val & (total_bit_cnt - 1));
+    assert(u->operands[3].kind == OP_IMM);
+    int len = (u->operands[3].imm.val & (total_bit_cnt - 1));
+    if (len == 0) {
+        do_store(&u->operands[0], in1, stack, prefix, false);
+        return;
+    }
+    LLVMValueRef shifted = LLVMBuildShl(builder, in1, LLVMConstInt(get_llvm_type(tcg_ty), (total_bit_cnt - pos - len), 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shl"));
+    LLVMValueRef out = NULL;
+    if (sext) {
+        out = LLVMBuildAShr(builder, shifted, LLVMConstInt(get_llvm_type(tcg_ty), (total_bit_cnt - len), 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    } else {
+        out = LLVMBuildLShr(builder, shifted, LLVMConstInt(get_llvm_type(tcg_ty), (total_bit_cnt - len), 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
     }
     do_store(&u->operands[0], out, stack, prefix, false);
 }
@@ -954,6 +994,11 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
             translate_bswap(builder, stack, u, &prefix[0], ty); \
             break
 
+#define CASE_EXTRACT(opc, sext)                                     \
+        case opc:                                                   \
+            translate_extract(builder, stack, u, &prefix[0], sext); \
+            break
+
 #define CASE_COMMON(opc, llvm_api)                                      \
         case opc:                                                       \
             translate_common(builder, llvm_api, stack, u, &prefix[0]);  \
@@ -1129,16 +1174,14 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE(deposit_i32, translate_deposit);
             CASE(deposit_i64, translate_deposit);
             CASE(dupm_vec, translate_dupm_vec);
+            CASE(extract2_i32, translate_extract2);
+            CASE(extract2_i64, translate_extract2);
+            CASE_EXTRACT(extract_i32, false);
+            CASE_EXTRACT(extract_i64, false);
+            CASE_EXTRACT(sextract_i32, true);
+            CASE_EXTRACT(sextract_i64, true);
 
 #if 0
-            case extract2_i32:
-            case extract2_i64:
-                translate_extract2(opc, u);
-                break;
-            case extract_i32:
-            case extract_i64:
-                translate_extract(opc, u);
-                break;
             case extrh_i64_i32:
                 translate_extrh(opc, u);
                 break;
@@ -1205,10 +1248,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             case setcond_i32:
             case setcond_i64:
                 translate_setcond(opc, u);
-                break;
-            case sextract_i32:
-            case sextract_i64:
-                translate_sextract(opc, u);
                 break;
             case umax_vec:
                 translate_maxmin_vec(opc, u, gtu);
