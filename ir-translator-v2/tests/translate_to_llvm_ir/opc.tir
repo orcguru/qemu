@@ -187,12 +187,18 @@ bswap32_i64 loc0,loc0,iz
 bswap32_i64 loc0,loc0,iz,oz
 bswap32_i64 loc0,loc0,iz,os
 bswap32_i64 loc0,loc0
-
 bswap64_i64 loc0,loc0,oz
 bswap64_i64 loc0,loc0,os
 bswap64_i64 loc0,loc0,iz
 bswap64_i64 loc0,loc0,iz,oz
 bswap64_i64 loc0,loc0,iz,os
 bswap64_i64 loc0,loc0
+deposit_i32 loc0,loc0,loc1,$0x0,$0x8
+deposit_i32 loc0,loc0,loc1,$0x10,$0x8
+deposit_i32 loc0,loc0,loc1,$0x18,$0x8
+deposit_i32 loc0,loc0,loc1,$0x18,$0x18
+deposit_i64 rax,rax,loc0,$0x0,$0x8
+deposit_i64 rax,rax,loc0,$0x0,$0x0
+deposit_i64 rax,rax,loc0,$0x10,$0x0
 
 jmp_direct $0x55aa

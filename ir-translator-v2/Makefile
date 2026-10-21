@@ -466,6 +466,7 @@ clean-local:
 	rm -f *.o parser.tab.* lexer.yy.* tcg_mapper tcg_printer helper_lookup.c tests/expand_tcg_ir/*.out collect_helper_templates/*.E collect_helper_templates/*.E.out collect_helper_templates/*.E.err
 	rm -rf collect_helper_templates/*.o.E.helper_templates
 	rm -rf tests/translate_to_llvm_ir/out
+	rm -rf tests/translate_then_gen_asm_snippet/out
 	rm -rf .san .cov coverage
 	rm -f *.gcda *.gcno *.gcov
 	rm -f tests/expand_tcg_ir/*.err tests/expand_tcg_ir/*.exp.tmp
@@ -479,10 +480,13 @@ clean-all: clean clean-template
 # ============================================================================
 # Testing infrastructure
 #
-# Two suites:
+# Three suites:
 #   1. tests/expand_tcg_ir        -> tcg_printer, compared against .exp
 #   2. tests/translate_to_llvm_ir -> tcg_mapper + llvm_annotate.py, compared
 #      against a *host-arch specific* golden .ll file
+#   3. tests/translate_then_gen_asm_snippet
+#                                 -> tcg_mapper + opt + llc, compared against a
+#                                    *host-arch specific* golden .s file
 #
 # Both suites normally run the plain binaries.  The *-san targets re-run them
 # against sanitizer-instrumented copies (see the "sanitizers" section below);
@@ -652,6 +656,7 @@ test-expand-tcg-ir-update: $(TCG_PRINTER)
 #   make test-llvm-ir TEST_ARCH=riscv64    # compare against another arch's copy
 #   make test-llvm-ir-update               # (re)create goldens for THIS host
 #   make test-llvm-ir-update ONLY=load_store
+#   (suite 3 has the same shape: make test-asm / test-asm-update)
 #   make test-expand-tcg-ir-update         # (re)create the .exp goldens
 #   make test-expand-tcg-ir-update ONLY=call
 #   make test REPEAT=5                     # each case 5x, catch flaky output
@@ -801,12 +806,223 @@ test-llvm-ir-update: $(TCG_MAPPER)
 	fi; \
 	done
 
+# ----------------------------------------------------------------------------
+# Suite 3: tests/translate_then_gen_asm_snippet
+#
+# Every case is a <name>.tir file.  The pipeline is the full "translate then
+# let LLVM emit machine code" path:
+#
+#     ./tcg_mapper -d <name>.tir                       >  <name>.ll
+#     $(OPT)  -O2 <name>.ll                            -o <name>.ll.bc
+#     $(LLC)  -O2 <name>.ll.bc -filetype=asm           -o <name>.s
+#
+# and the resulting assembly is diffed against the golden file
+#
+#     tests/translate_then_gen_asm_snippet/<name>.tir.$(TEST_ARCH).s
+#     e.g.  example.tir.aarch64.s   on an aarch64 host
+#           example.tir.riscv64.s   on a riscv64  host
+#
+# Per-arch goldens are mandatory here (not just convenient): llc defaults to
+# the *host* target triple, so aarch64 and riscv64 produce genuinely different
+# instructions, and the object/register names also differ.  Same fallback as
+# suite 2: if <name>.tir.$(TEST_ARCH).s is missing, <name>.tir.s is used.
+#
+# Handy invocations:
+#   make test-asm                          # this suite only
+#   make test-asm ONLY=example             # subset (substring of case name)
+#   make test-asm TEST_ARCH=riscv64        # compare against another arch's copy
+#   make test-asm-update                   # (re)create goldens for THIS host
+#   make test-asm-update ONLY=example
+#   make test-asm REPEAT=3                 # catch non-deterministic output
+#   make test-asm-san                      # same, with an instrumented mapper
+#
+# Things worth knowing before you commit goldens:
+#   * Assembly output is tied to the exact LLVM build in $(LLVM_PATH).  Bump
+#     LLVM and every .tir.<arch>.s needs regenerating - that is expected, not a
+#     regression.
+#   * llc defaults to the host triple and to that target's default CPU.  If you
+#     want a fixed target regardless of the machine, add it to LLC_FLAGS,
+#     e.g.  make test-asm LLC_FLAGS="-O2 -filetype=asm -mtriple=aarch64-linux-gnu"
+#   * llc may emit a `.file "<path>"` directive naming the intermediate .bc.
+#     That path contains out/$(TEST_ARCH)/, i.e. it is already arch-scoped, so
+#     per-arch goldens compare cleanly.  If you would rather not have build
+#     paths in the goldens at all, set ASM_FILTER to a command that strips them;
+#     it is applied to both the update and the compare path.  Default: off.
+#
+# Artifacts (kept for inspection, cleaned by `make clean`):
+#   tests/translate_then_gen_asm_snippet/out/$(TEST_ARCH)/<name>.ll
+#   tests/translate_then_gen_asm_snippet/out/$(TEST_ARCH)/<name>.ll.bc
+#   tests/translate_then_gen_asm_snippet/out/$(TEST_ARCH)/<name>.s   <- compared
+#   tests/translate_then_gen_asm_snippet/out/$(TEST_ARCH)/<name>.run1.s
+#   tests/translate_then_gen_asm_snippet/out/$(TEST_ARCH)/<name>.diff
+#   tests/translate_then_gen_asm_snippet/out/$(TEST_ARCH)/<name>.{mapper,opt,llc}.err
+# ----------------------------------------------------------------------------
+
+ASM_TIR_DIR    := tests/translate_then_gen_asm_snippet
+ASM_TIR_FILES  := $(sort $(wildcard $(ASM_TIR_DIR)/*.tir))
+ASM_TIR_OUTDIR := $(ASM_TIR_DIR)/out/$(TEST_ARCH)
+
+# LLVM tools.  They live next to llvm-config, so they follow LLVM_PATH (which
+# already switches between the aarch64 and riscv64 LLVM installs).
+OPT ?= $(LLVM_PATH)/bin/opt
+LLC ?= $(LLVM_PATH)/bin/llc
+
+OPT_FLAGS  ?= -O2
+LLC_FLAGS  ?= -O2 -filetype=asm
+
+# Optional normalisation applied to the .s before comparing / recording.
+# Empty by default.  Example:
+#   make test-asm ASM_FILTER='sed -E "/^\s*\.file\s+\"/d"'
+ASM_FILTER ?=
+
+# Optional subset filter: make test-asm ONLY=example
+ifeq ($(ONLY),)
+ASM_TIR_CASES := $(ASM_TIR_FILES)
+else
+ASM_TIR_CASES := $(foreach f,$(ASM_TIR_FILES),\
+	$(if $(findstring $(ONLY),$(basename $(notdir $f))),$f))
+endif
+
+# Run the mapper -> opt -> llc pipeline and diff the .s against the golden.
+test-asm: $(TCG_MAPPER)
+	@mkdir -p "$(ASM_TIR_OUTDIR)"
+	@if [ -z "$(ASM_TIR_CASES)" ]; then \
+	echo "No .tir case found under $(ASM_TIR_DIR)/"; \
+	exit 0; \
+	fi
+	@echo "==================================================================="
+	@echo "translate_then_gen_asm_snippet: $(words $(ASM_TIR_CASES)) case(s), TEST_ARCH=$(TEST_ARCH)"
+	@echo "golden file pattern : <name>.tir.$(TEST_ARCH).s"
+	@echo "tools               : $(OPT) | $(LLC)"
+	@echo "==================================================================="
+	@rc=0; pass=0; fail=0; skip=0; unstable=0; \
+	runs=$(REPEAT); \
+	case "$$runs" in ''|*[!0-9]*) runs=1 ;; esac; \
+	[ "$$runs" -ge 1 ] || runs=1; \
+	for tir in $(ASM_TIR_CASES); do \
+	name=$$(basename "$$tir" .tir); \
+	ll="$(ASM_TIR_OUTDIR)/$$name.ll"; \
+	bc="$(ASM_TIR_OUTDIR)/$$name.ll.bc"; \
+	asm="$(ASM_TIR_OUTDIR)/$$name.s"; \
+	asm1="$(ASM_TIR_OUTDIR)/$$name.run1.s"; \
+	asmn="$(ASM_TIR_OUTDIR)/$$name.norm.s"; \
+	diffout="$(ASM_TIR_OUTDIR)/$$name.diff"; \
+	errlog="$(ASM_TIR_OUTDIR)/$$name.mapper.err"; \
+	exp="$${tir}.$(TEST_ARCH).s"; \
+	if [ ! -f "$$exp" ] && [ -f "$${tir}.s" ]; then \
+	exp="$${tir}.s"; \
+	fi; \
+	i=1; \
+	while [ $$i -le $$runs ]; do \
+	echo "==> $$tir (run $$i/$$runs)"; \
+	st=0; $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" 2> "$$errlog" || st=$$?; \
+	if [ "$$st" -eq $(SAN_ERROR_EXIT) ]; then \
+	echo "SANITIZER FAIL: $$tir - see $$errlog"; \
+	tail -n 25 "$$errlog"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	if [ "$$st" -ne 0 ]; then \
+	echo "FAIL: $$tir (tcg_mapper exit $$st - see $$errlog)"; \
+	tail -n 20 "$$errlog"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	if ! $(OPT) $(OPT_FLAGS) "$$ll" -o "$$bc" 2> "$(ASM_TIR_OUTDIR)/$$name.opt.err"; then \
+	echo "FAIL: $$tir (opt failed - see $(ASM_TIR_OUTDIR)/$$name.opt.err)"; \
+	tail -n 20 "$(ASM_TIR_OUTDIR)/$$name.opt.err"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	if ! $(LLC) $(LLC_FLAGS) "$$bc" -o "$$asm" 2> "$(ASM_TIR_OUTDIR)/$$name.llc.err"; then \
+	echo "FAIL: $$tir (llc failed - see $(ASM_TIR_OUTDIR)/$$name.llc.err)"; \
+	tail -n 20 "$(ASM_TIR_OUTDIR)/$$name.llc.err"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	if [ ! -s "$$asm" ]; then \
+	echo "FAIL: $$tir ($$asm was not produced by llc)"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	cmp="$$asm"; \
+	if [ -n "$(strip $(ASM_FILTER))" ]; then \
+	$(ASM_FILTER) "$$asm" > "$$asmn" || { \
+	echo "FAIL: $$tir (ASM_FILTER failed)"; \
+	fail=$$((fail+1)); rc=1; break; }; \
+	cmp="$$asmn"; \
+	fi; \
+	[ $$i -eq 1 ] && cp -f "$$cmp" "$$asm1"; \
+	if [ ! -f "$$exp" ]; then \
+	echo "SKIP: $$tir (no golden $${tir}.$(TEST_ARCH).s - wrote $$asm)"; \
+	skip=$$((skip+1)); break; \
+	fi; \
+	if diff -u "$$exp" "$$cmp" > "$$diffout"; then \
+	[ $$i -eq 1 ] && pass=$$((pass+1)); \
+	echo "PASS: $$tir"; \
+	else \
+	echo "FAIL: $$tir (diff vs $$exp)"; \
+	cat "$$diffout"; \
+	fail=$$((fail+1)); rc=1; \
+	fi; \
+	if [ $$i -gt 1 ] && ! diff -q "$$asm1" "$$cmp" > /dev/null; then \
+	echo "UNSTABLE: $$tir - run $$i differs from run 1 ($$asm1 vs $$cmp)"; \
+	diff -u "$$asm1" "$$cmp" | head -n 40; \
+	unstable=$$((unstable+1)); rc=1; \
+	fi; \
+	i=$$((i+1)); \
+	done; \
+	done; \
+	echo "-------------------------------------------------------------------"; \
+	echo "translate_then_gen_asm_snippet [$(TEST_ARCH)]: $$pass passed, $$fail failed, $$unstable unstable, $$skip skipped (REPEAT=$$runs; fail/unstable counted per run)"; \
+	if [ "$$skip" -gt 0 ]; then \
+	echo "hint: run 'make test-asm-update' to create the missing goldens"; \
+	fi; \
+	exit $$rc
+
+# (Re)generate the .s goldens for the *current* host architecture.  Counterpart
+# of test-llvm-ir-update / test-expand-tcg-ir-update.
+#
+#   make test-asm-update                   # all cases
+#   make test-asm-update ONLY=example      # only names containing "example"
+#
+# Writes to a temp file and only moves it into place once the whole pipeline
+# succeeded, so a failing case can never truncate the golden it was about to
+# replace.  Failures are reported and make the target exit non-zero.
+test-asm-update: $(TCG_MAPPER)
+	@mkdir -p "$(ASM_TIR_OUTDIR)"
+	@rc=0; updated=0; failed=0; \
+	for tir in $(ASM_TIR_CASES); do \
+	name=$$(basename "$$tir" .tir); \
+	ll="$(ASM_TIR_OUTDIR)/$$name.ll"; \
+	bc="$(ASM_TIR_OUTDIR)/$$name.ll.bc"; \
+	asm="$(ASM_TIR_OUTDIR)/$$name.s"; \
+	asmn="$(ASM_TIR_OUTDIR)/$$name.norm.s"; \
+	gold="$${tir}.$(TEST_ARCH).s"; \
+	tmp="$${gold}.tmp"; \
+	echo "==> $$tir"; \
+	if $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" 2> "$(ASM_TIR_OUTDIR)/$$name.mapper.err" && \
+	   $(OPT) $(OPT_FLAGS) "$$ll" -o "$$bc" 2> "$(ASM_TIR_OUTDIR)/$$name.opt.err" && \
+	   $(LLC) $(LLC_FLAGS) "$$bc" -o "$$asm" 2> "$(ASM_TIR_OUTDIR)/$$name.llc.err"; then \
+	if [ -n "$(strip $(ASM_FILTER))" ]; then \
+	$(ASM_FILTER) "$$asm" > "$$tmp"; \
+	else \
+	cp -f "$$asm" "$$tmp"; \
+	fi; \
+	mv -f "$$tmp" "$$gold"; \
+	echo "UPDATE: $$gold"; \
+	updated=$$((updated+1)); \
+	else \
+	rm -f "$$tmp"; \
+	echo "ERROR: pipeline failed for $$tir (golden left untouched)"; \
+	failed=$$((failed+1)); rc=1; \
+	fi; \
+	done; \
+	echo "-------------------------------------------------------------------"; \
+	echo "translate_then_gen_asm_snippet update: $$updated updated, $$failed failed"; \
+	exit $$rc
 # ============================================================================
 # Sanitizers
 #
-#   make test-san                    # both suites, AddressSanitizer + UBSan
+#   make test-san                    # all suites, AddressSanitizer + UBSan
 #   make test-llvm-ir-san            # only the LLVM-IR suite
 #   make test-expand-tcg-ir-san      # only the expand_tcg_ir suite
+#   make test-asm-san                # only the asm-snippet suite
 #   make test-san SAN=msan           # MemorySanitizer (uninitialised reads)
 #   make test-san SAN=ubsan          # undefined behaviour only (fastest)
 #   make test-san ONLY=load_store    # filters work as usual
@@ -946,7 +1162,14 @@ test-llvm-ir-san: check-san $(SAN_MAPPER)
 	ONLY='$(ONLY)' TEST_ARCH='$(TEST_ARCH)' REPEAT='$(REPEAT)' \
 	test-llvm-ir
 
-# Both suites under the sanitizer; -k keeps suite 2 running if suite 1 fails.
+test-asm-san: check-san $(SAN_MAPPER)
+	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) \
+	TCG_MAPPER='$(SAN_MAPPER)' \
+	ONLY='$(ONLY)' TEST_ARCH='$(TEST_ARCH)' REPEAT='$(REPEAT)' \
+	test-asm
+
+# All three suites under the sanitizer; -k keeps the remaining suites running
+# if one of them fails.
 test-san: check-san $(SAN_MAPPER) $(SAN_PRINTER)
 	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) -k \
 	TCG_MAPPER='$(SAN_MAPPER)' TCG_PRINTER='$(SAN_PRINTER)' \
@@ -954,12 +1177,13 @@ test-san: check-san $(SAN_MAPPER) $(SAN_PRINTER)
 	ONLY='$(ONLY)' TEST_ARCH='$(TEST_ARCH)' REPEAT='$(REPEAT)' \
 	test
 
-# Default: run both suites against the plain binaries.
-test: test-expand-tcg-ir test-llvm-ir
+# Default: run all three suites against the plain binaries.
+test: test-expand-tcg-ir test-llvm-ir test-asm
+
 # ============================================================================
 # Source coverage
 #
-#   make coverage                 # build + run both suites + write report
+#   make coverage                 # build + run all suites + write report
 #   make cov-build                # only build the instrumented binaries
 #   make cov-run                  # only run the suites (counts accumulate)
 #   make coverage-report          # only (re)generate the report
@@ -968,7 +1192,7 @@ test: test-expand-tcg-ir test-llvm-ir
 #
 # gcc/gcov based.  --coverage makes every object emit a .gcno at compile time
 # and a .gcda when the binary exits.  Crucially, counts ACCUMULATE across runs,
-# so pushing the whole corpus through both binaries gives one merged picture
+# so pushing the whole corpus through the binaries gives one merged picture
 # with no extra merge step.  That is why cov-run can simply invoke the normal
 # `test` target with the instrumented binaries, and why failures are tolerated
 # (-k): a case that crashes or mismatches still contributed its counts.
@@ -1093,6 +1317,7 @@ coverage-open: coverage-report
 .PHONY: all test test-expand-tcg-ir test-llvm-ir test-llvm-ir-update \
 	test-san test-expand-tcg-ir-san test-llvm-ir-san san-build check-san \
 	test-expand-tcg-ir-update \
+	test-asm test-asm-update test-asm-san \
 	coverage cov-build cov-run cov-reset coverage-report coverage-open \
 	clean clean-all clean-local clean-qemu-source clean-template \
 	qemu-preprocess qemu-preprocess-tcg-runtime \

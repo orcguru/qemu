@@ -434,6 +434,26 @@ void translate_bswap(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
     return;
 }
 
+void translate_deposit(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    assert(u->operands[3].kind == OP_IMM);
+    int pos = (u->operands[3].imm.val & (total_bit_cnt - 1));
+    assert(u->operands[4].kind == OP_IMM);
+    int len = (u->operands[4].imm.val & (total_bit_cnt - 1));
+    if (len == 0) {
+        do_store(&u->operands[0], in1, stack, prefix, false);
+        return;
+    }
+    in1 = LLVMBuildAnd(builder, in1, LLVMBuildNot(builder, LLVMBuildShl(builder, LLVMConstInt(get_llvm_type(tcg_ty), ((1ULL << len) - 1), 0), LLVMConstInt(get_llvm_type(tcg_ty), pos, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "bits")), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "mask")), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "t1"));
+    in2 = LLVMBuildShl(builder, LLVMBuildZExt(builder, LLVMBuildTrunc(builder, in2, LLVMIntType(len), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tr")), get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "zext")), LLVMConstInt(get_llvm_type(tcg_ty), pos, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "t2"));
+    LLVMValueRef out = LLVMBuildOr(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+}
+
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -1094,6 +1114,8 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_BSWAP(bswap32_i32, LLVMInt32);
             CASE_BSWAP(bswap32_i64, LLVMInt32);
             CASE_BSWAP(bswap64_i64, LLVMInt64);
+            CASE(deposit_i32, translate_deposit);
+            CASE(deposit_i64, translate_deposit);
 
 #if 0
             case deposit_i32:

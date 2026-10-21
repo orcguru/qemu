@@ -1446,19 +1446,72 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T175.swap_out.ie207 = insertelement <8 x i8> %T175.swap_out.ie205, i8 %T175.tmp2.swap_vec.ee206, i64 0, !tcg.op !178
   %T175.swap_out = bitcast <8 x i8> %T175.swap_out.ie207 to i64, !tcg.op !178
   store i64 %T175.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !178
-; ======== TCG [176] func_addr t9,0x55aa,0x0 ========
-  store ptr @Fx55aa, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !179
-; ======== TCG [177] tail_call_qemuaot t9 VEC_ARGS: ========
-  %T177.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !180
-  %T177.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !180
-  %T177.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !180
-  %T177.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !180
-  %T177.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !180
-  %T177.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !180
-  %T177.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !180
-  %T177.loaded_fn = load ptr, ptr %tmp9.stack, align 8, !tcg.op !180
-  tail call qemuaot void %T177.loaded_fn(i64 %T177.rax.stack, i64 %T177.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %T177.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T177.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T177.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T177.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T177.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !180
-  ret void, !tcg.op !180
+; ======== TCG [176] deposit_i32 [t2],t2,t0,0x0,0x8 ========
+  %T176.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !179
+  %T176.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !179
+  %T176.t1 = and i32 %T176.tmp2, -256, !tcg.op !179
+  %T176.tr = trunc i32 %T176.tmp0 to i8, !tcg.op !179
+  %T176.zext = zext i8 %T176.tr to i32, !tcg.op !179
+  %T176.t2 = shl i32 %T176.zext, 0, !tcg.op !179
+  %T176.out = or i32 %T176.t1, %T176.t2, !tcg.op !179
+  store i32 %T176.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !179
+; ======== TCG [177] deposit_i32 [t2],t2,t0,0x10,0x8 ========
+  %T177.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !180
+  %T177.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !180
+  %T177.t1 = and i32 %T177.tmp2, -16711681, !tcg.op !180
+  %T177.tr = trunc i32 %T177.tmp0 to i8, !tcg.op !180
+  %T177.zext = zext i8 %T177.tr to i32, !tcg.op !180
+  %T177.t2 = shl i32 %T177.zext, 16, !tcg.op !180
+  %T177.out = or i32 %T177.t1, %T177.t2, !tcg.op !180
+  store i32 %T177.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !180
+; ======== TCG [178] deposit_i32 [t2],t2,t0,0x18,0x8 ========
+  %T178.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !181
+  %T178.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !181
+  %T178.t1 = and i32 %T178.tmp2, 16777215, !tcg.op !181
+  %T178.tr = trunc i32 %T178.tmp0 to i8, !tcg.op !181
+  %T178.zext = zext i8 %T178.tr to i32, !tcg.op !181
+  %T178.t2 = shl i32 %T178.zext, 24, !tcg.op !181
+  %T178.out = or i32 %T178.t1, %T178.t2, !tcg.op !181
+  store i32 %T178.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !181
+; ======== TCG [179] deposit_i32 [t2],t2,t0,0x18,0x18 ========
+  %T179.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !182
+  %T179.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !182
+  %T179.t1 = and i32 %T179.tmp2, 16777215, !tcg.op !182
+  %T179.tr = trunc i32 %T179.tmp0 to i24, !tcg.op !182
+  %T179.zext = zext i24 %T179.tr to i32, !tcg.op !182
+  %T179.t2 = shl i32 %T179.zext, 24, !tcg.op !182
+  %T179.out = or i32 %T179.t1, %T179.t2, !tcg.op !182
+  store i32 %T179.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !182
+; ======== TCG [180] deposit_i64 [rax],rax,t2,0x0,0x8 ========
+  %T180.rax = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !183
+  %T180.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !183
+  %T180.t1 = and i64 %T180.rax, -256, !tcg.op !183
+  %T180.tr = trunc i64 %T180.tmp2 to i8, !tcg.op !183
+  %T180.zext = zext i8 %T180.tr to i64, !tcg.op !183
+  %T180.t2 = shl i64 %T180.zext, 0, !tcg.op !183
+  %T180.out = or i64 %T180.t1, %T180.t2, !tcg.op !183
+  store i64 %T180.out, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !183
+; ======== TCG [181] deposit_i64 [rax],rax,t2,0x0,0x0 ========
+  %T181.rax = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !184
+  %T181.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !184
+  store i64 %T181.rax, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !184
+; ======== TCG [182] deposit_i64 [rax],rax,t2,0x10,0x0 ========
+  %T182.rax = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !185
+  %T182.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !185
+  store i64 %T182.rax, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !185
+; ======== TCG [183] func_addr t9,0x55aa,0x0 ========
+  store ptr @Fx55aa, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !186
+; ======== TCG [184] tail_call_qemuaot t9 VEC_ARGS: ========
+  %T184.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !187
+  %T184.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !187
+  %T184.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !187
+  %T184.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !187
+  %T184.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !187
+  %T184.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !187
+  %T184.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !187
+  %T184.loaded_fn = load ptr, ptr %tmp9.stack, align 8, !tcg.op !187
+  tail call qemuaot void %T184.loaded_fn(i64 %T184.rax.stack, i64 %T184.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %T184.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T184.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T184.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T184.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T184.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, <2 x i64> %xmm14, <2 x i64> %ymm14_h, ptr %cpu), !tcg.op !187
+  ret void, !tcg.op !187
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
@@ -1715,5 +1768,12 @@ attributes #2 = { nounwind "target-features"="+neon" }
 !176 = !{!"[173] bswap64_i64 [t2],t2,attr-swp:iz,attr-swp:oz"}
 !177 = !{!"[174] bswap64_i64 [t2],t2,attr-swp:iz,attr-swp:os"}
 !178 = !{!"[175] bswap64_i64 [t2],t2"}
-!179 = !{!"[176] func_addr t9,0x55aa,0x0"}
-!180 = !{!"[177] tail_call_qemuaot t9 VEC_ARGS:"}
+!179 = !{!"[176] deposit_i32 [t2],t2,t0,0x0,0x8"}
+!180 = !{!"[177] deposit_i32 [t2],t2,t0,0x10,0x8"}
+!181 = !{!"[178] deposit_i32 [t2],t2,t0,0x18,0x8"}
+!182 = !{!"[179] deposit_i32 [t2],t2,t0,0x18,0x18"}
+!183 = !{!"[180] deposit_i64 [rax],rax,t2,0x0,0x8"}
+!184 = !{!"[181] deposit_i64 [rax],rax,t2,0x0,0x0"}
+!185 = !{!"[182] deposit_i64 [rax],rax,t2,0x10,0x0"}
+!186 = !{!"[183] func_addr t9,0x55aa,0x0"}
+!187 = !{!"[184] tail_call_qemuaot t9 VEC_ARGS:"}
