@@ -139,7 +139,7 @@ static LLVMValueRef do_cond(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueR
 static LLVMValueRef do_cmp_vec(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueRef in2, RelopType r, LLVMType ty, const char *prefix) {
     char var_name[32] = {0};
     LLVMValueRef bv = do_cond(builder, in1, in2, r, ty, prefix);
-    LLVMValueRef v_one = get_const_vector(-1UL, ty);
+    LLVMValueRef v_one = get_const_vector(-1ULL, ty);
     LLVMValueRef v_zero = get_const_vector(0, ty);
     return LLVMBuildSelect(builder, bv, v_one, v_zero, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "predicate"));
 }
@@ -189,7 +189,7 @@ void translate_ct_intrinsic(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     LLVMBuildCondBr(builder, b, bb_ctz_is_zero, bb_ctz_not_zero);
     LLVMPositionBuilderAtEnd(builder, bb_ctz_is_zero);
     LLVMBuildBr(builder, bb_ctz_merge);
-    // FIXME: aarch64 requires single argument
+    // NOTICE: aarch64 requires single argument
     //LLVMTypeRef intrinsic_types[] = {llvm_ty, LLVMInt1Type()};
     LLVMTypeRef intrinsic_types[] = {llvm_ty};
     char intrinsic_func[128] = {0};
@@ -202,7 +202,7 @@ void translate_ct_intrinsic(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     LLVMTypeRef fn_type  = LLVMFunctionType(llvm_ty, intrinsic_types, 1, 0);
 
     LLVMPositionBuilderAtEnd(builder, bb_ctz_not_zero);
-    // FIXME: aarch64 requires single argument
+    // NOTICE: aarch64 requires single argument
     //LLVMValueRef false_val = LLVMConstInt(LLVMInt1Type(), 0, 0);
     //LLVMValueRef call_args[] = {in1, false_val};
     LLVMValueRef call_args[] = {in1};
@@ -589,6 +589,72 @@ void translate_setcond(LLVMBuilderRef builder, StackAlloca *stack, const Unified
                               u->operands[3].relop, tcg_ty, prefix);
     LLVMValueRef out = llvm_api(builder, bv, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
     do_store(&u->operands[0], out, stack, prefix, false);
+}
+
+void translate_div2(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, LLVM_EXT_API ext_api, LLVM_BIN_API div_api, LLVM_BIN_API rem_api) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
+    LLVMTypeRef llvm_double_ty = (tcg_ty == LLVMInt64) ? LLVMInt128Type() : LLVMInt64Type();
+
+    LLVMValueRef nl = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    LLVMValueRef nh = get_input_val_for_operand(&u->operands[3], stack, prefix);
+    LLVMValueRef d = get_input_val_for_operand(&u->operands[4], stack, prefix);
+
+    LLVMBasicBlockRef bb_chk  = LLVMAppendBasicBlock(F, "divs2.chk");
+    LLVMBasicBlockRef bb_do   = LLVMAppendBasicBlock(F, "divs2.do");
+    LLVMBasicBlockRef bb_trap = LLVMAppendBasicBlock(F, "divs2.trap");
+    LLVMBasicBlockRef bb_done = LLVMAppendBasicBlock(F, "divs2.done");
+
+    /* ---- guard 1: divide by zero ---- */
+    LLVMValueRef is0 = LLVMBuildICmp(builder, LLVMIntEQ, d,
+                                     LLVMConstInt(get_llvm_type(tcg_ty), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "d_is0"));
+    LLVMBuildCondBr(builder, is0, bb_trap, bb_chk);
+
+    LLVMPositionBuilderAtEnd(builder, bb_chk);
+    LLVMValueRef hi  = LLVMBuildShl(builder, LLVMBuildSExt(builder, nh, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "nh_double")),
+                                    LLVMConstInt(llvm_double_ty, total_bit_cnt, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "num_hi"));
+    LLVMValueRef num = LLVMBuildOr(builder, hi, LLVMBuildZExt(builder, nl, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "nl_double")),
+                                   assemble_name_2(&var_name[0], sizeof(var_name), prefix, "num"));
+
+    /* ---- guard 2: INT128_MIN / -1  (poison in LLVM, #DE on x86) ---- */
+    LLVMValueRef min128 = LLVMBuildShl(builder, LLVMConstInt(llvm_double_ty, 1, 0),
+                                       LLVMConstInt(llvm_double_ty, (2 * total_bit_cnt - 1), 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "int_min"));
+    LLVMValueRef ismin = LLVMBuildICmp(builder, LLVMIntEQ, num, min128, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "num_ismin"));
+    LLVMValueRef ism1  = LLVMBuildICmp(builder, LLVMIntEQ, d,
+                                       LLVMConstInt(get_llvm_type(tcg_ty), (unsigned long long)-1LL, 1),
+                                       assemble_name_2(&var_name[0], sizeof(var_name), prefix, "d_ism1"));
+    LLVMBuildCondBr(builder, LLVMBuildAnd(builder, ismin, ism1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "i128_ovf")), bb_trap, bb_do);
+
+    /* ---- the divide ---- */
+    LLVMPositionBuilderAtEnd(builder, bb_do);
+    LLVMValueRef den = ext_api(builder, d, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "d_128"));
+    LLVMValueRef q128 = div_api(builder, num, den, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q_128"));
+    LLVMValueRef r128 = rem_api(builder, num, den, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r_128"));
+    LLVMValueRef q64  = LLVMBuildTrunc(builder, q128, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q"));
+    LLVMValueRef r64  = LLVMBuildTrunc(builder, r128, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r"));
+
+    /* ---- guard 3: quotient must fit in i64 ---- */
+    LLVMValueRef fits = LLVMBuildICmp(builder, LLVMIntEQ,
+                                      ext_api(builder, q64, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q_back")),
+                                      q128, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q_fits"));
+    LLVMBuildCondBr(builder, fits, bb_done, bb_trap);
+
+    /* ---- noreturn trap: makes bb_done single-predecessor, so no phi ---- */
+    LLVMPositionBuilderAtEnd(builder, bb_trap);
+    LLVMBuildBr(builder, bb_done);
+
+    LLVMPositionBuilderAtEnd(builder, bb_done);
+
+    LLVMValueRef phi_q = LLVMBuildPhi(builder, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "phi_q"));
+    LLVMValueRef phi_r = LLVMBuildPhi(builder, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "phi_r"));
+    LLVMBasicBlockRef phi_incoming_blocks[] = {bb_do, bb_trap};
+    LLVMValueRef phi_q_incoming_values[] = {q64, LLVMConstInt(get_llvm_type(tcg_ty), 0, 0)};
+    LLVMValueRef phi_r_incoming_values[] = {r64, LLVMConstInt(get_llvm_type(tcg_ty), 0, 0)};
+    LLVMAddIncoming(phi_q, phi_q_incoming_values, phi_incoming_blocks, 2);
+    LLVMAddIncoming(phi_r, phi_r_incoming_values, phi_incoming_blocks, 2);
+    do_store(&u->operands[0], phi_q, stack, prefix, false);
+    do_store(&u->operands[1], phi_r, stack, prefix, false);
 }
 
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
@@ -1104,9 +1170,14 @@ static void print_instr(const UnifiedInstr *u, SBuf *b) {
             translate_mulx2(builder, stack, u, &prefix[0], llvm_api);   \
             break
 
-#define CASE_SETCOND(opc, llvm_api)                                       \
+#define CASE_SETCOND(opc, llvm_api)                                     \
         case opc:                                                       \
-            translate_setcond(builder, stack, u, &prefix[0], llvm_api);   \
+            translate_setcond(builder, stack, u, &prefix[0], llvm_api); \
+            break
+
+#define CASE_DIV2(opc, ext_api, div_api, rem_api)                       \
+        case opc:                                                       \
+            translate_div2(builder, F, stack, u, &prefix[0], ext_api, div_api, rem_api);    \
             break
 
 #define CASE_COMMON(opc, llvm_api)                                      \
@@ -1161,14 +1232,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
         print_instr(u, &b);
         tcg_tag_begin(&tag, idx, "%s", &dump_instr_buf[0]);
         switch (u->opc) {
-            // FIXME: support all TCG-ops
-            case divs2_i32:
-            case divs2_i64:
-            case divu2_i32:
-            case divu2_i64:
-                assert(0);
-                break;
-
             CASE(addci_i32, translate_addc_subb);
             CASE(addci_i64, translate_addc_subb);
             CASE(addco_i32, translate_addc_subb);
@@ -1310,6 +1373,10 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_SETCOND(setcond_i64, LLVMBuildZExt);
             CASE_SETCOND(negsetcond_i32, LLVMBuildSExt);
             CASE_SETCOND(negsetcond_i64, LLVMBuildSExt);
+            CASE_DIV2(divs2_i32, LLVMBuildSExt, LLVMBuildSDiv, LLVMBuildSRem);
+            CASE_DIV2(divs2_i64, LLVMBuildSExt, LLVMBuildSDiv, LLVMBuildSRem);
+            CASE_DIV2(divu2_i32, LLVMBuildZExt, LLVMBuildUDiv, LLVMBuildURem);
+            CASE_DIV2(divu2_i64, LLVMBuildZExt, LLVMBuildUDiv, LLVMBuildURem);
             CASE(ld8u_i32, translate_ld_zext);
             CASE(ld8u_i64, translate_ld_zext);
             CASE(ld16u_i32, translate_ld_zext);

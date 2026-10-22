@@ -232,6 +232,10 @@ umin_vec v128,e8,tmp27,tmp24,tmp25
 umin_vec v128,e32,tmp27,tmp24,tmp25
 dup_vec v128,e8,tmp9,rax
 dup_vec v128,e64,tmp9,loc0
+divs2_i32 loc0,loc1,loc0,loc1,loc2
+divs2_i64 loc0,loc1,loc0,loc1,loc2
+divu2_i32 loc0,loc1,loc0,loc1,loc2
+divu2_i64 loc0,loc1,loc0,loc1,loc2
 discard rax
 discard loc0
 jmp_direct $0x55aa

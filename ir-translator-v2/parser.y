@@ -177,12 +177,14 @@ scalar_instr:
         }
         if (u->opc == addci_i32 || u->opc == addci_i64 ||
             u->opc == addcio_i32 || u->opc == addcio_i64 ||
-            u->opc == addco_i32 || u->opc == addco_i64) {
+            u->opc == addco_i32 || u->opc == addco_i64 ||
+            u->opc == addc1o_i32 || u->opc == addc1o_i64) {
             ctx->carry_on = true;
         }
         if (u->opc == subbi_i32 || u->opc == subbi_i64 ||
             u->opc == subbio_i32 || u->opc == subbio_i64 ||
-            u->opc == subbo_i32 || u->opc == subbo_i64) {
+            u->opc == subbo_i32 || u->opc == subbo_i64 ||
+            u->opc == subb1o_i32 || u->opc == subb1o_i64) {
             ctx->borrow_on = true;
         }
         if (skip_alias_instr == 0) {
