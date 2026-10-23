@@ -122,6 +122,8 @@ func:
         debug_print_instr(ctx, "after expand_push_ret_addr");
         expand_ret(ctx);
         debug_print_instr(ctx, "after expand_ret");
+        expand_div(ctx);
+        debug_print_instr(ctx, "after expand_div");
         expand_jmp_direct(ctx);
         debug_print_instr(ctx, "after expand_jmp_direct");
         expand_llvm_func(ctx);

@@ -73,6 +73,81 @@ static inline UnifiedInstr *get_single_target_opc(const TcgContext *ctx, OpCodeT
     return NULL;
 }
 
+void expand_div(TcgContext *ctx) {
+    bool got_div = false;
+    int last_label = -1;
+    UnifiedInstr *u = ctx->instr_head;
+    while (u) {
+        if (u->opc > DIV_BEGIN && u->opc < DIV_END) {
+            got_div = true;
+        }
+        if (u->opc == set_label) {
+            int label = (int)(u->operands[u->operand_count - 1].label);
+            if (label >= last_label) {
+                last_label = label;
+            }
+        }
+        u = u->next;
+    }
+    if (!got_div) {
+        return;
+    }
+    int trap_label = last_label + 1;
+    u = ctx->instr_head;
+    while (u) {
+        if (!(u->opc > DIV_BEGIN && u->opc < DIV_END)) {
+            u = u->next;
+            continue;
+        }
+        /*
+         * Add per instruction check
+         */
+        bool is_32bit = (u->opc == divs_i32 || u->opc == divu_i32 ||
+                         u->opc == divs2_i32 || u->opc == divu2_i32);
+        // - CHECK division by zero
+        // brcond_i32/64 division,0,eq,L<TRAP>
+        Operand division = (u->opc == divs_i32 || u->opc == divs_i64 ||
+                            u->opc == divu_i32 || u->opc == divu_i64) ? u->operands[2] : u->operands[4];
+        EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? brcond_i32 : brcond_i64, 0, 0, division, IMM_OP(0), RELOP_OP(eq), LABEL_OP(trap_label));
+
+        if (u->opc == divs_i32 || u->opc == divs_i64 ||
+            u->opc == divs2_i32 || u->opc == divs2_i64) {
+            int b1 = get_next_tmp_idx(ctx);
+            int b2 = get_next_tmp_idx(ctx);
+            // setcond b1,division,-1ULL,eq
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? setcond_i32 : setcond_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b1), division, IMM_OP(-1ULL), RELOP_OP(eq));
+
+            if (u->opc == divs_i32 || u->opc == divs_i64) {
+                // setcond b2,numerator,(1<<(bit_count-1)),eq
+                EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? setcond_i32 : setcond_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b2), u->operands[1], IMM_OP(1ULL << (is_32bit ? 31 : 63)), RELOP_OP(eq));
+            } else {
+                int b3 = get_next_tmp_idx(ctx);
+                // setcond b2,nh,(1<<(bit_count-1)),eq
+                EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? setcond_i32 : setcond_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b2), u->operands[3], IMM_OP(1ULL << (is_32bit ? 31 : 63)), RELOP_OP(eq));
+
+                // setcond b2,nl,0,eq
+                EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? setcond_i32 : setcond_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b3), u->operands[2], IMM_OP(0), RELOP_OP(eq));
+
+                // and b2,b2,b3
+                EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? and_i32 : and_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b2), SLOT_OP(SUB_SLOT_TMP, b2), SLOT_OP(SUB_SLOT_TMP, b3));
+            }
+
+            // and b1,b1,b2
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? and_i32 : and_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b1), SLOT_OP(SUB_SLOT_TMP, b1), SLOT_OP(SUB_SLOT_TMP, b2));
+
+            // - CHECK overflow INT_MIN / -1
+            // brcond_i32/64 b1,1,eq,L<TRAP>
+            EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? brcond_i32 : brcond_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b1), IMM_OP(1), RELOP_OP(eq), LABEL_OP(trap_label));
+        }
+        u = u->next;
+    }
+    // Add trap
+    // set_label <TRAP>
+    // call raise_exception,0xa,0,env,0
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, NULL, set_label, 0, 0, LABEL_OP(trap_label));
+    EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, NULL, call, 0, 0, SYMBOL_OP(helper_raise_exception), IMM_OP(0xa), IMM_OP(0), ENV_OP(0), IMM_OP(0));
+}
+
 void expand_push_ret_addr(TcgContext *ctx) {
     UnifiedInstr *u = get_single_target_opc(ctx, push_ret_addr);
     if (!u) {
@@ -1401,8 +1476,9 @@ void expand_call_runtime(TcgContext *ctx) {
             }
 
             // Next step in case runtime returns/helper_jmp_ind
-            int tmp_n = get_next_tmp_idx(ctx);
+            int tmp_n = -1;
             if (!helper_runtime_does_not_return[h]) {
+                tmp_n = get_next_tmp_idx(ctx);
                 // - GET the address of next
                 // func_addr tmp_n,hex_offset,nfidx
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,
@@ -1410,6 +1486,7 @@ void expand_call_runtime(TcgContext *ctx) {
                     IMM_OP(ctx->hex_offset),
                     IMM_OP(lookup_next_func_idx(ctx, u)));
             } else if (h == helper_jmp_ind) {
+                tmp_n = get_next_tmp_idx(ctx);
                 // - GET the address of next
                 // func_addr tmp_n,jmp_ind_callback
                 EMIT_INSTR_BEFORE(ctx, &(ctx->llvm_func_set.lists[fi].head), &(ctx->llvm_func_set.lists[fi].tail), u, func_addr, 0, 0,

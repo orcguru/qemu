@@ -9,6 +9,7 @@
 #include "tcg_ast.h"
 
 void sanity_check_op_type_solid(const TcgContext *ctx);
+void expand_div(TcgContext *ctx);
 void expand_push_ret_addr(TcgContext *ctx);
 void expand_ret(TcgContext *ctx);
 void expand_jmp_direct(TcgContext *ctx);
