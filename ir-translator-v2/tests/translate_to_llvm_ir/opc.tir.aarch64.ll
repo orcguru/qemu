@@ -987,448 +987,568 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   store <4 x i32> %T145.not, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !148
 ; ======== TCG [146] bswap16_i32 [t2],t2,attr-swp:oz ========
   %T146.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !149
-  %T146.tmp2.bc = bitcast i32 %T146.tmp2 to <2 x i16>, !tcg.op !149
-  %T146.tmp2.bc.ee = extractelement <2 x i16> %T146.tmp2.bc, i64 0, !tcg.op !149
-  %T146.tmp2.bc.ee.swap_vec = bitcast i16 %T146.tmp2.bc.ee to <2 x i8>, !tcg.op !149
-  %T146.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T146.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !149
-  %T146.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T146.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !149
-  %T146.tmp2.bc.ee.swap_vec.ee28 = extractelement <2 x i8> %T146.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !149
-  %T146.swap_out.ie29 = insertelement <2 x i8> %T146.swap_out.ie, i8 %T146.tmp2.bc.ee.swap_vec.ee28, i64 0, !tcg.op !149
-  %T146.swap_out = bitcast <2 x i8> %T146.swap_out.ie29 to i16, !tcg.op !149
-  %T146.out = zext i16 %T146.swap_out to i32, !tcg.op !149
+  %T146.vec = bitcast i32 %T146.tmp2 to <4 x i8>, !tcg.op !149
+  %T146.vec.ee = extractelement <4 x i8> %T146.vec, i64 0, !tcg.op !149
+  %T146.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T146.vec.ee, i64 3, !tcg.op !149
+  %T146.vec.ee28 = extractelement <4 x i8> %T146.vec, i64 1, !tcg.op !149
+  %T146.vec_swap.ie29 = insertelement <4 x i8> %T146.vec_swap.ie, i8 %T146.vec.ee28, i64 2, !tcg.op !149
+  %T146.vec.ee30 = extractelement <4 x i8> %T146.vec, i64 2, !tcg.op !149
+  %T146.vec_swap.ie31 = insertelement <4 x i8> %T146.vec_swap.ie29, i8 %T146.vec.ee30, i64 1, !tcg.op !149
+  %T146.vec.ee32 = extractelement <4 x i8> %T146.vec, i64 3, !tcg.op !149
+  %T146.vec_swap.ie33 = insertelement <4 x i8> %T146.vec_swap.ie31, i8 %T146.vec.ee32, i64 0, !tcg.op !149
+  %T146.swap_out = bitcast <4 x i8> %T146.vec_swap.ie33 to i32, !tcg.op !149
+  %T146.out = lshr i32 %T146.swap_out, 16, !tcg.op !149
   store i32 %T146.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !149
 ; ======== TCG [147] bswap16_i32 [t2],t2,attr-swp:os ========
   %T147.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !150
-  %T147.tmp2.bc = bitcast i32 %T147.tmp2 to <2 x i16>, !tcg.op !150
-  %T147.tmp2.bc.ee = extractelement <2 x i16> %T147.tmp2.bc, i64 0, !tcg.op !150
-  %T147.tmp2.bc.ee.swap_vec = bitcast i16 %T147.tmp2.bc.ee to <2 x i8>, !tcg.op !150
-  %T147.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T147.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !150
-  %T147.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T147.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !150
-  %T147.tmp2.bc.ee.swap_vec.ee30 = extractelement <2 x i8> %T147.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !150
-  %T147.swap_out.ie31 = insertelement <2 x i8> %T147.swap_out.ie, i8 %T147.tmp2.bc.ee.swap_vec.ee30, i64 0, !tcg.op !150
-  %T147.swap_out = bitcast <2 x i8> %T147.swap_out.ie31 to i16, !tcg.op !150
-  %T147.out = sext i16 %T147.swap_out to i32, !tcg.op !150
+  %T147.vec = bitcast i32 %T147.tmp2 to <4 x i8>, !tcg.op !150
+  %T147.vec.ee = extractelement <4 x i8> %T147.vec, i64 0, !tcg.op !150
+  %T147.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T147.vec.ee, i64 3, !tcg.op !150
+  %T147.vec.ee34 = extractelement <4 x i8> %T147.vec, i64 1, !tcg.op !150
+  %T147.vec_swap.ie35 = insertelement <4 x i8> %T147.vec_swap.ie, i8 %T147.vec.ee34, i64 2, !tcg.op !150
+  %T147.vec.ee36 = extractelement <4 x i8> %T147.vec, i64 2, !tcg.op !150
+  %T147.vec_swap.ie37 = insertelement <4 x i8> %T147.vec_swap.ie35, i8 %T147.vec.ee36, i64 1, !tcg.op !150
+  %T147.vec.ee38 = extractelement <4 x i8> %T147.vec, i64 3, !tcg.op !150
+  %T147.vec_swap.ie39 = insertelement <4 x i8> %T147.vec_swap.ie37, i8 %T147.vec.ee38, i64 0, !tcg.op !150
+  %T147.swap_out = bitcast <4 x i8> %T147.vec_swap.ie39 to i32, !tcg.op !150
+  %T147.out = ashr i32 %T147.swap_out, 16, !tcg.op !150
   store i32 %T147.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !150
 ; ======== TCG [148] bswap16_i32 [t2],t2,attr-swp:iz ========
   %T148.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !151
-  %T148.tmp2.bc = bitcast i32 %T148.tmp2 to <2 x i16>, !tcg.op !151
-  %T148.tmp2.bc.ee = extractelement <2 x i16> %T148.tmp2.bc, i64 0, !tcg.op !151
-  %T148.tmp2.bc.ee.swap_vec = bitcast i16 %T148.tmp2.bc.ee to <2 x i8>, !tcg.op !151
-  %T148.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T148.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !151
-  %T148.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T148.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !151
-  %T148.tmp2.bc.ee.swap_vec.ee32 = extractelement <2 x i8> %T148.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !151
-  %T148.swap_out.ie33 = insertelement <2 x i8> %T148.swap_out.ie, i8 %T148.tmp2.bc.ee.swap_vec.ee32, i64 0, !tcg.op !151
-  %T148.swap_out = bitcast <2 x i8> %T148.swap_out.ie33 to i16, !tcg.op !151
-  %T148.out = insertelement <2 x i16> %T148.tmp2.bc, i16 %T148.swap_out, i64 0, !tcg.op !151
-  store <2 x i16> %T148.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !151
+  %T148.vec = bitcast i32 %T148.tmp2 to <4 x i8>, !tcg.op !151
+  %T148.vec.ee = extractelement <4 x i8> %T148.vec, i64 0, !tcg.op !151
+  %T148.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T148.vec.ee, i64 3, !tcg.op !151
+  %T148.vec.ee40 = extractelement <4 x i8> %T148.vec, i64 1, !tcg.op !151
+  %T148.vec_swap.ie41 = insertelement <4 x i8> %T148.vec_swap.ie, i8 %T148.vec.ee40, i64 2, !tcg.op !151
+  %T148.vec.ee42 = extractelement <4 x i8> %T148.vec, i64 2, !tcg.op !151
+  %T148.vec_swap.ie43 = insertelement <4 x i8> %T148.vec_swap.ie41, i8 %T148.vec.ee42, i64 1, !tcg.op !151
+  %T148.vec.ee44 = extractelement <4 x i8> %T148.vec, i64 3, !tcg.op !151
+  %T148.vec_swap.ie45 = insertelement <4 x i8> %T148.vec_swap.ie43, i8 %T148.vec.ee44, i64 0, !tcg.op !151
+  %T148.swap_out = bitcast <4 x i8> %T148.vec_swap.ie45 to i32, !tcg.op !151
+  %T148.out = lshr i32 %T148.swap_out, 16, !tcg.op !151
+  store i32 %T148.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !151
 ; ======== TCG [149] bswap16_i32 [t2],t2,attr-swp:iz,attr-swp:oz ========
   %T149.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !152
-  %T149.tmp2.bc = bitcast i32 %T149.tmp2 to <2 x i16>, !tcg.op !152
-  %T149.tmp2.bc.ee = extractelement <2 x i16> %T149.tmp2.bc, i64 0, !tcg.op !152
-  %T149.tmp2.bc.ee.swap_vec = bitcast i16 %T149.tmp2.bc.ee to <2 x i8>, !tcg.op !152
-  %T149.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T149.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !152
-  %T149.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T149.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !152
-  %T149.tmp2.bc.ee.swap_vec.ee34 = extractelement <2 x i8> %T149.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !152
-  %T149.swap_out.ie35 = insertelement <2 x i8> %T149.swap_out.ie, i8 %T149.tmp2.bc.ee.swap_vec.ee34, i64 0, !tcg.op !152
-  %T149.swap_out = bitcast <2 x i8> %T149.swap_out.ie35 to i16, !tcg.op !152
-  %T149.out = insertelement <2 x i16> %T149.tmp2.bc, i16 %T149.swap_out, i64 0, !tcg.op !152
-  store <2 x i16> %T149.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !152
+  %T149.vec = bitcast i32 %T149.tmp2 to <4 x i8>, !tcg.op !152
+  %T149.vec.ee = extractelement <4 x i8> %T149.vec, i64 0, !tcg.op !152
+  %T149.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T149.vec.ee, i64 3, !tcg.op !152
+  %T149.vec.ee46 = extractelement <4 x i8> %T149.vec, i64 1, !tcg.op !152
+  %T149.vec_swap.ie47 = insertelement <4 x i8> %T149.vec_swap.ie, i8 %T149.vec.ee46, i64 2, !tcg.op !152
+  %T149.vec.ee48 = extractelement <4 x i8> %T149.vec, i64 2, !tcg.op !152
+  %T149.vec_swap.ie49 = insertelement <4 x i8> %T149.vec_swap.ie47, i8 %T149.vec.ee48, i64 1, !tcg.op !152
+  %T149.vec.ee50 = extractelement <4 x i8> %T149.vec, i64 3, !tcg.op !152
+  %T149.vec_swap.ie51 = insertelement <4 x i8> %T149.vec_swap.ie49, i8 %T149.vec.ee50, i64 0, !tcg.op !152
+  %T149.swap_out = bitcast <4 x i8> %T149.vec_swap.ie51 to i32, !tcg.op !152
+  %T149.out = lshr i32 %T149.swap_out, 16, !tcg.op !152
+  store i32 %T149.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !152
 ; ======== TCG [150] bswap16_i32 [t2],t2,attr-swp:iz,attr-swp:os ========
   %T150.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !153
-  %T150.tmp2.bc = bitcast i32 %T150.tmp2 to <2 x i16>, !tcg.op !153
-  %T150.tmp2.bc.ee = extractelement <2 x i16> %T150.tmp2.bc, i64 0, !tcg.op !153
-  %T150.tmp2.bc.ee.swap_vec = bitcast i16 %T150.tmp2.bc.ee to <2 x i8>, !tcg.op !153
-  %T150.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T150.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !153
-  %T150.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T150.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !153
-  %T150.tmp2.bc.ee.swap_vec.ee36 = extractelement <2 x i8> %T150.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !153
-  %T150.swap_out.ie37 = insertelement <2 x i8> %T150.swap_out.ie, i8 %T150.tmp2.bc.ee.swap_vec.ee36, i64 0, !tcg.op !153
-  %T150.swap_out = bitcast <2 x i8> %T150.swap_out.ie37 to i16, !tcg.op !153
-  %T150.out = sext i16 %T150.swap_out to i32, !tcg.op !153
+  %T150.vec = bitcast i32 %T150.tmp2 to <4 x i8>, !tcg.op !153
+  %T150.vec.ee = extractelement <4 x i8> %T150.vec, i64 0, !tcg.op !153
+  %T150.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T150.vec.ee, i64 3, !tcg.op !153
+  %T150.vec.ee52 = extractelement <4 x i8> %T150.vec, i64 1, !tcg.op !153
+  %T150.vec_swap.ie53 = insertelement <4 x i8> %T150.vec_swap.ie, i8 %T150.vec.ee52, i64 2, !tcg.op !153
+  %T150.vec.ee54 = extractelement <4 x i8> %T150.vec, i64 2, !tcg.op !153
+  %T150.vec_swap.ie55 = insertelement <4 x i8> %T150.vec_swap.ie53, i8 %T150.vec.ee54, i64 1, !tcg.op !153
+  %T150.vec.ee56 = extractelement <4 x i8> %T150.vec, i64 3, !tcg.op !153
+  %T150.vec_swap.ie57 = insertelement <4 x i8> %T150.vec_swap.ie55, i8 %T150.vec.ee56, i64 0, !tcg.op !153
+  %T150.swap_out = bitcast <4 x i8> %T150.vec_swap.ie57 to i32, !tcg.op !153
+  %T150.out = ashr i32 %T150.swap_out, 16, !tcg.op !153
   store i32 %T150.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !153
 ; ======== TCG [151] bswap16_i32 [t2],t2 ========
   %T151.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !154
-  %T151.tmp2.bc = bitcast i32 %T151.tmp2 to <2 x i16>, !tcg.op !154
-  %T151.tmp2.bc.ee = extractelement <2 x i16> %T151.tmp2.bc, i64 0, !tcg.op !154
-  %T151.tmp2.bc.ee.swap_vec = bitcast i16 %T151.tmp2.bc.ee to <2 x i8>, !tcg.op !154
-  %T151.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T151.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !154
-  %T151.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T151.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !154
-  %T151.tmp2.bc.ee.swap_vec.ee38 = extractelement <2 x i8> %T151.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !154
-  %T151.swap_out.ie39 = insertelement <2 x i8> %T151.swap_out.ie, i8 %T151.tmp2.bc.ee.swap_vec.ee38, i64 0, !tcg.op !154
-  %T151.swap_out = bitcast <2 x i8> %T151.swap_out.ie39 to i16, !tcg.op !154
-  %T151.out = insertelement <2 x i16> %T151.tmp2.bc, i16 %T151.swap_out, i64 0, !tcg.op !154
-  store <2 x i16> %T151.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !154
+  %T151.vec = bitcast i32 %T151.tmp2 to <4 x i8>, !tcg.op !154
+  %T151.vec.ee = extractelement <4 x i8> %T151.vec, i64 0, !tcg.op !154
+  %T151.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T151.vec.ee, i64 3, !tcg.op !154
+  %T151.vec.ee58 = extractelement <4 x i8> %T151.vec, i64 1, !tcg.op !154
+  %T151.vec_swap.ie59 = insertelement <4 x i8> %T151.vec_swap.ie, i8 %T151.vec.ee58, i64 2, !tcg.op !154
+  %T151.vec.ee60 = extractelement <4 x i8> %T151.vec, i64 2, !tcg.op !154
+  %T151.vec_swap.ie61 = insertelement <4 x i8> %T151.vec_swap.ie59, i8 %T151.vec.ee60, i64 1, !tcg.op !154
+  %T151.vec.ee62 = extractelement <4 x i8> %T151.vec, i64 3, !tcg.op !154
+  %T151.vec_swap.ie63 = insertelement <4 x i8> %T151.vec_swap.ie61, i8 %T151.vec.ee62, i64 0, !tcg.op !154
+  %T151.swap_out = bitcast <4 x i8> %T151.vec_swap.ie63 to i32, !tcg.op !154
+  %T151.out = lshr i32 %T151.swap_out, 16, !tcg.op !154
+  store i32 %T151.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !154
 ; ======== TCG [152] bswap16_i64 [t2],t2,attr-swp:oz ========
   %T152.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !155
-  %T152.tmp2.bc = bitcast i64 %T152.tmp2 to <4 x i16>, !tcg.op !155
-  %T152.tmp2.bc.ee = extractelement <4 x i16> %T152.tmp2.bc, i64 0, !tcg.op !155
-  %T152.tmp2.bc.ee.swap_vec = bitcast i16 %T152.tmp2.bc.ee to <2 x i8>, !tcg.op !155
-  %T152.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T152.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !155
-  %T152.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T152.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !155
-  %T152.tmp2.bc.ee.swap_vec.ee40 = extractelement <2 x i8> %T152.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !155
-  %T152.swap_out.ie41 = insertelement <2 x i8> %T152.swap_out.ie, i8 %T152.tmp2.bc.ee.swap_vec.ee40, i64 0, !tcg.op !155
-  %T152.swap_out = bitcast <2 x i8> %T152.swap_out.ie41 to i16, !tcg.op !155
-  %T152.out = zext i16 %T152.swap_out to i64, !tcg.op !155
+  %T152.vec = bitcast i64 %T152.tmp2 to <8 x i8>, !tcg.op !155
+  %T152.vec.ee = extractelement <8 x i8> %T152.vec, i64 0, !tcg.op !155
+  %T152.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T152.vec.ee, i64 7, !tcg.op !155
+  %T152.vec.ee64 = extractelement <8 x i8> %T152.vec, i64 1, !tcg.op !155
+  %T152.vec_swap.ie65 = insertelement <8 x i8> %T152.vec_swap.ie, i8 %T152.vec.ee64, i64 6, !tcg.op !155
+  %T152.vec.ee66 = extractelement <8 x i8> %T152.vec, i64 2, !tcg.op !155
+  %T152.vec_swap.ie67 = insertelement <8 x i8> %T152.vec_swap.ie65, i8 %T152.vec.ee66, i64 5, !tcg.op !155
+  %T152.vec.ee68 = extractelement <8 x i8> %T152.vec, i64 3, !tcg.op !155
+  %T152.vec_swap.ie69 = insertelement <8 x i8> %T152.vec_swap.ie67, i8 %T152.vec.ee68, i64 4, !tcg.op !155
+  %T152.vec.ee70 = extractelement <8 x i8> %T152.vec, i64 4, !tcg.op !155
+  %T152.vec_swap.ie71 = insertelement <8 x i8> %T152.vec_swap.ie69, i8 %T152.vec.ee70, i64 3, !tcg.op !155
+  %T152.vec.ee72 = extractelement <8 x i8> %T152.vec, i64 5, !tcg.op !155
+  %T152.vec_swap.ie73 = insertelement <8 x i8> %T152.vec_swap.ie71, i8 %T152.vec.ee72, i64 2, !tcg.op !155
+  %T152.vec.ee74 = extractelement <8 x i8> %T152.vec, i64 6, !tcg.op !155
+  %T152.vec_swap.ie75 = insertelement <8 x i8> %T152.vec_swap.ie73, i8 %T152.vec.ee74, i64 1, !tcg.op !155
+  %T152.vec.ee76 = extractelement <8 x i8> %T152.vec, i64 7, !tcg.op !155
+  %T152.vec_swap.ie77 = insertelement <8 x i8> %T152.vec_swap.ie75, i8 %T152.vec.ee76, i64 0, !tcg.op !155
+  %T152.swap_out = bitcast <8 x i8> %T152.vec_swap.ie77 to i64, !tcg.op !155
+  %T152.out = lshr i64 %T152.swap_out, 48, !tcg.op !155
   store i64 %T152.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !155
 ; ======== TCG [153] bswap16_i64 [t2],t2,attr-swp:os ========
   %T153.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !156
-  %T153.tmp2.bc = bitcast i64 %T153.tmp2 to <4 x i16>, !tcg.op !156
-  %T153.tmp2.bc.ee = extractelement <4 x i16> %T153.tmp2.bc, i64 0, !tcg.op !156
-  %T153.tmp2.bc.ee.swap_vec = bitcast i16 %T153.tmp2.bc.ee to <2 x i8>, !tcg.op !156
-  %T153.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T153.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !156
-  %T153.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T153.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !156
-  %T153.tmp2.bc.ee.swap_vec.ee42 = extractelement <2 x i8> %T153.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !156
-  %T153.swap_out.ie43 = insertelement <2 x i8> %T153.swap_out.ie, i8 %T153.tmp2.bc.ee.swap_vec.ee42, i64 0, !tcg.op !156
-  %T153.swap_out = bitcast <2 x i8> %T153.swap_out.ie43 to i16, !tcg.op !156
-  %T153.out = sext i16 %T153.swap_out to i64, !tcg.op !156
+  %T153.vec = bitcast i64 %T153.tmp2 to <8 x i8>, !tcg.op !156
+  %T153.vec.ee = extractelement <8 x i8> %T153.vec, i64 0, !tcg.op !156
+  %T153.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T153.vec.ee, i64 7, !tcg.op !156
+  %T153.vec.ee78 = extractelement <8 x i8> %T153.vec, i64 1, !tcg.op !156
+  %T153.vec_swap.ie79 = insertelement <8 x i8> %T153.vec_swap.ie, i8 %T153.vec.ee78, i64 6, !tcg.op !156
+  %T153.vec.ee80 = extractelement <8 x i8> %T153.vec, i64 2, !tcg.op !156
+  %T153.vec_swap.ie81 = insertelement <8 x i8> %T153.vec_swap.ie79, i8 %T153.vec.ee80, i64 5, !tcg.op !156
+  %T153.vec.ee82 = extractelement <8 x i8> %T153.vec, i64 3, !tcg.op !156
+  %T153.vec_swap.ie83 = insertelement <8 x i8> %T153.vec_swap.ie81, i8 %T153.vec.ee82, i64 4, !tcg.op !156
+  %T153.vec.ee84 = extractelement <8 x i8> %T153.vec, i64 4, !tcg.op !156
+  %T153.vec_swap.ie85 = insertelement <8 x i8> %T153.vec_swap.ie83, i8 %T153.vec.ee84, i64 3, !tcg.op !156
+  %T153.vec.ee86 = extractelement <8 x i8> %T153.vec, i64 5, !tcg.op !156
+  %T153.vec_swap.ie87 = insertelement <8 x i8> %T153.vec_swap.ie85, i8 %T153.vec.ee86, i64 2, !tcg.op !156
+  %T153.vec.ee88 = extractelement <8 x i8> %T153.vec, i64 6, !tcg.op !156
+  %T153.vec_swap.ie89 = insertelement <8 x i8> %T153.vec_swap.ie87, i8 %T153.vec.ee88, i64 1, !tcg.op !156
+  %T153.vec.ee90 = extractelement <8 x i8> %T153.vec, i64 7, !tcg.op !156
+  %T153.vec_swap.ie91 = insertelement <8 x i8> %T153.vec_swap.ie89, i8 %T153.vec.ee90, i64 0, !tcg.op !156
+  %T153.swap_out = bitcast <8 x i8> %T153.vec_swap.ie91 to i64, !tcg.op !156
+  %T153.out = ashr i64 %T153.swap_out, 48, !tcg.op !156
   store i64 %T153.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !156
 ; ======== TCG [154] bswap16_i64 [t2],t2,attr-swp:iz ========
   %T154.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !157
-  %T154.tmp2.bc = bitcast i64 %T154.tmp2 to <4 x i16>, !tcg.op !157
-  %T154.tmp2.bc.ee = extractelement <4 x i16> %T154.tmp2.bc, i64 0, !tcg.op !157
-  %T154.tmp2.bc.ee.swap_vec = bitcast i16 %T154.tmp2.bc.ee to <2 x i8>, !tcg.op !157
-  %T154.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T154.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !157
-  %T154.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T154.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !157
-  %T154.tmp2.bc.ee.swap_vec.ee44 = extractelement <2 x i8> %T154.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !157
-  %T154.swap_out.ie45 = insertelement <2 x i8> %T154.swap_out.ie, i8 %T154.tmp2.bc.ee.swap_vec.ee44, i64 0, !tcg.op !157
-  %T154.swap_out = bitcast <2 x i8> %T154.swap_out.ie45 to i16, !tcg.op !157
-  %T154.out = insertelement <4 x i16> %T154.tmp2.bc, i16 %T154.swap_out, i64 0, !tcg.op !157
-  store <4 x i16> %T154.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !157
+  %T154.vec = bitcast i64 %T154.tmp2 to <8 x i8>, !tcg.op !157
+  %T154.vec.ee = extractelement <8 x i8> %T154.vec, i64 0, !tcg.op !157
+  %T154.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T154.vec.ee, i64 7, !tcg.op !157
+  %T154.vec.ee92 = extractelement <8 x i8> %T154.vec, i64 1, !tcg.op !157
+  %T154.vec_swap.ie93 = insertelement <8 x i8> %T154.vec_swap.ie, i8 %T154.vec.ee92, i64 6, !tcg.op !157
+  %T154.vec.ee94 = extractelement <8 x i8> %T154.vec, i64 2, !tcg.op !157
+  %T154.vec_swap.ie95 = insertelement <8 x i8> %T154.vec_swap.ie93, i8 %T154.vec.ee94, i64 5, !tcg.op !157
+  %T154.vec.ee96 = extractelement <8 x i8> %T154.vec, i64 3, !tcg.op !157
+  %T154.vec_swap.ie97 = insertelement <8 x i8> %T154.vec_swap.ie95, i8 %T154.vec.ee96, i64 4, !tcg.op !157
+  %T154.vec.ee98 = extractelement <8 x i8> %T154.vec, i64 4, !tcg.op !157
+  %T154.vec_swap.ie99 = insertelement <8 x i8> %T154.vec_swap.ie97, i8 %T154.vec.ee98, i64 3, !tcg.op !157
+  %T154.vec.ee100 = extractelement <8 x i8> %T154.vec, i64 5, !tcg.op !157
+  %T154.vec_swap.ie101 = insertelement <8 x i8> %T154.vec_swap.ie99, i8 %T154.vec.ee100, i64 2, !tcg.op !157
+  %T154.vec.ee102 = extractelement <8 x i8> %T154.vec, i64 6, !tcg.op !157
+  %T154.vec_swap.ie103 = insertelement <8 x i8> %T154.vec_swap.ie101, i8 %T154.vec.ee102, i64 1, !tcg.op !157
+  %T154.vec.ee104 = extractelement <8 x i8> %T154.vec, i64 7, !tcg.op !157
+  %T154.vec_swap.ie105 = insertelement <8 x i8> %T154.vec_swap.ie103, i8 %T154.vec.ee104, i64 0, !tcg.op !157
+  %T154.swap_out = bitcast <8 x i8> %T154.vec_swap.ie105 to i64, !tcg.op !157
+  %T154.out = lshr i64 %T154.swap_out, 48, !tcg.op !157
+  store i64 %T154.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !157
 ; ======== TCG [155] bswap16_i64 [t2],t2,attr-swp:iz,attr-swp:oz ========
   %T155.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !158
-  %T155.tmp2.bc = bitcast i64 %T155.tmp2 to <4 x i16>, !tcg.op !158
-  %T155.tmp2.bc.ee = extractelement <4 x i16> %T155.tmp2.bc, i64 0, !tcg.op !158
-  %T155.tmp2.bc.ee.swap_vec = bitcast i16 %T155.tmp2.bc.ee to <2 x i8>, !tcg.op !158
-  %T155.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T155.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !158
-  %T155.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T155.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !158
-  %T155.tmp2.bc.ee.swap_vec.ee46 = extractelement <2 x i8> %T155.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !158
-  %T155.swap_out.ie47 = insertelement <2 x i8> %T155.swap_out.ie, i8 %T155.tmp2.bc.ee.swap_vec.ee46, i64 0, !tcg.op !158
-  %T155.swap_out = bitcast <2 x i8> %T155.swap_out.ie47 to i16, !tcg.op !158
-  %T155.out = insertelement <4 x i16> %T155.tmp2.bc, i16 %T155.swap_out, i64 0, !tcg.op !158
-  store <4 x i16> %T155.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !158
+  %T155.vec = bitcast i64 %T155.tmp2 to <8 x i8>, !tcg.op !158
+  %T155.vec.ee = extractelement <8 x i8> %T155.vec, i64 0, !tcg.op !158
+  %T155.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T155.vec.ee, i64 7, !tcg.op !158
+  %T155.vec.ee106 = extractelement <8 x i8> %T155.vec, i64 1, !tcg.op !158
+  %T155.vec_swap.ie107 = insertelement <8 x i8> %T155.vec_swap.ie, i8 %T155.vec.ee106, i64 6, !tcg.op !158
+  %T155.vec.ee108 = extractelement <8 x i8> %T155.vec, i64 2, !tcg.op !158
+  %T155.vec_swap.ie109 = insertelement <8 x i8> %T155.vec_swap.ie107, i8 %T155.vec.ee108, i64 5, !tcg.op !158
+  %T155.vec.ee110 = extractelement <8 x i8> %T155.vec, i64 3, !tcg.op !158
+  %T155.vec_swap.ie111 = insertelement <8 x i8> %T155.vec_swap.ie109, i8 %T155.vec.ee110, i64 4, !tcg.op !158
+  %T155.vec.ee112 = extractelement <8 x i8> %T155.vec, i64 4, !tcg.op !158
+  %T155.vec_swap.ie113 = insertelement <8 x i8> %T155.vec_swap.ie111, i8 %T155.vec.ee112, i64 3, !tcg.op !158
+  %T155.vec.ee114 = extractelement <8 x i8> %T155.vec, i64 5, !tcg.op !158
+  %T155.vec_swap.ie115 = insertelement <8 x i8> %T155.vec_swap.ie113, i8 %T155.vec.ee114, i64 2, !tcg.op !158
+  %T155.vec.ee116 = extractelement <8 x i8> %T155.vec, i64 6, !tcg.op !158
+  %T155.vec_swap.ie117 = insertelement <8 x i8> %T155.vec_swap.ie115, i8 %T155.vec.ee116, i64 1, !tcg.op !158
+  %T155.vec.ee118 = extractelement <8 x i8> %T155.vec, i64 7, !tcg.op !158
+  %T155.vec_swap.ie119 = insertelement <8 x i8> %T155.vec_swap.ie117, i8 %T155.vec.ee118, i64 0, !tcg.op !158
+  %T155.swap_out = bitcast <8 x i8> %T155.vec_swap.ie119 to i64, !tcg.op !158
+  %T155.out = lshr i64 %T155.swap_out, 48, !tcg.op !158
+  store i64 %T155.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !158
 ; ======== TCG [156] bswap16_i64 [t2],t2,attr-swp:iz,attr-swp:os ========
   %T156.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !159
-  %T156.tmp2.bc = bitcast i64 %T156.tmp2 to <4 x i16>, !tcg.op !159
-  %T156.tmp2.bc.ee = extractelement <4 x i16> %T156.tmp2.bc, i64 0, !tcg.op !159
-  %T156.tmp2.bc.ee.swap_vec = bitcast i16 %T156.tmp2.bc.ee to <2 x i8>, !tcg.op !159
-  %T156.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T156.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !159
-  %T156.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T156.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !159
-  %T156.tmp2.bc.ee.swap_vec.ee48 = extractelement <2 x i8> %T156.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !159
-  %T156.swap_out.ie49 = insertelement <2 x i8> %T156.swap_out.ie, i8 %T156.tmp2.bc.ee.swap_vec.ee48, i64 0, !tcg.op !159
-  %T156.swap_out = bitcast <2 x i8> %T156.swap_out.ie49 to i16, !tcg.op !159
-  %T156.out = sext i16 %T156.swap_out to i64, !tcg.op !159
+  %T156.vec = bitcast i64 %T156.tmp2 to <8 x i8>, !tcg.op !159
+  %T156.vec.ee = extractelement <8 x i8> %T156.vec, i64 0, !tcg.op !159
+  %T156.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T156.vec.ee, i64 7, !tcg.op !159
+  %T156.vec.ee120 = extractelement <8 x i8> %T156.vec, i64 1, !tcg.op !159
+  %T156.vec_swap.ie121 = insertelement <8 x i8> %T156.vec_swap.ie, i8 %T156.vec.ee120, i64 6, !tcg.op !159
+  %T156.vec.ee122 = extractelement <8 x i8> %T156.vec, i64 2, !tcg.op !159
+  %T156.vec_swap.ie123 = insertelement <8 x i8> %T156.vec_swap.ie121, i8 %T156.vec.ee122, i64 5, !tcg.op !159
+  %T156.vec.ee124 = extractelement <8 x i8> %T156.vec, i64 3, !tcg.op !159
+  %T156.vec_swap.ie125 = insertelement <8 x i8> %T156.vec_swap.ie123, i8 %T156.vec.ee124, i64 4, !tcg.op !159
+  %T156.vec.ee126 = extractelement <8 x i8> %T156.vec, i64 4, !tcg.op !159
+  %T156.vec_swap.ie127 = insertelement <8 x i8> %T156.vec_swap.ie125, i8 %T156.vec.ee126, i64 3, !tcg.op !159
+  %T156.vec.ee128 = extractelement <8 x i8> %T156.vec, i64 5, !tcg.op !159
+  %T156.vec_swap.ie129 = insertelement <8 x i8> %T156.vec_swap.ie127, i8 %T156.vec.ee128, i64 2, !tcg.op !159
+  %T156.vec.ee130 = extractelement <8 x i8> %T156.vec, i64 6, !tcg.op !159
+  %T156.vec_swap.ie131 = insertelement <8 x i8> %T156.vec_swap.ie129, i8 %T156.vec.ee130, i64 1, !tcg.op !159
+  %T156.vec.ee132 = extractelement <8 x i8> %T156.vec, i64 7, !tcg.op !159
+  %T156.vec_swap.ie133 = insertelement <8 x i8> %T156.vec_swap.ie131, i8 %T156.vec.ee132, i64 0, !tcg.op !159
+  %T156.swap_out = bitcast <8 x i8> %T156.vec_swap.ie133 to i64, !tcg.op !159
+  %T156.out = ashr i64 %T156.swap_out, 48, !tcg.op !159
   store i64 %T156.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !159
 ; ======== TCG [157] bswap16_i64 [t2],t2 ========
   %T157.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !160
-  %T157.tmp2.bc = bitcast i64 %T157.tmp2 to <4 x i16>, !tcg.op !160
-  %T157.tmp2.bc.ee = extractelement <4 x i16> %T157.tmp2.bc, i64 0, !tcg.op !160
-  %T157.tmp2.bc.ee.swap_vec = bitcast i16 %T157.tmp2.bc.ee to <2 x i8>, !tcg.op !160
-  %T157.tmp2.bc.ee.swap_vec.ee = extractelement <2 x i8> %T157.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !160
-  %T157.swap_out.ie = insertelement <2 x i8> zeroinitializer, i8 %T157.tmp2.bc.ee.swap_vec.ee, i64 1, !tcg.op !160
-  %T157.tmp2.bc.ee.swap_vec.ee50 = extractelement <2 x i8> %T157.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !160
-  %T157.swap_out.ie51 = insertelement <2 x i8> %T157.swap_out.ie, i8 %T157.tmp2.bc.ee.swap_vec.ee50, i64 0, !tcg.op !160
-  %T157.swap_out = bitcast <2 x i8> %T157.swap_out.ie51 to i16, !tcg.op !160
-  %T157.out = insertelement <4 x i16> %T157.tmp2.bc, i16 %T157.swap_out, i64 0, !tcg.op !160
-  store <4 x i16> %T157.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !160
+  %T157.vec = bitcast i64 %T157.tmp2 to <8 x i8>, !tcg.op !160
+  %T157.vec.ee = extractelement <8 x i8> %T157.vec, i64 0, !tcg.op !160
+  %T157.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T157.vec.ee, i64 7, !tcg.op !160
+  %T157.vec.ee134 = extractelement <8 x i8> %T157.vec, i64 1, !tcg.op !160
+  %T157.vec_swap.ie135 = insertelement <8 x i8> %T157.vec_swap.ie, i8 %T157.vec.ee134, i64 6, !tcg.op !160
+  %T157.vec.ee136 = extractelement <8 x i8> %T157.vec, i64 2, !tcg.op !160
+  %T157.vec_swap.ie137 = insertelement <8 x i8> %T157.vec_swap.ie135, i8 %T157.vec.ee136, i64 5, !tcg.op !160
+  %T157.vec.ee138 = extractelement <8 x i8> %T157.vec, i64 3, !tcg.op !160
+  %T157.vec_swap.ie139 = insertelement <8 x i8> %T157.vec_swap.ie137, i8 %T157.vec.ee138, i64 4, !tcg.op !160
+  %T157.vec.ee140 = extractelement <8 x i8> %T157.vec, i64 4, !tcg.op !160
+  %T157.vec_swap.ie141 = insertelement <8 x i8> %T157.vec_swap.ie139, i8 %T157.vec.ee140, i64 3, !tcg.op !160
+  %T157.vec.ee142 = extractelement <8 x i8> %T157.vec, i64 5, !tcg.op !160
+  %T157.vec_swap.ie143 = insertelement <8 x i8> %T157.vec_swap.ie141, i8 %T157.vec.ee142, i64 2, !tcg.op !160
+  %T157.vec.ee144 = extractelement <8 x i8> %T157.vec, i64 6, !tcg.op !160
+  %T157.vec_swap.ie145 = insertelement <8 x i8> %T157.vec_swap.ie143, i8 %T157.vec.ee144, i64 1, !tcg.op !160
+  %T157.vec.ee146 = extractelement <8 x i8> %T157.vec, i64 7, !tcg.op !160
+  %T157.vec_swap.ie147 = insertelement <8 x i8> %T157.vec_swap.ie145, i8 %T157.vec.ee146, i64 0, !tcg.op !160
+  %T157.swap_out = bitcast <8 x i8> %T157.vec_swap.ie147 to i64, !tcg.op !160
+  %T157.out = lshr i64 %T157.swap_out, 48, !tcg.op !160
+  store i64 %T157.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !160
 ; ======== TCG [158] bswap32_i32 [t2],t2,attr-swp:oz ========
   %T158.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !161
-  %T158.tmp2.swap_vec = bitcast i32 %T158.tmp2 to <4 x i8>, !tcg.op !161
-  %T158.tmp2.swap_vec.ee = extractelement <4 x i8> %T158.tmp2.swap_vec, i64 0, !tcg.op !161
-  %T158.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T158.tmp2.swap_vec.ee, i64 3, !tcg.op !161
-  %T158.tmp2.swap_vec.ee52 = extractelement <4 x i8> %T158.tmp2.swap_vec, i64 1, !tcg.op !161
-  %T158.swap_out.ie53 = insertelement <4 x i8> %T158.swap_out.ie, i8 %T158.tmp2.swap_vec.ee52, i64 2, !tcg.op !161
-  %T158.tmp2.swap_vec.ee54 = extractelement <4 x i8> %T158.tmp2.swap_vec, i64 2, !tcg.op !161
-  %T158.swap_out.ie55 = insertelement <4 x i8> %T158.swap_out.ie53, i8 %T158.tmp2.swap_vec.ee54, i64 1, !tcg.op !161
-  %T158.tmp2.swap_vec.ee56 = extractelement <4 x i8> %T158.tmp2.swap_vec, i64 3, !tcg.op !161
-  %T158.swap_out.ie57 = insertelement <4 x i8> %T158.swap_out.ie55, i8 %T158.tmp2.swap_vec.ee56, i64 0, !tcg.op !161
-  %T158.swap_out = bitcast <4 x i8> %T158.swap_out.ie57 to i32, !tcg.op !161
-  store i32 %T158.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !161
+  %T158.vec = bitcast i32 %T158.tmp2 to <4 x i8>, !tcg.op !161
+  %T158.vec.ee = extractelement <4 x i8> %T158.vec, i64 0, !tcg.op !161
+  %T158.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T158.vec.ee, i64 3, !tcg.op !161
+  %T158.vec.ee148 = extractelement <4 x i8> %T158.vec, i64 1, !tcg.op !161
+  %T158.vec_swap.ie149 = insertelement <4 x i8> %T158.vec_swap.ie, i8 %T158.vec.ee148, i64 2, !tcg.op !161
+  %T158.vec.ee150 = extractelement <4 x i8> %T158.vec, i64 2, !tcg.op !161
+  %T158.vec_swap.ie151 = insertelement <4 x i8> %T158.vec_swap.ie149, i8 %T158.vec.ee150, i64 1, !tcg.op !161
+  %T158.vec.ee152 = extractelement <4 x i8> %T158.vec, i64 3, !tcg.op !161
+  %T158.vec_swap.ie153 = insertelement <4 x i8> %T158.vec_swap.ie151, i8 %T158.vec.ee152, i64 0, !tcg.op !161
+  %T158.swap_out = bitcast <4 x i8> %T158.vec_swap.ie153 to i32, !tcg.op !161
+  %T158.out = lshr i32 %T158.swap_out, 0, !tcg.op !161
+  store i32 %T158.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !161
 ; ======== TCG [159] bswap32_i32 [t2],t2,attr-swp:os ========
   %T159.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !162
-  %T159.tmp2.swap_vec = bitcast i32 %T159.tmp2 to <4 x i8>, !tcg.op !162
-  %T159.tmp2.swap_vec.ee = extractelement <4 x i8> %T159.tmp2.swap_vec, i64 0, !tcg.op !162
-  %T159.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T159.tmp2.swap_vec.ee, i64 3, !tcg.op !162
-  %T159.tmp2.swap_vec.ee58 = extractelement <4 x i8> %T159.tmp2.swap_vec, i64 1, !tcg.op !162
-  %T159.swap_out.ie59 = insertelement <4 x i8> %T159.swap_out.ie, i8 %T159.tmp2.swap_vec.ee58, i64 2, !tcg.op !162
-  %T159.tmp2.swap_vec.ee60 = extractelement <4 x i8> %T159.tmp2.swap_vec, i64 2, !tcg.op !162
-  %T159.swap_out.ie61 = insertelement <4 x i8> %T159.swap_out.ie59, i8 %T159.tmp2.swap_vec.ee60, i64 1, !tcg.op !162
-  %T159.tmp2.swap_vec.ee62 = extractelement <4 x i8> %T159.tmp2.swap_vec, i64 3, !tcg.op !162
-  %T159.swap_out.ie63 = insertelement <4 x i8> %T159.swap_out.ie61, i8 %T159.tmp2.swap_vec.ee62, i64 0, !tcg.op !162
-  %T159.swap_out = bitcast <4 x i8> %T159.swap_out.ie63 to i32, !tcg.op !162
-  store i32 %T159.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !162
+  %T159.vec = bitcast i32 %T159.tmp2 to <4 x i8>, !tcg.op !162
+  %T159.vec.ee = extractelement <4 x i8> %T159.vec, i64 0, !tcg.op !162
+  %T159.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T159.vec.ee, i64 3, !tcg.op !162
+  %T159.vec.ee154 = extractelement <4 x i8> %T159.vec, i64 1, !tcg.op !162
+  %T159.vec_swap.ie155 = insertelement <4 x i8> %T159.vec_swap.ie, i8 %T159.vec.ee154, i64 2, !tcg.op !162
+  %T159.vec.ee156 = extractelement <4 x i8> %T159.vec, i64 2, !tcg.op !162
+  %T159.vec_swap.ie157 = insertelement <4 x i8> %T159.vec_swap.ie155, i8 %T159.vec.ee156, i64 1, !tcg.op !162
+  %T159.vec.ee158 = extractelement <4 x i8> %T159.vec, i64 3, !tcg.op !162
+  %T159.vec_swap.ie159 = insertelement <4 x i8> %T159.vec_swap.ie157, i8 %T159.vec.ee158, i64 0, !tcg.op !162
+  %T159.swap_out = bitcast <4 x i8> %T159.vec_swap.ie159 to i32, !tcg.op !162
+  %T159.out = ashr i32 %T159.swap_out, 0, !tcg.op !162
+  store i32 %T159.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !162
 ; ======== TCG [160] bswap32_i32 [t2],t2,attr-swp:iz ========
   %T160.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !163
-  %T160.tmp2.swap_vec = bitcast i32 %T160.tmp2 to <4 x i8>, !tcg.op !163
-  %T160.tmp2.swap_vec.ee = extractelement <4 x i8> %T160.tmp2.swap_vec, i64 0, !tcg.op !163
-  %T160.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T160.tmp2.swap_vec.ee, i64 3, !tcg.op !163
-  %T160.tmp2.swap_vec.ee64 = extractelement <4 x i8> %T160.tmp2.swap_vec, i64 1, !tcg.op !163
-  %T160.swap_out.ie65 = insertelement <4 x i8> %T160.swap_out.ie, i8 %T160.tmp2.swap_vec.ee64, i64 2, !tcg.op !163
-  %T160.tmp2.swap_vec.ee66 = extractelement <4 x i8> %T160.tmp2.swap_vec, i64 2, !tcg.op !163
-  %T160.swap_out.ie67 = insertelement <4 x i8> %T160.swap_out.ie65, i8 %T160.tmp2.swap_vec.ee66, i64 1, !tcg.op !163
-  %T160.tmp2.swap_vec.ee68 = extractelement <4 x i8> %T160.tmp2.swap_vec, i64 3, !tcg.op !163
-  %T160.swap_out.ie69 = insertelement <4 x i8> %T160.swap_out.ie67, i8 %T160.tmp2.swap_vec.ee68, i64 0, !tcg.op !163
-  %T160.swap_out = bitcast <4 x i8> %T160.swap_out.ie69 to i32, !tcg.op !163
-  store i32 %T160.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !163
+  %T160.vec = bitcast i32 %T160.tmp2 to <4 x i8>, !tcg.op !163
+  %T160.vec.ee = extractelement <4 x i8> %T160.vec, i64 0, !tcg.op !163
+  %T160.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T160.vec.ee, i64 3, !tcg.op !163
+  %T160.vec.ee160 = extractelement <4 x i8> %T160.vec, i64 1, !tcg.op !163
+  %T160.vec_swap.ie161 = insertelement <4 x i8> %T160.vec_swap.ie, i8 %T160.vec.ee160, i64 2, !tcg.op !163
+  %T160.vec.ee162 = extractelement <4 x i8> %T160.vec, i64 2, !tcg.op !163
+  %T160.vec_swap.ie163 = insertelement <4 x i8> %T160.vec_swap.ie161, i8 %T160.vec.ee162, i64 1, !tcg.op !163
+  %T160.vec.ee164 = extractelement <4 x i8> %T160.vec, i64 3, !tcg.op !163
+  %T160.vec_swap.ie165 = insertelement <4 x i8> %T160.vec_swap.ie163, i8 %T160.vec.ee164, i64 0, !tcg.op !163
+  %T160.swap_out = bitcast <4 x i8> %T160.vec_swap.ie165 to i32, !tcg.op !163
+  %T160.out = lshr i32 %T160.swap_out, 0, !tcg.op !163
+  store i32 %T160.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !163
 ; ======== TCG [161] bswap32_i32 [t2],t2,attr-swp:iz,attr-swp:oz ========
   %T161.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !164
-  %T161.tmp2.swap_vec = bitcast i32 %T161.tmp2 to <4 x i8>, !tcg.op !164
-  %T161.tmp2.swap_vec.ee = extractelement <4 x i8> %T161.tmp2.swap_vec, i64 0, !tcg.op !164
-  %T161.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T161.tmp2.swap_vec.ee, i64 3, !tcg.op !164
-  %T161.tmp2.swap_vec.ee70 = extractelement <4 x i8> %T161.tmp2.swap_vec, i64 1, !tcg.op !164
-  %T161.swap_out.ie71 = insertelement <4 x i8> %T161.swap_out.ie, i8 %T161.tmp2.swap_vec.ee70, i64 2, !tcg.op !164
-  %T161.tmp2.swap_vec.ee72 = extractelement <4 x i8> %T161.tmp2.swap_vec, i64 2, !tcg.op !164
-  %T161.swap_out.ie73 = insertelement <4 x i8> %T161.swap_out.ie71, i8 %T161.tmp2.swap_vec.ee72, i64 1, !tcg.op !164
-  %T161.tmp2.swap_vec.ee74 = extractelement <4 x i8> %T161.tmp2.swap_vec, i64 3, !tcg.op !164
-  %T161.swap_out.ie75 = insertelement <4 x i8> %T161.swap_out.ie73, i8 %T161.tmp2.swap_vec.ee74, i64 0, !tcg.op !164
-  %T161.swap_out = bitcast <4 x i8> %T161.swap_out.ie75 to i32, !tcg.op !164
-  store i32 %T161.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !164
+  %T161.vec = bitcast i32 %T161.tmp2 to <4 x i8>, !tcg.op !164
+  %T161.vec.ee = extractelement <4 x i8> %T161.vec, i64 0, !tcg.op !164
+  %T161.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T161.vec.ee, i64 3, !tcg.op !164
+  %T161.vec.ee166 = extractelement <4 x i8> %T161.vec, i64 1, !tcg.op !164
+  %T161.vec_swap.ie167 = insertelement <4 x i8> %T161.vec_swap.ie, i8 %T161.vec.ee166, i64 2, !tcg.op !164
+  %T161.vec.ee168 = extractelement <4 x i8> %T161.vec, i64 2, !tcg.op !164
+  %T161.vec_swap.ie169 = insertelement <4 x i8> %T161.vec_swap.ie167, i8 %T161.vec.ee168, i64 1, !tcg.op !164
+  %T161.vec.ee170 = extractelement <4 x i8> %T161.vec, i64 3, !tcg.op !164
+  %T161.vec_swap.ie171 = insertelement <4 x i8> %T161.vec_swap.ie169, i8 %T161.vec.ee170, i64 0, !tcg.op !164
+  %T161.swap_out = bitcast <4 x i8> %T161.vec_swap.ie171 to i32, !tcg.op !164
+  %T161.out = lshr i32 %T161.swap_out, 0, !tcg.op !164
+  store i32 %T161.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !164
 ; ======== TCG [162] bswap32_i32 [t2],t2,attr-swp:iz,attr-swp:os ========
   %T162.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !165
-  %T162.tmp2.swap_vec = bitcast i32 %T162.tmp2 to <4 x i8>, !tcg.op !165
-  %T162.tmp2.swap_vec.ee = extractelement <4 x i8> %T162.tmp2.swap_vec, i64 0, !tcg.op !165
-  %T162.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T162.tmp2.swap_vec.ee, i64 3, !tcg.op !165
-  %T162.tmp2.swap_vec.ee76 = extractelement <4 x i8> %T162.tmp2.swap_vec, i64 1, !tcg.op !165
-  %T162.swap_out.ie77 = insertelement <4 x i8> %T162.swap_out.ie, i8 %T162.tmp2.swap_vec.ee76, i64 2, !tcg.op !165
-  %T162.tmp2.swap_vec.ee78 = extractelement <4 x i8> %T162.tmp2.swap_vec, i64 2, !tcg.op !165
-  %T162.swap_out.ie79 = insertelement <4 x i8> %T162.swap_out.ie77, i8 %T162.tmp2.swap_vec.ee78, i64 1, !tcg.op !165
-  %T162.tmp2.swap_vec.ee80 = extractelement <4 x i8> %T162.tmp2.swap_vec, i64 3, !tcg.op !165
-  %T162.swap_out.ie81 = insertelement <4 x i8> %T162.swap_out.ie79, i8 %T162.tmp2.swap_vec.ee80, i64 0, !tcg.op !165
-  %T162.swap_out = bitcast <4 x i8> %T162.swap_out.ie81 to i32, !tcg.op !165
-  store i32 %T162.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !165
+  %T162.vec = bitcast i32 %T162.tmp2 to <4 x i8>, !tcg.op !165
+  %T162.vec.ee = extractelement <4 x i8> %T162.vec, i64 0, !tcg.op !165
+  %T162.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T162.vec.ee, i64 3, !tcg.op !165
+  %T162.vec.ee172 = extractelement <4 x i8> %T162.vec, i64 1, !tcg.op !165
+  %T162.vec_swap.ie173 = insertelement <4 x i8> %T162.vec_swap.ie, i8 %T162.vec.ee172, i64 2, !tcg.op !165
+  %T162.vec.ee174 = extractelement <4 x i8> %T162.vec, i64 2, !tcg.op !165
+  %T162.vec_swap.ie175 = insertelement <4 x i8> %T162.vec_swap.ie173, i8 %T162.vec.ee174, i64 1, !tcg.op !165
+  %T162.vec.ee176 = extractelement <4 x i8> %T162.vec, i64 3, !tcg.op !165
+  %T162.vec_swap.ie177 = insertelement <4 x i8> %T162.vec_swap.ie175, i8 %T162.vec.ee176, i64 0, !tcg.op !165
+  %T162.swap_out = bitcast <4 x i8> %T162.vec_swap.ie177 to i32, !tcg.op !165
+  %T162.out = ashr i32 %T162.swap_out, 0, !tcg.op !165
+  store i32 %T162.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !165
 ; ======== TCG [163] bswap32_i32 [t2],t2 ========
   %T163.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !166
-  %T163.tmp2.swap_vec = bitcast i32 %T163.tmp2 to <4 x i8>, !tcg.op !166
-  %T163.tmp2.swap_vec.ee = extractelement <4 x i8> %T163.tmp2.swap_vec, i64 0, !tcg.op !166
-  %T163.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T163.tmp2.swap_vec.ee, i64 3, !tcg.op !166
-  %T163.tmp2.swap_vec.ee82 = extractelement <4 x i8> %T163.tmp2.swap_vec, i64 1, !tcg.op !166
-  %T163.swap_out.ie83 = insertelement <4 x i8> %T163.swap_out.ie, i8 %T163.tmp2.swap_vec.ee82, i64 2, !tcg.op !166
-  %T163.tmp2.swap_vec.ee84 = extractelement <4 x i8> %T163.tmp2.swap_vec, i64 2, !tcg.op !166
-  %T163.swap_out.ie85 = insertelement <4 x i8> %T163.swap_out.ie83, i8 %T163.tmp2.swap_vec.ee84, i64 1, !tcg.op !166
-  %T163.tmp2.swap_vec.ee86 = extractelement <4 x i8> %T163.tmp2.swap_vec, i64 3, !tcg.op !166
-  %T163.swap_out.ie87 = insertelement <4 x i8> %T163.swap_out.ie85, i8 %T163.tmp2.swap_vec.ee86, i64 0, !tcg.op !166
-  %T163.swap_out = bitcast <4 x i8> %T163.swap_out.ie87 to i32, !tcg.op !166
-  store i32 %T163.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !166
+  %T163.vec = bitcast i32 %T163.tmp2 to <4 x i8>, !tcg.op !166
+  %T163.vec.ee = extractelement <4 x i8> %T163.vec, i64 0, !tcg.op !166
+  %T163.vec_swap.ie = insertelement <4 x i8> zeroinitializer, i8 %T163.vec.ee, i64 3, !tcg.op !166
+  %T163.vec.ee178 = extractelement <4 x i8> %T163.vec, i64 1, !tcg.op !166
+  %T163.vec_swap.ie179 = insertelement <4 x i8> %T163.vec_swap.ie, i8 %T163.vec.ee178, i64 2, !tcg.op !166
+  %T163.vec.ee180 = extractelement <4 x i8> %T163.vec, i64 2, !tcg.op !166
+  %T163.vec_swap.ie181 = insertelement <4 x i8> %T163.vec_swap.ie179, i8 %T163.vec.ee180, i64 1, !tcg.op !166
+  %T163.vec.ee182 = extractelement <4 x i8> %T163.vec, i64 3, !tcg.op !166
+  %T163.vec_swap.ie183 = insertelement <4 x i8> %T163.vec_swap.ie181, i8 %T163.vec.ee182, i64 0, !tcg.op !166
+  %T163.swap_out = bitcast <4 x i8> %T163.vec_swap.ie183 to i32, !tcg.op !166
+  %T163.out = lshr i32 %T163.swap_out, 0, !tcg.op !166
+  store i32 %T163.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !166
 ; ======== TCG [164] bswap32_i64 [t2],t2,attr-swp:oz ========
   %T164.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !167
-  %T164.tmp2.bc = bitcast i64 %T164.tmp2 to <2 x i32>, !tcg.op !167
-  %T164.tmp2.bc.ee = extractelement <2 x i32> %T164.tmp2.bc, i64 0, !tcg.op !167
-  %T164.tmp2.bc.ee.swap_vec = bitcast i32 %T164.tmp2.bc.ee to <4 x i8>, !tcg.op !167
-  %T164.tmp2.bc.ee.swap_vec.ee = extractelement <4 x i8> %T164.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !167
-  %T164.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T164.tmp2.bc.ee.swap_vec.ee, i64 3, !tcg.op !167
-  %T164.tmp2.bc.ee.swap_vec.ee88 = extractelement <4 x i8> %T164.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !167
-  %T164.swap_out.ie89 = insertelement <4 x i8> %T164.swap_out.ie, i8 %T164.tmp2.bc.ee.swap_vec.ee88, i64 2, !tcg.op !167
-  %T164.tmp2.bc.ee.swap_vec.ee90 = extractelement <4 x i8> %T164.tmp2.bc.ee.swap_vec, i64 2, !tcg.op !167
-  %T164.swap_out.ie91 = insertelement <4 x i8> %T164.swap_out.ie89, i8 %T164.tmp2.bc.ee.swap_vec.ee90, i64 1, !tcg.op !167
-  %T164.tmp2.bc.ee.swap_vec.ee92 = extractelement <4 x i8> %T164.tmp2.bc.ee.swap_vec, i64 3, !tcg.op !167
-  %T164.swap_out.ie93 = insertelement <4 x i8> %T164.swap_out.ie91, i8 %T164.tmp2.bc.ee.swap_vec.ee92, i64 0, !tcg.op !167
-  %T164.swap_out = bitcast <4 x i8> %T164.swap_out.ie93 to i32, !tcg.op !167
-  %T164.out = zext i32 %T164.swap_out to i64, !tcg.op !167
+  %T164.vec = bitcast i64 %T164.tmp2 to <8 x i8>, !tcg.op !167
+  %T164.vec.ee = extractelement <8 x i8> %T164.vec, i64 0, !tcg.op !167
+  %T164.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T164.vec.ee, i64 7, !tcg.op !167
+  %T164.vec.ee184 = extractelement <8 x i8> %T164.vec, i64 1, !tcg.op !167
+  %T164.vec_swap.ie185 = insertelement <8 x i8> %T164.vec_swap.ie, i8 %T164.vec.ee184, i64 6, !tcg.op !167
+  %T164.vec.ee186 = extractelement <8 x i8> %T164.vec, i64 2, !tcg.op !167
+  %T164.vec_swap.ie187 = insertelement <8 x i8> %T164.vec_swap.ie185, i8 %T164.vec.ee186, i64 5, !tcg.op !167
+  %T164.vec.ee188 = extractelement <8 x i8> %T164.vec, i64 3, !tcg.op !167
+  %T164.vec_swap.ie189 = insertelement <8 x i8> %T164.vec_swap.ie187, i8 %T164.vec.ee188, i64 4, !tcg.op !167
+  %T164.vec.ee190 = extractelement <8 x i8> %T164.vec, i64 4, !tcg.op !167
+  %T164.vec_swap.ie191 = insertelement <8 x i8> %T164.vec_swap.ie189, i8 %T164.vec.ee190, i64 3, !tcg.op !167
+  %T164.vec.ee192 = extractelement <8 x i8> %T164.vec, i64 5, !tcg.op !167
+  %T164.vec_swap.ie193 = insertelement <8 x i8> %T164.vec_swap.ie191, i8 %T164.vec.ee192, i64 2, !tcg.op !167
+  %T164.vec.ee194 = extractelement <8 x i8> %T164.vec, i64 6, !tcg.op !167
+  %T164.vec_swap.ie195 = insertelement <8 x i8> %T164.vec_swap.ie193, i8 %T164.vec.ee194, i64 1, !tcg.op !167
+  %T164.vec.ee196 = extractelement <8 x i8> %T164.vec, i64 7, !tcg.op !167
+  %T164.vec_swap.ie197 = insertelement <8 x i8> %T164.vec_swap.ie195, i8 %T164.vec.ee196, i64 0, !tcg.op !167
+  %T164.swap_out = bitcast <8 x i8> %T164.vec_swap.ie197 to i64, !tcg.op !167
+  %T164.out = lshr i64 %T164.swap_out, 32, !tcg.op !167
   store i64 %T164.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !167
 ; ======== TCG [165] bswap32_i64 [t2],t2,attr-swp:os ========
   %T165.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !168
-  %T165.tmp2.bc = bitcast i64 %T165.tmp2 to <2 x i32>, !tcg.op !168
-  %T165.tmp2.bc.ee = extractelement <2 x i32> %T165.tmp2.bc, i64 0, !tcg.op !168
-  %T165.tmp2.bc.ee.swap_vec = bitcast i32 %T165.tmp2.bc.ee to <4 x i8>, !tcg.op !168
-  %T165.tmp2.bc.ee.swap_vec.ee = extractelement <4 x i8> %T165.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !168
-  %T165.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T165.tmp2.bc.ee.swap_vec.ee, i64 3, !tcg.op !168
-  %T165.tmp2.bc.ee.swap_vec.ee94 = extractelement <4 x i8> %T165.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !168
-  %T165.swap_out.ie95 = insertelement <4 x i8> %T165.swap_out.ie, i8 %T165.tmp2.bc.ee.swap_vec.ee94, i64 2, !tcg.op !168
-  %T165.tmp2.bc.ee.swap_vec.ee96 = extractelement <4 x i8> %T165.tmp2.bc.ee.swap_vec, i64 2, !tcg.op !168
-  %T165.swap_out.ie97 = insertelement <4 x i8> %T165.swap_out.ie95, i8 %T165.tmp2.bc.ee.swap_vec.ee96, i64 1, !tcg.op !168
-  %T165.tmp2.bc.ee.swap_vec.ee98 = extractelement <4 x i8> %T165.tmp2.bc.ee.swap_vec, i64 3, !tcg.op !168
-  %T165.swap_out.ie99 = insertelement <4 x i8> %T165.swap_out.ie97, i8 %T165.tmp2.bc.ee.swap_vec.ee98, i64 0, !tcg.op !168
-  %T165.swap_out = bitcast <4 x i8> %T165.swap_out.ie99 to i32, !tcg.op !168
-  %T165.out = sext i32 %T165.swap_out to i64, !tcg.op !168
+  %T165.vec = bitcast i64 %T165.tmp2 to <8 x i8>, !tcg.op !168
+  %T165.vec.ee = extractelement <8 x i8> %T165.vec, i64 0, !tcg.op !168
+  %T165.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T165.vec.ee, i64 7, !tcg.op !168
+  %T165.vec.ee198 = extractelement <8 x i8> %T165.vec, i64 1, !tcg.op !168
+  %T165.vec_swap.ie199 = insertelement <8 x i8> %T165.vec_swap.ie, i8 %T165.vec.ee198, i64 6, !tcg.op !168
+  %T165.vec.ee200 = extractelement <8 x i8> %T165.vec, i64 2, !tcg.op !168
+  %T165.vec_swap.ie201 = insertelement <8 x i8> %T165.vec_swap.ie199, i8 %T165.vec.ee200, i64 5, !tcg.op !168
+  %T165.vec.ee202 = extractelement <8 x i8> %T165.vec, i64 3, !tcg.op !168
+  %T165.vec_swap.ie203 = insertelement <8 x i8> %T165.vec_swap.ie201, i8 %T165.vec.ee202, i64 4, !tcg.op !168
+  %T165.vec.ee204 = extractelement <8 x i8> %T165.vec, i64 4, !tcg.op !168
+  %T165.vec_swap.ie205 = insertelement <8 x i8> %T165.vec_swap.ie203, i8 %T165.vec.ee204, i64 3, !tcg.op !168
+  %T165.vec.ee206 = extractelement <8 x i8> %T165.vec, i64 5, !tcg.op !168
+  %T165.vec_swap.ie207 = insertelement <8 x i8> %T165.vec_swap.ie205, i8 %T165.vec.ee206, i64 2, !tcg.op !168
+  %T165.vec.ee208 = extractelement <8 x i8> %T165.vec, i64 6, !tcg.op !168
+  %T165.vec_swap.ie209 = insertelement <8 x i8> %T165.vec_swap.ie207, i8 %T165.vec.ee208, i64 1, !tcg.op !168
+  %T165.vec.ee210 = extractelement <8 x i8> %T165.vec, i64 7, !tcg.op !168
+  %T165.vec_swap.ie211 = insertelement <8 x i8> %T165.vec_swap.ie209, i8 %T165.vec.ee210, i64 0, !tcg.op !168
+  %T165.swap_out = bitcast <8 x i8> %T165.vec_swap.ie211 to i64, !tcg.op !168
+  %T165.out = ashr i64 %T165.swap_out, 32, !tcg.op !168
   store i64 %T165.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !168
 ; ======== TCG [166] bswap32_i64 [t2],t2,attr-swp:iz ========
   %T166.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !169
-  %T166.tmp2.bc = bitcast i64 %T166.tmp2 to <2 x i32>, !tcg.op !169
-  %T166.tmp2.bc.ee = extractelement <2 x i32> %T166.tmp2.bc, i64 0, !tcg.op !169
-  %T166.tmp2.bc.ee.swap_vec = bitcast i32 %T166.tmp2.bc.ee to <4 x i8>, !tcg.op !169
-  %T166.tmp2.bc.ee.swap_vec.ee = extractelement <4 x i8> %T166.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !169
-  %T166.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T166.tmp2.bc.ee.swap_vec.ee, i64 3, !tcg.op !169
-  %T166.tmp2.bc.ee.swap_vec.ee100 = extractelement <4 x i8> %T166.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !169
-  %T166.swap_out.ie101 = insertelement <4 x i8> %T166.swap_out.ie, i8 %T166.tmp2.bc.ee.swap_vec.ee100, i64 2, !tcg.op !169
-  %T166.tmp2.bc.ee.swap_vec.ee102 = extractelement <4 x i8> %T166.tmp2.bc.ee.swap_vec, i64 2, !tcg.op !169
-  %T166.swap_out.ie103 = insertelement <4 x i8> %T166.swap_out.ie101, i8 %T166.tmp2.bc.ee.swap_vec.ee102, i64 1, !tcg.op !169
-  %T166.tmp2.bc.ee.swap_vec.ee104 = extractelement <4 x i8> %T166.tmp2.bc.ee.swap_vec, i64 3, !tcg.op !169
-  %T166.swap_out.ie105 = insertelement <4 x i8> %T166.swap_out.ie103, i8 %T166.tmp2.bc.ee.swap_vec.ee104, i64 0, !tcg.op !169
-  %T166.swap_out = bitcast <4 x i8> %T166.swap_out.ie105 to i32, !tcg.op !169
-  %T166.out = insertelement <2 x i32> %T166.tmp2.bc, i32 %T166.swap_out, i64 0, !tcg.op !169
-  store <2 x i32> %T166.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !169
+  %T166.vec = bitcast i64 %T166.tmp2 to <8 x i8>, !tcg.op !169
+  %T166.vec.ee = extractelement <8 x i8> %T166.vec, i64 0, !tcg.op !169
+  %T166.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T166.vec.ee, i64 7, !tcg.op !169
+  %T166.vec.ee212 = extractelement <8 x i8> %T166.vec, i64 1, !tcg.op !169
+  %T166.vec_swap.ie213 = insertelement <8 x i8> %T166.vec_swap.ie, i8 %T166.vec.ee212, i64 6, !tcg.op !169
+  %T166.vec.ee214 = extractelement <8 x i8> %T166.vec, i64 2, !tcg.op !169
+  %T166.vec_swap.ie215 = insertelement <8 x i8> %T166.vec_swap.ie213, i8 %T166.vec.ee214, i64 5, !tcg.op !169
+  %T166.vec.ee216 = extractelement <8 x i8> %T166.vec, i64 3, !tcg.op !169
+  %T166.vec_swap.ie217 = insertelement <8 x i8> %T166.vec_swap.ie215, i8 %T166.vec.ee216, i64 4, !tcg.op !169
+  %T166.vec.ee218 = extractelement <8 x i8> %T166.vec, i64 4, !tcg.op !169
+  %T166.vec_swap.ie219 = insertelement <8 x i8> %T166.vec_swap.ie217, i8 %T166.vec.ee218, i64 3, !tcg.op !169
+  %T166.vec.ee220 = extractelement <8 x i8> %T166.vec, i64 5, !tcg.op !169
+  %T166.vec_swap.ie221 = insertelement <8 x i8> %T166.vec_swap.ie219, i8 %T166.vec.ee220, i64 2, !tcg.op !169
+  %T166.vec.ee222 = extractelement <8 x i8> %T166.vec, i64 6, !tcg.op !169
+  %T166.vec_swap.ie223 = insertelement <8 x i8> %T166.vec_swap.ie221, i8 %T166.vec.ee222, i64 1, !tcg.op !169
+  %T166.vec.ee224 = extractelement <8 x i8> %T166.vec, i64 7, !tcg.op !169
+  %T166.vec_swap.ie225 = insertelement <8 x i8> %T166.vec_swap.ie223, i8 %T166.vec.ee224, i64 0, !tcg.op !169
+  %T166.swap_out = bitcast <8 x i8> %T166.vec_swap.ie225 to i64, !tcg.op !169
+  %T166.out = lshr i64 %T166.swap_out, 32, !tcg.op !169
+  store i64 %T166.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !169
 ; ======== TCG [167] bswap32_i64 [t2],t2,attr-swp:iz,attr-swp:oz ========
   %T167.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !170
-  %T167.tmp2.bc = bitcast i64 %T167.tmp2 to <2 x i32>, !tcg.op !170
-  %T167.tmp2.bc.ee = extractelement <2 x i32> %T167.tmp2.bc, i64 0, !tcg.op !170
-  %T167.tmp2.bc.ee.swap_vec = bitcast i32 %T167.tmp2.bc.ee to <4 x i8>, !tcg.op !170
-  %T167.tmp2.bc.ee.swap_vec.ee = extractelement <4 x i8> %T167.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !170
-  %T167.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T167.tmp2.bc.ee.swap_vec.ee, i64 3, !tcg.op !170
-  %T167.tmp2.bc.ee.swap_vec.ee106 = extractelement <4 x i8> %T167.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !170
-  %T167.swap_out.ie107 = insertelement <4 x i8> %T167.swap_out.ie, i8 %T167.tmp2.bc.ee.swap_vec.ee106, i64 2, !tcg.op !170
-  %T167.tmp2.bc.ee.swap_vec.ee108 = extractelement <4 x i8> %T167.tmp2.bc.ee.swap_vec, i64 2, !tcg.op !170
-  %T167.swap_out.ie109 = insertelement <4 x i8> %T167.swap_out.ie107, i8 %T167.tmp2.bc.ee.swap_vec.ee108, i64 1, !tcg.op !170
-  %T167.tmp2.bc.ee.swap_vec.ee110 = extractelement <4 x i8> %T167.tmp2.bc.ee.swap_vec, i64 3, !tcg.op !170
-  %T167.swap_out.ie111 = insertelement <4 x i8> %T167.swap_out.ie109, i8 %T167.tmp2.bc.ee.swap_vec.ee110, i64 0, !tcg.op !170
-  %T167.swap_out = bitcast <4 x i8> %T167.swap_out.ie111 to i32, !tcg.op !170
-  %T167.out = insertelement <2 x i32> %T167.tmp2.bc, i32 %T167.swap_out, i64 0, !tcg.op !170
-  store <2 x i32> %T167.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !170
+  %T167.vec = bitcast i64 %T167.tmp2 to <8 x i8>, !tcg.op !170
+  %T167.vec.ee = extractelement <8 x i8> %T167.vec, i64 0, !tcg.op !170
+  %T167.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T167.vec.ee, i64 7, !tcg.op !170
+  %T167.vec.ee226 = extractelement <8 x i8> %T167.vec, i64 1, !tcg.op !170
+  %T167.vec_swap.ie227 = insertelement <8 x i8> %T167.vec_swap.ie, i8 %T167.vec.ee226, i64 6, !tcg.op !170
+  %T167.vec.ee228 = extractelement <8 x i8> %T167.vec, i64 2, !tcg.op !170
+  %T167.vec_swap.ie229 = insertelement <8 x i8> %T167.vec_swap.ie227, i8 %T167.vec.ee228, i64 5, !tcg.op !170
+  %T167.vec.ee230 = extractelement <8 x i8> %T167.vec, i64 3, !tcg.op !170
+  %T167.vec_swap.ie231 = insertelement <8 x i8> %T167.vec_swap.ie229, i8 %T167.vec.ee230, i64 4, !tcg.op !170
+  %T167.vec.ee232 = extractelement <8 x i8> %T167.vec, i64 4, !tcg.op !170
+  %T167.vec_swap.ie233 = insertelement <8 x i8> %T167.vec_swap.ie231, i8 %T167.vec.ee232, i64 3, !tcg.op !170
+  %T167.vec.ee234 = extractelement <8 x i8> %T167.vec, i64 5, !tcg.op !170
+  %T167.vec_swap.ie235 = insertelement <8 x i8> %T167.vec_swap.ie233, i8 %T167.vec.ee234, i64 2, !tcg.op !170
+  %T167.vec.ee236 = extractelement <8 x i8> %T167.vec, i64 6, !tcg.op !170
+  %T167.vec_swap.ie237 = insertelement <8 x i8> %T167.vec_swap.ie235, i8 %T167.vec.ee236, i64 1, !tcg.op !170
+  %T167.vec.ee238 = extractelement <8 x i8> %T167.vec, i64 7, !tcg.op !170
+  %T167.vec_swap.ie239 = insertelement <8 x i8> %T167.vec_swap.ie237, i8 %T167.vec.ee238, i64 0, !tcg.op !170
+  %T167.swap_out = bitcast <8 x i8> %T167.vec_swap.ie239 to i64, !tcg.op !170
+  %T167.out = lshr i64 %T167.swap_out, 32, !tcg.op !170
+  store i64 %T167.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !170
 ; ======== TCG [168] bswap32_i64 [t2],t2,attr-swp:iz,attr-swp:os ========
   %T168.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !171
-  %T168.tmp2.bc = bitcast i64 %T168.tmp2 to <2 x i32>, !tcg.op !171
-  %T168.tmp2.bc.ee = extractelement <2 x i32> %T168.tmp2.bc, i64 0, !tcg.op !171
-  %T168.tmp2.bc.ee.swap_vec = bitcast i32 %T168.tmp2.bc.ee to <4 x i8>, !tcg.op !171
-  %T168.tmp2.bc.ee.swap_vec.ee = extractelement <4 x i8> %T168.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !171
-  %T168.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T168.tmp2.bc.ee.swap_vec.ee, i64 3, !tcg.op !171
-  %T168.tmp2.bc.ee.swap_vec.ee112 = extractelement <4 x i8> %T168.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !171
-  %T168.swap_out.ie113 = insertelement <4 x i8> %T168.swap_out.ie, i8 %T168.tmp2.bc.ee.swap_vec.ee112, i64 2, !tcg.op !171
-  %T168.tmp2.bc.ee.swap_vec.ee114 = extractelement <4 x i8> %T168.tmp2.bc.ee.swap_vec, i64 2, !tcg.op !171
-  %T168.swap_out.ie115 = insertelement <4 x i8> %T168.swap_out.ie113, i8 %T168.tmp2.bc.ee.swap_vec.ee114, i64 1, !tcg.op !171
-  %T168.tmp2.bc.ee.swap_vec.ee116 = extractelement <4 x i8> %T168.tmp2.bc.ee.swap_vec, i64 3, !tcg.op !171
-  %T168.swap_out.ie117 = insertelement <4 x i8> %T168.swap_out.ie115, i8 %T168.tmp2.bc.ee.swap_vec.ee116, i64 0, !tcg.op !171
-  %T168.swap_out = bitcast <4 x i8> %T168.swap_out.ie117 to i32, !tcg.op !171
-  %T168.out = sext i32 %T168.swap_out to i64, !tcg.op !171
+  %T168.vec = bitcast i64 %T168.tmp2 to <8 x i8>, !tcg.op !171
+  %T168.vec.ee = extractelement <8 x i8> %T168.vec, i64 0, !tcg.op !171
+  %T168.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T168.vec.ee, i64 7, !tcg.op !171
+  %T168.vec.ee240 = extractelement <8 x i8> %T168.vec, i64 1, !tcg.op !171
+  %T168.vec_swap.ie241 = insertelement <8 x i8> %T168.vec_swap.ie, i8 %T168.vec.ee240, i64 6, !tcg.op !171
+  %T168.vec.ee242 = extractelement <8 x i8> %T168.vec, i64 2, !tcg.op !171
+  %T168.vec_swap.ie243 = insertelement <8 x i8> %T168.vec_swap.ie241, i8 %T168.vec.ee242, i64 5, !tcg.op !171
+  %T168.vec.ee244 = extractelement <8 x i8> %T168.vec, i64 3, !tcg.op !171
+  %T168.vec_swap.ie245 = insertelement <8 x i8> %T168.vec_swap.ie243, i8 %T168.vec.ee244, i64 4, !tcg.op !171
+  %T168.vec.ee246 = extractelement <8 x i8> %T168.vec, i64 4, !tcg.op !171
+  %T168.vec_swap.ie247 = insertelement <8 x i8> %T168.vec_swap.ie245, i8 %T168.vec.ee246, i64 3, !tcg.op !171
+  %T168.vec.ee248 = extractelement <8 x i8> %T168.vec, i64 5, !tcg.op !171
+  %T168.vec_swap.ie249 = insertelement <8 x i8> %T168.vec_swap.ie247, i8 %T168.vec.ee248, i64 2, !tcg.op !171
+  %T168.vec.ee250 = extractelement <8 x i8> %T168.vec, i64 6, !tcg.op !171
+  %T168.vec_swap.ie251 = insertelement <8 x i8> %T168.vec_swap.ie249, i8 %T168.vec.ee250, i64 1, !tcg.op !171
+  %T168.vec.ee252 = extractelement <8 x i8> %T168.vec, i64 7, !tcg.op !171
+  %T168.vec_swap.ie253 = insertelement <8 x i8> %T168.vec_swap.ie251, i8 %T168.vec.ee252, i64 0, !tcg.op !171
+  %T168.swap_out = bitcast <8 x i8> %T168.vec_swap.ie253 to i64, !tcg.op !171
+  %T168.out = ashr i64 %T168.swap_out, 32, !tcg.op !171
   store i64 %T168.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !171
 ; ======== TCG [169] bswap32_i64 [t2],t2 ========
   %T169.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !172
-  %T169.tmp2.bc = bitcast i64 %T169.tmp2 to <2 x i32>, !tcg.op !172
-  %T169.tmp2.bc.ee = extractelement <2 x i32> %T169.tmp2.bc, i64 0, !tcg.op !172
-  %T169.tmp2.bc.ee.swap_vec = bitcast i32 %T169.tmp2.bc.ee to <4 x i8>, !tcg.op !172
-  %T169.tmp2.bc.ee.swap_vec.ee = extractelement <4 x i8> %T169.tmp2.bc.ee.swap_vec, i64 0, !tcg.op !172
-  %T169.swap_out.ie = insertelement <4 x i8> zeroinitializer, i8 %T169.tmp2.bc.ee.swap_vec.ee, i64 3, !tcg.op !172
-  %T169.tmp2.bc.ee.swap_vec.ee118 = extractelement <4 x i8> %T169.tmp2.bc.ee.swap_vec, i64 1, !tcg.op !172
-  %T169.swap_out.ie119 = insertelement <4 x i8> %T169.swap_out.ie, i8 %T169.tmp2.bc.ee.swap_vec.ee118, i64 2, !tcg.op !172
-  %T169.tmp2.bc.ee.swap_vec.ee120 = extractelement <4 x i8> %T169.tmp2.bc.ee.swap_vec, i64 2, !tcg.op !172
-  %T169.swap_out.ie121 = insertelement <4 x i8> %T169.swap_out.ie119, i8 %T169.tmp2.bc.ee.swap_vec.ee120, i64 1, !tcg.op !172
-  %T169.tmp2.bc.ee.swap_vec.ee122 = extractelement <4 x i8> %T169.tmp2.bc.ee.swap_vec, i64 3, !tcg.op !172
-  %T169.swap_out.ie123 = insertelement <4 x i8> %T169.swap_out.ie121, i8 %T169.tmp2.bc.ee.swap_vec.ee122, i64 0, !tcg.op !172
-  %T169.swap_out = bitcast <4 x i8> %T169.swap_out.ie123 to i32, !tcg.op !172
-  %T169.out = insertelement <2 x i32> %T169.tmp2.bc, i32 %T169.swap_out, i64 0, !tcg.op !172
-  store <2 x i32> %T169.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !172
+  %T169.vec = bitcast i64 %T169.tmp2 to <8 x i8>, !tcg.op !172
+  %T169.vec.ee = extractelement <8 x i8> %T169.vec, i64 0, !tcg.op !172
+  %T169.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T169.vec.ee, i64 7, !tcg.op !172
+  %T169.vec.ee254 = extractelement <8 x i8> %T169.vec, i64 1, !tcg.op !172
+  %T169.vec_swap.ie255 = insertelement <8 x i8> %T169.vec_swap.ie, i8 %T169.vec.ee254, i64 6, !tcg.op !172
+  %T169.vec.ee256 = extractelement <8 x i8> %T169.vec, i64 2, !tcg.op !172
+  %T169.vec_swap.ie257 = insertelement <8 x i8> %T169.vec_swap.ie255, i8 %T169.vec.ee256, i64 5, !tcg.op !172
+  %T169.vec.ee258 = extractelement <8 x i8> %T169.vec, i64 3, !tcg.op !172
+  %T169.vec_swap.ie259 = insertelement <8 x i8> %T169.vec_swap.ie257, i8 %T169.vec.ee258, i64 4, !tcg.op !172
+  %T169.vec.ee260 = extractelement <8 x i8> %T169.vec, i64 4, !tcg.op !172
+  %T169.vec_swap.ie261 = insertelement <8 x i8> %T169.vec_swap.ie259, i8 %T169.vec.ee260, i64 3, !tcg.op !172
+  %T169.vec.ee262 = extractelement <8 x i8> %T169.vec, i64 5, !tcg.op !172
+  %T169.vec_swap.ie263 = insertelement <8 x i8> %T169.vec_swap.ie261, i8 %T169.vec.ee262, i64 2, !tcg.op !172
+  %T169.vec.ee264 = extractelement <8 x i8> %T169.vec, i64 6, !tcg.op !172
+  %T169.vec_swap.ie265 = insertelement <8 x i8> %T169.vec_swap.ie263, i8 %T169.vec.ee264, i64 1, !tcg.op !172
+  %T169.vec.ee266 = extractelement <8 x i8> %T169.vec, i64 7, !tcg.op !172
+  %T169.vec_swap.ie267 = insertelement <8 x i8> %T169.vec_swap.ie265, i8 %T169.vec.ee266, i64 0, !tcg.op !172
+  %T169.swap_out = bitcast <8 x i8> %T169.vec_swap.ie267 to i64, !tcg.op !172
+  %T169.out = lshr i64 %T169.swap_out, 32, !tcg.op !172
+  store i64 %T169.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !172
 ; ======== TCG [170] bswap64_i64 [t2],t2,attr-swp:oz ========
   %T170.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !173
-  %T170.tmp2.swap_vec = bitcast i64 %T170.tmp2 to <8 x i8>, !tcg.op !173
-  %T170.tmp2.swap_vec.ee = extractelement <8 x i8> %T170.tmp2.swap_vec, i64 0, !tcg.op !173
-  %T170.swap_out.ie = insertelement <8 x i8> zeroinitializer, i8 %T170.tmp2.swap_vec.ee, i64 7, !tcg.op !173
-  %T170.tmp2.swap_vec.ee124 = extractelement <8 x i8> %T170.tmp2.swap_vec, i64 1, !tcg.op !173
-  %T170.swap_out.ie125 = insertelement <8 x i8> %T170.swap_out.ie, i8 %T170.tmp2.swap_vec.ee124, i64 6, !tcg.op !173
-  %T170.tmp2.swap_vec.ee126 = extractelement <8 x i8> %T170.tmp2.swap_vec, i64 2, !tcg.op !173
-  %T170.swap_out.ie127 = insertelement <8 x i8> %T170.swap_out.ie125, i8 %T170.tmp2.swap_vec.ee126, i64 5, !tcg.op !173
-  %T170.tmp2.swap_vec.ee128 = extractelement <8 x i8> %T170.tmp2.swap_vec, i64 3, !tcg.op !173
-  %T170.swap_out.ie129 = insertelement <8 x i8> %T170.swap_out.ie127, i8 %T170.tmp2.swap_vec.ee128, i64 4, !tcg.op !173
-  %T170.tmp2.swap_vec.ee130 = extractelement <8 x i8> %T170.tmp2.swap_vec, i64 4, !tcg.op !173
-  %T170.swap_out.ie131 = insertelement <8 x i8> %T170.swap_out.ie129, i8 %T170.tmp2.swap_vec.ee130, i64 3, !tcg.op !173
-  %T170.tmp2.swap_vec.ee132 = extractelement <8 x i8> %T170.tmp2.swap_vec, i64 5, !tcg.op !173
-  %T170.swap_out.ie133 = insertelement <8 x i8> %T170.swap_out.ie131, i8 %T170.tmp2.swap_vec.ee132, i64 2, !tcg.op !173
-  %T170.tmp2.swap_vec.ee134 = extractelement <8 x i8> %T170.tmp2.swap_vec, i64 6, !tcg.op !173
-  %T170.swap_out.ie135 = insertelement <8 x i8> %T170.swap_out.ie133, i8 %T170.tmp2.swap_vec.ee134, i64 1, !tcg.op !173
-  %T170.tmp2.swap_vec.ee136 = extractelement <8 x i8> %T170.tmp2.swap_vec, i64 7, !tcg.op !173
-  %T170.swap_out.ie137 = insertelement <8 x i8> %T170.swap_out.ie135, i8 %T170.tmp2.swap_vec.ee136, i64 0, !tcg.op !173
-  %T170.swap_out = bitcast <8 x i8> %T170.swap_out.ie137 to i64, !tcg.op !173
-  store i64 %T170.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !173
+  %T170.vec = bitcast i64 %T170.tmp2 to <8 x i8>, !tcg.op !173
+  %T170.vec.ee = extractelement <8 x i8> %T170.vec, i64 0, !tcg.op !173
+  %T170.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T170.vec.ee, i64 7, !tcg.op !173
+  %T170.vec.ee268 = extractelement <8 x i8> %T170.vec, i64 1, !tcg.op !173
+  %T170.vec_swap.ie269 = insertelement <8 x i8> %T170.vec_swap.ie, i8 %T170.vec.ee268, i64 6, !tcg.op !173
+  %T170.vec.ee270 = extractelement <8 x i8> %T170.vec, i64 2, !tcg.op !173
+  %T170.vec_swap.ie271 = insertelement <8 x i8> %T170.vec_swap.ie269, i8 %T170.vec.ee270, i64 5, !tcg.op !173
+  %T170.vec.ee272 = extractelement <8 x i8> %T170.vec, i64 3, !tcg.op !173
+  %T170.vec_swap.ie273 = insertelement <8 x i8> %T170.vec_swap.ie271, i8 %T170.vec.ee272, i64 4, !tcg.op !173
+  %T170.vec.ee274 = extractelement <8 x i8> %T170.vec, i64 4, !tcg.op !173
+  %T170.vec_swap.ie275 = insertelement <8 x i8> %T170.vec_swap.ie273, i8 %T170.vec.ee274, i64 3, !tcg.op !173
+  %T170.vec.ee276 = extractelement <8 x i8> %T170.vec, i64 5, !tcg.op !173
+  %T170.vec_swap.ie277 = insertelement <8 x i8> %T170.vec_swap.ie275, i8 %T170.vec.ee276, i64 2, !tcg.op !173
+  %T170.vec.ee278 = extractelement <8 x i8> %T170.vec, i64 6, !tcg.op !173
+  %T170.vec_swap.ie279 = insertelement <8 x i8> %T170.vec_swap.ie277, i8 %T170.vec.ee278, i64 1, !tcg.op !173
+  %T170.vec.ee280 = extractelement <8 x i8> %T170.vec, i64 7, !tcg.op !173
+  %T170.vec_swap.ie281 = insertelement <8 x i8> %T170.vec_swap.ie279, i8 %T170.vec.ee280, i64 0, !tcg.op !173
+  %T170.swap_out = bitcast <8 x i8> %T170.vec_swap.ie281 to i64, !tcg.op !173
+  %T170.out = lshr i64 %T170.swap_out, 0, !tcg.op !173
+  store i64 %T170.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !173
 ; ======== TCG [171] bswap64_i64 [t2],t2,attr-swp:os ========
   %T171.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !174
-  %T171.tmp2.swap_vec = bitcast i64 %T171.tmp2 to <8 x i8>, !tcg.op !174
-  %T171.tmp2.swap_vec.ee = extractelement <8 x i8> %T171.tmp2.swap_vec, i64 0, !tcg.op !174
-  %T171.swap_out.ie = insertelement <8 x i8> zeroinitializer, i8 %T171.tmp2.swap_vec.ee, i64 7, !tcg.op !174
-  %T171.tmp2.swap_vec.ee138 = extractelement <8 x i8> %T171.tmp2.swap_vec, i64 1, !tcg.op !174
-  %T171.swap_out.ie139 = insertelement <8 x i8> %T171.swap_out.ie, i8 %T171.tmp2.swap_vec.ee138, i64 6, !tcg.op !174
-  %T171.tmp2.swap_vec.ee140 = extractelement <8 x i8> %T171.tmp2.swap_vec, i64 2, !tcg.op !174
-  %T171.swap_out.ie141 = insertelement <8 x i8> %T171.swap_out.ie139, i8 %T171.tmp2.swap_vec.ee140, i64 5, !tcg.op !174
-  %T171.tmp2.swap_vec.ee142 = extractelement <8 x i8> %T171.tmp2.swap_vec, i64 3, !tcg.op !174
-  %T171.swap_out.ie143 = insertelement <8 x i8> %T171.swap_out.ie141, i8 %T171.tmp2.swap_vec.ee142, i64 4, !tcg.op !174
-  %T171.tmp2.swap_vec.ee144 = extractelement <8 x i8> %T171.tmp2.swap_vec, i64 4, !tcg.op !174
-  %T171.swap_out.ie145 = insertelement <8 x i8> %T171.swap_out.ie143, i8 %T171.tmp2.swap_vec.ee144, i64 3, !tcg.op !174
-  %T171.tmp2.swap_vec.ee146 = extractelement <8 x i8> %T171.tmp2.swap_vec, i64 5, !tcg.op !174
-  %T171.swap_out.ie147 = insertelement <8 x i8> %T171.swap_out.ie145, i8 %T171.tmp2.swap_vec.ee146, i64 2, !tcg.op !174
-  %T171.tmp2.swap_vec.ee148 = extractelement <8 x i8> %T171.tmp2.swap_vec, i64 6, !tcg.op !174
-  %T171.swap_out.ie149 = insertelement <8 x i8> %T171.swap_out.ie147, i8 %T171.tmp2.swap_vec.ee148, i64 1, !tcg.op !174
-  %T171.tmp2.swap_vec.ee150 = extractelement <8 x i8> %T171.tmp2.swap_vec, i64 7, !tcg.op !174
-  %T171.swap_out.ie151 = insertelement <8 x i8> %T171.swap_out.ie149, i8 %T171.tmp2.swap_vec.ee150, i64 0, !tcg.op !174
-  %T171.swap_out = bitcast <8 x i8> %T171.swap_out.ie151 to i64, !tcg.op !174
-  store i64 %T171.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !174
+  %T171.vec = bitcast i64 %T171.tmp2 to <8 x i8>, !tcg.op !174
+  %T171.vec.ee = extractelement <8 x i8> %T171.vec, i64 0, !tcg.op !174
+  %T171.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T171.vec.ee, i64 7, !tcg.op !174
+  %T171.vec.ee282 = extractelement <8 x i8> %T171.vec, i64 1, !tcg.op !174
+  %T171.vec_swap.ie283 = insertelement <8 x i8> %T171.vec_swap.ie, i8 %T171.vec.ee282, i64 6, !tcg.op !174
+  %T171.vec.ee284 = extractelement <8 x i8> %T171.vec, i64 2, !tcg.op !174
+  %T171.vec_swap.ie285 = insertelement <8 x i8> %T171.vec_swap.ie283, i8 %T171.vec.ee284, i64 5, !tcg.op !174
+  %T171.vec.ee286 = extractelement <8 x i8> %T171.vec, i64 3, !tcg.op !174
+  %T171.vec_swap.ie287 = insertelement <8 x i8> %T171.vec_swap.ie285, i8 %T171.vec.ee286, i64 4, !tcg.op !174
+  %T171.vec.ee288 = extractelement <8 x i8> %T171.vec, i64 4, !tcg.op !174
+  %T171.vec_swap.ie289 = insertelement <8 x i8> %T171.vec_swap.ie287, i8 %T171.vec.ee288, i64 3, !tcg.op !174
+  %T171.vec.ee290 = extractelement <8 x i8> %T171.vec, i64 5, !tcg.op !174
+  %T171.vec_swap.ie291 = insertelement <8 x i8> %T171.vec_swap.ie289, i8 %T171.vec.ee290, i64 2, !tcg.op !174
+  %T171.vec.ee292 = extractelement <8 x i8> %T171.vec, i64 6, !tcg.op !174
+  %T171.vec_swap.ie293 = insertelement <8 x i8> %T171.vec_swap.ie291, i8 %T171.vec.ee292, i64 1, !tcg.op !174
+  %T171.vec.ee294 = extractelement <8 x i8> %T171.vec, i64 7, !tcg.op !174
+  %T171.vec_swap.ie295 = insertelement <8 x i8> %T171.vec_swap.ie293, i8 %T171.vec.ee294, i64 0, !tcg.op !174
+  %T171.swap_out = bitcast <8 x i8> %T171.vec_swap.ie295 to i64, !tcg.op !174
+  %T171.out = ashr i64 %T171.swap_out, 0, !tcg.op !174
+  store i64 %T171.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !174
 ; ======== TCG [172] bswap64_i64 [t2],t2,attr-swp:iz ========
   %T172.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !175
-  %T172.tmp2.swap_vec = bitcast i64 %T172.tmp2 to <8 x i8>, !tcg.op !175
-  %T172.tmp2.swap_vec.ee = extractelement <8 x i8> %T172.tmp2.swap_vec, i64 0, !tcg.op !175
-  %T172.swap_out.ie = insertelement <8 x i8> zeroinitializer, i8 %T172.tmp2.swap_vec.ee, i64 7, !tcg.op !175
-  %T172.tmp2.swap_vec.ee152 = extractelement <8 x i8> %T172.tmp2.swap_vec, i64 1, !tcg.op !175
-  %T172.swap_out.ie153 = insertelement <8 x i8> %T172.swap_out.ie, i8 %T172.tmp2.swap_vec.ee152, i64 6, !tcg.op !175
-  %T172.tmp2.swap_vec.ee154 = extractelement <8 x i8> %T172.tmp2.swap_vec, i64 2, !tcg.op !175
-  %T172.swap_out.ie155 = insertelement <8 x i8> %T172.swap_out.ie153, i8 %T172.tmp2.swap_vec.ee154, i64 5, !tcg.op !175
-  %T172.tmp2.swap_vec.ee156 = extractelement <8 x i8> %T172.tmp2.swap_vec, i64 3, !tcg.op !175
-  %T172.swap_out.ie157 = insertelement <8 x i8> %T172.swap_out.ie155, i8 %T172.tmp2.swap_vec.ee156, i64 4, !tcg.op !175
-  %T172.tmp2.swap_vec.ee158 = extractelement <8 x i8> %T172.tmp2.swap_vec, i64 4, !tcg.op !175
-  %T172.swap_out.ie159 = insertelement <8 x i8> %T172.swap_out.ie157, i8 %T172.tmp2.swap_vec.ee158, i64 3, !tcg.op !175
-  %T172.tmp2.swap_vec.ee160 = extractelement <8 x i8> %T172.tmp2.swap_vec, i64 5, !tcg.op !175
-  %T172.swap_out.ie161 = insertelement <8 x i8> %T172.swap_out.ie159, i8 %T172.tmp2.swap_vec.ee160, i64 2, !tcg.op !175
-  %T172.tmp2.swap_vec.ee162 = extractelement <8 x i8> %T172.tmp2.swap_vec, i64 6, !tcg.op !175
-  %T172.swap_out.ie163 = insertelement <8 x i8> %T172.swap_out.ie161, i8 %T172.tmp2.swap_vec.ee162, i64 1, !tcg.op !175
-  %T172.tmp2.swap_vec.ee164 = extractelement <8 x i8> %T172.tmp2.swap_vec, i64 7, !tcg.op !175
-  %T172.swap_out.ie165 = insertelement <8 x i8> %T172.swap_out.ie163, i8 %T172.tmp2.swap_vec.ee164, i64 0, !tcg.op !175
-  %T172.swap_out = bitcast <8 x i8> %T172.swap_out.ie165 to i64, !tcg.op !175
-  store i64 %T172.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !175
+  %T172.vec = bitcast i64 %T172.tmp2 to <8 x i8>, !tcg.op !175
+  %T172.vec.ee = extractelement <8 x i8> %T172.vec, i64 0, !tcg.op !175
+  %T172.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T172.vec.ee, i64 7, !tcg.op !175
+  %T172.vec.ee296 = extractelement <8 x i8> %T172.vec, i64 1, !tcg.op !175
+  %T172.vec_swap.ie297 = insertelement <8 x i8> %T172.vec_swap.ie, i8 %T172.vec.ee296, i64 6, !tcg.op !175
+  %T172.vec.ee298 = extractelement <8 x i8> %T172.vec, i64 2, !tcg.op !175
+  %T172.vec_swap.ie299 = insertelement <8 x i8> %T172.vec_swap.ie297, i8 %T172.vec.ee298, i64 5, !tcg.op !175
+  %T172.vec.ee300 = extractelement <8 x i8> %T172.vec, i64 3, !tcg.op !175
+  %T172.vec_swap.ie301 = insertelement <8 x i8> %T172.vec_swap.ie299, i8 %T172.vec.ee300, i64 4, !tcg.op !175
+  %T172.vec.ee302 = extractelement <8 x i8> %T172.vec, i64 4, !tcg.op !175
+  %T172.vec_swap.ie303 = insertelement <8 x i8> %T172.vec_swap.ie301, i8 %T172.vec.ee302, i64 3, !tcg.op !175
+  %T172.vec.ee304 = extractelement <8 x i8> %T172.vec, i64 5, !tcg.op !175
+  %T172.vec_swap.ie305 = insertelement <8 x i8> %T172.vec_swap.ie303, i8 %T172.vec.ee304, i64 2, !tcg.op !175
+  %T172.vec.ee306 = extractelement <8 x i8> %T172.vec, i64 6, !tcg.op !175
+  %T172.vec_swap.ie307 = insertelement <8 x i8> %T172.vec_swap.ie305, i8 %T172.vec.ee306, i64 1, !tcg.op !175
+  %T172.vec.ee308 = extractelement <8 x i8> %T172.vec, i64 7, !tcg.op !175
+  %T172.vec_swap.ie309 = insertelement <8 x i8> %T172.vec_swap.ie307, i8 %T172.vec.ee308, i64 0, !tcg.op !175
+  %T172.swap_out = bitcast <8 x i8> %T172.vec_swap.ie309 to i64, !tcg.op !175
+  %T172.out = lshr i64 %T172.swap_out, 0, !tcg.op !175
+  store i64 %T172.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !175
 ; ======== TCG [173] bswap64_i64 [t2],t2,attr-swp:iz,attr-swp:oz ========
   %T173.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !176
-  %T173.tmp2.swap_vec = bitcast i64 %T173.tmp2 to <8 x i8>, !tcg.op !176
-  %T173.tmp2.swap_vec.ee = extractelement <8 x i8> %T173.tmp2.swap_vec, i64 0, !tcg.op !176
-  %T173.swap_out.ie = insertelement <8 x i8> zeroinitializer, i8 %T173.tmp2.swap_vec.ee, i64 7, !tcg.op !176
-  %T173.tmp2.swap_vec.ee166 = extractelement <8 x i8> %T173.tmp2.swap_vec, i64 1, !tcg.op !176
-  %T173.swap_out.ie167 = insertelement <8 x i8> %T173.swap_out.ie, i8 %T173.tmp2.swap_vec.ee166, i64 6, !tcg.op !176
-  %T173.tmp2.swap_vec.ee168 = extractelement <8 x i8> %T173.tmp2.swap_vec, i64 2, !tcg.op !176
-  %T173.swap_out.ie169 = insertelement <8 x i8> %T173.swap_out.ie167, i8 %T173.tmp2.swap_vec.ee168, i64 5, !tcg.op !176
-  %T173.tmp2.swap_vec.ee170 = extractelement <8 x i8> %T173.tmp2.swap_vec, i64 3, !tcg.op !176
-  %T173.swap_out.ie171 = insertelement <8 x i8> %T173.swap_out.ie169, i8 %T173.tmp2.swap_vec.ee170, i64 4, !tcg.op !176
-  %T173.tmp2.swap_vec.ee172 = extractelement <8 x i8> %T173.tmp2.swap_vec, i64 4, !tcg.op !176
-  %T173.swap_out.ie173 = insertelement <8 x i8> %T173.swap_out.ie171, i8 %T173.tmp2.swap_vec.ee172, i64 3, !tcg.op !176
-  %T173.tmp2.swap_vec.ee174 = extractelement <8 x i8> %T173.tmp2.swap_vec, i64 5, !tcg.op !176
-  %T173.swap_out.ie175 = insertelement <8 x i8> %T173.swap_out.ie173, i8 %T173.tmp2.swap_vec.ee174, i64 2, !tcg.op !176
-  %T173.tmp2.swap_vec.ee176 = extractelement <8 x i8> %T173.tmp2.swap_vec, i64 6, !tcg.op !176
-  %T173.swap_out.ie177 = insertelement <8 x i8> %T173.swap_out.ie175, i8 %T173.tmp2.swap_vec.ee176, i64 1, !tcg.op !176
-  %T173.tmp2.swap_vec.ee178 = extractelement <8 x i8> %T173.tmp2.swap_vec, i64 7, !tcg.op !176
-  %T173.swap_out.ie179 = insertelement <8 x i8> %T173.swap_out.ie177, i8 %T173.tmp2.swap_vec.ee178, i64 0, !tcg.op !176
-  %T173.swap_out = bitcast <8 x i8> %T173.swap_out.ie179 to i64, !tcg.op !176
-  store i64 %T173.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !176
+  %T173.vec = bitcast i64 %T173.tmp2 to <8 x i8>, !tcg.op !176
+  %T173.vec.ee = extractelement <8 x i8> %T173.vec, i64 0, !tcg.op !176
+  %T173.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T173.vec.ee, i64 7, !tcg.op !176
+  %T173.vec.ee310 = extractelement <8 x i8> %T173.vec, i64 1, !tcg.op !176
+  %T173.vec_swap.ie311 = insertelement <8 x i8> %T173.vec_swap.ie, i8 %T173.vec.ee310, i64 6, !tcg.op !176
+  %T173.vec.ee312 = extractelement <8 x i8> %T173.vec, i64 2, !tcg.op !176
+  %T173.vec_swap.ie313 = insertelement <8 x i8> %T173.vec_swap.ie311, i8 %T173.vec.ee312, i64 5, !tcg.op !176
+  %T173.vec.ee314 = extractelement <8 x i8> %T173.vec, i64 3, !tcg.op !176
+  %T173.vec_swap.ie315 = insertelement <8 x i8> %T173.vec_swap.ie313, i8 %T173.vec.ee314, i64 4, !tcg.op !176
+  %T173.vec.ee316 = extractelement <8 x i8> %T173.vec, i64 4, !tcg.op !176
+  %T173.vec_swap.ie317 = insertelement <8 x i8> %T173.vec_swap.ie315, i8 %T173.vec.ee316, i64 3, !tcg.op !176
+  %T173.vec.ee318 = extractelement <8 x i8> %T173.vec, i64 5, !tcg.op !176
+  %T173.vec_swap.ie319 = insertelement <8 x i8> %T173.vec_swap.ie317, i8 %T173.vec.ee318, i64 2, !tcg.op !176
+  %T173.vec.ee320 = extractelement <8 x i8> %T173.vec, i64 6, !tcg.op !176
+  %T173.vec_swap.ie321 = insertelement <8 x i8> %T173.vec_swap.ie319, i8 %T173.vec.ee320, i64 1, !tcg.op !176
+  %T173.vec.ee322 = extractelement <8 x i8> %T173.vec, i64 7, !tcg.op !176
+  %T173.vec_swap.ie323 = insertelement <8 x i8> %T173.vec_swap.ie321, i8 %T173.vec.ee322, i64 0, !tcg.op !176
+  %T173.swap_out = bitcast <8 x i8> %T173.vec_swap.ie323 to i64, !tcg.op !176
+  %T173.out = lshr i64 %T173.swap_out, 0, !tcg.op !176
+  store i64 %T173.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !176
 ; ======== TCG [174] bswap64_i64 [t2],t2,attr-swp:iz,attr-swp:os ========
   %T174.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !177
-  %T174.tmp2.swap_vec = bitcast i64 %T174.tmp2 to <8 x i8>, !tcg.op !177
-  %T174.tmp2.swap_vec.ee = extractelement <8 x i8> %T174.tmp2.swap_vec, i64 0, !tcg.op !177
-  %T174.swap_out.ie = insertelement <8 x i8> zeroinitializer, i8 %T174.tmp2.swap_vec.ee, i64 7, !tcg.op !177
-  %T174.tmp2.swap_vec.ee180 = extractelement <8 x i8> %T174.tmp2.swap_vec, i64 1, !tcg.op !177
-  %T174.swap_out.ie181 = insertelement <8 x i8> %T174.swap_out.ie, i8 %T174.tmp2.swap_vec.ee180, i64 6, !tcg.op !177
-  %T174.tmp2.swap_vec.ee182 = extractelement <8 x i8> %T174.tmp2.swap_vec, i64 2, !tcg.op !177
-  %T174.swap_out.ie183 = insertelement <8 x i8> %T174.swap_out.ie181, i8 %T174.tmp2.swap_vec.ee182, i64 5, !tcg.op !177
-  %T174.tmp2.swap_vec.ee184 = extractelement <8 x i8> %T174.tmp2.swap_vec, i64 3, !tcg.op !177
-  %T174.swap_out.ie185 = insertelement <8 x i8> %T174.swap_out.ie183, i8 %T174.tmp2.swap_vec.ee184, i64 4, !tcg.op !177
-  %T174.tmp2.swap_vec.ee186 = extractelement <8 x i8> %T174.tmp2.swap_vec, i64 4, !tcg.op !177
-  %T174.swap_out.ie187 = insertelement <8 x i8> %T174.swap_out.ie185, i8 %T174.tmp2.swap_vec.ee186, i64 3, !tcg.op !177
-  %T174.tmp2.swap_vec.ee188 = extractelement <8 x i8> %T174.tmp2.swap_vec, i64 5, !tcg.op !177
-  %T174.swap_out.ie189 = insertelement <8 x i8> %T174.swap_out.ie187, i8 %T174.tmp2.swap_vec.ee188, i64 2, !tcg.op !177
-  %T174.tmp2.swap_vec.ee190 = extractelement <8 x i8> %T174.tmp2.swap_vec, i64 6, !tcg.op !177
-  %T174.swap_out.ie191 = insertelement <8 x i8> %T174.swap_out.ie189, i8 %T174.tmp2.swap_vec.ee190, i64 1, !tcg.op !177
-  %T174.tmp2.swap_vec.ee192 = extractelement <8 x i8> %T174.tmp2.swap_vec, i64 7, !tcg.op !177
-  %T174.swap_out.ie193 = insertelement <8 x i8> %T174.swap_out.ie191, i8 %T174.tmp2.swap_vec.ee192, i64 0, !tcg.op !177
-  %T174.swap_out = bitcast <8 x i8> %T174.swap_out.ie193 to i64, !tcg.op !177
-  store i64 %T174.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !177
+  %T174.vec = bitcast i64 %T174.tmp2 to <8 x i8>, !tcg.op !177
+  %T174.vec.ee = extractelement <8 x i8> %T174.vec, i64 0, !tcg.op !177
+  %T174.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T174.vec.ee, i64 7, !tcg.op !177
+  %T174.vec.ee324 = extractelement <8 x i8> %T174.vec, i64 1, !tcg.op !177
+  %T174.vec_swap.ie325 = insertelement <8 x i8> %T174.vec_swap.ie, i8 %T174.vec.ee324, i64 6, !tcg.op !177
+  %T174.vec.ee326 = extractelement <8 x i8> %T174.vec, i64 2, !tcg.op !177
+  %T174.vec_swap.ie327 = insertelement <8 x i8> %T174.vec_swap.ie325, i8 %T174.vec.ee326, i64 5, !tcg.op !177
+  %T174.vec.ee328 = extractelement <8 x i8> %T174.vec, i64 3, !tcg.op !177
+  %T174.vec_swap.ie329 = insertelement <8 x i8> %T174.vec_swap.ie327, i8 %T174.vec.ee328, i64 4, !tcg.op !177
+  %T174.vec.ee330 = extractelement <8 x i8> %T174.vec, i64 4, !tcg.op !177
+  %T174.vec_swap.ie331 = insertelement <8 x i8> %T174.vec_swap.ie329, i8 %T174.vec.ee330, i64 3, !tcg.op !177
+  %T174.vec.ee332 = extractelement <8 x i8> %T174.vec, i64 5, !tcg.op !177
+  %T174.vec_swap.ie333 = insertelement <8 x i8> %T174.vec_swap.ie331, i8 %T174.vec.ee332, i64 2, !tcg.op !177
+  %T174.vec.ee334 = extractelement <8 x i8> %T174.vec, i64 6, !tcg.op !177
+  %T174.vec_swap.ie335 = insertelement <8 x i8> %T174.vec_swap.ie333, i8 %T174.vec.ee334, i64 1, !tcg.op !177
+  %T174.vec.ee336 = extractelement <8 x i8> %T174.vec, i64 7, !tcg.op !177
+  %T174.vec_swap.ie337 = insertelement <8 x i8> %T174.vec_swap.ie335, i8 %T174.vec.ee336, i64 0, !tcg.op !177
+  %T174.swap_out = bitcast <8 x i8> %T174.vec_swap.ie337 to i64, !tcg.op !177
+  %T174.out = ashr i64 %T174.swap_out, 0, !tcg.op !177
+  store i64 %T174.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !177
 ; ======== TCG [175] bswap64_i64 [t2],t2 ========
   %T175.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !178
-  %T175.tmp2.swap_vec = bitcast i64 %T175.tmp2 to <8 x i8>, !tcg.op !178
-  %T175.tmp2.swap_vec.ee = extractelement <8 x i8> %T175.tmp2.swap_vec, i64 0, !tcg.op !178
-  %T175.swap_out.ie = insertelement <8 x i8> zeroinitializer, i8 %T175.tmp2.swap_vec.ee, i64 7, !tcg.op !178
-  %T175.tmp2.swap_vec.ee194 = extractelement <8 x i8> %T175.tmp2.swap_vec, i64 1, !tcg.op !178
-  %T175.swap_out.ie195 = insertelement <8 x i8> %T175.swap_out.ie, i8 %T175.tmp2.swap_vec.ee194, i64 6, !tcg.op !178
-  %T175.tmp2.swap_vec.ee196 = extractelement <8 x i8> %T175.tmp2.swap_vec, i64 2, !tcg.op !178
-  %T175.swap_out.ie197 = insertelement <8 x i8> %T175.swap_out.ie195, i8 %T175.tmp2.swap_vec.ee196, i64 5, !tcg.op !178
-  %T175.tmp2.swap_vec.ee198 = extractelement <8 x i8> %T175.tmp2.swap_vec, i64 3, !tcg.op !178
-  %T175.swap_out.ie199 = insertelement <8 x i8> %T175.swap_out.ie197, i8 %T175.tmp2.swap_vec.ee198, i64 4, !tcg.op !178
-  %T175.tmp2.swap_vec.ee200 = extractelement <8 x i8> %T175.tmp2.swap_vec, i64 4, !tcg.op !178
-  %T175.swap_out.ie201 = insertelement <8 x i8> %T175.swap_out.ie199, i8 %T175.tmp2.swap_vec.ee200, i64 3, !tcg.op !178
-  %T175.tmp2.swap_vec.ee202 = extractelement <8 x i8> %T175.tmp2.swap_vec, i64 5, !tcg.op !178
-  %T175.swap_out.ie203 = insertelement <8 x i8> %T175.swap_out.ie201, i8 %T175.tmp2.swap_vec.ee202, i64 2, !tcg.op !178
-  %T175.tmp2.swap_vec.ee204 = extractelement <8 x i8> %T175.tmp2.swap_vec, i64 6, !tcg.op !178
-  %T175.swap_out.ie205 = insertelement <8 x i8> %T175.swap_out.ie203, i8 %T175.tmp2.swap_vec.ee204, i64 1, !tcg.op !178
-  %T175.tmp2.swap_vec.ee206 = extractelement <8 x i8> %T175.tmp2.swap_vec, i64 7, !tcg.op !178
-  %T175.swap_out.ie207 = insertelement <8 x i8> %T175.swap_out.ie205, i8 %T175.tmp2.swap_vec.ee206, i64 0, !tcg.op !178
-  %T175.swap_out = bitcast <8 x i8> %T175.swap_out.ie207 to i64, !tcg.op !178
-  store i64 %T175.swap_out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !178
+  %T175.vec = bitcast i64 %T175.tmp2 to <8 x i8>, !tcg.op !178
+  %T175.vec.ee = extractelement <8 x i8> %T175.vec, i64 0, !tcg.op !178
+  %T175.vec_swap.ie = insertelement <8 x i8> zeroinitializer, i8 %T175.vec.ee, i64 7, !tcg.op !178
+  %T175.vec.ee338 = extractelement <8 x i8> %T175.vec, i64 1, !tcg.op !178
+  %T175.vec_swap.ie339 = insertelement <8 x i8> %T175.vec_swap.ie, i8 %T175.vec.ee338, i64 6, !tcg.op !178
+  %T175.vec.ee340 = extractelement <8 x i8> %T175.vec, i64 2, !tcg.op !178
+  %T175.vec_swap.ie341 = insertelement <8 x i8> %T175.vec_swap.ie339, i8 %T175.vec.ee340, i64 5, !tcg.op !178
+  %T175.vec.ee342 = extractelement <8 x i8> %T175.vec, i64 3, !tcg.op !178
+  %T175.vec_swap.ie343 = insertelement <8 x i8> %T175.vec_swap.ie341, i8 %T175.vec.ee342, i64 4, !tcg.op !178
+  %T175.vec.ee344 = extractelement <8 x i8> %T175.vec, i64 4, !tcg.op !178
+  %T175.vec_swap.ie345 = insertelement <8 x i8> %T175.vec_swap.ie343, i8 %T175.vec.ee344, i64 3, !tcg.op !178
+  %T175.vec.ee346 = extractelement <8 x i8> %T175.vec, i64 5, !tcg.op !178
+  %T175.vec_swap.ie347 = insertelement <8 x i8> %T175.vec_swap.ie345, i8 %T175.vec.ee346, i64 2, !tcg.op !178
+  %T175.vec.ee348 = extractelement <8 x i8> %T175.vec, i64 6, !tcg.op !178
+  %T175.vec_swap.ie349 = insertelement <8 x i8> %T175.vec_swap.ie347, i8 %T175.vec.ee348, i64 1, !tcg.op !178
+  %T175.vec.ee350 = extractelement <8 x i8> %T175.vec, i64 7, !tcg.op !178
+  %T175.vec_swap.ie351 = insertelement <8 x i8> %T175.vec_swap.ie349, i8 %T175.vec.ee350, i64 0, !tcg.op !178
+  %T175.swap_out = bitcast <8 x i8> %T175.vec_swap.ie351 to i64, !tcg.op !178
+  %T175.out = lshr i64 %T175.swap_out, 0, !tcg.op !178
+  store i64 %T175.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !178
 ; ======== TCG [176] deposit_i32 [t2],t2,t0,0x0,0x8 ========
   %T176.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !179
   %T176.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !179
@@ -1486,28 +1606,28 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T183.v0 = load <16 x i8>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !186
   %T183.elem = extractelement <16 x i8> %T183.v0, i64 0, !tcg.op !186
   %T183.ie = insertelement <16 x i8> zeroinitializer, i8 %T183.elem, i64 0, !tcg.op !186
-  %T183.ie208 = insertelement <16 x i8> %T183.ie, i8 %T183.elem, i64 1, !tcg.op !186
-  %T183.ie209 = insertelement <16 x i8> %T183.ie208, i8 %T183.elem, i64 2, !tcg.op !186
-  %T183.ie210 = insertelement <16 x i8> %T183.ie209, i8 %T183.elem, i64 3, !tcg.op !186
-  %T183.ie211 = insertelement <16 x i8> %T183.ie210, i8 %T183.elem, i64 4, !tcg.op !186
-  %T183.ie212 = insertelement <16 x i8> %T183.ie211, i8 %T183.elem, i64 5, !tcg.op !186
-  %T183.ie213 = insertelement <16 x i8> %T183.ie212, i8 %T183.elem, i64 6, !tcg.op !186
-  %T183.ie214 = insertelement <16 x i8> %T183.ie213, i8 %T183.elem, i64 7, !tcg.op !186
-  %T183.ie215 = insertelement <16 x i8> %T183.ie214, i8 %T183.elem, i64 8, !tcg.op !186
-  %T183.ie216 = insertelement <16 x i8> %T183.ie215, i8 %T183.elem, i64 9, !tcg.op !186
-  %T183.ie217 = insertelement <16 x i8> %T183.ie216, i8 %T183.elem, i64 10, !tcg.op !186
-  %T183.ie218 = insertelement <16 x i8> %T183.ie217, i8 %T183.elem, i64 11, !tcg.op !186
-  %T183.ie219 = insertelement <16 x i8> %T183.ie218, i8 %T183.elem, i64 12, !tcg.op !186
-  %T183.ie220 = insertelement <16 x i8> %T183.ie219, i8 %T183.elem, i64 13, !tcg.op !186
-  %T183.ie221 = insertelement <16 x i8> %T183.ie220, i8 %T183.elem, i64 14, !tcg.op !186
-  %T183.ie222 = insertelement <16 x i8> %T183.ie221, i8 %T183.elem, i64 15, !tcg.op !186
-  store <16 x i8> %T183.ie222, ptr %tmp9.stack, align 16, !tbaa !0, !tcg.op !186
+  %T183.ie352 = insertelement <16 x i8> %T183.ie, i8 %T183.elem, i64 1, !tcg.op !186
+  %T183.ie353 = insertelement <16 x i8> %T183.ie352, i8 %T183.elem, i64 2, !tcg.op !186
+  %T183.ie354 = insertelement <16 x i8> %T183.ie353, i8 %T183.elem, i64 3, !tcg.op !186
+  %T183.ie355 = insertelement <16 x i8> %T183.ie354, i8 %T183.elem, i64 4, !tcg.op !186
+  %T183.ie356 = insertelement <16 x i8> %T183.ie355, i8 %T183.elem, i64 5, !tcg.op !186
+  %T183.ie357 = insertelement <16 x i8> %T183.ie356, i8 %T183.elem, i64 6, !tcg.op !186
+  %T183.ie358 = insertelement <16 x i8> %T183.ie357, i8 %T183.elem, i64 7, !tcg.op !186
+  %T183.ie359 = insertelement <16 x i8> %T183.ie358, i8 %T183.elem, i64 8, !tcg.op !186
+  %T183.ie360 = insertelement <16 x i8> %T183.ie359, i8 %T183.elem, i64 9, !tcg.op !186
+  %T183.ie361 = insertelement <16 x i8> %T183.ie360, i8 %T183.elem, i64 10, !tcg.op !186
+  %T183.ie362 = insertelement <16 x i8> %T183.ie361, i8 %T183.elem, i64 11, !tcg.op !186
+  %T183.ie363 = insertelement <16 x i8> %T183.ie362, i8 %T183.elem, i64 12, !tcg.op !186
+  %T183.ie364 = insertelement <16 x i8> %T183.ie363, i8 %T183.elem, i64 13, !tcg.op !186
+  %T183.ie365 = insertelement <16 x i8> %T183.ie364, i8 %T183.elem, i64 14, !tcg.op !186
+  %T183.ie366 = insertelement <16 x i8> %T183.ie365, i8 %T183.elem, i64 15, !tcg.op !186
+  store <16 x i8> %T183.ie366, ptr %tmp9.stack, align 16, !tbaa !0, !tcg.op !186
 ; ======== TCG [184] dupm_vec v128,e64,[t9],v0 ========
   %T184.v0 = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !187
   %T184.elem = extractelement <2 x i64> %T184.v0, i64 0, !tcg.op !187
   %T184.ie = insertelement <2 x i64> zeroinitializer, i64 %T184.elem, i64 0, !tcg.op !187
-  %T184.ie223 = insertelement <2 x i64> %T184.ie, i64 %T184.elem, i64 1, !tcg.op !187
-  store <2 x i64> %T184.ie223, ptr %tmp9.stack, align 16, !tbaa !0, !tcg.op !187
+  %T184.ie367 = insertelement <2 x i64> %T184.ie, i64 %T184.elem, i64 1, !tcg.op !187
+  store <2 x i64> %T184.ie367, ptr %tmp9.stack, align 16, !tbaa !0, !tcg.op !187
 ; ======== TCG [185] extract2_i32 [t2],t0,t2,0x8 ========
   %T185.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !188
   %T185.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !188
@@ -1577,16 +1697,16 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T196.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !199
   %T196.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !199
   %T196.bool = icmp ne <16 x i8> %T196.tmp3, %T196.tmp4, !tcg.op !199
-  %T196.tmp3224 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !199
-  %T196.tmp4225 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !199
-  %T196.out = select <16 x i1> %T196.bool, <16 x i8> %T196.tmp3224, <16 x i8> %T196.tmp4225, !tcg.op !199
+  %T196.tmp3368 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !199
+  %T196.tmp4369 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !199
+  %T196.out = select <16 x i1> %T196.bool, <16 x i8> %T196.tmp3368, <16 x i8> %T196.tmp4369, !tcg.op !199
   store <16 x i8> %T196.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !199
 ; ======== TCG [197] mulsh_i32 [t2],t0,t2 ========
   %T197.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !200
   %T197.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !200
   %T197.double_ty = sext i32 %T197.tmp0 to i64, !tcg.op !200
-  %T197.double_ty226 = sext i32 %T197.tmp2 to i64, !tcg.op !200
-  %T197.mul = mul i64 %T197.double_ty, %T197.double_ty226, !tcg.op !200
+  %T197.double_ty370 = sext i32 %T197.tmp2 to i64, !tcg.op !200
+  %T197.mul = mul i64 %T197.double_ty, %T197.double_ty370, !tcg.op !200
   %T197.lshr = lshr i64 %T197.mul, 32, !tcg.op !200
   %T197.tr = trunc i64 %T197.lshr to i32, !tcg.op !200
   store i32 %T197.tr, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !200
@@ -1594,8 +1714,8 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T198.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !201
   %T198.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !201
   %T198.double_ty = sext i64 %T198.tmp0 to i128, !tcg.op !201
-  %T198.double_ty227 = sext i64 %T198.tmp2 to i128, !tcg.op !201
-  %T198.mul = mul i128 %T198.double_ty, %T198.double_ty227, !tcg.op !201
+  %T198.double_ty371 = sext i64 %T198.tmp2 to i128, !tcg.op !201
+  %T198.mul = mul i128 %T198.double_ty, %T198.double_ty371, !tcg.op !201
   %T198.lshr = lshr i128 %T198.mul, 64, !tcg.op !201
   %T198.tr = trunc i128 %T198.lshr to i64, !tcg.op !201
   store i64 %T198.tr, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !201
@@ -1603,8 +1723,8 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T199.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !202
   %T199.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !202
   %T199.double_ty = zext i32 %T199.tmp0 to i64, !tcg.op !202
-  %T199.double_ty228 = zext i32 %T199.tmp2 to i64, !tcg.op !202
-  %T199.mul = mul i64 %T199.double_ty, %T199.double_ty228, !tcg.op !202
+  %T199.double_ty372 = zext i32 %T199.tmp2 to i64, !tcg.op !202
+  %T199.mul = mul i64 %T199.double_ty, %T199.double_ty372, !tcg.op !202
   %T199.lshr = lshr i64 %T199.mul, 32, !tcg.op !202
   %T199.tr = trunc i64 %T199.lshr to i32, !tcg.op !202
   store i32 %T199.tr, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !202
@@ -1612,62 +1732,62 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
   %T200.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !203
   %T200.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !203
   %T200.double_ty = zext i64 %T200.tmp0 to i128, !tcg.op !203
-  %T200.double_ty229 = zext i64 %T200.tmp2 to i128, !tcg.op !203
-  %T200.mul = mul i128 %T200.double_ty, %T200.double_ty229, !tcg.op !203
+  %T200.double_ty373 = zext i64 %T200.tmp2 to i128, !tcg.op !203
+  %T200.mul = mul i128 %T200.double_ty, %T200.double_ty373, !tcg.op !203
   %T200.lshr = lshr i128 %T200.mul, 64, !tcg.op !203
   %T200.tr = trunc i128 %T200.lshr to i64, !tcg.op !203
   store i64 %T200.tr, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !203
 ; ======== TCG [201] muls2_i32 [t2],[t0],t2,t2 ========
   %T201.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
-  %T201.tmp2230 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
+  %T201.tmp2374 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
   %T201.double_ty = sext i32 %T201.tmp2 to i64, !tcg.op !204
-  %T201.double_ty231 = sext i32 %T201.tmp2230 to i64, !tcg.op !204
-  %T201.mul = mul i64 %T201.double_ty, %T201.double_ty231, !tcg.op !204
+  %T201.double_ty375 = sext i32 %T201.tmp2374 to i64, !tcg.op !204
+  %T201.mul = mul i64 %T201.double_ty, %T201.double_ty375, !tcg.op !204
   %T201.lshr = lshr i64 %T201.mul, 32, !tcg.op !204
   %T201.tr = trunc i64 %T201.lshr to i32, !tcg.op !204
   store i32 %T201.tr, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !204
-  %T201.tmp2232 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
-  %T201.tmp2233 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
-  %T201.mul_low = mul i32 %T201.tmp2232, %T201.tmp2233, !tcg.op !204
+  %T201.tmp2376 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
+  %T201.tmp2377 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
+  %T201.mul_low = mul i32 %T201.tmp2376, %T201.tmp2377, !tcg.op !204
   store i32 %T201.mul_low, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !204
 ; ======== TCG [202] muls2_i64 [t2],[t0],t2,t2 ========
   %T202.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
-  %T202.tmp2234 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
+  %T202.tmp2378 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
   %T202.double_ty = sext i64 %T202.tmp2 to i128, !tcg.op !205
-  %T202.double_ty235 = sext i64 %T202.tmp2234 to i128, !tcg.op !205
-  %T202.mul = mul i128 %T202.double_ty, %T202.double_ty235, !tcg.op !205
+  %T202.double_ty379 = sext i64 %T202.tmp2378 to i128, !tcg.op !205
+  %T202.mul = mul i128 %T202.double_ty, %T202.double_ty379, !tcg.op !205
   %T202.lshr = lshr i128 %T202.mul, 64, !tcg.op !205
   %T202.tr = trunc i128 %T202.lshr to i64, !tcg.op !205
   store i64 %T202.tr, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !205
-  %T202.tmp2236 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
-  %T202.tmp2237 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
-  %T202.mul_low = mul i64 %T202.tmp2236, %T202.tmp2237, !tcg.op !205
+  %T202.tmp2380 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
+  %T202.tmp2381 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
+  %T202.mul_low = mul i64 %T202.tmp2380, %T202.tmp2381, !tcg.op !205
   store i64 %T202.mul_low, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !205
 ; ======== TCG [203] mulu2_i32 [t2],[t0],t2,t2 ========
   %T203.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
-  %T203.tmp2238 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
+  %T203.tmp2382 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
   %T203.double_ty = zext i32 %T203.tmp2 to i64, !tcg.op !206
-  %T203.double_ty239 = zext i32 %T203.tmp2238 to i64, !tcg.op !206
-  %T203.mul = mul i64 %T203.double_ty, %T203.double_ty239, !tcg.op !206
+  %T203.double_ty383 = zext i32 %T203.tmp2382 to i64, !tcg.op !206
+  %T203.mul = mul i64 %T203.double_ty, %T203.double_ty383, !tcg.op !206
   %T203.lshr = lshr i64 %T203.mul, 32, !tcg.op !206
   %T203.tr = trunc i64 %T203.lshr to i32, !tcg.op !206
   store i32 %T203.tr, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !206
-  %T203.tmp2240 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
-  %T203.tmp2241 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
-  %T203.mul_low = mul i32 %T203.tmp2240, %T203.tmp2241, !tcg.op !206
+  %T203.tmp2384 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
+  %T203.tmp2385 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
+  %T203.mul_low = mul i32 %T203.tmp2384, %T203.tmp2385, !tcg.op !206
   store i32 %T203.mul_low, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !206
 ; ======== TCG [204] mulu2_i64 [t2],[t0],t2,t2 ========
   %T204.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
-  %T204.tmp2242 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
+  %T204.tmp2386 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
   %T204.double_ty = zext i64 %T204.tmp2 to i128, !tcg.op !207
-  %T204.double_ty243 = zext i64 %T204.tmp2242 to i128, !tcg.op !207
-  %T204.mul = mul i128 %T204.double_ty, %T204.double_ty243, !tcg.op !207
+  %T204.double_ty387 = zext i64 %T204.tmp2386 to i128, !tcg.op !207
+  %T204.mul = mul i128 %T204.double_ty, %T204.double_ty387, !tcg.op !207
   %T204.lshr = lshr i128 %T204.mul, 64, !tcg.op !207
   %T204.tr = trunc i128 %T204.lshr to i64, !tcg.op !207
   store i64 %T204.tr, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !207
-  %T204.tmp2244 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
-  %T204.tmp2245 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
-  %T204.mul_low = mul i64 %T204.tmp2244, %T204.tmp2245, !tcg.op !207
+  %T204.tmp2388 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
+  %T204.tmp2389 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
+  %T204.mul_low = mul i64 %T204.tmp2388, %T204.tmp2389, !tcg.op !207
   store i64 %T204.mul_low, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !207
 ; ======== TCG [205] setcond_i32 [t2],cc_dst,0xffffffff,tsteq ========
   %T205.cc_dst = load i32, ptr %cc_dst.stack, align 8, !tbaa !0, !tcg.op !208
@@ -1716,27 +1836,27 @@ T85.merge:                                        ; preds = %T85.nz, %T85.z
 ; ======== TCG [213] dup_vec v128,e8,[t9],rax ========
   %T213.ld_element = load i8, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !216
   %T213.ie = insertelement <16 x i8> zeroinitializer, i8 %T213.ld_element, i64 0, !tcg.op !216
-  %T213.ie246 = insertelement <16 x i8> %T213.ie, i8 %T213.ld_element, i64 1, !tcg.op !216
-  %T213.ie247 = insertelement <16 x i8> %T213.ie246, i8 %T213.ld_element, i64 2, !tcg.op !216
-  %T213.ie248 = insertelement <16 x i8> %T213.ie247, i8 %T213.ld_element, i64 3, !tcg.op !216
-  %T213.ie249 = insertelement <16 x i8> %T213.ie248, i8 %T213.ld_element, i64 4, !tcg.op !216
-  %T213.ie250 = insertelement <16 x i8> %T213.ie249, i8 %T213.ld_element, i64 5, !tcg.op !216
-  %T213.ie251 = insertelement <16 x i8> %T213.ie250, i8 %T213.ld_element, i64 6, !tcg.op !216
-  %T213.ie252 = insertelement <16 x i8> %T213.ie251, i8 %T213.ld_element, i64 7, !tcg.op !216
-  %T213.ie253 = insertelement <16 x i8> %T213.ie252, i8 %T213.ld_element, i64 8, !tcg.op !216
-  %T213.ie254 = insertelement <16 x i8> %T213.ie253, i8 %T213.ld_element, i64 9, !tcg.op !216
-  %T213.ie255 = insertelement <16 x i8> %T213.ie254, i8 %T213.ld_element, i64 10, !tcg.op !216
-  %T213.ie256 = insertelement <16 x i8> %T213.ie255, i8 %T213.ld_element, i64 11, !tcg.op !216
-  %T213.ie257 = insertelement <16 x i8> %T213.ie256, i8 %T213.ld_element, i64 12, !tcg.op !216
-  %T213.ie258 = insertelement <16 x i8> %T213.ie257, i8 %T213.ld_element, i64 13, !tcg.op !216
-  %T213.ie259 = insertelement <16 x i8> %T213.ie258, i8 %T213.ld_element, i64 14, !tcg.op !216
-  %T213.ie260 = insertelement <16 x i8> %T213.ie259, i8 %T213.ld_element, i64 15, !tcg.op !216
-  store <16 x i8> %T213.ie260, ptr %tmp9.stack, align 16, !tbaa !0, !tcg.op !216
+  %T213.ie390 = insertelement <16 x i8> %T213.ie, i8 %T213.ld_element, i64 1, !tcg.op !216
+  %T213.ie391 = insertelement <16 x i8> %T213.ie390, i8 %T213.ld_element, i64 2, !tcg.op !216
+  %T213.ie392 = insertelement <16 x i8> %T213.ie391, i8 %T213.ld_element, i64 3, !tcg.op !216
+  %T213.ie393 = insertelement <16 x i8> %T213.ie392, i8 %T213.ld_element, i64 4, !tcg.op !216
+  %T213.ie394 = insertelement <16 x i8> %T213.ie393, i8 %T213.ld_element, i64 5, !tcg.op !216
+  %T213.ie395 = insertelement <16 x i8> %T213.ie394, i8 %T213.ld_element, i64 6, !tcg.op !216
+  %T213.ie396 = insertelement <16 x i8> %T213.ie395, i8 %T213.ld_element, i64 7, !tcg.op !216
+  %T213.ie397 = insertelement <16 x i8> %T213.ie396, i8 %T213.ld_element, i64 8, !tcg.op !216
+  %T213.ie398 = insertelement <16 x i8> %T213.ie397, i8 %T213.ld_element, i64 9, !tcg.op !216
+  %T213.ie399 = insertelement <16 x i8> %T213.ie398, i8 %T213.ld_element, i64 10, !tcg.op !216
+  %T213.ie400 = insertelement <16 x i8> %T213.ie399, i8 %T213.ld_element, i64 11, !tcg.op !216
+  %T213.ie401 = insertelement <16 x i8> %T213.ie400, i8 %T213.ld_element, i64 12, !tcg.op !216
+  %T213.ie402 = insertelement <16 x i8> %T213.ie401, i8 %T213.ld_element, i64 13, !tcg.op !216
+  %T213.ie403 = insertelement <16 x i8> %T213.ie402, i8 %T213.ld_element, i64 14, !tcg.op !216
+  %T213.ie404 = insertelement <16 x i8> %T213.ie403, i8 %T213.ld_element, i64 15, !tcg.op !216
+  store <16 x i8> %T213.ie404, ptr %tmp9.stack, align 16, !tbaa !0, !tcg.op !216
 ; ======== TCG [214] dup_vec v128,e64,[t9],t2 ========
   %T214.ld_element = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !217
   %T214.ie = insertelement <2 x i64> zeroinitializer, i64 %T214.ld_element, i64 0, !tcg.op !217
-  %T214.ie261 = insertelement <2 x i64> %T214.ie, i64 %T214.ld_element, i64 1, !tcg.op !217
-  store <2 x i64> %T214.ie261, ptr %tmp9.stack, align 16, !tbaa !0, !tcg.op !217
+  %T214.ie405 = insertelement <2 x i64> %T214.ie, i64 %T214.ld_element, i64 1, !tcg.op !217
+  store <2 x i64> %T214.ie405, ptr %tmp9.stack, align 16, !tbaa !0, !tcg.op !217
 ; ======== TCG [215] divs2_i32 [t2],[t0],t2,t0,t1 ========
   %T215.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !218
   %T215.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !218
@@ -1777,9 +1897,9 @@ divs2.done:                                       ; preds = %divs2.trap, %divs2.
   %T216.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !219
   %T216.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !219
   %T216.d_is0 = icmp eq i64 %T216.tmp1, 0, !tcg.op !219
-  br i1 %T216.d_is0, label %divs2.trap264, label %divs2.chk262, !tcg.op !219
+  br i1 %T216.d_is0, label %divs2.trap408, label %divs2.chk406, !tcg.op !219
 
-divs2.chk262:                                     ; preds = %divs2.done
+divs2.chk406:                                     ; preds = %divs2.done
   %T216.nh_double = sext i64 %T216.tmp0 to i128, !tcg.op !219
   %T216.num_hi = shl i128 %T216.nh_double, 64, !tcg.op !219
   %T216.nl_double = zext i64 %T216.tmp2 to i128, !tcg.op !219
@@ -1787,9 +1907,9 @@ divs2.chk262:                                     ; preds = %divs2.done
   %T216.num_ismin = icmp eq i128 %T216.num, -170141183460469231731687303715884105728, !tcg.op !219
   %T216.d_ism1 = icmp eq i64 %T216.tmp1, -1, !tcg.op !219
   %T216.i128_ovf = and i1 %T216.num_ismin, %T216.d_ism1, !tcg.op !219
-  br i1 %T216.i128_ovf, label %divs2.trap264, label %divs2.do263, !tcg.op !219
+  br i1 %T216.i128_ovf, label %divs2.trap408, label %divs2.do407, !tcg.op !219
 
-divs2.do263:                                      ; preds = %divs2.chk262
+divs2.do407:                                      ; preds = %divs2.chk406
   %T216.d_128 = sext i64 %T216.tmp1 to i128, !tcg.op !219
   %T216.q_128 = sdiv i128 %T216.num, %T216.d_128, !tcg.op !219
   %T216.r_128 = srem i128 %T216.num, %T216.d_128, !tcg.op !219
@@ -1797,14 +1917,14 @@ divs2.do263:                                      ; preds = %divs2.chk262
   %T216.r = trunc i128 %T216.r_128 to i64, !tcg.op !219
   %T216.q_back = sext i64 %T216.q to i128, !tcg.op !219
   %T216.q_fits = icmp eq i128 %T216.q_back, %T216.q_128, !tcg.op !219
-  br i1 %T216.q_fits, label %divs2.done265, label %divs2.trap264, !tcg.op !219
+  br i1 %T216.q_fits, label %divs2.done409, label %divs2.trap408, !tcg.op !219
 
-divs2.trap264:                                    ; preds = %divs2.do263, %divs2.chk262, %divs2.done
-  br label %divs2.done265, !tcg.op !219
+divs2.trap408:                                    ; preds = %divs2.do407, %divs2.chk406, %divs2.done
+  br label %divs2.done409, !tcg.op !219
 
-divs2.done265:                                    ; preds = %divs2.trap264, %divs2.do263
-  %T216.phi_q = phi i64 [ %T216.q, %divs2.do263 ], [ 0, %divs2.trap264 ], !tcg.op !219
-  %T216.phi_r = phi i64 [ %T216.r, %divs2.do263 ], [ 0, %divs2.trap264 ], !tcg.op !219
+divs2.done409:                                    ; preds = %divs2.trap408, %divs2.do407
+  %T216.phi_q = phi i64 [ %T216.q, %divs2.do407 ], [ 0, %divs2.trap408 ], !tcg.op !219
+  %T216.phi_r = phi i64 [ %T216.r, %divs2.do407 ], [ 0, %divs2.trap408 ], !tcg.op !219
   store i64 %T216.phi_q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !219
   store i64 %T216.phi_r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !219
 ; ======== TCG [217] divu2_i32 [t2],[t0],t2,t0,t1 ========
@@ -1812,9 +1932,9 @@ divs2.done265:                                    ; preds = %divs2.trap264, %div
   %T217.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !220
   %T217.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !220
   %T217.d_is0 = icmp eq i32 %T217.tmp1, 0, !tcg.op !220
-  br i1 %T217.d_is0, label %divs2.trap268, label %divs2.chk266, !tcg.op !220
+  br i1 %T217.d_is0, label %divs2.trap412, label %divs2.chk410, !tcg.op !220
 
-divs2.chk266:                                     ; preds = %divs2.done265
+divs2.chk410:                                     ; preds = %divs2.done409
   %T217.nh_double = sext i32 %T217.tmp0 to i64, !tcg.op !220
   %T217.num_hi = shl i64 %T217.nh_double, 32, !tcg.op !220
   %T217.nl_double = zext i32 %T217.tmp2 to i64, !tcg.op !220
@@ -1822,9 +1942,9 @@ divs2.chk266:                                     ; preds = %divs2.done265
   %T217.num_ismin = icmp eq i64 %T217.num, -9223372036854775808, !tcg.op !220
   %T217.d_ism1 = icmp eq i32 %T217.tmp1, -1, !tcg.op !220
   %T217.i128_ovf = and i1 %T217.num_ismin, %T217.d_ism1, !tcg.op !220
-  br i1 %T217.i128_ovf, label %divs2.trap268, label %divs2.do267, !tcg.op !220
+  br i1 %T217.i128_ovf, label %divs2.trap412, label %divs2.do411, !tcg.op !220
 
-divs2.do267:                                      ; preds = %divs2.chk266
+divs2.do411:                                      ; preds = %divs2.chk410
   %T217.d_128 = zext i32 %T217.tmp1 to i64, !tcg.op !220
   %T217.q_128 = udiv i64 %T217.num, %T217.d_128, !tcg.op !220
   %T217.r_128 = urem i64 %T217.num, %T217.d_128, !tcg.op !220
@@ -1832,14 +1952,14 @@ divs2.do267:                                      ; preds = %divs2.chk266
   %T217.r = trunc i64 %T217.r_128 to i32, !tcg.op !220
   %T217.q_back = zext i32 %T217.q to i64, !tcg.op !220
   %T217.q_fits = icmp eq i64 %T217.q_back, %T217.q_128, !tcg.op !220
-  br i1 %T217.q_fits, label %divs2.done269, label %divs2.trap268, !tcg.op !220
+  br i1 %T217.q_fits, label %divs2.done413, label %divs2.trap412, !tcg.op !220
 
-divs2.trap268:                                    ; preds = %divs2.do267, %divs2.chk266, %divs2.done265
-  br label %divs2.done269, !tcg.op !220
+divs2.trap412:                                    ; preds = %divs2.do411, %divs2.chk410, %divs2.done409
+  br label %divs2.done413, !tcg.op !220
 
-divs2.done269:                                    ; preds = %divs2.trap268, %divs2.do267
-  %T217.phi_q = phi i32 [ %T217.q, %divs2.do267 ], [ 0, %divs2.trap268 ], !tcg.op !220
-  %T217.phi_r = phi i32 [ %T217.r, %divs2.do267 ], [ 0, %divs2.trap268 ], !tcg.op !220
+divs2.done413:                                    ; preds = %divs2.trap412, %divs2.do411
+  %T217.phi_q = phi i32 [ %T217.q, %divs2.do411 ], [ 0, %divs2.trap412 ], !tcg.op !220
+  %T217.phi_r = phi i32 [ %T217.r, %divs2.do411 ], [ 0, %divs2.trap412 ], !tcg.op !220
   store i32 %T217.phi_q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !220
   store i32 %T217.phi_r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !220
 ; ======== TCG [218] divu2_i64 [t2],[t0],t2,t0,t1 ========
@@ -1847,9 +1967,9 @@ divs2.done269:                                    ; preds = %divs2.trap268, %div
   %T218.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !221
   %T218.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !221
   %T218.d_is0 = icmp eq i64 %T218.tmp1, 0, !tcg.op !221
-  br i1 %T218.d_is0, label %divs2.trap272, label %divs2.chk270, !tcg.op !221
+  br i1 %T218.d_is0, label %divs2.trap416, label %divs2.chk414, !tcg.op !221
 
-divs2.chk270:                                     ; preds = %divs2.done269
+divs2.chk414:                                     ; preds = %divs2.done413
   %T218.nh_double = sext i64 %T218.tmp0 to i128, !tcg.op !221
   %T218.num_hi = shl i128 %T218.nh_double, 64, !tcg.op !221
   %T218.nl_double = zext i64 %T218.tmp2 to i128, !tcg.op !221
@@ -1857,9 +1977,9 @@ divs2.chk270:                                     ; preds = %divs2.done269
   %T218.num_ismin = icmp eq i128 %T218.num, -170141183460469231731687303715884105728, !tcg.op !221
   %T218.d_ism1 = icmp eq i64 %T218.tmp1, -1, !tcg.op !221
   %T218.i128_ovf = and i1 %T218.num_ismin, %T218.d_ism1, !tcg.op !221
-  br i1 %T218.i128_ovf, label %divs2.trap272, label %divs2.do271, !tcg.op !221
+  br i1 %T218.i128_ovf, label %divs2.trap416, label %divs2.do415, !tcg.op !221
 
-divs2.do271:                                      ; preds = %divs2.chk270
+divs2.do415:                                      ; preds = %divs2.chk414
   %T218.d_128 = zext i64 %T218.tmp1 to i128, !tcg.op !221
   %T218.q_128 = udiv i128 %T218.num, %T218.d_128, !tcg.op !221
   %T218.r_128 = urem i128 %T218.num, %T218.d_128, !tcg.op !221
@@ -1867,14 +1987,14 @@ divs2.do271:                                      ; preds = %divs2.chk270
   %T218.r = trunc i128 %T218.r_128 to i64, !tcg.op !221
   %T218.q_back = zext i64 %T218.q to i128, !tcg.op !221
   %T218.q_fits = icmp eq i128 %T218.q_back, %T218.q_128, !tcg.op !221
-  br i1 %T218.q_fits, label %divs2.done273, label %divs2.trap272, !tcg.op !221
+  br i1 %T218.q_fits, label %divs2.done417, label %divs2.trap416, !tcg.op !221
 
-divs2.trap272:                                    ; preds = %divs2.do271, %divs2.chk270, %divs2.done269
-  br label %divs2.done273, !tcg.op !221
+divs2.trap416:                                    ; preds = %divs2.do415, %divs2.chk414, %divs2.done413
+  br label %divs2.done417, !tcg.op !221
 
-divs2.done273:                                    ; preds = %divs2.trap272, %divs2.do271
-  %T218.phi_q = phi i64 [ %T218.q, %divs2.do271 ], [ 0, %divs2.trap272 ], !tcg.op !221
-  %T218.phi_r = phi i64 [ %T218.r, %divs2.do271 ], [ 0, %divs2.trap272 ], !tcg.op !221
+divs2.done417:                                    ; preds = %divs2.trap416, %divs2.do415
+  %T218.phi_q = phi i64 [ %T218.q, %divs2.do415 ], [ 0, %divs2.trap416 ], !tcg.op !221
+  %T218.phi_r = phi i64 [ %T218.r, %divs2.do415 ], [ 0, %divs2.trap416 ], !tcg.op !221
   store i64 %T218.phi_q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !221
   store i64 %T218.phi_r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !221
 ; ======== TCG [219] discard rax ========

@@ -419,42 +419,22 @@ void translate_bswap(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
             swap_flag |= u->operands[i].attr_info.p.swap;
         }
     }
-    LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
-    LLVMValueRef effective_in = NULL;
-    LLVMValueRef in_bc = NULL;
-    if (total_bit_cnt != effective_bit_cnt) {
-        assert(total_bit_cnt % effective_bit_cnt == 0);
-        in_bc = LLVMBuildBitCast(builder, in, LLVMVectorType(get_llvm_type(effective_ty), (total_bit_cnt / effective_bit_cnt)), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(in), "bc"));
-        effective_in = LLVMBuildExtractElement(builder, in_bc, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(in_bc), "ee"));
-    } else {
-        effective_in = in;
-    }
-    effective_in = LLVMBuildBitCast(builder, effective_in, LLVMVectorType(get_llvm_type(LLVMInt8), (effective_bit_cnt / 8)), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(effective_in), "swap_vec"));
+    LLVMValueRef vec = LLVMBuildBitCast(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), LLVMVectorType(get_llvm_type(LLVMInt8), (total_bit_cnt / 8)), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "vec"));
     LLVMValueRef constants[16];
-    int elem_cnt = (effective_bit_cnt / 8);
+    int elem_cnt = (total_bit_cnt / 8);
     for (int i = 0; i < elem_cnt; i++) {
         constants[i] = LLVMConstInt(get_llvm_type(LLVMInt8), 0, 0);
     }
-    LLVMValueRef swap_out = LLVMConstVector(constants, elem_cnt);
-    for (int i = 0; i < effective_bit_cnt / 8; ++i) {
-        LLVMValueRef elem = LLVMBuildExtractElement(builder, effective_in, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(effective_in), "ee"));
-        swap_out = LLVMBuildInsertElement(builder, swap_out, elem, LLVMConstInt(get_llvm_type(LLVMInt64), ((effective_bit_cnt / 8) - 1 - i), 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "swap_out", "ie"));
+    LLVMValueRef vec_swap = LLVMConstVector(constants, elem_cnt);
+    for (int i = 0; i < total_bit_cnt / 8; ++i) {
+        LLVMValueRef elem = LLVMBuildExtractElement(builder, vec, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(vec), "ee"));
+        vec_swap = LLVMBuildInsertElement(builder, vec_swap, elem, LLVMConstInt(get_llvm_type(LLVMInt64), ((total_bit_cnt / 8) - 1 - i), 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "vec_swap", "ie"));
     }
-    swap_out = LLVMBuildBitCast(builder, swap_out, get_llvm_type(effective_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "swap_out"));
-    if (tcg_ty == effective_ty) {
-        do_store(&u->operands[0], swap_out, stack, prefix, false);
-        return;
-    }
-    LLVMValueRef out = NULL;
-    if (swap_flag == 0 || (((swap_flag & OZ) && (swap_flag & IZ)) ||
-                          !((swap_flag & OS) || (swap_flag & OZ)))) {
-        out = LLVMBuildInsertElement(builder, in_bc, swap_out, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    LLVMValueRef out = LLVMBuildBitCast(builder, vec_swap, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "swap_out"));
+    if (swap_flag & OS) {
+        out = LLVMBuildAShr(builder, out, LLVMConstInt(get_llvm_type(tcg_ty), (total_bit_cnt - effective_bit_cnt), 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
     } else {
-        if (swap_flag & OS) {
-            out = LLVMBuildSExt(builder, swap_out, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
-        } else if (swap_flag & OZ) {
-            out = LLVMBuildZExt(builder, swap_out, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
-        }
+        out = LLVMBuildLShr(builder, out, LLVMConstInt(get_llvm_type(tcg_ty), (total_bit_cnt - effective_bit_cnt), 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
     }
     do_store(&u->operands[0], out, stack, prefix, false);
     return;
