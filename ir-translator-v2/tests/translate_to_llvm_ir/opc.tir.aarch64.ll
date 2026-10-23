@@ -60,25 +60,19 @@ entry:
 ; ======== TCG [4] addci_i32 [t2],t0,t1 ========
   %T4.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !7
   %T4.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !7
-  %T4.r1 = call { i32, i1 } @llvm.uadd.with.overflow.i32.i32(i32 %T4.tmp0, i32 %T4.tmp1), !tcg.op !7
-  %T4.s1 = extractvalue { i32, i1 } %T4.r1, 0, !tcg.op !7
-  %T4.c1 = extractvalue { i32, i1 } %T4.r1, 1, !tcg.op !7
+  %T4.add = add i32 %T4.tmp0, %T4.tmp1, !tcg.op !7
   %T4.ci = load i1, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !7
-  %T4.ze_ci = zext i1 %T4.ci to i32, !tcg.op !7
-  %T4.r2 = call { i32, i1 } @llvm.uadd.with.overflow.i32.i32(i32 %T4.s1, i32 %T4.ze_ci), !tcg.op !7
-  %T4.s2 = extractvalue { i32, i1 } %T4.r2, 0, !tcg.op !7
-  store i32 %T4.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !7
+  %T4.ci_zext = zext i1 %T4.ci to i32, !tcg.op !7
+  %T4.addc = add i32 %T4.add, %T4.ci_zext, !tcg.op !7
+  store i32 %T4.addc, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !7
 ; ======== TCG [5] addci_i64 [t2],t0,t1 ========
   %T5.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !8
   %T5.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !8
-  %T5.r1 = call { i64, i1 } @llvm.uadd.with.overflow.i64.i64(i64 %T5.tmp0, i64 %T5.tmp1), !tcg.op !8
-  %T5.s1 = extractvalue { i64, i1 } %T5.r1, 0, !tcg.op !8
-  %T5.c1 = extractvalue { i64, i1 } %T5.r1, 1, !tcg.op !8
+  %T5.add = add i64 %T5.tmp0, %T5.tmp1, !tcg.op !8
   %T5.ci = load i1, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !8
-  %T5.ze_ci = zext i1 %T5.ci to i64, !tcg.op !8
-  %T5.r2 = call { i64, i1 } @llvm.uadd.with.overflow.i64.i64(i64 %T5.s1, i64 %T5.ze_ci), !tcg.op !8
-  %T5.s2 = extractvalue { i64, i1 } %T5.r2, 0, !tcg.op !8
-  store i64 %T5.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !8
+  %T5.ci_zext = zext i1 %T5.ci to i64, !tcg.op !8
+  %T5.addc = add i64 %T5.add, %T5.ci_zext, !tcg.op !8
+  store i64 %T5.addc, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !8
 ; ======== TCG [6] addcio_i32 [t2],t0,t1 ========
   %T6.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !9
   %T6.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !9
@@ -86,13 +80,12 @@ entry:
   %T6.s1 = extractvalue { i32, i1 } %T6.r1, 0, !tcg.op !9
   %T6.c1 = extractvalue { i32, i1 } %T6.r1, 1, !tcg.op !9
   %T6.ci = load i1, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !9
-  %T6.ze_ci = zext i1 %T6.ci to i32, !tcg.op !9
-  %T6.r2 = call { i32, i1 } @llvm.uadd.with.overflow.i32.i32(i32 %T6.s1, i32 %T6.ze_ci), !tcg.op !9
-  %T6.s2 = extractvalue { i32, i1 } %T6.r2, 0, !tcg.op !9
-  store i32 %T6.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !9
-  %T6.c2 = extractvalue { i32, i1 } %T6.r2, 1, !tcg.op !9
-  %T6.co = or i1 %T6.c1, %T6.c2, !tcg.op !9
-  store i1 %T6.co, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !9
+  %T6.ci_zext = zext i1 %T6.ci to i32, !tcg.op !9
+  %T6.addc = add i32 %T6.s1, %T6.ci_zext, !tcg.op !9
+  store i32 %T6.addc, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !9
+  %T6.wrap = icmp ult i32 %T6.addc, %T6.ci_zext, !tcg.op !9
+  %T6.cout = or i1 %T6.c1, %T6.wrap, !tcg.op !9
+  store i1 %T6.cout, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !9
 ; ======== TCG [7] addcio_i64 [t2],t0,t1 ========
   %T7.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !10
   %T7.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !10
@@ -100,13 +93,12 @@ entry:
   %T7.s1 = extractvalue { i64, i1 } %T7.r1, 0, !tcg.op !10
   %T7.c1 = extractvalue { i64, i1 } %T7.r1, 1, !tcg.op !10
   %T7.ci = load i1, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !10
-  %T7.ze_ci = zext i1 %T7.ci to i64, !tcg.op !10
-  %T7.r2 = call { i64, i1 } @llvm.uadd.with.overflow.i64.i64(i64 %T7.s1, i64 %T7.ze_ci), !tcg.op !10
-  %T7.s2 = extractvalue { i64, i1 } %T7.r2, 0, !tcg.op !10
-  store i64 %T7.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !10
-  %T7.c2 = extractvalue { i64, i1 } %T7.r2, 1, !tcg.op !10
-  %T7.co = or i1 %T7.c1, %T7.c2, !tcg.op !10
-  store i1 %T7.co, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !10
+  %T7.ci_zext = zext i1 %T7.ci to i64, !tcg.op !10
+  %T7.addc = add i64 %T7.s1, %T7.ci_zext, !tcg.op !10
+  store i64 %T7.addc, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !10
+  %T7.wrap = icmp ult i64 %T7.addc, %T7.ci_zext, !tcg.op !10
+  %T7.cout = or i1 %T7.c1, %T7.wrap, !tcg.op !10
+  store i1 %T7.cout, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !10
 ; ======== TCG [8] subbo_i32 [t2],t0,t1 ========
   %T8.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !11
   %T8.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !11
@@ -126,25 +118,19 @@ entry:
 ; ======== TCG [10] subbi_i32 [t2],t0,t1 ========
   %T10.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !13
   %T10.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !13
-  %T10.r1 = call { i32, i1 } @llvm.usub.with.overflow.i32.i32(i32 %T10.tmp0, i32 %T10.tmp1), !tcg.op !13
-  %T10.s1 = extractvalue { i32, i1 } %T10.r1, 0, !tcg.op !13
-  %T10.c1 = extractvalue { i32, i1 } %T10.r1, 1, !tcg.op !13
-  %T10.ci = load i1, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !13
-  %T10.ze_ci = zext i1 %T10.ci to i32, !tcg.op !13
-  %T10.r2 = call { i32, i1 } @llvm.usub.with.overflow.i32.i32(i32 %T10.s1, i32 %T10.ze_ci), !tcg.op !13
-  %T10.s2 = extractvalue { i32, i1 } %T10.r2, 0, !tcg.op !13
-  store i32 %T10.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !13
+  %T10.sub = sub i32 %T10.tmp0, %T10.tmp1, !tcg.op !13
+  %T10.bi = load i1, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !13
+  %T10.bi_zext = zext i1 %T10.bi to i32, !tcg.op !13
+  %T10.subb = sub i32 %T10.sub, %T10.bi_zext, !tcg.op !13
+  store i32 %T10.subb, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !13
 ; ======== TCG [11] subbi_i64 [t2],t0,t1 ========
   %T11.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !14
   %T11.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !14
-  %T11.r1 = call { i64, i1 } @llvm.usub.with.overflow.i64.i64(i64 %T11.tmp0, i64 %T11.tmp1), !tcg.op !14
-  %T11.s1 = extractvalue { i64, i1 } %T11.r1, 0, !tcg.op !14
-  %T11.c1 = extractvalue { i64, i1 } %T11.r1, 1, !tcg.op !14
-  %T11.ci = load i1, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !14
-  %T11.ze_ci = zext i1 %T11.ci to i64, !tcg.op !14
-  %T11.r2 = call { i64, i1 } @llvm.usub.with.overflow.i64.i64(i64 %T11.s1, i64 %T11.ze_ci), !tcg.op !14
-  %T11.s2 = extractvalue { i64, i1 } %T11.r2, 0, !tcg.op !14
-  store i64 %T11.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !14
+  %T11.sub = sub i64 %T11.tmp0, %T11.tmp1, !tcg.op !14
+  %T11.bi = load i1, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !14
+  %T11.bi_zext = zext i1 %T11.bi to i64, !tcg.op !14
+  %T11.subb = sub i64 %T11.sub, %T11.bi_zext, !tcg.op !14
+  store i64 %T11.subb, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !14
 ; ======== TCG [12] subbio_i32 [t2],t0,t1 ========
   %T12.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !15
   %T12.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !15
@@ -152,13 +138,12 @@ entry:
   %T12.s1 = extractvalue { i32, i1 } %T12.r1, 0, !tcg.op !15
   %T12.c1 = extractvalue { i32, i1 } %T12.r1, 1, !tcg.op !15
   %T12.ci = load i1, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !15
-  %T12.ze_ci = zext i1 %T12.ci to i32, !tcg.op !15
-  %T12.r2 = call { i32, i1 } @llvm.usub.with.overflow.i32.i32(i32 %T12.s1, i32 %T12.ze_ci), !tcg.op !15
-  %T12.s2 = extractvalue { i32, i1 } %T12.r2, 0, !tcg.op !15
-  store i32 %T12.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !15
-  %T12.c2 = extractvalue { i32, i1 } %T12.r2, 1, !tcg.op !15
-  %T12.co = or i1 %T12.c1, %T12.c2, !tcg.op !15
-  store i1 %T12.co, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !15
+  %T12.bi_zext = zext i1 %T12.ci to i32, !tcg.op !15
+  %T12.subb = sub i32 %T12.s1, %T12.bi_zext, !tcg.op !15
+  store i32 %T12.subb, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !15
+  %T12.wrap = icmp ult i32 %T12.s1, %T12.bi_zext, !tcg.op !15
+  %T12.bout = or i1 %T12.c1, %T12.wrap, !tcg.op !15
+  store i1 %T12.bout, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !15
 ; ======== TCG [13] subbio_i64 [t2],t0,t1 ========
   %T13.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !16
   %T13.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !16
@@ -166,61 +151,56 @@ entry:
   %T13.s1 = extractvalue { i64, i1 } %T13.r1, 0, !tcg.op !16
   %T13.c1 = extractvalue { i64, i1 } %T13.r1, 1, !tcg.op !16
   %T13.ci = load i1, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !16
-  %T13.ze_ci = zext i1 %T13.ci to i64, !tcg.op !16
-  %T13.r2 = call { i64, i1 } @llvm.usub.with.overflow.i64.i64(i64 %T13.s1, i64 %T13.ze_ci), !tcg.op !16
-  %T13.s2 = extractvalue { i64, i1 } %T13.r2, 0, !tcg.op !16
-  store i64 %T13.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !16
-  %T13.c2 = extractvalue { i64, i1 } %T13.r2, 1, !tcg.op !16
-  %T13.co = or i1 %T13.c1, %T13.c2, !tcg.op !16
-  store i1 %T13.co, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !16
+  %T13.bi_zext = zext i1 %T13.ci to i64, !tcg.op !16
+  %T13.subb = sub i64 %T13.s1, %T13.bi_zext, !tcg.op !16
+  store i64 %T13.subb, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !16
+  %T13.wrap = icmp ult i64 %T13.s1, %T13.bi_zext, !tcg.op !16
+  %T13.bout = or i1 %T13.c1, %T13.wrap, !tcg.op !16
+  store i1 %T13.bout, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !16
 ; ======== TCG [14] addc1o_i32 t2,t0,t1 ========
   %T14.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !17
   %T14.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !17
   %T14.r1 = call { i32, i1 } @llvm.uadd.with.overflow.i32.i32(i32 %T14.tmp0, i32 %T14.tmp1), !tcg.op !17
   %T14.s1 = extractvalue { i32, i1 } %T14.r1, 0, !tcg.op !17
   %T14.c1 = extractvalue { i32, i1 } %T14.r1, 1, !tcg.op !17
-  %T14.r2 = call { i32, i1 } @llvm.uadd.with.overflow.i32.i32(i32 %T14.s1, i32 1), !tcg.op !17
-  %T14.s2 = extractvalue { i32, i1 } %T14.r2, 0, !tcg.op !17
-  store i32 %T14.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !17
-  %T14.c2 = extractvalue { i32, i1 } %T14.r2, 1, !tcg.op !17
-  %T14.co = or i1 %T14.c1, %T14.c2, !tcg.op !17
-  store i1 %T14.co, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !17
+  %T14.addc = add i32 %T14.s1, 1, !tcg.op !17
+  store i32 %T14.addc, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !17
+  %T14.wrap = icmp ult i32 %T14.addc, 1, !tcg.op !17
+  %T14.cout = or i1 %T14.c1, %T14.wrap, !tcg.op !17
+  store i1 %T14.cout, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !17
 ; ======== TCG [15] addc1o_i64 t2,t0,t1 ========
   %T15.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !18
   %T15.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !18
   %T15.r1 = call { i64, i1 } @llvm.uadd.with.overflow.i64.i64(i64 %T15.tmp0, i64 %T15.tmp1), !tcg.op !18
   %T15.s1 = extractvalue { i64, i1 } %T15.r1, 0, !tcg.op !18
   %T15.c1 = extractvalue { i64, i1 } %T15.r1, 1, !tcg.op !18
-  %T15.r2 = call { i64, i1 } @llvm.uadd.with.overflow.i64.i64(i64 %T15.s1, i64 1), !tcg.op !18
-  %T15.s2 = extractvalue { i64, i1 } %T15.r2, 0, !tcg.op !18
-  store i64 %T15.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !18
-  %T15.c2 = extractvalue { i64, i1 } %T15.r2, 1, !tcg.op !18
-  %T15.co = or i1 %T15.c1, %T15.c2, !tcg.op !18
-  store i1 %T15.co, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !18
+  %T15.addc = add i64 %T15.s1, 1, !tcg.op !18
+  store i64 %T15.addc, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !18
+  %T15.wrap = icmp ult i64 %T15.addc, 1, !tcg.op !18
+  %T15.cout = or i1 %T15.c1, %T15.wrap, !tcg.op !18
+  store i1 %T15.cout, ptr %carry.stack, align 8, !tbaa !0, !tcg.op !18
 ; ======== TCG [16] subb1o_i32 t2,t0,t1 ========
   %T16.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !19
   %T16.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !19
   %T16.r1 = call { i32, i1 } @llvm.usub.with.overflow.i32.i32(i32 %T16.tmp0, i32 %T16.tmp1), !tcg.op !19
   %T16.s1 = extractvalue { i32, i1 } %T16.r1, 0, !tcg.op !19
   %T16.c1 = extractvalue { i32, i1 } %T16.r1, 1, !tcg.op !19
-  %T16.r2 = call { i32, i1 } @llvm.usub.with.overflow.i32.i32(i32 %T16.s1, i32 1), !tcg.op !19
-  %T16.s2 = extractvalue { i32, i1 } %T16.r2, 0, !tcg.op !19
-  store i32 %T16.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !19
-  %T16.c2 = extractvalue { i32, i1 } %T16.r2, 1, !tcg.op !19
-  %T16.co = or i1 %T16.c1, %T16.c2, !tcg.op !19
-  store i1 %T16.co, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !19
+  %T16.subb = sub i32 %T16.s1, 1, !tcg.op !19
+  store i32 %T16.subb, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !19
+  %T16.wrap = icmp ult i32 %T16.s1, 1, !tcg.op !19
+  %T16.bout = or i1 %T16.c1, %T16.wrap, !tcg.op !19
+  store i1 %T16.bout, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !19
 ; ======== TCG [17] subb1o_i64 t2,t0,t1 ========
   %T17.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !20
   %T17.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !20
   %T17.r1 = call { i64, i1 } @llvm.usub.with.overflow.i64.i64(i64 %T17.tmp0, i64 %T17.tmp1), !tcg.op !20
   %T17.s1 = extractvalue { i64, i1 } %T17.r1, 0, !tcg.op !20
   %T17.c1 = extractvalue { i64, i1 } %T17.r1, 1, !tcg.op !20
-  %T17.r2 = call { i64, i1 } @llvm.usub.with.overflow.i64.i64(i64 %T17.s1, i64 1), !tcg.op !20
-  %T17.s2 = extractvalue { i64, i1 } %T17.r2, 0, !tcg.op !20
-  store i64 %T17.s2, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !20
-  %T17.c2 = extractvalue { i64, i1 } %T17.r2, 1, !tcg.op !20
-  %T17.co = or i1 %T17.c1, %T17.c2, !tcg.op !20
-  store i1 %T17.co, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !20
+  %T17.subb = sub i64 %T17.s1, 1, !tcg.op !20
+  store i64 %T17.subb, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !20
+  %T17.wrap = icmp ult i64 %T17.s1, 1, !tcg.op !20
+  %T17.bout = or i1 %T17.c1, %T17.wrap, !tcg.op !20
+  store i1 %T17.bout, ptr %borrow.stack, align 8, !tbaa !0, !tcg.op !20
 ; ======== TCG [18] add_i32 [t2],t0,t1 ========
   %T18.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !21
   %T18.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !21

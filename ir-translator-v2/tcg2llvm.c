@@ -42,12 +42,9 @@ void translate_mov(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInst
     do_store(&u->operands[0], in, stack, prefix, false);
 }
 
-void translate_addc_subb(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+void translate_addco_subbo(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     char var_name[32] = {0};
-    bool is_add = (u->opc == addci_i32 || u->opc == addci_i64 ||
-                  u->opc == addco_i32 || u->opc == addco_i64 ||
-                  u->opc == addcio_i32 || u->opc == addcio_i64 ||
-                  u->opc == addc1o_i32 || u->opc == addc1o_i64);
+    bool is_add = (u->opc == addco_i32 || u->opc == addco_i64);
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
     LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
     LLVMTypeRef intrinsic_types[] = {llvm_ty, llvm_ty};
@@ -64,27 +61,51 @@ void translate_addc_subb(LLVMBuilderRef builder, StackAlloca *stack, const Unifi
     LLVMValueRef call1 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call1_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r1"));
     LLVMValueRef s1 = LLVMBuildExtractValue(builder, call1, 0, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "s1"));
     LLVMValueRef c1 = LLVMBuildExtractValue(builder, call1, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "c1"));
-    if (u->opc == addco_i32 || u->opc == addco_i64 ||
-        u->opc == subbo_i32 || u->opc == subbo_i64) {
-        do_store(&u->operands[0], s1, stack, prefix, false);
-        build_store_with_alignment(builder, c1, is_add ? stack->carry : stack->borrow, 8, SPILL_TAG);
-        return;
-    }
+    do_store(&u->operands[0], s1, stack, prefix, false);
+    build_store_with_alignment(builder, c1, is_add ? stack->carry : stack->borrow, 8, SPILL_TAG);
+}
+
+void translate_addci_subbi(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    bool is_add = (u->opc == addci_i32 || u->opc == addci_i64);
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    LLVMValueRef sum = is_add ? LLVMBuildAdd(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "add")) : LLVMBuildSub(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "sub"));
+    LLVMValueRef cin = LLVMBuildZExt(builder, build_load_with_alignment(builder, LLVMInt1Type(), is_add ? stack->carry : stack->borrow, assemble_name_2(&var_name[0], sizeof(var_name), prefix, is_add ? "ci" : "bi"), 8, SPILL_TAG), get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, is_add ? "ci_zext" : "bi_zext"));
+    sum = is_add ? LLVMBuildAdd(builder, sum, cin, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "addc")) : LLVMBuildSub(builder, sum, cin, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "subb"));
+    do_store(&u->operands[0], sum, stack, prefix, false);
+}
+
+void translate_addcio_subbio(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
+    char var_name[32] = {0};
+    bool is_add = (u->opc == addcio_i32 || u->opc == addcio_i64 ||
+                   u->opc == addc1o_i32 || u->opc == addc1o_i64);
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
+    LLVMTypeRef intrinsic_types[] = {llvm_ty, llvm_ty};
+    char intrinsic_func[128] = {0};
+    sprintf(intrinsic_func, "llvm.%s.with.overflow.i%d", is_add ? "uadd" : "usub", llvm_vector_elem_bit_counts[tcg_ty * 2 + 1]);
+    LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func, intrinsic_types, 2);
+    LLVMTypeRef ret_args[] = {llvm_ty, LLVMInt1Type()};
+    LLVMTypeRef ret_type = LLVMStructType(ret_args, 2, false);
+    LLVMTypeRef fn_type  = LLVMFunctionType(ret_type, intrinsic_types, 2, false);
+
+    LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    LLVMValueRef intrinsic_call1_args[] = {in1, in2};
+    LLVMValueRef call1 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call1_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r1"));
+    LLVMValueRef s1 = LLVMBuildExtractValue(builder, call1, 0, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "s1"));
+    LLVMValueRef c1 = LLVMBuildExtractValue(builder, call1, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "c1"));
     LLVMValueRef ci = (u->opc == addc1o_i32 || u->opc == addc1o_i64 ||
                       u->opc == subb1o_i32 || u->opc == subb1o_i64) ?
                     LLVMConstInt(LLVMInt1Type(), 1, 0) :
                     build_load_with_alignment(builder, LLVMInt1Type(), is_add ? stack->carry : stack->borrow, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ci"), 8, SPILL_TAG);
-    LLVMValueRef ci_ext = LLVMBuildZExt(builder, ci, llvm_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ze_ci"));
-    LLVMValueRef intrinsic_call2_args[] = {s1, ci_ext};
-    LLVMValueRef call2 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call2_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r2"));
-    LLVMValueRef s2 = LLVMBuildExtractValue(builder, call2, 0, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "s2"));
-    do_store(&u->operands[0], s2, stack, prefix, false);
-    if (u->opc == addci_i32 || u->opc == addci_i64 ||
-        u->opc == subbi_i32 || u->opc == subbi_i64) {
-        return;
-    }
-    LLVMValueRef c2 = LLVMBuildExtractValue(builder, call2, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "c2"));
-    LLVMValueRef co = LLVMBuildOr(builder, c1, c2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "co"));
+    LLVMValueRef ci_ext = LLVMBuildZExt(builder, ci, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, is_add ? "ci_zext" : "bi_zext"));
+    LLVMValueRef out = is_add ? LLVMBuildAdd(builder, s1, ci_ext, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "addc")) : LLVMBuildSub(builder, s1, ci_ext, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "subb"));
+    do_store(&u->operands[0], out, stack, prefix, false);
+    LLVMValueRef wrap = LLVMBuildICmp(builder, LLVMIntULT, is_add ? out : s1, ci_ext, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "wrap"));
+    LLVMValueRef co = LLVMBuildOr(builder, c1, wrap, assemble_name_2(&var_name[0], sizeof(var_name), prefix, is_add ? "cout" : "bout"));
     build_store_with_alignment(builder, co, is_add ? stack->carry : stack->borrow, 8, SPILL_TAG);
 }
 
@@ -1232,22 +1253,22 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
         print_instr(u, &b);
         tcg_tag_begin(&tag, idx, "%s", &dump_instr_buf[0]);
         switch (u->opc) {
-            CASE(addci_i32, translate_addc_subb);
-            CASE(addci_i64, translate_addc_subb);
-            CASE(addco_i32, translate_addc_subb);
-            CASE(addco_i64, translate_addc_subb);
-            CASE(addcio_i32, translate_addc_subb);
-            CASE(addcio_i64, translate_addc_subb);
-            CASE(subbi_i32, translate_addc_subb);
-            CASE(subbi_i64, translate_addc_subb);
-            CASE(subbo_i32, translate_addc_subb);
-            CASE(subbo_i64, translate_addc_subb);
-            CASE(subbio_i32, translate_addc_subb);
-            CASE(subbio_i64, translate_addc_subb);
-            CASE(addc1o_i32, translate_addc_subb);
-            CASE(addc1o_i64, translate_addc_subb);
-            CASE(subb1o_i32, translate_addc_subb);
-            CASE(subb1o_i64, translate_addc_subb);
+            CASE(addco_i32, translate_addco_subbo);
+            CASE(addco_i64, translate_addco_subbo);
+            CASE(addci_i32, translate_addci_subbi);
+            CASE(addci_i64, translate_addci_subbi);
+            CASE(addcio_i32, translate_addcio_subbio);
+            CASE(addcio_i64, translate_addcio_subbio);
+            CASE(subbo_i32, translate_addco_subbo);
+            CASE(subbo_i64, translate_addco_subbo);
+            CASE(subbi_i32, translate_addci_subbi);
+            CASE(subbi_i64, translate_addci_subbi);
+            CASE(subbio_i32, translate_addcio_subbio);
+            CASE(subbio_i64, translate_addcio_subbio);
+            CASE(addc1o_i32, translate_addcio_subbio);
+            CASE(addc1o_i64, translate_addcio_subbio);
+            CASE(subb1o_i32, translate_addcio_subbio);
+            CASE(subb1o_i64, translate_addcio_subbio);
             CASE_COMMON(add_i32, LLVMBuildAdd);
             CASE_COMMON(add_i64, LLVMBuildAdd);
             CASE_COMMON(add_vec, LLVMBuildAdd);
