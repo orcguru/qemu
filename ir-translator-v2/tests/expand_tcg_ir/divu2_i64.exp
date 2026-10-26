@@ -4,7 +4,7 @@ mov_i64 [t0],rax
 mov_i64 [t1],rbx
 mov_i64 [t2],rcx
 brcond_i64 t2,0x0,eq,L0
-divu2_i64 [t3],[t4],t0,t1,t2
+divu2_i64 [t3],[t4],t0,t1,t2,L0
 mov_i64 [rax],t3
 mov_i64 [rbx],t4
 func_addr t5,0xaa55,0x0

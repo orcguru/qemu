@@ -10,7 +10,7 @@ setcond_i64 [t7],t0,0x0,eq
 and_i64 [t6],t6,t7
 and_i64 [t5],t5,t6
 brcond_i64 t5,0x1,eq,L0
-divs2_i64 [t3],[t4],t0,t1,t2
+divs2_i64 [t3],[t4],t0,t1,t2,L0
 mov_i64 [rax],t3
 mov_i64 [rbx],t4
 func_addr t8,0xaa55,0x0

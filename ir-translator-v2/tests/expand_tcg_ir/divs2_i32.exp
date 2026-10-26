@@ -10,7 +10,7 @@ setcond_i32 [t10],t0,0x0,eq
 and_i32 [t9],t9,t10
 and_i32 [t8],t8,t9
 brcond_i32 t8,0x1,eq,L1
-divs2_i32 [t3],[t4],t0,t1,t2
+divs2_i32 [t3],[t4],t0,t1,t2,L1
 mov_i32 [rax],t3
 mov_i32 [rbx],t4
 ld_i64 [t5],env:0xfffffffffffffff8

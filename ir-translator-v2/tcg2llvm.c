@@ -592,72 +592,6 @@ void translate_setcond(LLVMBuilderRef builder, StackAlloca *stack, const Unified
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
-void translate_div2(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, LLVM_EXT_API ext_api, LLVM_BIN_API div_api, LLVM_BIN_API rem_api) {
-    char var_name[32] = {0};
-    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
-    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
-    LLVMTypeRef llvm_double_ty = (tcg_ty == LLVMInt64) ? LLVMInt128Type() : LLVMInt64Type();
-
-    LLVMValueRef nl = get_input_val_for_operand(&u->operands[2], stack, prefix);
-    LLVMValueRef nh = get_input_val_for_operand(&u->operands[3], stack, prefix);
-    LLVMValueRef d = get_input_val_for_operand(&u->operands[4], stack, prefix);
-
-    LLVMBasicBlockRef bb_chk  = LLVMAppendBasicBlock(F, "divs2.chk");
-    LLVMBasicBlockRef bb_do   = LLVMAppendBasicBlock(F, "divs2.do");
-    LLVMBasicBlockRef bb_trap = LLVMAppendBasicBlock(F, "divs2.trap");
-    LLVMBasicBlockRef bb_done = LLVMAppendBasicBlock(F, "divs2.done");
-
-    /* ---- guard 1: divide by zero ---- */
-    LLVMValueRef is0 = LLVMBuildICmp(builder, LLVMIntEQ, d,
-                                     LLVMConstInt(get_llvm_type(tcg_ty), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "d_is0"));
-    LLVMBuildCondBr(builder, is0, bb_trap, bb_chk);
-
-    LLVMPositionBuilderAtEnd(builder, bb_chk);
-    LLVMValueRef hi  = LLVMBuildShl(builder, LLVMBuildSExt(builder, nh, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "nh_double")),
-                                    LLVMConstInt(llvm_double_ty, total_bit_cnt, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "num_hi"));
-    LLVMValueRef num = LLVMBuildOr(builder, hi, LLVMBuildZExt(builder, nl, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "nl_double")),
-                                   assemble_name_2(&var_name[0], sizeof(var_name), prefix, "num"));
-
-    /* ---- guard 2: INT128_MIN / -1  (poison in LLVM, #DE on x86) ---- */
-    LLVMValueRef min128 = LLVMBuildShl(builder, LLVMConstInt(llvm_double_ty, 1, 0),
-                                       LLVMConstInt(llvm_double_ty, (2 * total_bit_cnt - 1), 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "int_min"));
-    LLVMValueRef ismin = LLVMBuildICmp(builder, LLVMIntEQ, num, min128, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "num_ismin"));
-    LLVMValueRef ism1  = LLVMBuildICmp(builder, LLVMIntEQ, d,
-                                       LLVMConstInt(get_llvm_type(tcg_ty), (unsigned long long)-1LL, 1),
-                                       assemble_name_2(&var_name[0], sizeof(var_name), prefix, "d_ism1"));
-    LLVMBuildCondBr(builder, LLVMBuildAnd(builder, ismin, ism1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "i128_ovf")), bb_trap, bb_do);
-
-    /* ---- the divide ---- */
-    LLVMPositionBuilderAtEnd(builder, bb_do);
-    LLVMValueRef den = ext_api(builder, d, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "d_128"));
-    LLVMValueRef q128 = div_api(builder, num, den, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q_128"));
-    LLVMValueRef r128 = rem_api(builder, num, den, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r_128"));
-    LLVMValueRef q64  = LLVMBuildTrunc(builder, q128, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q"));
-    LLVMValueRef r64  = LLVMBuildTrunc(builder, r128, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r"));
-
-    /* ---- guard 3: quotient must fit in i64 ---- */
-    LLVMValueRef fits = LLVMBuildICmp(builder, LLVMIntEQ,
-                                      ext_api(builder, q64, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q_back")),
-                                      q128, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q_fits"));
-    LLVMBuildCondBr(builder, fits, bb_done, bb_trap);
-
-    /* ---- noreturn trap: makes bb_done single-predecessor, so no phi ---- */
-    LLVMPositionBuilderAtEnd(builder, bb_trap);
-    LLVMBuildBr(builder, bb_done);
-
-    LLVMPositionBuilderAtEnd(builder, bb_done);
-
-    LLVMValueRef phi_q = LLVMBuildPhi(builder, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "phi_q"));
-    LLVMValueRef phi_r = LLVMBuildPhi(builder, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "phi_r"));
-    LLVMBasicBlockRef phi_incoming_blocks[] = {bb_do, bb_trap};
-    LLVMValueRef phi_q_incoming_values[] = {q64, LLVMConstInt(get_llvm_type(tcg_ty), 0, 0)};
-    LLVMValueRef phi_r_incoming_values[] = {r64, LLVMConstInt(get_llvm_type(tcg_ty), 0, 0)};
-    LLVMAddIncoming(phi_q, phi_q_incoming_values, phi_incoming_blocks, 2);
-    LLVMAddIncoming(phi_r, phi_r_incoming_values, phi_incoming_blocks, 2);
-    do_store(&u->operands[0], phi_q, stack, prefix, false);
-    do_store(&u->operands[1], phi_r, stack, prefix, false);
-}
-
 static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(F);
     while (bb != NULL) {
@@ -668,6 +602,45 @@ static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
         bb = LLVMGetNextBasicBlock(bb);
     }
     return NULL;
+}
+
+void translate_div2(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, LLVM_EXT_API ext_api, LLVM_BIN_API div_api, LLVM_BIN_API rem_api) {
+    char var_name[32] = {0};
+    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
+    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
+    LLVMTypeRef llvm_double_ty = (tcg_ty == LLVMInt64) ? LLVMInt128Type() : LLVMInt64Type();
+
+    LLVMValueRef nl = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    LLVMValueRef nh = get_input_val_for_operand(&u->operands[3], stack, prefix);
+    LLVMValueRef d = get_input_val_for_operand(&u->operands[4], stack, prefix);
+
+    LLVMBasicBlockRef bb_done = LLVMAppendBasicBlock(F, "divs2.done");
+
+    LLVMValueRef hi  = LLVMBuildShl(builder, LLVMBuildSExt(builder, nh, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "nh_double")),
+                                    LLVMConstInt(llvm_double_ty, total_bit_cnt, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "num_hi"));
+    LLVMValueRef num = LLVMBuildOr(builder, hi, LLVMBuildZExt(builder, nl, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "nl_double")),
+                                   assemble_name_2(&var_name[0], sizeof(var_name), prefix, "num"));
+
+    /* ---- the divide ---- */
+    LLVMValueRef den = ext_api(builder, d, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "d_128"));
+    LLVMValueRef q128 = div_api(builder, num, den, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q_128"));
+    LLVMValueRef r128 = rem_api(builder, num, den, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r_128"));
+    LLVMValueRef q64  = LLVMBuildTrunc(builder, q128, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q"));
+    LLVMValueRef r64  = LLVMBuildTrunc(builder, r128, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r"));
+
+    /* ---- guard 3: quotient must fit in i64 ---- */
+    LLVMValueRef fits = LLVMBuildICmp(builder, LLVMIntEQ,
+                                      ext_api(builder, q64, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q_back")),
+                                      q128, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q_fits"));
+    assert(u->operand_count == 6 && u->operands[5].kind == OP_LABEL);
+    char trap_name[16] = {0};
+    sprintf(trap_name, "bb_L%d", u->operands[5].label);
+    LLVMBasicBlockRef bb_trap = get_bb(F, &trap_name[0]);
+    assert(bb_trap);
+    LLVMBuildCondBr(builder, fits, bb_done, bb_trap);
+    LLVMPositionBuilderAtEnd(builder, bb_done);
+    do_store(&u->operands[0], q64, stack, prefix, false);
+    do_store(&u->operands[1], r64, stack, prefix, false);
 }
 
 void translate_set_label(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {

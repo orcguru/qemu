@@ -110,6 +110,7 @@ void expand_div(TcgContext *ctx) {
                             u->opc == divu_i32 || u->opc == divu_i64) ? u->operands[2] : u->operands[4];
         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? brcond_i32 : brcond_i64, 0, 0, division, IMM_OP(0), RELOP_OP(eq), LABEL_OP(trap_label));
 
+        // - CHECK overflow INT_MIN / -1
         if (u->opc == divs_i32 || u->opc == divs_i64 ||
             u->opc == divs2_i32 || u->opc == divs2_i64) {
             int b1 = get_next_tmp_idx(ctx);
@@ -135,9 +136,20 @@ void expand_div(TcgContext *ctx) {
             // and b1,b1,b2
             EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? and_i32 : and_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b1), SLOT_OP(SUB_SLOT_TMP, b1), SLOT_OP(SUB_SLOT_TMP, b2));
 
-            // - CHECK overflow INT_MIN / -1
             // brcond_i32/64 b1,1,eq,L<TRAP>
             EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? brcond_i32 : brcond_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b1), IMM_OP(1), RELOP_OP(eq), LABEL_OP(trap_label));
+        }
+
+        // - Add <TRAP> number for later check of result overflow
+        if (u->opc == divs2_i32 || u->opc == divs2_i64 ||
+            u->opc == divu2_i32 || u->opc == divu2_i64) {
+            Operand trap;
+            trap.kind = OP_LABEL;
+            trap.label = trap_label;
+            UnifiedInstr *u_with_trap = clone_instr_optional_operands(u, 1, trap);
+            instr_list_insert_before(&(ctx->instr_head), &(ctx->instr_tail), u, u_with_trap);
+            instr_list_remove_and_free(&(ctx->instr_head), &(ctx->instr_tail), u);
+            u = u_with_trap;
         }
         u = u->next;
     }

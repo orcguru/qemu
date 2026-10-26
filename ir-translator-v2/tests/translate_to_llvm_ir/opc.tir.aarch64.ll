@@ -379,7 +379,7 @@ bb_false:                                         ; preds = %entry
   %T50.bool = icmp eq i32 %T50.tmp10, 1, !tcg.op !53
   br i1 %T50.bool, label %bb_L0, label %bb_false1, !tcg.op !53
 
-bb_L0:                                            ; preds = %divs2.done423, %divs2.done418, %bb_false413, %divs2.done, %bb_false411, %T97.merge, %bb_false4, %bb_false3, %bb_false2, %bb_false1, %bb_false, %entry
+bb_L0:                                            ; preds = %bb_false418, %divs2.done417, %bb_false416, %divs2.done415, %bb_false414, %bb_false413, %divs2.done, %bb_false412, %bb_false411, %T97.merge, %bb_false4, %bb_false3, %bb_false2, %bb_false1, %bb_false, %entry
 ; ======== TCG [252] func_addr t21,0x0,0x1 ========
   store ptr @trampoline_helper_raise_exception, ptr %tmp21.stack, align 8, !tbaa !0, !tcg.op !54
 ; ======== TCG [253] tail_call_qemuaot t21,env,0x0 VEC_ARGS: ========
@@ -1988,24 +1988,14 @@ bb_false411:                                      ; preds = %T97.merge
   br i1 %T233.bool, label %bb_L0, label %bb_false412, !tcg.op !238
 
 bb_false412:                                      ; preds = %bb_false411
-; ======== TCG [234] divs2_i32 [t2],[t0],t2,t0,t1 ========
+; ======== TCG [234] divs2_i32 [t2],[t0],t2,t0,t1,L0 ========
   %T234.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !239
   %T234.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !239
   %T234.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !239
-  %T234.d_is0 = icmp eq i32 %T234.tmp1, 0, !tcg.op !239
-  br i1 %T234.d_is0, label %divs2.trap, label %divs2.chk, !tcg.op !239
-
-divs2.chk:                                        ; preds = %bb_false412
   %T234.nh_double = sext i32 %T234.tmp0 to i64, !tcg.op !239
   %T234.num_hi = shl i64 %T234.nh_double, 32, !tcg.op !239
   %T234.nl_double = zext i32 %T234.tmp2 to i64, !tcg.op !239
   %T234.num = or i64 %T234.num_hi, %T234.nl_double, !tcg.op !239
-  %T234.num_ismin = icmp eq i64 %T234.num, -9223372036854775808, !tcg.op !239
-  %T234.d_ism1 = icmp eq i32 %T234.tmp1, -1, !tcg.op !239
-  %T234.i128_ovf = and i1 %T234.num_ismin, %T234.d_ism1, !tcg.op !239
-  br i1 %T234.i128_ovf, label %divs2.trap, label %divs2.do, !tcg.op !239
-
-divs2.do:                                         ; preds = %divs2.chk
   %T234.d_128 = sext i32 %T234.tmp1 to i64, !tcg.op !239
   %T234.q_128 = sdiv i64 %T234.num, %T234.d_128, !tcg.op !239
   %T234.r_128 = srem i64 %T234.num, %T234.d_128, !tcg.op !239
@@ -2013,16 +2003,11 @@ divs2.do:                                         ; preds = %divs2.chk
   %T234.r = trunc i64 %T234.r_128 to i32, !tcg.op !239
   %T234.q_back = sext i32 %T234.q to i64, !tcg.op !239
   %T234.q_fits = icmp eq i64 %T234.q_back, %T234.q_128, !tcg.op !239
-  br i1 %T234.q_fits, label %divs2.done, label %divs2.trap, !tcg.op !239
+  br i1 %T234.q_fits, label %divs2.done, label %bb_L0, !tcg.op !239
 
-divs2.trap:                                       ; preds = %divs2.do, %divs2.chk, %bb_false412
-  br label %divs2.done, !tcg.op !239
-
-divs2.done:                                       ; preds = %divs2.trap, %divs2.do
-  %T234.phi_q = phi i32 [ %T234.q, %divs2.do ], [ 0, %divs2.trap ], !tcg.op !239
-  %T234.phi_r = phi i32 [ %T234.r, %divs2.do ], [ 0, %divs2.trap ], !tcg.op !239
-  store i32 %T234.phi_q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !239
-  store i32 %T234.phi_r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !239
+divs2.done:                                       ; preds = %bb_false412
+  store i32 %T234.q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !239
+  store i32 %T234.r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !239
 ; ======== TCG [235] brcond_i64 t1,0x0,eq,L0 ========
   %T235.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !240
   %T235.bool = icmp eq i64 %T235.tmp1, 0, !tcg.op !240
@@ -2060,24 +2045,14 @@ bb_false413:                                      ; preds = %divs2.done
   br i1 %T241.bool, label %bb_L0, label %bb_false414, !tcg.op !246
 
 bb_false414:                                      ; preds = %bb_false413
-; ======== TCG [242] divs2_i64 [t2],[t0],t2,t0,t1 ========
+; ======== TCG [242] divs2_i64 [t2],[t0],t2,t0,t1,L0 ========
   %T242.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !247
   %T242.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !247
   %T242.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !247
-  %T242.d_is0 = icmp eq i64 %T242.tmp1, 0, !tcg.op !247
-  br i1 %T242.d_is0, label %divs2.trap417, label %divs2.chk415, !tcg.op !247
-
-divs2.chk415:                                     ; preds = %bb_false414
   %T242.nh_double = sext i64 %T242.tmp0 to i128, !tcg.op !247
   %T242.num_hi = shl i128 %T242.nh_double, 64, !tcg.op !247
   %T242.nl_double = zext i64 %T242.tmp2 to i128, !tcg.op !247
   %T242.num = or i128 %T242.num_hi, %T242.nl_double, !tcg.op !247
-  %T242.num_ismin = icmp eq i128 %T242.num, -170141183460469231731687303715884105728, !tcg.op !247
-  %T242.d_ism1 = icmp eq i64 %T242.tmp1, -1, !tcg.op !247
-  %T242.i128_ovf = and i1 %T242.num_ismin, %T242.d_ism1, !tcg.op !247
-  br i1 %T242.i128_ovf, label %divs2.trap417, label %divs2.do416, !tcg.op !247
-
-divs2.do416:                                      ; preds = %divs2.chk415
   %T242.d_128 = sext i64 %T242.tmp1 to i128, !tcg.op !247
   %T242.q_128 = sdiv i128 %T242.num, %T242.d_128, !tcg.op !247
   %T242.r_128 = srem i128 %T242.num, %T242.d_128, !tcg.op !247
@@ -2085,40 +2060,25 @@ divs2.do416:                                      ; preds = %divs2.chk415
   %T242.r = trunc i128 %T242.r_128 to i64, !tcg.op !247
   %T242.q_back = sext i64 %T242.q to i128, !tcg.op !247
   %T242.q_fits = icmp eq i128 %T242.q_back, %T242.q_128, !tcg.op !247
-  br i1 %T242.q_fits, label %divs2.done418, label %divs2.trap417, !tcg.op !247
+  br i1 %T242.q_fits, label %divs2.done415, label %bb_L0, !tcg.op !247
 
-divs2.trap417:                                    ; preds = %divs2.do416, %divs2.chk415, %bb_false414
-  br label %divs2.done418, !tcg.op !247
-
-divs2.done418:                                    ; preds = %divs2.trap417, %divs2.do416
-  %T242.phi_q = phi i64 [ %T242.q, %divs2.do416 ], [ 0, %divs2.trap417 ], !tcg.op !247
-  %T242.phi_r = phi i64 [ %T242.r, %divs2.do416 ], [ 0, %divs2.trap417 ], !tcg.op !247
-  store i64 %T242.phi_q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !247
-  store i64 %T242.phi_r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !247
+divs2.done415:                                    ; preds = %bb_false414
+  store i64 %T242.q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !247
+  store i64 %T242.r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !247
 ; ======== TCG [243] brcond_i32 t1,0x0,eq,L0 ========
   %T243.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !248
   %T243.bool = icmp eq i32 %T243.tmp1, 0, !tcg.op !248
-  br i1 %T243.bool, label %bb_L0, label %bb_false419, !tcg.op !248
+  br i1 %T243.bool, label %bb_L0, label %bb_false416, !tcg.op !248
 
-bb_false419:                                      ; preds = %divs2.done418
-; ======== TCG [244] divu2_i32 [t2],[t0],t2,t0,t1 ========
+bb_false416:                                      ; preds = %divs2.done415
+; ======== TCG [244] divu2_i32 [t2],[t0],t2,t0,t1,L0 ========
   %T244.tmp2 = load i32, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !249
   %T244.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !249
   %T244.tmp1 = load i32, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !249
-  %T244.d_is0 = icmp eq i32 %T244.tmp1, 0, !tcg.op !249
-  br i1 %T244.d_is0, label %divs2.trap422, label %divs2.chk420, !tcg.op !249
-
-divs2.chk420:                                     ; preds = %bb_false419
   %T244.nh_double = sext i32 %T244.tmp0 to i64, !tcg.op !249
   %T244.num_hi = shl i64 %T244.nh_double, 32, !tcg.op !249
   %T244.nl_double = zext i32 %T244.tmp2 to i64, !tcg.op !249
   %T244.num = or i64 %T244.num_hi, %T244.nl_double, !tcg.op !249
-  %T244.num_ismin = icmp eq i64 %T244.num, -9223372036854775808, !tcg.op !249
-  %T244.d_ism1 = icmp eq i32 %T244.tmp1, -1, !tcg.op !249
-  %T244.i128_ovf = and i1 %T244.num_ismin, %T244.d_ism1, !tcg.op !249
-  br i1 %T244.i128_ovf, label %divs2.trap422, label %divs2.do421, !tcg.op !249
-
-divs2.do421:                                      ; preds = %divs2.chk420
   %T244.d_128 = zext i32 %T244.tmp1 to i64, !tcg.op !249
   %T244.q_128 = udiv i64 %T244.num, %T244.d_128, !tcg.op !249
   %T244.r_128 = urem i64 %T244.num, %T244.d_128, !tcg.op !249
@@ -2126,40 +2086,25 @@ divs2.do421:                                      ; preds = %divs2.chk420
   %T244.r = trunc i64 %T244.r_128 to i32, !tcg.op !249
   %T244.q_back = zext i32 %T244.q to i64, !tcg.op !249
   %T244.q_fits = icmp eq i64 %T244.q_back, %T244.q_128, !tcg.op !249
-  br i1 %T244.q_fits, label %divs2.done423, label %divs2.trap422, !tcg.op !249
+  br i1 %T244.q_fits, label %divs2.done417, label %bb_L0, !tcg.op !249
 
-divs2.trap422:                                    ; preds = %divs2.do421, %divs2.chk420, %bb_false419
-  br label %divs2.done423, !tcg.op !249
-
-divs2.done423:                                    ; preds = %divs2.trap422, %divs2.do421
-  %T244.phi_q = phi i32 [ %T244.q, %divs2.do421 ], [ 0, %divs2.trap422 ], !tcg.op !249
-  %T244.phi_r = phi i32 [ %T244.r, %divs2.do421 ], [ 0, %divs2.trap422 ], !tcg.op !249
-  store i32 %T244.phi_q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !249
-  store i32 %T244.phi_r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !249
+divs2.done417:                                    ; preds = %bb_false416
+  store i32 %T244.q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !249
+  store i32 %T244.r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !249
 ; ======== TCG [245] brcond_i64 t1,0x0,eq,L0 ========
   %T245.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !250
   %T245.bool = icmp eq i64 %T245.tmp1, 0, !tcg.op !250
-  br i1 %T245.bool, label %bb_L0, label %bb_false424, !tcg.op !250
+  br i1 %T245.bool, label %bb_L0, label %bb_false418, !tcg.op !250
 
-bb_false424:                                      ; preds = %divs2.done423
-; ======== TCG [246] divu2_i64 [t2],[t0],t2,t0,t1 ========
+bb_false418:                                      ; preds = %divs2.done417
+; ======== TCG [246] divu2_i64 [t2],[t0],t2,t0,t1,L0 ========
   %T246.tmp2 = load i64, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !251
   %T246.tmp0 = load i64, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !251
   %T246.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !251
-  %T246.d_is0 = icmp eq i64 %T246.tmp1, 0, !tcg.op !251
-  br i1 %T246.d_is0, label %divs2.trap427, label %divs2.chk425, !tcg.op !251
-
-divs2.chk425:                                     ; preds = %bb_false424
   %T246.nh_double = sext i64 %T246.tmp0 to i128, !tcg.op !251
   %T246.num_hi = shl i128 %T246.nh_double, 64, !tcg.op !251
   %T246.nl_double = zext i64 %T246.tmp2 to i128, !tcg.op !251
   %T246.num = or i128 %T246.num_hi, %T246.nl_double, !tcg.op !251
-  %T246.num_ismin = icmp eq i128 %T246.num, -170141183460469231731687303715884105728, !tcg.op !251
-  %T246.d_ism1 = icmp eq i64 %T246.tmp1, -1, !tcg.op !251
-  %T246.i128_ovf = and i1 %T246.num_ismin, %T246.d_ism1, !tcg.op !251
-  br i1 %T246.i128_ovf, label %divs2.trap427, label %divs2.do426, !tcg.op !251
-
-divs2.do426:                                      ; preds = %divs2.chk425
   %T246.d_128 = zext i64 %T246.tmp1 to i128, !tcg.op !251
   %T246.q_128 = udiv i128 %T246.num, %T246.d_128, !tcg.op !251
   %T246.r_128 = urem i128 %T246.num, %T246.d_128, !tcg.op !251
@@ -2167,16 +2112,11 @@ divs2.do426:                                      ; preds = %divs2.chk425
   %T246.r = trunc i128 %T246.r_128 to i64, !tcg.op !251
   %T246.q_back = zext i64 %T246.q to i128, !tcg.op !251
   %T246.q_fits = icmp eq i128 %T246.q_back, %T246.q_128, !tcg.op !251
-  br i1 %T246.q_fits, label %divs2.done428, label %divs2.trap427, !tcg.op !251
+  br i1 %T246.q_fits, label %divs2.done419, label %bb_L0, !tcg.op !251
 
-divs2.trap427:                                    ; preds = %divs2.do426, %divs2.chk425, %bb_false424
-  br label %divs2.done428, !tcg.op !251
-
-divs2.done428:                                    ; preds = %divs2.trap427, %divs2.do426
-  %T246.phi_q = phi i64 [ %T246.q, %divs2.do426 ], [ 0, %divs2.trap427 ], !tcg.op !251
-  %T246.phi_r = phi i64 [ %T246.r, %divs2.do426 ], [ 0, %divs2.trap427 ], !tcg.op !251
-  store i64 %T246.phi_q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !251
-  store i64 %T246.phi_r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !251
+divs2.done419:                                    ; preds = %bb_false418
+  store i64 %T246.q, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !251
+  store i64 %T246.r, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !251
 ; ======== TCG [247] discard rax ========
   store i64 poison, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !252
 ; ======== TCG [248] discard t2 ========
@@ -2730,7 +2670,7 @@ attributes #2 = { nounwind "target-features"="+neon" }
 !236 = !{!"[231] and_i32 [t15],t15,t16"}
 !237 = !{!"[232] and_i32 [t14],t14,t15"}
 !238 = !{!"[233] brcond_i32 t14,0x1,eq,L0"}
-!239 = !{!"[234] divs2_i32 [t2],[t0],t2,t0,t1"}
+!239 = !{!"[234] divs2_i32 [t2],[t0],t2,t0,t1,L0"}
 !240 = !{!"[235] brcond_i64 t1,0x0,eq,L0"}
 !241 = !{!"[236] setcond_i64 [t17],t1,0xffffffffffffffff,eq"}
 !242 = !{!"[237] setcond_i64 [t18],t0,0x8000000000000000,eq"}
@@ -2738,11 +2678,11 @@ attributes #2 = { nounwind "target-features"="+neon" }
 !244 = !{!"[239] and_i64 [t18],t18,t19"}
 !245 = !{!"[240] and_i64 [t17],t17,t18"}
 !246 = !{!"[241] brcond_i64 t17,0x1,eq,L0"}
-!247 = !{!"[242] divs2_i64 [t2],[t0],t2,t0,t1"}
+!247 = !{!"[242] divs2_i64 [t2],[t0],t2,t0,t1,L0"}
 !248 = !{!"[243] brcond_i32 t1,0x0,eq,L0"}
-!249 = !{!"[244] divu2_i32 [t2],[t0],t2,t0,t1"}
+!249 = !{!"[244] divu2_i32 [t2],[t0],t2,t0,t1,L0"}
 !250 = !{!"[245] brcond_i64 t1,0x0,eq,L0"}
-!251 = !{!"[246] divu2_i64 [t2],[t0],t2,t0,t1"}
+!251 = !{!"[246] divu2_i64 [t2],[t0],t2,t0,t1,L0"}
 !252 = !{!"[247] discard rax"}
 !253 = !{!"[248] discard t2"}
 !254 = !{!"[249] func_addr t20,0x55aa,0x0"}
