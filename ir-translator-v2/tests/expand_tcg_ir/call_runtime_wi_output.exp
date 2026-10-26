@@ -58,8 +58,6 @@ st_vec v128,e8,v24,env:0x660
 st_vec v128,e8,v25,env:0x670
 st_vec v128,e8,v26,env:0x6a0
 st_vec v128,e8,v27,env:0x6b0
-st_vec v128,e8,v28,env:0x6e0
-st_vec v128,e8,v29,env:0x6f0
 call_default helper_rdrand,[t1],arg0,arg1,arg2
 ld_i64 [rax],env
 ld_i64 [rcx],env:0x8
@@ -109,7 +107,5 @@ ld_vec v128,e8,[v24],env:0x660
 ld_vec v128,e8,[v25],env:0x670
 ld_vec v128,e8,[v26],env:0x6a0
 ld_vec v128,e8,[v27],env:0x6b0
-ld_vec v128,e8,[v28],env:0x6e0
-ld_vec v128,e8,[v29],env:0x6f0
 tail_call_qemuaot __last_arg__,t1 VEC_ARGS:
 

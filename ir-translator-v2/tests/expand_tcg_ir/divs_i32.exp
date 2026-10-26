@@ -75,8 +75,6 @@ st_vec v128,e8,v24,env:0x660
 st_vec v128,e8,v25,env:0x670
 st_vec v128,e8,v26,env:0x6a0
 st_vec v128,e8,v27,env:0x6b0
-st_vec v128,e8,v28,env:0x6e0
-st_vec v128,e8,v29,env:0x6f0
 tail_call_default helper_raise_exception,arg0,arg1
 
 FUNC:trampoline_helper_jit N2
@@ -128,7 +126,5 @@ st_vec v128,e8,v24,env:0x660
 st_vec v128,e8,v25,env:0x670
 st_vec v128,e8,v26,env:0x6a0
 st_vec v128,e8,v27,env:0x6b0
-st_vec v128,e8,v28,env:0x6e0
-st_vec v128,e8,v29,env:0x6f0
 tail_call_default helper_jit,arg0,arg1
 

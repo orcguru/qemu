@@ -499,7 +499,6 @@ const char *qemuaot_default_param_name[XREG_MAX + 2 * XMM_COUNT] = {
     "xmm11", "ymm11_h",
     "xmm12", "ymm12_h",
     "xmm13", "ymm13_h",
-    "xmm14", "ymm14_h"
 };
 
 const char *qemuaot_default_stack_alloca_name[XREG_MAX + 2 * XMM_COUNT] = {
@@ -537,7 +536,6 @@ const char *qemuaot_default_stack_alloca_name[XREG_MAX + 2 * XMM_COUNT] = {
     "v22.stack", "v23.stack",
     "v24.stack", "v25.stack",
     "v26.stack", "v27.stack",
-    "v28.stack", "v29.stack",
 };
 
 const LLVMType qemuaot_default_param_type[XREG_MAX + 2 * XMM_COUNT] = {
@@ -575,7 +573,6 @@ const LLVMType qemuaot_default_param_type[XREG_MAX + 2 * XMM_COUNT] = {
     LLVMVector2xi64, LLVMVector2xi64,
     LLVMVector2xi64, LLVMVector2xi64,
     LLVMVector2xi64, LLVMVector2xi64,
-    LLVMVector2xi64, LLVMVector2xi64
 };
 
 // Collected by qemu-runtime
