@@ -555,29 +555,35 @@ void translate_movcond(LLVMBuilderRef builder, StackAlloca *stack, const Unified
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
-static LLVMValueRef do_mulxh(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueRef in2, LLVMType tcg_ty, const char *prefix, LLVM_EXT_API llvm_api) {
+static LLVMValueRef do_mul_double(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueRef in2, LLVMType tcg_ty, const char *prefix, LLVM_EXT_API llvm_api) {
     char var_name[32] = {0};
-    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
     LLVMTypeRef llvm_double_ty = (tcg_ty == LLVMInt64) ? LLVMInt128Type() : LLVMInt64Type();
     in1 = llvm_api(builder, in1, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "double_ty"));
     in2 = llvm_api(builder, in2, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "double_ty"));
-    LLVMValueRef out = LLVMBuildMul(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "mul"));
-    out = LLVMBuildLShr(builder, out, LLVMConstInt(llvm_double_ty, total_bit_cnt, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "lshr"));
-    return LLVMBuildTrunc(builder, out, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tr"));
+    return LLVMBuildMul(builder, in1, in2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "mul"));
 }
 
 void translate_mulxh(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, LLVM_EXT_API llvm_api) {
+    char var_name[32] = {0};
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
-    LLVMValueRef out = do_mulxh(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), get_input_val_for_operand(&u->operands[2], stack, prefix), tcg_ty, prefix, llvm_api);
-    do_store(&u->operands[0], out, stack, prefix, false);
+    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
+    LLVMTypeRef llvm_double_ty = (tcg_ty == LLVMInt64) ? LLVMInt128Type() : LLVMInt64Type();
+    LLVMValueRef mul = do_mul_double(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), get_input_val_for_operand(&u->operands[2], stack, prefix), tcg_ty, prefix, llvm_api);
+    mul = LLVMBuildLShr(builder, mul, LLVMConstInt(llvm_double_ty, total_bit_cnt, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "lshr"));
+    mul = LLVMBuildTrunc(builder, mul, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tr"));
+    do_store(&u->operands[0], mul, stack, prefix, false);
 }
 
 void translate_mulx2(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, LLVM_EXT_API llvm_api) {
     char var_name[32] = {0};
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
-    LLVMValueRef high = do_mulxh(builder, get_input_val_for_operand(&u->operands[2], stack, prefix), get_input_val_for_operand(&u->operands[3], stack, prefix), tcg_ty, prefix, llvm_api);
+    int total_bit_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2 + 1];
+    LLVMTypeRef llvm_double_ty = (tcg_ty == LLVMInt64) ? LLVMInt128Type() : LLVMInt64Type();
+    LLVMValueRef mul = do_mul_double(builder, get_input_val_for_operand(&u->operands[2], stack, prefix), get_input_val_for_operand(&u->operands[3], stack, prefix), tcg_ty, prefix, llvm_api);
+    LLVMValueRef high = LLVMBuildLShr(builder, mul, LLVMConstInt(llvm_double_ty, total_bit_cnt, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "lshr"));
+    high = LLVMBuildTrunc(builder, high, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tr"));
     do_store(&u->operands[1], high, stack, prefix, false);
-    LLVMValueRef low = LLVMBuildMul(builder, get_input_val_for_operand(&u->operands[2], stack, prefix), get_input_val_for_operand(&u->operands[3], stack, prefix), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "mul_low"));
+    LLVMValueRef low = LLVMBuildTrunc(builder, mul, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "tr"));
     do_store(&u->operands[0], low, stack, prefix, false);
 }
 
