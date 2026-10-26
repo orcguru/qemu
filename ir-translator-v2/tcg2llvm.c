@@ -252,68 +252,39 @@ void translate_binary_intrinsic(LLVMBuilderRef builder, StackAlloca *stack, cons
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
-static LLVMValueRef do_rotate(LLVMBuilderRef builder, LLVMValueRef a, LLVMValueRef shift_l, LLVMValueRef shift_r, const char *prefix) {
-    char var_name[32] = {0};
-    return LLVMBuildOr(builder,
-                          LLVMBuildShl(builder, a, shift_l, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shl")),
-                          LLVMBuildLShr(builder, a, shift_r, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "lshr")),
-                          assemble_name_2(&var_name[0], sizeof(var_name), prefix, "or"));
-}
-
 void translate_rotate(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, bool left) {
     char var_name[32] = {0};
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
     bool is_vec = tcg_ty > LLVMInt64;
-    LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
     LLVMValueRef shift_amount = NULL;
-    LLVMValueRef shift_value = NULL;
     if (!is_vec) {
         shift_amount = get_input_val_for_operand(&u->operands[2], stack, prefix);
-        shift_value = shift_amount;
     } else {
         // Hack op_type for rotli/s_vec
-        if (u->operands[2].kind == OP_SLOT) {
+        if ((u->opc == rotli_vec || u->opc == rotls_vec) && u->operands[2].kind == OP_SLOT) {
             assert(u->operands[2].slot.type == SUB_SLOT_TMP);
             int tidx = u->operands[2].slot.idx;
             assert(stack->tmp.alloca[tidx]);
             LLVMValueRef elem = build_load_with_alignment(builder, get_llvm_type(OPC_VECTOR_TO_FIXED(tcg_ty)), stack->tmp.alloca[tidx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, "s"), stack->tmp.align[tidx], SPILL_TAG);
-            shift_value = elem;
             shift_amount = get_const_vector(0, tcg_ty);
             int elem_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2];
             for (int i = 0; i < elem_cnt; ++i) {
                 shift_amount = LLVMBuildInsertElement(builder, shift_amount, elem, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "shift", "ie"));
             }
+        } else if (u->opc == rotlv_vec || u->opc == rotrv_vec) {
+            shift_amount = get_input_val_for_operand(&u->operands[2], stack, prefix);
         } else {
             assert(u->operands[2].kind == OP_IMM);
             shift_amount = get_const_vector(u->operands[2].imm.val, tcg_ty);
-            shift_value = LLVMConstInt(get_llvm_type(OPC_VECTOR_TO_FIXED(tcg_ty)), u->operands[2].imm.val, 0);
         }
     }
-    int bc = llvm_vector_elem_bit_counts[2 * OPC_VECTOR_TO_FIXED(tcg_ty) + 1];
-    // Need to do compare against zero in order to avoid LLVM poison value
-    LLVMValueRef shift_value_masked = LLVMBuildAnd(builder, shift_value, LLVMConstInt(get_llvm_type(OPC_VECTOR_TO_FIXED(tcg_ty)), (bc - 1), 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shift_value_masked"));
-    LLVMValueRef bit_count = is_vec ? get_const_vector(bc, tcg_ty) : LLVMConstInt(llvm_ty, bc, 0);
-    LLVMValueRef shift_mask = is_vec ? get_const_vector((bc - 1), tcg_ty) : LLVMConstInt(llvm_ty, (bc - 1), 0);
-    LLVMValueRef shift_a = LLVMBuildAnd(builder, shift_amount, shift_mask, assemble_name_2(&var_name[0], sizeof(var_name), prefix, left ? "shift_l" : "shift_r"));
-    LLVMValueRef shift_b = LLVMBuildSub(builder, bit_count, shift_a, assemble_name_2(&var_name[0], sizeof(var_name), prefix, left ? "shift_r" : "shift_l"));
-    LLVMValueRef out = do_rotate(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), (left ? shift_a : shift_b), (left ? shift_b : shift_a), prefix);
-    LLVMValueRef bv = do_cond(builder, shift_value_masked, LLVMConstInt(get_llvm_type(OPC_VECTOR_TO_FIXED(tcg_ty)), 0, 0), eq, OPC_VECTOR_TO_FIXED(tcg_ty), prefix);
-    out = LLVMBuildSelect(builder, bv, get_input_val_for_operand(&u->operands[1], stack, prefix), out, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "avoid_poison"));
-    do_store(&u->operands[0], out, stack, prefix, false);
-}
-
-void translate_rotate_nocheck(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, bool left) {
-    char var_name[32] = {0};
-    LLVMType tcg_ty = get_operand_type(&u->operands[0]);
-    bool is_vec = tcg_ty > LLVMInt64;
     LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
-    LLVMValueRef shift_amount = get_input_val_for_operand(&u->operands[2], stack, prefix);
-    int bc = llvm_vector_elem_bit_counts[2 * OPC_VECTOR_TO_FIXED(tcg_ty) + 1];
-    LLVMValueRef bit_count = is_vec ? get_const_vector(bc, tcg_ty) : LLVMConstInt(llvm_ty, bc, 0);
-    LLVMValueRef shift_mask = is_vec ? get_const_vector((bc - 1), tcg_ty) : LLVMConstInt(llvm_ty, (bc - 1), 0);
-    LLVMValueRef shift_a = LLVMBuildAnd(builder, shift_amount, shift_mask, assemble_name_2(&var_name[0], sizeof(var_name), prefix, left ? "shift_l" : "shift_r"));
-    LLVMValueRef shift_b = LLVMBuildSub(builder, bit_count, shift_a, assemble_name_2(&var_name[0], sizeof(var_name), prefix, left ? "shift_r" : "shift_l"));
-    LLVMValueRef out = do_rotate(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), (left ? shift_a : shift_b), (left ? shift_b : shift_a), prefix);
+    LLVMTypeRef intrinsic_types[] = {llvm_ty, llvm_ty, llvm_ty};
+    LLVMValueRef fn = get_intrinsic_declaration(left ? "llvm.fshl" : "llvm.fshr", intrinsic_types, 3);
+    LLVMTypeRef fn_type  = LLVMFunctionType(llvm_ty, intrinsic_types, 3, 0);
+    LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    LLVMValueRef intrinsic_call_args[] = {in, in, shift_amount};
+    LLVMValueRef out = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call_args, 3, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
@@ -1285,10 +1256,10 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_BOOL(rotl_i64, translate_rotate, true);
             CASE_BOOL(rotli_vec, translate_rotate, true);
             CASE_BOOL(rotls_vec, translate_rotate, true);
-            CASE_BOOL(rotlv_vec, translate_rotate_nocheck, true);
+            CASE_BOOL(rotlv_vec, translate_rotate, true);
             CASE_BOOL(rotr_i32, translate_rotate, false);
             CASE_BOOL(rotr_i64, translate_rotate, false);
-            CASE_BOOL(rotrv_vec, translate_rotate_nocheck, false);
+            CASE_BOOL(rotrv_vec, translate_rotate, false);
             CASE_SHIFT(shli_vec, LLVMBuildShl);
             CASE_SHIFT(shls_vec, LLVMBuildShl);
             CASE_SHIFT(shri_vec, LLVMBuildLShr);
