@@ -103,22 +103,26 @@ void expand_div(TcgContext *ctx) {
          * Add per instruction check
          */
         bool is_32bit = (u->opc == divs_i32 || u->opc == divu_i32 ||
-                         u->opc == divs2_i32 || u->opc == divu2_i32);
+                         u->opc == divs2_i32 || u->opc == divu2_i32 ||
+                         u->opc == rems_i32 || u->opc == remu_i32);
         // - CHECK division by zero
         // brcond_i32/64 division,0,eq,L<TRAP>
         Operand division = (u->opc == divs_i32 || u->opc == divs_i64 ||
-                            u->opc == divu_i32 || u->opc == divu_i64) ? u->operands[2] : u->operands[4];
+                            u->opc == divu_i32 || u->opc == divu_i64 ||
+                            u->opc == rems_i32 || u->opc == rems_i64 ||
+                            u->opc == remu_i32 || u->opc == remu_i64) ? u->operands[2] : u->operands[4];
         EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? brcond_i32 : brcond_i64, 0, 0, division, IMM_OP(0), RELOP_OP(eq), LABEL_OP(trap_label));
 
         // - CHECK overflow INT_MIN / -1
         if (u->opc == divs_i32 || u->opc == divs_i64 ||
-            u->opc == divs2_i32 || u->opc == divs2_i64) {
+            u->opc == divs2_i32 || u->opc == divs2_i64 ||
+            u->opc == rems_i32 || u->opc == rems_i64) {
             int b1 = get_next_tmp_idx(ctx);
             int b2 = get_next_tmp_idx(ctx);
             // setcond b1,division,-1ULL,eq
             EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? setcond_i32 : setcond_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b1), division, IMM_OP(-1ULL), RELOP_OP(eq));
 
-            if (u->opc == divs_i32 || u->opc == divs_i64) {
+            if (u->opc == divs_i32 || u->opc == divs_i64 || u->opc == rems_i32 || u->opc == rems_i64) {
                 // setcond b2,numerator,(1<<(bit_count-1)),eq
                 EMIT_INSTR_BEFORE(ctx, &ctx->instr_head, &ctx->instr_tail, u, is_32bit ? setcond_i32 : setcond_i64, 0, 0, SLOT_OP(SUB_SLOT_TMP, b2), u->operands[1], IMM_OP(1ULL << (is_32bit ? 31 : 63)), RELOP_OP(eq));
             } else {

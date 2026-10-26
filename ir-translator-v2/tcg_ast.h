@@ -1247,6 +1247,10 @@ typedef enum __attribute__((packed)) {
     X(deposit_i64)       \
     X(discard)           \
     X(DIV_BEGIN)         \
+    X(rems_i32)          \
+    X(rems_i64)          \
+    X(remu_i32)          \
+    X(remu_i64)          \
     X(divs2_i32)         \
     X(divs2_i64)         \
     X(divs_i32)          \
@@ -1327,10 +1331,6 @@ typedef enum __attribute__((packed)) {
     X(qemu_st2_i128)     \
     X(qemu_st_i32)       \
     X(qemu_st_i64)       \
-    X(rems_i32)          \
-    X(rems_i64)          \
-    X(remu_i32)          \
-    X(remu_i64)          \
     X(ret)               \
     X(rotl_i32)          \
     X(rotl_i64)          \
