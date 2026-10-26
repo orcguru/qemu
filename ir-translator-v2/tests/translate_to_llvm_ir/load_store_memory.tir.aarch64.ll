@@ -310,19 +310,21 @@ entry:
 ; ======== TCG [51] qemu_ld2_i128 [t10],[t11],t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC16B,0x2 ========
   %T51.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !58
   %T51.tmp7.ptr = inttoptr i64 %T51.tmp7 to ptr, !tcg.op !58
-  %T51.ld = load <2 x i64>, ptr %T51.tmp7.ptr, align 1, !tbaa !24, !tcg.op !58
-  %T51.ld.ee = extractelement <2 x i64> %T51.ld, i64 0, !tcg.op !58
-  store i64 %T51.ld.ee, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !58
-  %T51.ld.ee2 = extractelement <2 x i64> %T51.ld, i64 1, !tcg.op !58
-  store i64 %T51.ld.ee2, ptr %tmp11.stack, align 8, !tbaa !0, !tcg.op !58
+  %T51.ld = load i64, ptr %T51.tmp7.ptr, align 1, !tbaa !24, !tcg.op !58
+  store i64 %T51.ld, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !58
+  %T51.tmp7.addr_high_val = add i64 %T51.tmp7, 8, !tcg.op !58
+  %T51.tmp7.addr_high_val.ptr = inttoptr i64 %T51.tmp7.addr_high_val to ptr, !tcg.op !58
+  %T51.ld2 = load i64, ptr %T51.tmp7.addr_high_val.ptr, align 8, !tbaa !24, !tcg.op !58
+  store i64 %T51.ld2, ptr %tmp11.stack, align 8, !tbaa !0, !tcg.op !58
 ; ======== TCG [52] qemu_ld2_i128 [t10],[t11],t7,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC16B,0x2 ========
   %T52.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !59
   %T52.tmp7.ptr = inttoptr i64 %T52.tmp7 to ptr, !tcg.op !59
-  %T52.ld = load <2 x i64>, ptr %T52.tmp7.ptr, align 16, !tbaa !24, !tcg.op !59
-  %T52.ld.ee = extractelement <2 x i64> %T52.ld, i64 0, !tcg.op !59
-  store i64 %T52.ld.ee, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !59
-  %T52.ld.ee3 = extractelement <2 x i64> %T52.ld, i64 1, !tcg.op !59
-  store i64 %T52.ld.ee3, ptr %tmp11.stack, align 8, !tbaa !0, !tcg.op !59
+  %T52.ld = load i64, ptr %T52.tmp7.ptr, align 16, !tbaa !24, !tcg.op !59
+  store i64 %T52.ld, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !59
+  %T52.tmp7.addr_high_val = add i64 %T52.tmp7, 8, !tcg.op !59
+  %T52.tmp7.addr_high_val.ptr = inttoptr i64 %T52.tmp7.addr_high_val to ptr, !tcg.op !59
+  %T52.ld3 = load i64, ptr %T52.tmp7.addr_high_val.ptr, align 8, !tbaa !24, !tcg.op !59
+  store i64 %T52.ld3, ptr %tmp11.stack, align 8, !tbaa !0, !tcg.op !59
 ; ======== TCG [53] st8_i32 t0,env:0xac ========
   %T53.tmp0 = load i32, ptr %tmp0.stack, align 8, !tbaa !0, !tcg.op !60
   %T53.tmp0.tr = trunc i32 %T53.tmp0 to i8, !tcg.op !60
@@ -687,18 +689,20 @@ entry:
   %T109.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !116
   %T109.tmp7.ptr = inttoptr i64 %T109.tmp7 to ptr, !tcg.op !116
   %T109.tmp10 = load i64, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !116
+  store i64 %T109.tmp10, ptr %T109.tmp7.ptr, align 1, !tbaa !24, !tcg.op !116
+  %T109.addr_high_val = add i64 %T109.tmp7, 8, !tcg.op !116
+  %T109.addr_high_val.ptr = inttoptr i64 %T109.addr_high_val to ptr, !tcg.op !116
   %T109.tmp11 = load i64, ptr %tmp11.stack, align 8, !tbaa !0, !tcg.op !116
-  %T109.st2.ie = insertelement <2 x i64> zeroinitializer, i64 %T109.tmp10, i64 0, !tcg.op !116
-  %T109.st2.ie35 = insertelement <2 x i64> %T109.st2.ie, i64 %T109.tmp11, i64 1, !tcg.op !116
-  store <2 x i64> %T109.st2.ie35, ptr %T109.tmp7.ptr, align 1, !tbaa !24, !tcg.op !116
+  store i64 %T109.tmp11, ptr %T109.addr_high_val.ptr, align 8, !tbaa !24, !tcg.op !116
 ; ======== TCG [110] qemu_st2_i128 t10,t11,t7,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC16B,0x2 ========
   %T110.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !117
   %T110.tmp7.ptr = inttoptr i64 %T110.tmp7 to ptr, !tcg.op !117
   %T110.tmp10 = load i64, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !117
+  store i64 %T110.tmp10, ptr %T110.tmp7.ptr, align 16, !tbaa !24, !tcg.op !117
+  %T110.addr_high_val = add i64 %T110.tmp7, 8, !tcg.op !117
+  %T110.addr_high_val.ptr = inttoptr i64 %T110.addr_high_val to ptr, !tcg.op !117
   %T110.tmp11 = load i64, ptr %tmp11.stack, align 8, !tbaa !0, !tcg.op !117
-  %T110.st2.ie = insertelement <2 x i64> zeroinitializer, i64 %T110.tmp10, i64 0, !tcg.op !117
-  %T110.st2.ie36 = insertelement <2 x i64> %T110.st2.ie, i64 %T110.tmp11, i64 1, !tcg.op !117
-  store <2 x i64> %T110.st2.ie36, ptr %T110.tmp7.ptr, align 16, !tbaa !24, !tcg.op !117
+  store i64 %T110.tmp11, ptr %T110.addr_high_val.ptr, align 8, !tbaa !24, !tcg.op !117
 }
 
 attributes #0 = { noinline nounwind "target-features"="+neon" }

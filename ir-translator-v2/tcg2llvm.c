@@ -750,12 +750,13 @@ void translate_ld2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
     op_addr.slot.op_type = LLVMInt64;
     assert(op_addr.slot.op_type <= (op_addr.slot.type == SUB_SLOT_TMP ? stack->tmp.tcg_ty[op_addr.slot.idx] : stack->xreg.tcg_ty[op_addr.slot.idx]));
     LLVMValueRef addr = get_input_val_for_operand(&op_addr, stack, prefix);
-    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(LLVMVector2xi64), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
-    LLVMValueRef val = build_load_with_alignment(builder, get_llvm_type(LLVMVector2xi64), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld"), alignment_from_attr(u->operands[3].attr_info, LLVMVector2xi64), GUEST_TAG);
-    LLVMValueRef elem0 = LLVMBuildExtractElement(builder, val, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ee"));
-    do_store(&u->operands[0], elem0, stack, prefix, false);
-    LLVMValueRef elem1 = LLVMBuildExtractElement(builder, val, LLVMConstInt(get_llvm_type(LLVMInt64), 1, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ee"));
-    do_store(&u->operands[1], elem1, stack, prefix, false);
+    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(LLVMInt64), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
+    LLVMValueRef val = build_load_with_alignment(builder, get_llvm_type(LLVMInt64), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld"), alignment_from_attr(u->operands[3].attr_info, LLVMVector2xi64), GUEST_TAG);
+    do_store(&u->operands[0], val, stack, prefix, false);
+    LLVMValueRef addr2 = LLVMBuildAdd(builder, addr, LLVMConstInt(get_llvm_type(LLVMInt64), 8, 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "addr_high_val"));
+    ptr = LLVMBuildIntToPtr(builder, addr2, LLVMPointerType(get_llvm_type(LLVMInt64), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr2), "ptr"));
+    val = build_load_with_alignment(builder, get_llvm_type(LLVMInt64), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ld"), 8, GUEST_TAG);
+    do_store(&u->operands[1], val, stack, prefix, false);
 }
 
 void translate_st(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
@@ -812,18 +813,13 @@ void translate_st2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
     op_addr.slot.op_type = LLVMInt64;
     assert(op_addr.slot.op_type <= (op_addr.slot.type == SUB_SLOT_TMP ? stack->tmp.tcg_ty[op_addr.slot.idx] : stack->xreg.tcg_ty[op_addr.slot.idx]));
     LLVMValueRef addr = get_input_val_for_operand(&op_addr, stack, prefix);
-    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(LLVMVector2xi64), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
-
+    LLVMValueRef ptr = LLVMBuildIntToPtr(builder, addr, LLVMPointerType(get_llvm_type(LLVMInt64), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr), "ptr"));
     LLVMValueRef elem0 = get_input_val_for_operand(&u->operands[0], stack, prefix);
+    build_store_with_alignment(builder, elem0, ptr, alignment_from_attr(u->operands[3].attr_info, u->operands[2].slot.op_type), GUEST_TAG);
+    LLVMValueRef addr2 = LLVMBuildAdd(builder, addr, LLVMConstInt(get_llvm_type(LLVMInt64), 8, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "addr_high_val"));
+    ptr = LLVMBuildIntToPtr(builder, addr2, LLVMPointerType(get_llvm_type(LLVMInt64), 0), assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(addr2), "ptr"));
     LLVMValueRef elem1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
-    Operand out;
-    out.kind = OP_IMM;
-    out.imm.val = 0;
-    out.imm.op_type = LLVMVector2xi64;
-    LLVMValueRef val = get_input_val_for_operand(&out, stack, prefix);
-    val = LLVMBuildInsertElement(builder, val, elem0, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "st2", "ie"));
-    val = LLVMBuildInsertElement(builder, val, elem1, LLVMConstInt(get_llvm_type(LLVMInt64), 1, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "st2", "ie"));
-    build_store_with_alignment(builder, val, ptr, alignment_from_attr(u->operands[3].attr_info, u->operands[2].slot.op_type), GUEST_TAG);
+    build_store_with_alignment(builder, elem1, ptr, 8, GUEST_TAG);
 }
 
 int translate_func_addr(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
