@@ -447,6 +447,7 @@ templates: $(ANTLR_PARSE_CLASS) $(HELPER_TMPL_OUT)
 			[ -d "$$d" ] || continue; \
 			cp -f "$$d"/* "$(HELPER_TMPL_OUT)/" 2>/dev/null || true; \
 		done; \
+		cp -f jmp_ind_callback.c $(HELPER_TMPL_OUT)/ \
 		echo "Done. helper_templates ready in $(HELPER_TMPL_OUT)/."; \
 	fi
 
