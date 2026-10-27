@@ -58,7 +58,6 @@ char *get_func_name(unsigned long hex_offset, int sub_idx, char *buf, int buf_si
 
 #define GET_ALIGNMENT_FROM_OFFSET(off)      ((off) % 16 == 0 ? 16 : ((off) % 8 == 0 ? 8 : ((off) % 4 == 0 ? 4 : ((off) % 2 == 0 ? 2 : 1))))
 
-#define OPC_FIRST_SCALAR_TYPE   LLVMInt8
-#define OPC_VECTOR_TO_FIXED(T)      (((T - OPC_FIRST_SCALAR_TYPE) % 4) + OPC_FIRST_SCALAR_TYPE)
+#define OPC_VECTOR_TO_FIXED(T)      (((T - LLVMTypeBegin) % 4) + LLVMTypeBegin)
 
 #endif

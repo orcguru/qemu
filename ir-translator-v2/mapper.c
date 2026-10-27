@@ -132,7 +132,7 @@ LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, 
 }
 
 static LLVMType get_vector_type_for_elem(int elem_cnt, int elem_bits) {
-    for (LLVMType ty = LLVMVector8xi8; ty < LLVMTypeEnd; ++ty) {
+    for (LLVMType ty = LLVMTypeVectorBegin; ty <= LLVMTypeEnd; ++ty) {
         if (llvm_vector_elem_bit_counts[ty * 2] == elem_cnt && llvm_vector_elem_bit_counts[ty * 2 + 1] == elem_bits) {
             return ty;
         }
@@ -154,8 +154,7 @@ LLVMValueRef shrink_llvm_value(LLVMValueRef val, LLVMType from, LLVMType to) {
     int elem_bits = (llvm_vector_elem_bit_counts[to * 2] * llvm_vector_elem_bit_counts[to * 2 + 1]);
     LLVMType bc_ty = LLVMInvalidType;
     LLVMType elem_ty = LLVMInvalidType;
-    // FIXME: can this be calculated?
-    for (LLVMType ty = LLVMInvalidType; ty < LLVMVector8xi8; ++ty) {
+    for (LLVMType ty = LLVMTypeBegin; ty <= LLVMTypeScalarEnd; ++ty) {
         if (llvm_vector_elem_bit_counts[ty * 2 + 1] == elem_bits) {
             elem_ty = ty;
             break;
@@ -659,7 +658,7 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F, FuncInstrList *
         char tmp_alloca_name[16] = {0};
         sprintf(&tmp_alloca_name[0], "tmp%d.stack", (i & 0xffff));
         stack->tmp.tcg_ty[i] = stack_ty;
-        if (stack->tmp.tcg_ty[i] > LLVMTypeBegin && stack->tmp.tcg_ty[i] < LLVMTypeEnd) {
+        if (stack->tmp.tcg_ty[i] >= LLVMTypeBegin && stack->tmp.tcg_ty[i] <= LLVMTypeEnd) {
             stack->tmp.llvm_ty[i] = get_llvm_type(stack->tmp.tcg_ty[i]);
             stack->tmp.alloca[i] = LLVMBuildAlloca(g_builder, stack->tmp.llvm_ty[i], tmp_alloca_name);
             stack->tmp.align[i] = GET_ALIGNMENT_FROM_TYPE(stack->tmp.tcg_ty[i]);

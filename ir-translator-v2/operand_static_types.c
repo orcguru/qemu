@@ -8,8 +8,8 @@
 // INPUT-bits, OUTPUT-bits OR Memory-bits, Register-bits (for load/store)
 const LLVMType opciosz[OPCODE_MAX][2] = {
 #define SAME(T)     {T, T}
-    // Not supported OPC
-    // FIXME: should support all opc
+    // Define supported OPC:
+    [discard] = SAME(LLVMIntANY),
     [addc1o_i32] = SAME(LLVMInt32),
     [addc1o_i64] = SAME(LLVMInt64),
     [subb1o_i32] = SAME(LLVMInt32),
@@ -18,9 +18,6 @@ const LLVMType opciosz[OPCODE_MAX][2] = {
     [divs2_i64] = SAME(LLVMInt64),
     [divu2_i32] = SAME(LLVMInt32),
     [divu2_i64] = SAME(LLVMInt64),
-    [dup_vec] = SAME(LLVMInvalidType),
-    // Define supported OPC:
-    [discard] = SAME(LLVMIntANY),
     [addci_i32] = SAME(LLVMInt32),
     [addci_i64] = SAME(LLVMInt64),
     [addcio_i32] = SAME(LLVMInt32),
@@ -169,6 +166,7 @@ const LLVMType opciosz[OPCODE_MAX][2] = {
     [jmp_direct] = {LLVMInt64, LLVMInvalidType},
     // Vector
     [abs_vec] = SAME(LLVMInvalidType),
+    [dup_vec] = SAME(LLVMInvalidType),
     [dupm_vec] = SAME(LLVMInvalidType),
     [add_vec] = SAME(LLVMInvalidType),
     [andc_vec] = SAME(LLVMInvalidType),

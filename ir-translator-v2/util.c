@@ -336,12 +336,15 @@ void register_vec_spare_stack_alloca(TcgContext *ctx, const UnifiedInstr *u) {
 
 /*
  * Static types for operands
- * FIXME:
  */
 void set_operand_type(TcgContext *ctx, Operand *op, LLVMType ty) {
     if (op->kind == OP_SLOT) {
         if (op->slot.op_type != LLVMInvalidType &&
-            !(op->slot.op_type > LLVMTypeBegin && op->slot.op_type < LLVMTypeEnd)) {
+            !(op->slot.op_type >= LLVMTypeBegin && op->slot.op_type <= LLVMTypeEnd)) {
+            /*
+             * LLVMFuncPtr is the special case treated here, function prototype information
+             * is stored inside stack for LLVM IR
+             */
             if (op->slot.type == SUB_SLOT_TMP) {
                 if (!g_hash_table_contains(ctx->stack_type_map, (gconstpointer)(long)op->slot.idx)) {
                     g_hash_table_insert(ctx->stack_type_map, (gpointer)(long)op->slot.idx, (gpointer)(long)op->slot.op_type);

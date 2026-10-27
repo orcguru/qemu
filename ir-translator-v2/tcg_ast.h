@@ -1561,7 +1561,6 @@ typedef enum __attribute__((packed)) {
 
 #define LLVM_TYPE_LIST \
     X(LLVMInvalidType) \
-    X(LLVMTypeBegin) \
     X(LLVMInt8) \
     X(LLVMInt16) \
     X(LLVMInt32) \
@@ -1574,10 +1573,14 @@ typedef enum __attribute__((packed)) {
     X(LLVMVector8xi16) \
     X(LLVMVector4xi32) \
     X(LLVMVector2xi64) \
-    X(LLVMTypeEnd) \
     X(LLVMIntANY) /* no-op defined for opc:discard */ \
     X(LLVMFuncPtr) \
     X(LLVM_TYPE_MAX)
+
+#define LLVMTypeBegin       LLVMInt8
+#define LLVMTypeScalarEnd   LLVMInt64
+#define LLVMTypeVectorBegin LLVMVector8xi8
+#define LLVMTypeEnd         LLVMVector2xi64
 
 typedef enum __attribute__((packed)) {
     #define X(name) name,

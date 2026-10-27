@@ -598,7 +598,7 @@ const bool helper_runtime_does_not_return[HELPER_MAX] = {
     [helper_raise_interrupt] = true,
     [helper_raise_exception] = true,
     [helper_jmp_ind] = true,
-    // FIXME: check below helpers
+    // FIXME: do check how to emulate below helpers if required
     [helper_icebp] = true,
     [helper_iret_ind] = true,
     [helper_ljmp_protected] = true,
