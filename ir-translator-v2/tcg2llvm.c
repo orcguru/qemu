@@ -292,8 +292,10 @@ void translate_shift(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca 
     char var_name[32] = {0};
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
     LLVMValueRef shift_amount = NULL;
-    // Hack op_type for rotli/s_vec
-    if (u->operands[2].kind == OP_SLOT) {
+    // Hack op_type for ***i/s_vec
+    if ((u->opc == shli_vec || u->opc == shls_vec ||
+         u->opc == shri_vec || u->opc == shrs_vec ||
+         u->opc == sari_vec || u->opc == sars_vec) && u->operands[2].kind == OP_SLOT) {
         assert(u->operands[2].slot.type == SUB_SLOT_TMP);
         int tidx = u->operands[2].slot.idx;
         assert(stack->tmp.alloca[tidx]);
@@ -303,6 +305,8 @@ void translate_shift(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca 
         for (int i = 0; i < elem_cnt; ++i) {
             shift_amount = LLVMBuildInsertElement(builder, shift_amount, elem, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "shift", "ie"));
         }
+    } else if (u->opc == shlv_vec || u->opc == shrv_vec || u->opc == sarv_vec) {
+        shift_amount = get_input_val_for_operand(&u->operands[2], stack, prefix);
     } else {
         assert(u->operands[2].kind == OP_IMM);
         shift_amount = get_const_vector(u->operands[2].imm.val, tcg_ty);
@@ -1219,9 +1223,6 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_COMMON(rems_i64, LLVMBuildSRem);
             CASE_COMMON(remu_i32, LLVMBuildURem);
             CASE_COMMON(remu_i64, LLVMBuildURem);
-            CASE_COMMON(sarv_vec, LLVMBuildAShr);
-            CASE_COMMON(shlv_vec, LLVMBuildShl);
-            CASE_COMMON(shrv_vec, LLVMBuildLShr);
             CASE_COMMON(sar_i32, LLVMBuildAShr);
             CASE_COMMON(sar_i64, LLVMBuildAShr);
             CASE_COMMON(and_i32, LLVMBuildAnd);
@@ -1262,10 +1263,13 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
             CASE_BOOL(rotrv_vec, translate_rotate, false);
             CASE_SHIFT(shli_vec, LLVMBuildShl);
             CASE_SHIFT(shls_vec, LLVMBuildShl);
+            CASE_SHIFT(shlv_vec, LLVMBuildShl);
             CASE_SHIFT(shri_vec, LLVMBuildLShr);
             CASE_SHIFT(shrs_vec, LLVMBuildLShr);
+            CASE_SHIFT(shrv_vec, LLVMBuildLShr);
             CASE_SHIFT(sari_vec, LLVMBuildAShr);
             CASE_SHIFT(sars_vec, LLVMBuildAShr);
+            CASE_SHIFT(sarv_vec, LLVMBuildAShr);
             CASE(andc_i32, translate_andc);
             CASE(andc_i64, translate_andc);
             CASE(andc_vec, translate_andc);

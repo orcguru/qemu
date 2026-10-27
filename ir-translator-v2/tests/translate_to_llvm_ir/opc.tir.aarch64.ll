@@ -617,34 +617,40 @@ bb_false11:                                       ; preds = %bb_false10
   %T91.out = xor i64 %T91.tmp0, %T91.tmp1, !tcg.op !96
   store i64 %T91.out, ptr %tmp2.stack, align 16, !tbaa !0, !tcg.op !96
 ; ======== TCG [92] sarv_vec v128,e8,[t8],t3,t4 ========
-  %T92.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !97
   %T92.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !97
-  %T92.out = ashr <16 x i8> %T92.tmp3, %T92.tmp4, !tcg.op !97
+  %T92.shift = and <16 x i8> %T92.tmp4, splat (i8 7), !tcg.op !97
+  %T92.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !97
+  %T92.out = ashr <16 x i8> %T92.tmp3, %T92.shift, !tcg.op !97
   store <16 x i8> %T92.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !97
 ; ======== TCG [93] sarv_vec v128,e32,[t8],t3,t4 ========
-  %T93.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !98
   %T93.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !98
-  %T93.out = ashr <4 x i32> %T93.tmp3, %T93.tmp4, !tcg.op !98
+  %T93.shift = and <4 x i32> %T93.tmp4, splat (i32 31), !tcg.op !98
+  %T93.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !98
+  %T93.out = ashr <4 x i32> %T93.tmp3, %T93.shift, !tcg.op !98
   store <4 x i32> %T93.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !98
 ; ======== TCG [94] shlv_vec v128,e8,[t8],t3,t4 ========
-  %T94.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !99
   %T94.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !99
-  %T94.out = shl <16 x i8> %T94.tmp3, %T94.tmp4, !tcg.op !99
+  %T94.shift = and <16 x i8> %T94.tmp4, splat (i8 7), !tcg.op !99
+  %T94.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !99
+  %T94.out = shl <16 x i8> %T94.tmp3, %T94.shift, !tcg.op !99
   store <16 x i8> %T94.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !99
 ; ======== TCG [95] shlv_vec v128,e32,[t8],t3,t4 ========
-  %T95.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !100
   %T95.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !100
-  %T95.out = shl <4 x i32> %T95.tmp3, %T95.tmp4, !tcg.op !100
+  %T95.shift = and <4 x i32> %T95.tmp4, splat (i32 31), !tcg.op !100
+  %T95.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !100
+  %T95.out = shl <4 x i32> %T95.tmp3, %T95.shift, !tcg.op !100
   store <4 x i32> %T95.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !100
 ; ======== TCG [96] shrv_vec v128,e8,[t8],t3,t4 ========
-  %T96.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !101
   %T96.tmp4 = load <16 x i8>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !101
-  %T96.out = lshr <16 x i8> %T96.tmp3, %T96.tmp4, !tcg.op !101
+  %T96.shift = and <16 x i8> %T96.tmp4, splat (i8 7), !tcg.op !101
+  %T96.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !101
+  %T96.out = lshr <16 x i8> %T96.tmp3, %T96.shift, !tcg.op !101
   store <16 x i8> %T96.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !101
 ; ======== TCG [97] shrv_vec v128,e32,[t8],t3,t4 ========
-  %T97.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !102
   %T97.tmp4 = load <4 x i32>, ptr %tmp4.stack, align 16, !tbaa !0, !tcg.op !102
-  %T97.out = lshr <4 x i32> %T97.tmp3, %T97.tmp4, !tcg.op !102
+  %T97.shift = and <4 x i32> %T97.tmp4, splat (i32 31), !tcg.op !102
+  %T97.tmp3 = load <4 x i32>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !102
+  %T97.out = lshr <4 x i32> %T97.tmp3, %T97.shift, !tcg.op !102
   store <4 x i32> %T97.out, ptr %tmp8.stack, align 16, !tbaa !0, !tcg.op !102
 ; ======== TCG [98] and_vec v128,e8,[t8],t3,t4 ========
   %T98.tmp3 = load <16 x i8>, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !103
