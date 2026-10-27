@@ -34,3 +34,9 @@ ir-translator/qemu-SSE-helper-extractor/parser/*.java
 ir-translator/qemu-SSE-helper-extractor/parser/antlr-4.9.3-complete.jar
 ir-translator/qemu-SSE-helper-extractor/*.helper_xmm
 ir-translator/*.splits
+ir-translator-v2/collect_helper_templates/parser/*.class
+ir-translator-v2/collect_helper_templates/parser/*.interp
+ir-translator-v2/collect_helper_templates/parser/*.tokens
+ir-translator-v2/collect_helper_templates/parser/*.java
+ir-translator-v2/collect_helper_templates/parser/antlr-4.9.3-complete.jar
+ir-translator-v2/tests/translate_to_llvm_ir/*.bc

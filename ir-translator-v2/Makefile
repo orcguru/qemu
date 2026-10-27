@@ -78,7 +78,7 @@ PRINTER_OBJS := $(COMMON_OBJS) printer.o
 
 all: tcg_mapper tcg_printer
 
-tcg_mapper: $(MAPPER_OBJS)
+tcg_mapper: qemu_cpu_sizes.h $(MAPPER_OBJS)
 	gcc -o $@ $^ $(LDFLAGS) -lfl
 
 tcg_printer: $(PRINTER_OBJS)
@@ -98,6 +98,21 @@ parser.tab.c: parser.y
 
 helper_lookup.c: helpers.gperf
 	gperf -t -L ANSI-C -N lookup_helper $^ > helper_lookup.c
+
+qemu_cpu_sizes.h: check-qemu-cpu-size-build
+	ninja -C $(QEMU_CPU_SIZE_BUILD) -t compdb > $(QEMU_CPU_SIZE_BUILD)/compile_commands.json
+	python3 gen_qemu_sizes.py --build-dir $(QEMU_CPU_SIZE_BUILD) --target i386 --out qemu_cpu_sizes.h
+
+check-qemu-cpu-size-build:
+	@if [ -z "$(QEMU_CPU_SIZE_BUILD)" ]; then \
+		echo "ERROR: QEMU_CPU_SIZE_BUILD is not set."; \
+		echo "Usage: make QEMU_CPU_SIZE_BUILD=/path/to/qemu-build"; \
+		exit 1; \
+	fi
+	@if [ ! -d "$(QEMU_CPU_SIZE_BUILD)" ]; then \
+		echo "ERROR: QEMU_CPU_SIZE_BUILD directory '$(QEMU_CPU_SIZE_BUILD)' does not exist."; \
+		exit 1; \
+	fi
 
 # ============================================================================
 # QEMU TCG preprocessing targets
@@ -470,6 +485,7 @@ clean-local:
 	rm -rf .san .cov coverage
 	rm -f *.gcda *.gcno *.gcov
 	rm -f tests/expand_tcg_ir/*.err tests/expand_tcg_ir/*.exp.tmp
+	rm -f qemu_cpu_sizes.h
 
 clean-template:
 	rm -f helper_templates/*
@@ -1311,8 +1327,6 @@ coverage-open: coverage-report
 	else \
 	echo "no HTML report at $$url (see *.gcov text dumps)"; \
 	fi
-
-
 
 .PHONY: all test test-expand-tcg-ir test-llvm-ir test-llvm-ir-update \
 	test-san test-expand-tcg-ir-san test-llvm-ir-san san-build check-san \

@@ -27,14 +27,10 @@
 #include "tcg2llvm.h"
 #include "i386_cpu.h"
 #include "xymm_def.h"
+#include "qemu_cpu_sizes.h"
 
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
-/*
- * Magic numbers collected by sizeof CPUState/CPUArchState in QEMU
- */
-#define QEMU_CPUSTATE_CPUARCHSTATE_TOTAL_SIZE   0x67a0ULL
-#define QEMU_CPUARCHSTATE_OFFSET                0x2cd0ULL
 
 extern char *lineptr;
 int cfg_xmm_count = XMM_COUNT;
@@ -474,7 +470,7 @@ LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, unsigned long hex
         LLVMSetValueName(LLVMGetParam(F, cpu_pos), "cpu");
         LLVMSetParamAlignment(LLVMGetParam(F, cpu_pos), 8);
         LLVMAttributeIndex idx = (LLVMAttributeIndex)(cpu_pos + 1);
-        LLVMAddAttributeAtIndex(F, idx, LLVMCreateEnumAttribute(LLVMGetModuleContext(g_module), LLVMGetEnumAttributeKindForName("dereferenceable", strlen("dereferenceable")), QEMU_CPUSTATE_CPUARCHSTATE_TOTAL_SIZE));
+        LLVMAddAttributeAtIndex(F, idx, LLVMCreateEnumAttribute(LLVMGetModuleContext(g_module), LLVMGetEnumAttributeKindForName("dereferenceable", strlen("dereferenceable")), (QEMU_SIZEOF_CPUSTATE + QEMU_SIZEOF_CPUARCHSTATE)));
         if (g_ctx != NULL && g_ctx->hex_offset == hex_offset && sub_idx < g_ctx->llvm_func_set.num_lists) {
             for (int i = 0, arg_idx = (XREG_MAX + 2 * XMM_COUNT + 1); i < g_ctx->llvm_func_set.lists[sub_idx].added_param_count; ++i, ++arg_idx) {
                 LLVMSetValueName(LLVMGetParam(F, arg_idx), g_ctx->llvm_func_set.lists[sub_idx].added_param_name[i]);
@@ -606,7 +602,7 @@ LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMVal
 }
 
 LLVMValueRef get_env(LLVMValueRef F) {
-    LLVMValueRef env_off = LLVMConstInt(LLVMInt64Type(), QEMU_CPUARCHSTATE_OFFSET, 0);
+    LLVMValueRef env_off = LLVMConstInt(LLVMInt64Type(), QEMU_SIZEOF_CPUSTATE, 0);
     return LLVMBuildGEP2(g_builder, LLVMInt8Type(), LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT)), &env_off, 1, "env");
 }
 
