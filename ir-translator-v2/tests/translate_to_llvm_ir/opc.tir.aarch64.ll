@@ -2426,11 +2426,10 @@ entry:
   %T47.envptr = getelementptr i8, ptr %env, i64 1712, !tcg.op !317
   store <2 x i64> %ymm13_h, ptr %T47.envptr, align 16, !tbaa !269, !tcg.op !317
 ; ======== TCG [48] tail_call_default helper_raise_exception,arg0,arg1 ========
-  tail call void @helper_raise_exception(i64 %arg0, i64 %arg1), !tcg.op !318
+  %T48.env = ptrtoint ptr %env to i64, !tcg.op !318
+  tail call void asm sideeffect "mov x0, $0\0A\09mov x1, $1\0A\09mov x25, $2\0A\09b helper_raise_exception", "r,r,r,~{x0},~{x1},~{x2},~{x3},~{x4},~{x5},~{x6},~{x7},~{x8},~{x9},~{x10},~{x11},~{x12},~{x13},~{x14},~{x15},~{x16},~{x17},~{x18},~{x29},~{x30},~{v0},~{v1},~{v2},~{v3},~{v4},~{v5},~{v6},~{v7},~{v8},~{v9},~{v10},~{v11},~{v12},~{v13},~{v14},~{v15},~{v16},~{v17},~{v18},~{v19},~{v20},~{v21},~{v22},~{v23},~{v24},~{v25},~{v26},~{v27},~{v28},~{v29},~{v30},~{v31},~{cc},~{memory}"(i64 %arg0, i64 %arg1, i64 %T48.env), !tcg.op !318
   ret void, !tcg.op !318
 }
-
-declare void @helper_raise_exception(i64, i64)
 
 attributes #0 = { noinline nounwind "target-features"="+neon" }
 attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }

@@ -98,19 +98,19 @@ Fx0:                                    // @Fx0
 	.type	trampoline_helper_raise_exception,@function
 trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 // %bb.0:                               // %entry
-	str	x0, [x25, #11624]
-	mov	x0, x4
-	str	x1, [x25, #11616]
-	mov	x1, x5
 	str	x6, [x25, #11472]
+	mov	x19, x5
+	mov	x29, x4
 	str	x7, [x25, #11480]
 	str	x8, [x25, #11488]
+	mov	w8, #11472                      // =0x2cd0
 	str	x9, [x25, #11496]
 	str	x10, [x25, #11504]
 	str	x11, [x25, #11512]
 	str	x12, [x25, #11520]
 	str	x13, [x25, #11528]
 	str	x20, [x25, #11536]
+	add	x20, x25, x8
 	str	x21, [x25, #11544]
 	str	x22, [x25, #11552]
 	str	x23, [x25, #11560]
@@ -118,6 +118,8 @@ trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 	str	x26, [x25, #11576]
 	str	x27, [x25, #11584]
 	str	x28, [x25, #11592]
+	str	x0, [x25, #11624]
+	str	x1, [x25, #11616]
 	str	w2, [x25, #11640]
 	str	x3, [x25, #11600]
 	str	q0, [x25, #12336]
@@ -148,7 +150,13 @@ trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 	str	q25, [x25, #13120]
 	str	q26, [x25, #13168]
 	str	q27, [x25, #13184]
+	//APP
+	mov	x0, x29
+	mov	x1, x19
+	mov	x25, x20
 	b	helper_raise_exception
+	//NO_APP
+	ret
 .Lfunc_end1:
 	.size	trampoline_helper_raise_exception, .Lfunc_end1-trampoline_helper_raise_exception
                                         // -- End function
