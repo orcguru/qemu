@@ -486,6 +486,7 @@ clean-local:
 	rm -rf .san .cov coverage
 	rm -f *.gcda *.gcno *.gcov
 	rm -f tests/expand_tcg_ir/*.err tests/expand_tcg_ir/*.exp.tmp
+	rm -f tests/translate_to_llvm_ir/*.ll.tmp
 	rm -f qemu_cpu_sizes.h
 
 clean-template:
@@ -673,6 +674,7 @@ test-expand-tcg-ir-update: $(TCG_PRINTER)
 #   make test-llvm-ir TEST_ARCH=riscv64    # compare against another arch's copy
 #   make test-llvm-ir-update               # (re)create goldens for THIS host
 #   make test-llvm-ir-update ONLY=load_store
+#   make test-llvm-ir LL_FILTER=           # compare byte-for-byte, no filtering
 #   (suite 3 has the same shape: make test-asm / test-asm-update)
 #   make test-expand-tcg-ir-update         # (re)create the .exp goldens
 #   make test-expand-tcg-ir-update ONLY=call
@@ -681,12 +683,18 @@ test-expand-tcg-ir-update: $(TCG_PRINTER)
 #   make test-san                          # same, under the sanitizer
 #   make test-san SAN=msan REPEAT=3
 #
+# Compiler provenance (the !llvm.ident / "clang version ..." string) is
+# neutralised before comparing, so rebuilding LLVM from a new commit does not
+# turn every case red.  See LL_FILTER below.  Set LL_FILTER= to compare raw.
+
 # Artifacts (kept for inspection, cleaned by `make clean`):
 #   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.ll
-#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.annotate.ll   <- compared
-#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.run1.annotate.ll
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.annotate.ll       <- raw
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.annotate.norm.ll  <- compared
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.golden.norm.ll    <- golden, filtered
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.run1.norm.ll
 #   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.diff
-#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.mapper.err    <- sanitizer report
+#   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.mapper.err        <- sanitizer report
 #   tests/translate_to_llvm_ir/out/$(TEST_ARCH)/<name>.annotate.err
 # ----------------------------------------------------------------------------
 
@@ -710,6 +718,37 @@ LLVM_TIR_OUTDIR := $(LLVM_TIR_DIR)/out/$(TEST_ARCH)
 LLVM_ANNOTATE ?= ./llvm_annotate.py
 PYTHON        ?= python3
 MAPPER_FLAGS  ?= -d
+
+# --- compiler-version normalisation -------------------------------------------
+# The generated IR carries the compiler provenance that produced it:
+#
+#     !llvm.ident = !{!0}
+#     !0 = !{!"clang version 21.0.0git (git@github.com:orcguru/llvm-project.git 11cd5d69de21c1a9991d6bdbc023e178d24ac98f)"}
+#
+# Rebuilding the same LLVM from a different commit changes that string (the
+# trailing git hash) even though nothing about the translation changed, so
+# every golden in this folder would "fail" for a reason that has nothing to do
+# with the test.  LL_FILTER rewrites those strings to a fixed placeholder
+# before the comparison happens.
+#
+# It is applied to BOTH sides of the diff, so:
+#   * goldens recorded before this existed (with a real version string) still
+#     compare fine, and
+#   * goldens recorded after it exist (already neutralised) also compare fine.
+#
+# The default only touches metadata strings that look like a compiler version.
+# Override to widen/narrow it, or set it empty to compare byte-for-byte:
+#   make test-llvm-ir LL_FILTER=
+#   make test-llvm-ir LL_FILTER='sed -E "s/!\"[^\"]*[Vv]ersion [^\"]*\"/!\"<COMPILER_VERSION>\"/g"'
+# The command takes one argument (the file) and writes to stdout.
+LL_FILTER ?= sed -E 's/!"[^"]*[Vv]ersion [^"]*"/!"<COMPILER_VERSION>"/g'
+
+# `cat` when no filter is requested, so the recipes below stay branch-free.
+ifeq ($(strip $(LL_FILTER)),)
+LL_NORMALIZE := cat
+else
+LL_NORMALIZE := $(LL_FILTER)
+endif
 
 ifeq ($(TCG_MAPPER),)
 	TCG_MAPPER := ./tcg_mapper
@@ -736,6 +775,7 @@ test-llvm-ir: $(TCG_MAPPER)
 	@echo "==================================================================="
 	@echo "translate_to_llvm_ir: $(words $(LLVM_TIR_CASES)) case(s), TEST_ARCH=$(TEST_ARCH)"
 	@echo "golden file pattern : <name>.tir.$(TEST_ARCH).ll"
+	@echo "normalisation       : $(if $(strip $(LL_FILTER)),compiler version strings neutralised,off - byte-for-byte compare)"
 	@echo "==================================================================="
 	@rc=0; pass=0; fail=0; skip=0; unstable=0; \
 	runs=$(REPEAT); \
@@ -745,7 +785,9 @@ test-llvm-ir: $(TCG_MAPPER)
 	name=$$(basename "$$tir" .tir); \
 	ll="$(LLVM_TIR_OUTDIR)/$$name.ll"; \
 	ann="$(LLVM_TIR_OUTDIR)/$$name.annotate.ll"; \
-	ann1="$(LLVM_TIR_OUTDIR)/$$name.run1.annotate.ll"; \
+	annn="$(LLVM_TIR_OUTDIR)/$$name.annotate.norm.ll"; \
+	ann1="$(LLVM_TIR_OUTDIR)/$$name.run1.norm.ll"; \
+	expn="$(LLVM_TIR_OUTDIR)/$$name.golden.norm.ll"; \
 	diffout="$(LLVM_TIR_OUTDIR)/$$name.diff"; \
 	errlog="$(LLVM_TIR_OUTDIR)/$$name.mapper.err"; \
 	exp="$${tir}.$(TEST_ARCH).ll"; \
@@ -775,22 +817,31 @@ test-llvm-ir: $(TCG_MAPPER)
 	echo "FAIL: $$tir ($$ann was not produced by llvm_annotate.py)"; \
 	fail=$$((fail+1)); rc=1; break; \
 	fi; \
-	[ $$i -eq 1 ] && cp -f "$$ann" "$$ann1"; \
+	if ! $(LL_NORMALIZE) "$$ann" > "$$annn"; then \
+	echo "FAIL: $$tir (LL_FILTER failed - check the LL_FILTER definition)"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	[ $$i -eq 1 ] && cp -f "$$annn" "$$ann1"; \
 	if [ ! -f "$$exp" ]; then \
 	echo "SKIP: $$tir (no golden $${tir}.$(TEST_ARCH).ll - wrote $$ann)"; \
 	skip=$$((skip+1)); break; \
 	fi; \
-	if diff -u "$$exp" "$$ann" > "$$diffout"; then \
+	if ! $(LL_NORMALIZE) "$$exp" > "$$expn"; then \
+	echo "FAIL: $$tir (LL_FILTER failed on the golden - check LL_FILTER)"; \
+	fail=$$((fail+1)); rc=1; break; \
+	fi; \
+	if diff -u "$$expn" "$$annn" > "$$diffout"; then \
 	[ $$i -eq 1 ] && pass=$$((pass+1)); \
 	echo "PASS: $$tir"; \
 	else \
 	echo "FAIL: $$tir (diff vs $$exp)"; \
+	echo "       (compiler version strings neutralised on both sides; see $$expn)"; \
 	cat "$$diffout"; \
 	fail=$$((fail+1)); rc=1; \
 	fi; \
-	if [ $$i -gt 1 ] && ! diff -q "$$ann1" "$$ann" > /dev/null; then \
-	echo "UNSTABLE: $$tir - run $$i differs from run 1 ($$ann1 vs $$ann)"; \
-	diff -u "$$ann1" "$$ann" | head -n 40; \
+	if [ $$i -gt 1 ] && ! diff -q "$$ann1" "$$annn" > /dev/null; then \
+	echo "UNSTABLE: $$tir - run $$i differs from run 1 ($$ann1 vs $$annn)"; \
+	diff -u "$$ann1" "$$annn" | head -n 40; \
 	unstable=$$((unstable+1)); rc=1; \
 	fi; \
 	i=$$((i+1)); \
@@ -806,22 +857,40 @@ test-llvm-ir: $(TCG_MAPPER)
 # (Re)generate the golden files for the *current* host architecture.
 # Run this on each native machine once, then commit
 # <name>.tir.<arch>.ll next to the .tir file.
+#
+# The golden is stored AFTER $(LL_NORMALIZE) has run, i.e. with the compiler
+# version string already neutralised.  That is what stops the whole folder from
+# churning on every compiler rebuild.  The comparison applies the same filter to
+# the golden again, which is a no-op on an already-neutralised file - so goldens
+# recorded before this filter existed keep working unchanged.
+#
+# Written via a temp file so a failing pipeline can never truncate a golden.
 test-llvm-ir-update: $(TCG_MAPPER)
 	@mkdir -p "$(LLVM_TIR_OUTDIR)"
-	@for tir in $(LLVM_TIR_CASES); do \
+	@rc=0; updated=0; failed=0; \
+	for tir in $(LLVM_TIR_CASES); do \
 	name=$$(basename "$$tir" .tir); \
 	ll="$(LLVM_TIR_OUTDIR)/$$name.ll"; \
 	ann="$(LLVM_TIR_OUTDIR)/$$name.annotate.ll"; \
+	annn="$(LLVM_TIR_OUTDIR)/$$name.annotate.norm.ll"; \
 	gold="$${tir}.$(TEST_ARCH).ll"; \
+	tmp="$${gold}.tmp"; \
 	echo "==> $$tir"; \
 	if $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" && \
-	   $(PYTHON) $(LLVM_ANNOTATE) -o "$$ann" "$$ll"; then \
-	cp -f "$$ann" "$$gold"; \
+	   $(PYTHON) $(LLVM_ANNOTATE) -o "$$ann" "$$ll" && \
+	   $(LL_NORMALIZE) "$$ann" > "$$tmp"; then \
+	mv -f "$$tmp" "$$gold"; \
 	echo "UPDATE: $$gold"; \
+	updated=$$((updated+1)); \
 	else \
+	rm -f "$$tmp"; \
 	echo "ERROR: pipeline failed for $$tir (golden left untouched)"; \
+	failed=$$((failed+1)); rc=1; \
 	fi; \
-	done
+	done; \
+	echo "-------------------------------------------------------------------"; \
+	echo "translate_to_llvm_ir update: $$updated updated, $$failed failed"; \
+	exit $$rc
 
 # ----------------------------------------------------------------------------
 # Suite 3: tests/translate_then_gen_asm_snippet
