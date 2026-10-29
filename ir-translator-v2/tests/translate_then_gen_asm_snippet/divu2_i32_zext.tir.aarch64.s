@@ -81,9 +81,9 @@ trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 	str	q26, [x25, #13168]
 	str	q27, [x25, #13184]
 	//APP
+	mov	x25, x20
 	mov	x0, x29
 	mov	x1, x19
-	mov	x25, x20
 	b	helper_raise_exception
 	//NO_APP
 	ret

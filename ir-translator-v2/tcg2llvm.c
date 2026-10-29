@@ -905,6 +905,7 @@ void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     LLVMValueRef call_args[MAX_ADDED_ARGS + 1] = {NULL};
     int arg_cnt = 0;
     assert(u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
+    call_args[arg_cnt++] = LLVMBuildPtrToInt(builder, stack->env, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "env"));
     for (int i = (u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? (TCG_CALL_PREFIX_COUNT + 1) : TCG_CALL_PREFIX_COUNT);
          i < u->operand_count; ++i) {
         if (u->operands[i].kind == OP_ENV && u->operands[i].env.offset == 0) {
@@ -923,13 +924,11 @@ void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     }
 
     // ASM block provides guarantee that the x25 points to the environment as expected by compiler
-    call_args[arg_cnt] = LLVMBuildPtrToInt(builder, stack->env, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "env"));
     LLVMTypeRef asm_arg_types[MAX_ADDED_ARGS + 1] = {NULL};
     for (int i = 0; i < arg_cnt; ++i) {
         asm_arg_types[i] = get_llvm_type(LLVMInt64);
     }
-    asm_arg_types[arg_cnt] = get_llvm_type(LLVMInt64);
-    LLVMTypeRef asm_type = LLVMFunctionType((helper_return_type[h] ? get_llvm_type(helper_return_type[h]) : LLVMVoidType()), asm_arg_types, (arg_cnt + 1), 0);
+    LLVMTypeRef asm_type = LLVMFunctionType((helper_return_type[h] ? get_llvm_type(helper_return_type[h]) : LLVMVoidType()), asm_arg_types, arg_cnt, 0);
     SBuf b_asm;
     SBuf b_constraint;
     char asm_string[512] = {0};
@@ -939,11 +938,11 @@ void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     if (helper_return_type[h]) {
         sbuf_printf(&b_constraint, "=r,");
     }
-    for (int i = 0; i < arg_cnt; ++i) {
-        sbuf_printf(&b_asm, "mov x%d, $%d\n\t", i, (i + (helper_return_type[h] ? 1 : 0)));
+    sbuf_printf(&b_asm, "mov x25, $%d\n\t", (helper_return_type[h] ? 1 : 0));
+    for (int i = 1; i < arg_cnt; ++i) {
+        sbuf_printf(&b_asm, "mov x%d, $%d\n\t", (i - 1), (i + (helper_return_type[h] ? 1 : 0)));
         sbuf_printf(&b_constraint, "r,");
     }
-    sbuf_printf(&b_asm, "mov x25, $%d\n\t", (arg_cnt + (helper_return_type[h] ? 1 : 0)));
     sbuf_printf(&b_constraint, "r");
     // Add clobber list for side effects
     for (int i = 0; i < 19; ++i) {
@@ -962,7 +961,7 @@ void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
         sbuf_printf(&b_asm, "\n\tmov $0, x0");
     }
     LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_type, asm_string, constraint_string, /* has_side_effects */ 1, /* is_align_stack */ 0);
-    LLVMValueRef call_inst = LLVMBuildCall2(builder, asm_type, inline_asm, call_args, (arg_cnt + 1), u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? assemble_name_2(&var_name[0], sizeof(var_name), prefix, "cr") : "");
+    LLVMValueRef call_inst = LLVMBuildCall2(builder, asm_type, inline_asm, call_args, arg_cnt, u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? assemble_name_2(&var_name[0], sizeof(var_name), prefix, "cr") : "");
     if (is_tail) {
         LLVMSetTailCall(call_inst, 1);
         LLVMBuildRetVoid(builder);

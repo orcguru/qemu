@@ -948,7 +948,7 @@ test-asm: $(TCG_MAPPER)
 	tail -n 20 "$(ASM_TIR_OUTDIR)/$$name.opt.err"; \
 	fail=$$((fail+1)); rc=1; break; \
 	fi; \
-	if ! $(LLC) $(LLC_FLAGS) "$$bc" -o "$$asm" 2> "$(ASM_TIR_OUTDIR)/$$name.llc.err"; then \
+	if ! LLVM_ENABLE_AOT_STACK_SWITCH=1 $(LLC) $(LLC_FLAGS) "$$bc" -o "$$asm" 2> "$(ASM_TIR_OUTDIR)/$$name.llc.err"; then \
 	echo "FAIL: $$tir (llc failed - see $(ASM_TIR_OUTDIR)/$$name.llc.err)"; \
 	tail -n 20 "$(ASM_TIR_OUTDIR)/$$name.llc.err"; \
 	fail=$$((fail+1)); rc=1; break; \
@@ -1015,7 +1015,7 @@ test-asm-update: $(TCG_MAPPER)
 	echo "==> $$tir"; \
 	if $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" 2> "$(ASM_TIR_OUTDIR)/$$name.mapper.err" && \
 	   $(OPT) $(OPT_FLAGS) "$$ll" -o "$$bc" 2> "$(ASM_TIR_OUTDIR)/$$name.opt.err" && \
-	   $(LLC) $(LLC_FLAGS) "$$bc" -o "$$asm" 2> "$(ASM_TIR_OUTDIR)/$$name.llc.err"; then \
+	   LLVM_ENABLE_AOT_STACK_SWITCH=1 $(LLC) $(LLC_FLAGS) "$$bc" -o "$$asm" 2> "$(ASM_TIR_OUTDIR)/$$name.llc.err"; then \
 	if [ -n "$(strip $(ASM_FILTER))" ]; then \
 	$(ASM_FILTER) "$$asm" > "$$tmp"; \
 	else \
