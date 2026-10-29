@@ -911,6 +911,11 @@ int fini_llvm(const char *output_file) {
     int rc = 0;
     LLVMPassBuilderOptionsRef options = NULL;
 
+    LLVMValueRef env_offset = LLVMAddGlobal(g_module, LLVMInt64Type(), "env_offset");
+    LLVMSetGlobalConstant(env_offset, 1);
+    LLVMSetSection(env_offset, ".rodata");
+    LLVMSetInitializer(env_offset, LLVMConstInt(LLVMInt64Type(), QEMU_SIZEOF_CPUSTATE, 0));
+
     /*
      * '-d': dump the mapped LLVM-IR module and bail out before kicking off
      * the compilation pipeline (optimization passes + object emission).

@@ -99,4 +99,12 @@ trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 .Lfunc_end1:
 	.size	trampoline_helper_raise_exception, .Lfunc_end1-trampoline_helper_raise_exception
                                         // -- End function
+	.type	env_offset,@object              // @env_offset
+	.section	.rodata,"a",@progbits
+	.globl	env_offset
+	.p2align	3, 0x0
+env_offset:
+	.xword	11472                           // 0x2cd0
+	.size	env_offset, 8
+
 	.section	".note.GNU-stack","",@progbits
