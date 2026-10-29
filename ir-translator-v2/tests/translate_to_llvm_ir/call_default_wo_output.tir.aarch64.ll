@@ -253,7 +253,7 @@ entry:
   store <2 x i64> %ymm13_h, ptr %T47.envptr, align 16, !tbaa !5, !tcg.op !61
 ; ======== TCG [48] call_default helper_fsave,arg0,arg1,arg2 ========
   %T48.env = ptrtoint ptr %env to i64, !tcg.op !62
-  call void asm sideeffect "mov x25, $0\0A\09mov x0, $1\0A\09mov x1, $2\0A\09mov x2, $3\0A\09bl helper_fsave", "r,r,r,r,~{x0},~{x1},~{x2},~{x3},~{x4},~{x5},~{x6},~{x7},~{x8},~{x9},~{x10},~{x11},~{x12},~{x13},~{x14},~{x15},~{x16},~{x17},~{x18},~{x29},~{x30},~{x25},~{v0},~{v1},~{v2},~{v3},~{v4},~{v5},~{v6},~{v7},~{v8},~{v9},~{v10},~{v11},~{v12},~{v13},~{v14},~{v15},~{v16},~{v17},~{v18},~{v19},~{v20},~{v21},~{v22},~{v23},~{v24},~{v25},~{v26},~{v27},~{v28},~{v29},~{v30},~{v31},~{cc},~{memory}"(i64 %T48.env, i64 %arg0, i64 %arg1, i64 %arg2), !tcg.op !62
+  call void asm sideeffect "mov x25, $0\0A\09mov x0, $1\0A\09mov x1, $2\0A\09mov x2, $3\0A\09bl helper_fsave", "r,r,r,r,~{x0},~{x1},~{x2},~{x3},~{x4},~{x5},~{x6},~{x7},~{x8},~{x9},~{x10},~{x11},~{x12},~{x13},~{x14},~{x15},~{x16},~{x17},~{x18},~{x29},~{x30},~{x25},~{x26},~{v0},~{v1},~{v2},~{v3},~{v4},~{v5},~{v6},~{v7},~{v8},~{v9},~{v10},~{v11},~{v12},~{v13},~{v14},~{v15},~{v16},~{v17},~{v18},~{v19},~{v20},~{v21},~{v22},~{v23},~{v24},~{v25},~{v26},~{v27},~{v28},~{v29},~{v30},~{v31},~{cc},~{memory}"(i64 %T48.env, i64 %arg0, i64 %arg1, i64 %arg2), !tcg.op !62
 ; ======== TCG [49] ld_i64 [rax],env ========
   %T49.envptr = getelementptr i8, ptr %env, i64 0, !tcg.op !63
   %T49.envval = load i64, ptr %T49.envptr, align 16, !tbaa !5, !tcg.op !63

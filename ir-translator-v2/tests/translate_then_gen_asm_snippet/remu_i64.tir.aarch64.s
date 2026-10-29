@@ -76,10 +76,12 @@ trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 	str	q25, [x25, #13120]
 	str	q26, [x25, #13168]
 	str	q27, [x25, #13184]
-	stur	sp, [x20, #-64]
-	ldur	sp, [x20, #-56]
-	stur	x20, [sp, #-8]
-	sub	sp, sp, #16
+	mov	x26, sp
+	stur	x26, [x20, #-64]
+	ldur	x26, [x20, #-56]
+	stur	x20, [x26, #-8]
+	sub	x26, x26, #16
+	mov	sp, x26
 	//APP
 	mov	x25, x20
 	mov	x0, x29
@@ -88,8 +90,10 @@ trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 	//NO_APP
 	add	sp, sp, #16
 	ldur	x25, [sp, #-8]
-	stur	sp, [x25, #-56]
-	ldur	sp, [x25, #-64]
+	mov	x26, sp
+	stur	x26, [x25, #-56]
+	ldur	x26, [x25, #-64]
+	mov	sp, x26
 	ret
 .Lfunc_end1:
 	.size	trampoline_helper_raise_exception, .Lfunc_end1-trampoline_helper_raise_exception
