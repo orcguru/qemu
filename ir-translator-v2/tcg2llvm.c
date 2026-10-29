@@ -952,6 +952,8 @@ void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     for (int i = 29; i < 31; ++i) {
         sbuf_printf(&b_constraint, ",~{x%d}", i);
     }
+    // X25 must be clobbed
+    sbuf_printf(&b_constraint, ",~{x25}");
     for (int i = 0; i < 32; ++i) {
         sbuf_printf(&b_constraint, ",~{v%d}", i);
     }
