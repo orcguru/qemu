@@ -585,6 +585,19 @@ static LLVMBasicBlockRef get_bb(LLVMValueRef F, const char *name) {
     return NULL;
 }
 
+static void setup_env_for_stack_switch(LLVMBuilderRef builder, StackAlloca *stack, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMTypeRef asm_param_types[] = {get_llvm_type(LLVMInt64)};
+    LLVMTypeRef asm_function_type = LLVMFunctionType(LLVMVoidType(), asm_param_types, 1, 0);
+    char asm_string[128];
+    // Copy env to the reserved register
+    sprintf(asm_string, "mov x16, $0");
+    const char *constraint_string = "r,~{x16}";
+    LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_function_type, asm_string, constraint_string, /* has_side_effects */ 0, /* is_align_stack */ 0);
+    LLVMValueRef asm_param_list[] = {LLVMBuildPtrToInt(builder, stack->env, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "env"))};
+    LLVMBuildCall2(builder, asm_function_type, inline_asm, asm_param_list, 1, "");
+}
+
 void translate_div2(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, LLVM_EXT_API ext_api, LLVM_BIN_API div_api, LLVM_BIN_API rem_api) {
     char var_name[32] = {0};
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
@@ -604,6 +617,7 @@ void translate_div2(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, 
 
     /* ---- the divide ---- */
     LLVMValueRef den = ext_api(builder, d, llvm_double_ty, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "d_128"));
+    setup_env_for_stack_switch(builder, stack, prefix);
     LLVMValueRef q128 = div_api(builder, num, den, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q_128"));
     LLVMValueRef r128 = rem_api(builder, num, den, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r_128"));
     LLVMValueRef q64  = LLVMBuildTrunc(builder, q128, get_llvm_type(tcg_ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "q"));
@@ -902,10 +916,10 @@ void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     char var_name[32] = {0};
     assert(u->operands[0].kind == OP_SYMBOL);
     HelperType h = u->operands[0].symbol;
-    LLVMValueRef call_args[MAX_ADDED_ARGS + 1] = {NULL};
+    LLVMValueRef TF = get_or_add_func_with_default_cc(h, u);
+    LLVMValueRef call_args[MAX_ADDED_ARGS] = {NULL};
     int arg_cnt = 0;
     assert(u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
-    call_args[arg_cnt++] = LLVMBuildPtrToInt(builder, stack->env, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "env"));
     for (int i = (u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? (TCG_CALL_PREFIX_COUNT + 1) : TCG_CALL_PREFIX_COUNT);
          i < u->operand_count; ++i) {
         if (u->operands[i].kind == OP_ENV && u->operands[i].env.offset == 0) {
@@ -922,48 +936,8 @@ void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
             call_args[arg_cnt++] = get_input_val_for_operand(&u->operands[i], stack, prefix);
         }
     }
-
-    // ASM block provides guarantee that the x25 points to the environment as expected by compiler
-    LLVMTypeRef asm_arg_types[MAX_ADDED_ARGS + 1] = {NULL};
-    for (int i = 0; i < arg_cnt; ++i) {
-        asm_arg_types[i] = get_llvm_type(LLVMInt64);
-    }
-    LLVMTypeRef asm_type = LLVMFunctionType((helper_return_type[h] ? get_llvm_type(helper_return_type[h]) : LLVMVoidType()), asm_arg_types, arg_cnt, 0);
-    SBuf b_asm;
-    SBuf b_constraint;
-    char asm_string[512] = {0};
-    char constraint_string[1024] = {0};
-    sbuf_init(&b_asm, &asm_string[0], sizeof(asm_string));
-    sbuf_init(&b_constraint, &constraint_string[0], sizeof(constraint_string));
-    if (helper_return_type[h]) {
-        sbuf_printf(&b_constraint, "=r,");
-    }
-    sbuf_printf(&b_asm, "mov x25, $%d\n\t", (helper_return_type[h] ? 1 : 0));
-    for (int i = 1; i < arg_cnt; ++i) {
-        sbuf_printf(&b_asm, "mov x%d, $%d\n\t", (i - 1), (i + (helper_return_type[h] ? 1 : 0)));
-        sbuf_printf(&b_constraint, "r,");
-    }
-    sbuf_printf(&b_constraint, "r");
-    // Add clobber list for side effects
-    for (int i = 0; i < 19; ++i) {
-        sbuf_printf(&b_constraint, ",~{x%d}", i);
-    }
-    // X19 - X28 are CalleeSavedRegisters on AArch64
-    for (int i = 29; i < 31; ++i) {
-        sbuf_printf(&b_constraint, ",~{x%d}", i);
-    }
-    // X25 clobbed for env pointer, X26 clobbed for SP
-    sbuf_printf(&b_constraint, ",~{x25},~{x26}");
-    for (int i = 0; i < 32; ++i) {
-        sbuf_printf(&b_constraint, ",~{v%d}", i);
-    }
-    sbuf_printf(&b_constraint, ",~{cc},~{memory}");
-    sbuf_printf(&b_asm, "%s %s", is_tail ? "b" : "bl", helper_str[h]);
-    if (helper_return_type[h]) {
-        sbuf_printf(&b_asm, "\n\tmov $0, x0");
-    }
-    LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_type, asm_string, constraint_string, /* has_side_effects */ 1, /* is_align_stack */ 0);
-    LLVMValueRef call_inst = LLVMBuildCall2(builder, asm_type, inline_asm, call_args, arg_cnt, u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? assemble_name_2(&var_name[0], sizeof(var_name), prefix, "cr") : "");
+    setup_env_for_stack_switch(builder, stack, prefix);
+    LLVMValueRef call_inst = LLVMBuildCall2(builder, LLVMGlobalGetValueType(TF), TF, call_args, arg_cnt, u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? assemble_name_2(&var_name[0], sizeof(var_name), prefix, "cr") : "");
     if (is_tail) {
         LLVMSetTailCall(call_inst, 1);
         LLVMBuildRetVoid(builder);

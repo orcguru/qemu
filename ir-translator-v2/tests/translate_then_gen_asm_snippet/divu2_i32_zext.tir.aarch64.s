@@ -5,19 +5,22 @@
 	.type	Fx0,@function
 Fx0:                                    // @Fx0
 // %bb.0:                               // %entry
+	mov	w14, #11472                     // =0x2cd0
+	add	x4, x25, x14
 	cbz	w8, .LBB0_2
-// %bb.1:                               // %divs2.done
+// %bb.1:                               // %bb_false
 	udiv	w14, w6, w8
-	and	x16, x6, #0xffffffff00000000
+	and	x18, x6, #0xffffffff00000000
+	//APP
+	mov	x16, x4
+	//NO_APP
 	msub	w15, w14, w8, w6
 	and	x8, x8, #0xffffffff00000000
-	orr	x6, x16, x14
+	orr	x6, x18, x14
 	orr	x8, x8, x15
 	b	Fx55aa
 .LBB0_2:                                // %bb_L0
-	mov	w14, #11472                     // =0x2cd0
 	mov	x5, xzr
-	add	x4, x25, x14
 	b	trampoline_helper_raise_exception
 .Lfunc_end0:
 	.size	Fx0, .Lfunc_end0-Fx0
@@ -28,19 +31,24 @@ Fx0:                                    // @Fx0
 	.type	trampoline_helper_raise_exception,@function
 trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 // %bb.0:                               // %entry
-	str	x6, [x25, #11472]
-	mov	x19, x5
-	mov	x29, x4
-	str	x7, [x25, #11480]
 	str	x8, [x25, #11488]
 	mov	w8, #11472                      // =0x2cd0
+	str	x0, [x25, #11624]
+	mov	x0, x4
+	add	x8, x25, x8
+	str	x1, [x25, #11616]
+	mov	x1, x5
+	//APP
+	mov	x16, x8
+	//NO_APP
+	str	x6, [x25, #11472]
+	str	x7, [x25, #11480]
 	str	x9, [x25, #11496]
 	str	x10, [x25, #11504]
 	str	x11, [x25, #11512]
 	str	x12, [x25, #11520]
 	str	x13, [x25, #11528]
 	str	x20, [x25, #11536]
-	add	x20, x25, x8
 	str	x21, [x25, #11544]
 	str	x22, [x25, #11552]
 	str	x23, [x25, #11560]
@@ -48,8 +56,6 @@ trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 	str	x26, [x25, #11576]
 	str	x27, [x25, #11584]
 	str	x28, [x25, #11592]
-	str	x0, [x25, #11624]
-	str	x1, [x25, #11616]
 	str	w2, [x25, #11640]
 	str	x3, [x25, #11600]
 	str	q0, [x25, #12336]
@@ -80,34 +86,14 @@ trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 	str	q25, [x25, #13120]
 	str	q26, [x25, #13168]
 	str	q27, [x25, #13184]
-	mov	x26, sp
-	stur	x26, [x20, #-64]
-	ldur	x26, [x20, #-56]
-	stur	x20, [x26, #-8]
-	sub	x26, x26, #16
-	mov	sp, x26
-	//APP
-	mov	x25, x20
-	mov	x0, x29
-	mov	x1, x19
+	mov	x17, sp
+	stur	x17, [x16, #-64]
+	ldur	x17, [x16, #-56]
+	stur	x16, [x17, #-8]
+	sub	x17, x17, #16
+	mov	sp, x17
 	b	helper_raise_exception
-	//NO_APP
-	add	sp, sp, #16
-	ldur	x25, [sp, #-8]
-	mov	x26, sp
-	stur	x26, [x25, #-56]
-	ldur	x26, [x25, #-64]
-	mov	sp, x26
-	ret
 .Lfunc_end1:
 	.size	trampoline_helper_raise_exception, .Lfunc_end1-trampoline_helper_raise_exception
                                         // -- End function
-	.type	env_offset,@object              // @env_offset
-	.section	.rodata,"a",@progbits
-	.globl	env_offset
-	.p2align	3, 0x0
-env_offset:
-	.xword	11472                           // 0x2cd0
-	.size	env_offset, 8
-
 	.section	".note.GNU-stack","",@progbits

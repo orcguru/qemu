@@ -963,7 +963,7 @@ OPT ?= $(LLVM_PATH)/bin/opt
 LLC ?= $(LLVM_PATH)/bin/llc
 
 OPT_FLAGS  ?= -O2
-LLC_FLAGS  ?= -O2 -filetype=asm
+LLC_FLAGS  ?= -O2 -filetype=asm --verify-machineinstrs
 
 # Optional normalisation applied to the .s before comparing / recording.
 # Empty by default.  Example:
@@ -982,6 +982,24 @@ ASM_FILTER ?=
 LLC_EXTRA_divs2_i64      ?= --qemu-aot-env-reg=aot
 LLC_EXTRA_divu2_i64      ?= --qemu-aot-env-reg=aot
 LLC_EXTRA_divs2_i64_sext ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_call_default_wo_output ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_call_default_wi_output ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divs2_i32 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divs2_i32_sext ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divs2_i64 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divs2_i64_sext ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divs_i32 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divs_i64 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divu2_i32 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divu2_i32_zext ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divu2_i64 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divu2_i64_zext ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divu_i32 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divu_i64 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_rems_i32 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_rems_i64 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_remu_i32 ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_remu_i64 ?= --qemu-aot-env-reg=aot
 
 # Flags added to EVERY case.  Empty by default.
 LLC_EXTRA_ALL ?=

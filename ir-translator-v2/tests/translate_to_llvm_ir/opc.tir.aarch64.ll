@@ -2,8 +2,6 @@
 source_filename = "qemuaot"
 target triple = "aarch64-unknown-linux-gnu"
 
-@env_offset = constant i64 11472, section ".rodata"
-
 ; Function Attrs: noinline nounwind
 define qemuaot void @Fx0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, ptr align 8 dereferenceable(26528) %cpu) #0 section ".text.Fx0" {
 entry:
@@ -1979,6 +1977,8 @@ bb_false399:                                      ; preds = %bb_false398
   %T246.nl_double = zext i32 %T246.tmp2 to i64, !tcg.op !251
   %T246.num = or i64 %T246.num_hi, %T246.nl_double, !tcg.op !251
   %T246.d_128 = sext i32 %T246.tmp1 to i64, !tcg.op !251
+  %T246.env = ptrtoint ptr %env to i64, !tcg.op !251
+  call void asm "mov x16, $0", "r,~{x16}"(i64 %T246.env), !tcg.op !251
   %T246.q_128 = sdiv i64 %T246.num, %T246.d_128, !tcg.op !251
   %T246.r_128 = srem i64 %T246.num, %T246.d_128, !tcg.op !251
   %T246.q = trunc i64 %T246.q_128 to i32, !tcg.op !251
@@ -2036,6 +2036,8 @@ bb_false401:                                      ; preds = %bb_false400
   %T254.nl_double = zext i64 %T254.tmp2 to i128, !tcg.op !259
   %T254.num = or i128 %T254.num_hi, %T254.nl_double, !tcg.op !259
   %T254.d_128 = sext i64 %T254.tmp1 to i128, !tcg.op !259
+  %T254.env = ptrtoint ptr %env to i64, !tcg.op !259
+  call void asm "mov x16, $0", "r,~{x16}"(i64 %T254.env), !tcg.op !259
   %T254.q_128 = sdiv i128 %T254.num, %T254.d_128, !tcg.op !259
   %T254.r_128 = srem i128 %T254.num, %T254.d_128, !tcg.op !259
   %T254.q = trunc i128 %T254.q_128 to i64, !tcg.op !259
@@ -2062,6 +2064,8 @@ bb_false403:                                      ; preds = %divs2.done402
   %T256.nl_double = zext i32 %T256.tmp2 to i64, !tcg.op !261
   %T256.num = or i64 %T256.num_hi, %T256.nl_double, !tcg.op !261
   %T256.d_128 = zext i32 %T256.tmp1 to i64, !tcg.op !261
+  %T256.env = ptrtoint ptr %env to i64, !tcg.op !261
+  call void asm "mov x16, $0", "r,~{x16}"(i64 %T256.env), !tcg.op !261
   %T256.q_128 = udiv i64 %T256.num, %T256.d_128, !tcg.op !261
   %T256.r_128 = urem i64 %T256.num, %T256.d_128, !tcg.op !261
   %T256.q = trunc i64 %T256.q_128 to i32, !tcg.op !261
@@ -2088,6 +2092,8 @@ bb_false405:                                      ; preds = %divs2.done404
   %T258.nl_double = zext i64 %T258.tmp2 to i128, !tcg.op !263
   %T258.num = or i128 %T258.num_hi, %T258.nl_double, !tcg.op !263
   %T258.d_128 = zext i64 %T258.tmp1 to i128, !tcg.op !263
+  %T258.env = ptrtoint ptr %env to i64, !tcg.op !263
+  call void asm "mov x16, $0", "r,~{x16}"(i64 %T258.env), !tcg.op !263
   %T258.q_128 = udiv i128 %T258.num, %T258.d_128, !tcg.op !263
   %T258.r_128 = urem i128 %T258.num, %T258.d_128, !tcg.op !263
   %T258.q = trunc i128 %T258.q_128 to i64, !tcg.op !263
@@ -2429,9 +2435,12 @@ entry:
   store <2 x i64> %ymm13_h, ptr %T47.envptr, align 16, !tbaa !269, !tcg.op !317
 ; ======== TCG [48] tail_call_default helper_raise_exception,arg0,arg1 ========
   %T48.env = ptrtoint ptr %env to i64, !tcg.op !318
-  tail call void asm sideeffect "mov x25, $0\0A\09mov x0, $1\0A\09mov x1, $2\0A\09b helper_raise_exception", "r,r,r,~{x0},~{x1},~{x2},~{x3},~{x4},~{x5},~{x6},~{x7},~{x8},~{x9},~{x10},~{x11},~{x12},~{x13},~{x14},~{x15},~{x16},~{x17},~{x18},~{x29},~{x30},~{x25},~{x26},~{v0},~{v1},~{v2},~{v3},~{v4},~{v5},~{v6},~{v7},~{v8},~{v9},~{v10},~{v11},~{v12},~{v13},~{v14},~{v15},~{v16},~{v17},~{v18},~{v19},~{v20},~{v21},~{v22},~{v23},~{v24},~{v25},~{v26},~{v27},~{v28},~{v29},~{v30},~{v31},~{cc},~{memory}"(i64 %T48.env, i64 %arg0, i64 %arg1), !tcg.op !318
+  call void asm "mov x16, $0", "r,~{x16}"(i64 %T48.env), !tcg.op !318
+  tail call void @helper_raise_exception(i64 %arg0, i64 %arg1), !tcg.op !318
   ret void, !tcg.op !318
 }
+
+declare void @helper_raise_exception(i64, i64)
 
 attributes #0 = { noinline nounwind "target-features"="+neon" }
 attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }

@@ -11,12 +11,4 @@ Fx0:                                    // @Fx0
 .Lfunc_end0:
 	.size	Fx0, .Lfunc_end0-Fx0
                                         // -- End function
-	.type	env_offset,@object              // @env_offset
-	.section	.rodata,"a",@progbits
-	.globl	env_offset
-	.p2align	3, 0x0
-env_offset:
-	.xword	11472                           // 0x2cd0
-	.size	env_offset, 8
-
 	.section	".note.GNU-stack","",@progbits

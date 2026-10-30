@@ -569,6 +569,24 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
     return F;
 }
 
+LLVMValueRef get_or_add_func_with_default_cc(HelperType h, const UnifiedInstr *u) {
+    LLVMValueRef TF = LLVMGetNamedFunction(g_module, helper_str[h]);
+    if (!TF) {
+        LLVMTypeRef arg_types[MAX_ADDED_ARGS] = {NULL};
+        int arg_cnt = 0;
+        assert(u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
+        assert(u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val == 0 || u->operands[TCG_CALL_PREFIX_COUNT].kind == OP_SLOT);
+        for (int i = (u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? (TCG_CALL_PREFIX_COUNT + 1) : TCG_CALL_PREFIX_COUNT);
+             i < u->operand_count; ++i) {
+            arg_types[arg_cnt++] = get_llvm_type(LLVMInt64);
+        }
+        assert(u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val == 0 || u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type == helper_return_type[h]);
+        LLVMTypeRef f_type = LLVMFunctionType((helper_return_type[h] ? get_llvm_type(helper_return_type[h]) : LLVMVoidType()), arg_types, arg_cnt, 0);
+        TF = LLVMAddFunction(g_module, helper_str[h], f_type);
+    }
+    return TF;
+}
+
 LLVMValueRef build_store_with_alignment(LLVMBuilderRef B, LLVMValueRef Val, LLVMValueRef PointerVal, unsigned Bytes, TagType tag_ty) {
     LLVMValueRef ST = LLVMBuildStore(B, Val, PointerVal);
     LLVMSetAlignment(ST, Bytes);
@@ -910,11 +928,6 @@ static int check_always_inline_status(LLVMValueRef F) {
 int fini_llvm(const char *output_file) {
     int rc = 0;
     LLVMPassBuilderOptionsRef options = NULL;
-
-    LLVMValueRef env_offset = LLVMAddGlobal(g_module, LLVMInt64Type(), "env_offset");
-    LLVMSetGlobalConstant(env_offset, 1);
-    LLVMSetSection(env_offset, ".rodata");
-    LLVMSetInitializer(env_offset, LLVMConstInt(LLVMInt64Type(), QEMU_SIZEOF_CPUSTATE, 0));
 
     /*
      * '-d': dump the mapped LLVM-IR module and bail out before kicking off

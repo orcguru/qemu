@@ -2,8 +2,6 @@
 source_filename = "qemuaot"
 target triple = "aarch64-unknown-linux-gnu"
 
-@env_offset = constant i64 11472, section ".rodata"
-
 ; Function Attrs: noinline nounwind
 define qemuaot void @Fx0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, ptr align 8 dereferenceable(26528) %cpu) #0 section ".text.Fx0" {
 entry:
@@ -238,7 +236,8 @@ entry:
   store <2 x i64> %ymm13_h, ptr %T47.envptr, align 16, !tbaa !8, !tcg.op !56
 ; ======== TCG [48] call_default helper_rdrand,[t1],arg0,arg1,arg2 ========
   %T48.env = ptrtoint ptr %env to i64, !tcg.op !57
-  %T48.cr = call i64 asm sideeffect "mov x25, $1\0A\09mov x0, $2\0A\09mov x1, $3\0A\09mov x2, $4\0A\09bl helper_rdrand\0A\09mov $0, x0", "=r,r,r,r,r,~{x0},~{x1},~{x2},~{x3},~{x4},~{x5},~{x6},~{x7},~{x8},~{x9},~{x10},~{x11},~{x12},~{x13},~{x14},~{x15},~{x16},~{x17},~{x18},~{x29},~{x30},~{x25},~{x26},~{v0},~{v1},~{v2},~{v3},~{v4},~{v5},~{v6},~{v7},~{v8},~{v9},~{v10},~{v11},~{v12},~{v13},~{v14},~{v15},~{v16},~{v17},~{v18},~{v19},~{v20},~{v21},~{v22},~{v23},~{v24},~{v25},~{v26},~{v27},~{v28},~{v29},~{v30},~{v31},~{cc},~{memory}"(i64 %T48.env, i64 %arg0, i64 %arg1, i64 %arg2), !tcg.op !57
+  call void asm "mov x16, $0", "r,~{x16}"(i64 %T48.env), !tcg.op !57
+  %T48.cr = call i64 @helper_rdrand(i64 %arg0, i64 %arg1, i64 %arg2), !tcg.op !57
   store i64 %T48.cr, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !57
 ; ======== TCG [49] ld_i64 [rax],env ========
   %T49.envptr = getelementptr i8, ptr %env, i64 0, !tcg.op !58
@@ -514,6 +513,8 @@ entry:
 
 ; Function Attrs: nounwind
 declare qemuaot void @Fx55aa(i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32, i64, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, ptr align 8 dereferenceable(26528)) #1 section ".text.Fx55aa"
+
+declare i64 @helper_rdrand(i64, i64, i64)
 
 attributes #0 = { noinline nounwind "target-features"="+neon" }
 attributes #1 = { nounwind "target-features"="+neon" }

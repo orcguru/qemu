@@ -5,105 +5,102 @@
 	.type	Fx0,@function
 Fx0:                                    // @Fx0
 // %bb.0:                               // %entry
-	mov	x16, x25
+	mov	w14, #11472                     // =0x2cd0
+	add	x19, x25, x14
 	cbz	x8, .LBB0_3
 // %bb.1:                               // %bb_false
 	str	x0, [sp, #536]                  // 8-byte Folded Spill
 	mov	x0, x6
-	mov	x19, x8
-	str	x1, [sp, #528]                  // 8-byte Folded Spill
+	mov	w29, w2
+	stp	x1, x27, [sp, #56]              // 16-byte Folded Spill
 	mov	x1, x7
-	mov	x29, x6
-	str	w2, [sp, #524]                  // 4-byte Folded Spill
 	mov	x2, x8
-	str	x3, [sp, #512]                  // 8-byte Folded Spill
+	str	x25, [sp, #528]                 // 8-byte Folded Spill
+	mov	x25, x3
 	mov	x3, xzr
-	stp	x24, x27, [sp, #40]             // 16-byte Folded Spill
-	mov	x27, x13
-	mov	x24, x11
-	stp	x20, x21, [sp, #8]              // 16-byte Folded Spill
-	mov	x21, x12
-	mov	x20, x10
+	//APP
+	mov	x16, x19
+	//NO_APP
+	str	x28, [sp, #72]                  // 8-byte Folded Spill
+	mov	x28, x13
 	stp	x22, x23, [sp, #24]             // 16-byte Folded Spill
-	mov	x23, x9
-	mov	x22, x7
-	str	x28, [sp, #56]                  // 8-byte Folded Spill
-	mov	x28, x16
-	stp	q0, q1, [sp, #64]               // 32-byte Folded Spill
-	stp	q2, q3, [sp, #96]               // 32-byte Folded Spill
-	stp	q4, q5, [sp, #128]              // 32-byte Folded Spill
-	stp	q6, q7, [sp, #160]              // 32-byte Folded Spill
-	stp	q8, q9, [sp, #192]              // 32-byte Folded Spill
-	stp	q10, q11, [sp, #224]            // 32-byte Folded Spill
-	stp	q12, q13, [sp, #256]            // 32-byte Folded Spill
-	stp	q14, q15, [sp, #288]            // 32-byte Folded Spill
-	stp	q16, q17, [sp, #320]            // 32-byte Folded Spill
-	stp	q18, q19, [sp, #352]            // 32-byte Folded Spill
-	stp	q20, q21, [sp, #384]            // 32-byte Folded Spill
-	stp	q22, q23, [sp, #416]            // 32-byte Folded Spill
-	stp	q24, q25, [sp, #448]            // 32-byte Folded Spill
-	stp	q26, q27, [sp, #480]            // 32-byte Folded Spill
-	mov	x26, #11472                     // =0x2cd0
-	add	x25, x25, x26, uxtx
-	mov	x26, sp
-	stur	x26, [x25, #-64]
-	ldur	x26, [x25, #-56]
-	stur	x25, [x26, #-8]
-	sub	x26, x26, #16
-	mov	sp, x26
+	mov	x23, x12
+	mov	x27, x11
+	mov	x22, x10
+	stp	x24, x26, [sp, #40]             // 16-byte Folded Spill
+	mov	x26, x9
+	stp	x20, x21, [sp, #8]              // 16-byte Folded Spill
+	mov	x21, x8
+	mov	x24, x7
+	mov	x20, x6
+	stp	q0, q1, [sp, #80]               // 32-byte Folded Spill
+	stp	q2, q3, [sp, #112]              // 32-byte Folded Spill
+	stp	q4, q5, [sp, #144]              // 32-byte Folded Spill
+	stp	q6, q7, [sp, #176]              // 32-byte Folded Spill
+	stp	q8, q9, [sp, #208]              // 32-byte Folded Spill
+	stp	q10, q11, [sp, #240]            // 32-byte Folded Spill
+	stp	q12, q13, [sp, #272]            // 32-byte Folded Spill
+	stp	q14, q15, [sp, #304]            // 32-byte Folded Spill
+	stp	q16, q17, [sp, #336]            // 32-byte Folded Spill
+	stp	q18, q19, [sp, #368]            // 32-byte Folded Spill
+	stp	q20, q21, [sp, #400]            // 32-byte Folded Spill
+	stp	q22, q23, [sp, #432]            // 32-byte Folded Spill
+	stp	q24, q25, [sp, #464]            // 32-byte Folded Spill
+	stp	q26, q27, [sp, #496]            // 32-byte Folded Spill
+	mov	x17, sp
+	stur	x17, [x16, #-64]
+	ldur	x17, [x16, #-56]
+	stur	x16, [x17, #-8]
+	sub	x17, x17, #16
+	mov	sp, x17
 	bl	__udivti3
 	add	sp, sp, #16
-	ldur	x25, [sp, #-8]
-	mov	x26, sp
-	stur	x26, [x25, #-56]
-	ldur	x26, [x25, #-64]
-	mov	sp, x26
-	mov	x26, #11472                     // =0x2cd0
-	sub	x25, x25, x26, uxtx
-	ldp	q0, q1, [sp, #64]               // 32-byte Folded Reload
-	mov	x16, x28
-	ldp	q2, q3, [sp, #96]               // 32-byte Folded Reload
-	mov	x7, x22
-	ldp	q4, q5, [sp, #128]              // 32-byte Folded Reload
-	mov	x9, x23
-	ldp	q6, q7, [sp, #160]              // 32-byte Folded Reload
-	mov	x10, x20
-	ldp	q8, q9, [sp, #192]              // 32-byte Folded Reload
-	mov	x12, x21
-	ldp	q10, q11, [sp, #224]            // 32-byte Folded Reload
-	mov	x13, x27
-	ldp	q12, q13, [sp, #256]            // 32-byte Folded Reload
-	mov	x11, x24
-	ldp	q14, q15, [sp, #288]            // 32-byte Folded Reload
+	ldur	x16, [sp, #-8]
+	mov	x17, sp
+	stur	x17, [x16, #-56]
+	ldur	x17, [x16, #-64]
+	mov	sp, x17
+	ldp	q0, q1, [sp, #80]               // 32-byte Folded Reload
+	mov	x6, x20
+	ldp	q2, q3, [sp, #112]              // 32-byte Folded Reload
+	mov	x7, x24
+	ldp	q4, q5, [sp, #144]              // 32-byte Folded Reload
+	mov	x8, x21
+	ldp	q6, q7, [sp, #176]              // 32-byte Folded Reload
+	mov	x9, x26
+	ldp	q8, q9, [sp, #208]              // 32-byte Folded Reload
+	mov	x10, x22
+	ldp	q10, q11, [sp, #240]            // 32-byte Folded Reload
+	mov	x11, x27
+	ldp	q12, q13, [sp, #272]            // 32-byte Folded Reload
+	mov	x12, x23
+	ldp	q14, q15, [sp, #304]            // 32-byte Folded Reload
+	mov	x13, x28
+	ldp	q16, q17, [sp, #336]            // 32-byte Folded Reload
+	mov	x3, x25
+	ldp	q18, q19, [sp, #368]            // 32-byte Folded Reload
 	mov	x15, x1
-	ldp	q16, q17, [sp, #320]            // 32-byte Folded Reload
+	ldp	q20, q21, [sp, #400]            // 32-byte Folded Reload
 	mov	x14, x0
-	ldp	q18, q19, [sp, #352]            // 32-byte Folded Reload
-	mov	x6, x29
-	ldp	q20, q21, [sp, #384]            // 32-byte Folded Reload
-	mov	x8, x19
-	ldp	q22, q23, [sp, #416]            // 32-byte Folded Reload
-	ldr	x24, [sp, #40]                  // 8-byte Folded Reload
-	ldp	q24, q25, [sp, #448]            // 32-byte Folded Reload
-	ldr	w2, [sp, #524]                  // 4-byte Folded Reload
-	ldr	x3, [sp, #512]                  // 8-byte Folded Reload
-	ldr	x1, [sp, #528]                  // 8-byte Folded Reload
+	ldp	q22, q23, [sp, #432]            // 32-byte Folded Reload
+	mov	w2, w29
+	ldp	q24, q25, [sp, #464]            // 32-byte Folded Reload
+	ldr	x25, [sp, #528]                 // 8-byte Folded Reload
+	ldp	q26, q27, [sp, #496]            // 32-byte Folded Reload
+	ldr	x1, [sp, #56]                   // 8-byte Folded Reload
 	ldr	x0, [sp, #536]                  // 8-byte Folded Reload
-	ldp	q26, q27, [sp, #480]            // 32-byte Folded Reload
-	ldp	x22, x23, [sp, #24]             // 16-byte Folded Reload
 	ldp	x20, x21, [sp, #8]              // 16-byte Folded Reload
-	ldp	x27, x28, [sp, #48]             // 16-byte Folded Reload
+	ldp	x24, x26, [sp, #40]             // 16-byte Folded Reload
+	ldp	x22, x23, [sp, #24]             // 16-byte Folded Reload
+	ldp	x27, x28, [sp, #64]             // 16-byte Folded Reload
 	cbnz	x15, .LBB0_3
 // %bb.2:                               // %divs2.done
 	msub	x8, x14, x8, x6
 	mov	x6, x14
-	mov	x25, x16
 	b	Fx55aa
 .LBB0_3:                                // %bb_L0
-	mov	w14, #11472                     // =0x2cd0
-	mov	x25, x16
+	mov	x4, x19
 	mov	x5, xzr
-	add	x4, x16, x14
 	b	trampoline_helper_raise_exception
 .Lfunc_end0:
 	.size	Fx0, .Lfunc_end0-Fx0
@@ -114,19 +111,24 @@ Fx0:                                    // @Fx0
 	.type	trampoline_helper_raise_exception,@function
 trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 // %bb.0:                               // %entry
-	str	x7, [x25, #11480]
-	mov	x19, x5
-	mov	x29, x4
-	str	x6, [x25, #11472]
 	str	x8, [x25, #11488]
 	mov	w8, #11472                      // =0x2cd0
+	str	x0, [x25, #11624]
+	mov	x0, x4
+	add	x8, x25, x8
+	str	x1, [x25, #11616]
+	mov	x1, x5
+	//APP
+	mov	x16, x8
+	//NO_APP
+	str	x6, [x25, #11472]
+	str	x7, [x25, #11480]
 	str	x9, [x25, #11496]
 	str	x10, [x25, #11504]
 	str	x11, [x25, #11512]
 	str	x12, [x25, #11520]
 	str	x13, [x25, #11528]
 	str	x20, [x25, #11536]
-	add	x20, x25, x8
 	str	x21, [x25, #11544]
 	str	x22, [x25, #11552]
 	str	x23, [x25, #11560]
@@ -134,8 +136,6 @@ trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 	str	x26, [x25, #11576]
 	str	x27, [x25, #11584]
 	str	x28, [x25, #11592]
-	str	x0, [x25, #11624]
-	str	x1, [x25, #11616]
 	str	w2, [x25, #11640]
 	str	x3, [x25, #11600]
 	str	q0, [x25, #12336]
@@ -166,34 +166,14 @@ trampoline_helper_raise_exception:      // @trampoline_helper_raise_exception
 	str	q25, [x25, #13120]
 	str	q26, [x25, #13168]
 	str	q27, [x25, #13184]
-	mov	x26, sp
-	stur	x26, [x20, #-64]
-	ldur	x26, [x20, #-56]
-	stur	x20, [x26, #-8]
-	sub	x26, x26, #16
-	mov	sp, x26
-	//APP
-	mov	x25, x20
-	mov	x0, x29
-	mov	x1, x19
+	mov	x17, sp
+	stur	x17, [x16, #-64]
+	ldur	x17, [x16, #-56]
+	stur	x16, [x17, #-8]
+	sub	x17, x17, #16
+	mov	sp, x17
 	b	helper_raise_exception
-	//NO_APP
-	add	sp, sp, #16
-	ldur	x25, [sp, #-8]
-	mov	x26, sp
-	stur	x26, [x25, #-56]
-	ldur	x26, [x25, #-64]
-	mov	sp, x26
-	ret
 .Lfunc_end1:
 	.size	trampoline_helper_raise_exception, .Lfunc_end1-trampoline_helper_raise_exception
                                         // -- End function
-	.type	env_offset,@object              // @env_offset
-	.section	.rodata,"a",@progbits
-	.globl	env_offset
-	.p2align	3, 0x0
-env_offset:
-	.xword	11472                           // 0x2cd0
-	.size	env_offset, 8
-
 	.section	".note.GNU-stack","",@progbits
