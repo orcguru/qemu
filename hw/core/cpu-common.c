@@ -69,6 +69,7 @@ CPUState *cpu_create(const char *typename)
         exit(EXIT_FAILURE);
     }
 #ifdef AOT
+    // tcg_target_qemu_aot_prologue initializes tpbr for RISCV64
     cpu->neg.iec.aot_cnt = 0;
     cpu->neg.iec.aot_visit_ptr = (uint64_t *)g_malloc0(8*ELF_ADDRESS_RANGE);
     assert(cpu->neg.iec.aot_visit_ptr);
