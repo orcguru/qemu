@@ -922,6 +922,10 @@ test-llvm-ir-update: $(TCG_MAPPER)
 #   make test-asm REPEAT=3                 # catch non-deterministic output
 #   make test-asm-san                      # same, with an instrumented mapper
 #
+# Per-case llc flags (see "Things worth knowing" below):
+#   divs2_i64, divu2_i64, divs2_i64_sext run llc with --qemu-aot-env-reg=aot;
+#   override with e.g.  make test-asm LLC_EXTRA_divs2_i64=
+#
 # Things worth knowing before you commit goldens:
 #   * Assembly output is tied to the exact LLVM build in $(LLVM_PATH).  Bump
 #     LLVM and every .tir.<arch>.s needs regenerating - that is expected, not a
@@ -929,6 +933,11 @@ test-llvm-ir-update: $(TCG_MAPPER)
 #   * llc defaults to the host triple and to that target's default CPU.  If you
 #     want a fixed target regardless of the machine, add it to LLC_FLAGS,
 #     e.g.  make test-asm LLC_FLAGS="-O2 -filetype=asm -mtriple=aarch64-linux-gnu"
+#   * Some cases need extra llc flags.  They are declared as
+#     LLC_EXTRA_<case> = <flags> (see below) and are applied by BOTH test-asm
+#     and test-asm-update, so a recorded golden always matches the command that
+#     will later be compared against it.  Changing a case's flags means
+#     re-recording that case's golden.
 #   * llc may emit a `.file "<path>"` directive naming the intermediate .bc.
 #     That path contains out/$(TEST_ARCH)/, i.e. it is already arch-scoped, so
 #     per-arch goldens compare cleanly.  If you would rather not have build
@@ -961,6 +970,48 @@ LLC_FLAGS  ?= -O2 -filetype=asm
 #   make test-asm ASM_FILTER='sed -E "/^\s*\.file\s+\"/d"'
 ASM_FILTER ?=
 
+# --- per-case extra llc flags -------------------------------------------------
+# A few cases need llc invoked with extra flags.  Declare one variable per case
+# name (the .tir basename WITHOUT the .tir extension):
+#
+#     LLC_EXTRA_<case> = <flags>
+#
+# These three need the QEMU AOT environment register: without it llc does not
+# know which register holds the AOT runtime environment, so the generated
+# snippet is wrong for them.
+LLC_EXTRA_divs2_i64      ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divu2_i64      ?= --qemu-aot-env-reg=aot
+LLC_EXTRA_divs2_i64_sext ?= --qemu-aot-env-reg=aot
+
+# Flags added to EVERY case.  Empty by default.
+LLC_EXTRA_ALL ?=
+
+# To add another case, just declare its variable above - no other edit is
+# needed.  Override from the command line to experiment:
+#   make test-asm LLC_EXTRA_divs2_i64=
+#   make test-asm LLC_EXTRA_divs2_i64='--qemu-aot-env-reg=other'
+
+# Case names (basename without .tir) of every discovered case.
+ASM_CASE_NAMES := $(basename $(notdir $(ASM_TIR_FILES)))
+# ...and of those, only the ones that actually declared extra flags.  This list
+# is turned into the shell if-chain below that maps a name to its flags at run
+# time (the name is only known then, so it cannot be a plain $(...) lookup).
+ASM_LLC_EXTRA_CASES := $(foreach n,$(ASM_CASE_NAMES),$(if $(LLC_EXTRA_$(n)),$(n)))
+
+# Shell snippet: sets extra_llc for the case named by $name.  Expanded into
+# BOTH test-asm and test-asm-update, so recording and comparing can never drift
+# apart.
+#
+# It is built as a chain of `if [ "$name" = ... ]` rather than a shell `case`
+# on purpose: a `case` arm needs a literal `)` after the pattern, and inside
+# $(foreach ...) make would treat that paren as the one closing the foreach
+# (leaving the body as just $(n) and the flags empty).  The if-chain has no
+# bare parens, so nothing is ambiguous.
+define ASM_LLC_EXTRA_SH
+extra_llc="$(LLC_EXTRA_ALL)"; \
+$(foreach n,$(ASM_LLC_EXTRA_CASES),if [ "$$name" = "$(n)" ]; then extra_llc="$$extra_llc $(LLC_EXTRA_$(n))"; fi;)
+endef
+
 # Optional subset filter: make test-asm ONLY=example
 ifeq ($(ONLY),)
 ASM_TIR_CASES := $(ASM_TIR_FILES)
@@ -987,6 +1038,7 @@ test-asm: $(TCG_MAPPER)
 	[ "$$runs" -ge 1 ] || runs=1; \
 	for tir in $(ASM_TIR_CASES); do \
 	name=$$(basename "$$tir" .tir); \
+	$(ASM_LLC_EXTRA_SH) \
 	ll="$(ASM_TIR_OUTDIR)/$$name.ll"; \
 	bc="$(ASM_TIR_OUTDIR)/$$name.ll.bc"; \
 	asm="$(ASM_TIR_OUTDIR)/$$name.s"; \
@@ -1001,6 +1053,9 @@ test-asm: $(TCG_MAPPER)
 	i=1; \
 	while [ $$i -le $$runs ]; do \
 	echo "==> $$tir (run $$i/$$runs)"; \
+	if [ -n "$$extra_llc" ]; then \
+	echo "    llc extra flags: $$extra_llc"; \
+	fi; \
 	st=0; $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" 2> "$$errlog" || st=$$?; \
 	if [ "$$st" -eq $(SAN_ERROR_EXIT) ]; then \
 	echo "SANITIZER FAIL: $$tir - see $$errlog"; \
@@ -1017,7 +1072,7 @@ test-asm: $(TCG_MAPPER)
 	tail -n 20 "$(ASM_TIR_OUTDIR)/$$name.opt.err"; \
 	fail=$$((fail+1)); rc=1; break; \
 	fi; \
-	if ! $(LLC) $(LLC_FLAGS) "$$bc" -o "$$asm" 2> "$(ASM_TIR_OUTDIR)/$$name.llc.err"; then \
+	if ! $(LLC) $(LLC_FLAGS) $$extra_llc "$$bc" -o "$$asm" 2> "$(ASM_TIR_OUTDIR)/$$name.llc.err"; then \
 	echo "FAIL: $$tir (llc failed - see $(ASM_TIR_OUTDIR)/$$name.llc.err)"; \
 	tail -n 20 "$(ASM_TIR_OUTDIR)/$$name.llc.err"; \
 	fail=$$((fail+1)); rc=1; break; \
@@ -1075,6 +1130,7 @@ test-asm-update: $(TCG_MAPPER)
 	@rc=0; updated=0; failed=0; \
 	for tir in $(ASM_TIR_CASES); do \
 	name=$$(basename "$$tir" .tir); \
+	$(ASM_LLC_EXTRA_SH) \
 	ll="$(ASM_TIR_OUTDIR)/$$name.ll"; \
 	bc="$(ASM_TIR_OUTDIR)/$$name.ll.bc"; \
 	asm="$(ASM_TIR_OUTDIR)/$$name.s"; \
@@ -1082,9 +1138,12 @@ test-asm-update: $(TCG_MAPPER)
 	gold="$${tir}.$(TEST_ARCH).s"; \
 	tmp="$${gold}.tmp"; \
 	echo "==> $$tir"; \
+	if [ -n "$$extra_llc" ]; then \
+	echo "    llc extra flags: $$extra_llc"; \
+	fi; \
 	if $(TCG_MAPPER) $(MAPPER_FLAGS) "$$tir" > "$$ll" 2> "$(ASM_TIR_OUTDIR)/$$name.mapper.err" && \
 	   $(OPT) $(OPT_FLAGS) "$$ll" -o "$$bc" 2> "$(ASM_TIR_OUTDIR)/$$name.opt.err" && \
-	   $(LLC) $(LLC_FLAGS) "$$bc" -o "$$asm" 2> "$(ASM_TIR_OUTDIR)/$$name.llc.err"; then \
+	   $(LLC) $(LLC_FLAGS) $$extra_llc "$$bc" -o "$$asm" 2> "$(ASM_TIR_OUTDIR)/$$name.llc.err"; then \
 	if [ -n "$(strip $(ASM_FILTER))" ]; then \
 	$(ASM_FILTER) "$$asm" > "$$tmp"; \
 	else \
