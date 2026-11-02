@@ -150,7 +150,7 @@ static LLVMValueRef do_cond(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueR
         if (ty <= LLVMInt64) {
             in2 = LLVMConstInt(get_llvm_type(ty), 0, 0);
         } else {
-            in2 = get_const_vector(0, ty);
+            in2 = get_const_vector(0, ty, prefix);
         }
     }
     assert(r < RELOP_MAX && llvm_predicate[r]);
@@ -160,8 +160,8 @@ static LLVMValueRef do_cond(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueR
 static LLVMValueRef do_cmp_vec(LLVMBuilderRef builder, LLVMValueRef in1, LLVMValueRef in2, RelopType r, LLVMType ty, const char *prefix) {
     char var_name[32] = {0};
     LLVMValueRef bv = do_cond(builder, in1, in2, r, ty, prefix);
-    LLVMValueRef v_one = get_const_vector(-1ULL, ty);
-    LLVMValueRef v_zero = get_const_vector(0, ty);
+    LLVMValueRef v_one = get_const_vector(-1ULL, ty, prefix);
+    LLVMValueRef v_zero = get_const_vector(0, ty, prefix);
     return LLVMBuildSelect(builder, bv, v_one, v_zero, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "predicate"));
 }
 
@@ -266,7 +266,7 @@ void translate_rotate(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedI
             int tidx = u->operands[2].slot.idx;
             assert(stack->tmp.alloca[tidx]);
             LLVMValueRef elem = build_load_with_alignment(builder, get_llvm_type(OPC_VECTOR_TO_FIXED(tcg_ty)), stack->tmp.alloca[tidx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, "s"), stack->tmp.align[tidx], SPILL_TAG);
-            shift_amount = get_const_vector(0, tcg_ty);
+            shift_amount = get_const_vector(0, tcg_ty, prefix);
             int elem_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2];
             for (int i = 0; i < elem_cnt; ++i) {
                 shift_amount = LLVMBuildInsertElement(builder, shift_amount, elem, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "shift", "ie"));
@@ -275,7 +275,7 @@ void translate_rotate(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedI
             shift_amount = get_input_val_for_operand(&u->operands[2], stack, prefix);
         } else {
             assert(u->operands[2].kind == OP_IMM);
-            shift_amount = get_const_vector(u->operands[2].imm.val, tcg_ty);
+            shift_amount = get_const_vector(u->operands[2].imm.val, tcg_ty, prefix);
         }
     }
     LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
@@ -300,7 +300,7 @@ void translate_shift(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca 
         int tidx = u->operands[2].slot.idx;
         assert(stack->tmp.alloca[tidx]);
         LLVMValueRef elem = build_load_with_alignment(builder, get_llvm_type(OPC_VECTOR_TO_FIXED(tcg_ty)), stack->tmp.alloca[tidx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, "s"), stack->tmp.align[tidx], SPILL_TAG);
-        shift_amount = get_const_vector(0, tcg_ty);
+        shift_amount = get_const_vector(0, tcg_ty, prefix);
         int elem_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2];
         for (int i = 0; i < elem_cnt; ++i) {
             shift_amount = LLVMBuildInsertElement(builder, shift_amount, elem, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_3(&var_name[0], sizeof(var_name), prefix, "shift", "ie"));
@@ -309,10 +309,10 @@ void translate_shift(LLVMBuilderRef builder, LLVM_BIN_API llvm_api, StackAlloca 
         shift_amount = get_input_val_for_operand(&u->operands[2], stack, prefix);
     } else {
         assert(u->operands[2].kind == OP_IMM);
-        shift_amount = get_const_vector(u->operands[2].imm.val, tcg_ty);
+        shift_amount = get_const_vector(u->operands[2].imm.val, tcg_ty, prefix);
     }
     int bc = llvm_vector_elem_bit_counts[2 * OPC_VECTOR_TO_FIXED(tcg_ty) + 1];
-    LLVMValueRef shift_mask = get_const_vector((bc - 1), tcg_ty);
+    LLVMValueRef shift_mask = get_const_vector((bc - 1), tcg_ty, prefix);
     shift_amount = LLVMBuildAnd(builder, shift_amount, shift_mask, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "shift"));
     LLVMValueRef out = llvm_api(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), shift_amount, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
     do_store(&u->operands[0], out, stack, prefix, false);
@@ -370,7 +370,7 @@ void translate_neg(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedInst
     char var_name[32] = {0};
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
     bool is_vec = tcg_ty > LLVMInt64;
-    LLVMValueRef out = LLVMBuildSub(builder, (is_vec ? get_const_vector(0, tcg_ty) : LLVMConstInt(get_llvm_type(tcg_ty), 0, 0)),
+    LLVMValueRef out = LLVMBuildSub(builder, (is_vec ? get_const_vector(0, tcg_ty, prefix) : LLVMConstInt(get_llvm_type(tcg_ty), 0, 0)),
                                     get_input_val_for_operand(&u->operands[1], stack, prefix),
                                     assemble_name_2(&var_name[0], sizeof(var_name), prefix, "sub_zero_a"));
     do_store(&u->operands[0], out, stack, prefix, false);
@@ -456,7 +456,7 @@ void translate_dup_vec(LLVMBuilderRef builder, StackAlloca *stack, const Unified
         elem = LLVMBuildExtractElement(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "elem"));
     }
     uint8_t elem_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2];
-    LLVMValueRef out = get_const_vector(0, tcg_ty);
+    LLVMValueRef out = get_const_vector(0, tcg_ty, prefix);
     for (int i = 0; i < elem_cnt; i++) {
         out = LLVMBuildInsertElement(builder, out, elem, LLVMConstInt(get_llvm_type(LLVMInt64), i, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ie"));
     }

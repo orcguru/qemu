@@ -247,13 +247,28 @@ LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *
     return LLVMGetIntrinsicDeclaration(g_module, id, intrinsic_types, cnt);
 }
 
-LLVMValueRef get_const_vector(unsigned long c, LLVMType ty) {
+LLVMValueRef get_const_vector(unsigned long c, LLVMType ty, const char *prefix) {
     LLVMValueRef constants[16];
     int elem_cnt = llvm_vector_elem_bit_counts[ty * 2];
     for (int i = 0; i < elem_cnt; i++) {
         constants[i] = LLVMConstInt(get_llvm_type(OPC_VECTOR_TO_FIXED(ty)), c, 0);
     }
-    return LLVMConstVector(constants, elem_cnt);
+    LLVMValueRef ret = LLVMConstVector(constants, elem_cnt);
+    if (!mapper_use_scalable_vector())
+        return ret;
+    // Scalable Vector
+    char var_name[32] = {0};
+    LLVMType elem_ty = OPC_VECTOR_TO_FIXED(ty);
+    LLVMTypeRef ret_type = get_llvm_type(ty);
+    LLVMTypeRef fixed_vec_type = LLVMVectorType(get_llvm_type(elem_ty), llvm_vector_elem_bit_counts[ty * 2]);
+    LLVMTypeRef intrinsic_types[] = {ret_type, fixed_vec_type, get_llvm_type(LLVMInt64)};
+    char intrinsic_func_name[128] = {0};
+    snprintf(intrinsic_func_name, sizeof(intrinsic_func_name), "llvm.vector.insert.nxv%di%d.v%di%d", (64 / llvm_vector_elem_bit_counts[elem_ty * 2 + 1]), llvm_vector_elem_bit_counts[elem_ty * 2 + 1], llvm_vector_elem_bit_counts[ty * 2], llvm_vector_elem_bit_counts[ty * 2 + 1]);
+    LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func_name, intrinsic_types, 3);
+    LLVMValueRef index_0 = LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0);
+    LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(ret_type), ret, index_0};
+    LLVMTypeRef fn_type = LLVMFunctionType(ret_type, intrinsic_types, 3, 0);
+    return LLVMBuildCall2(g_builder, fn_type, fn, intrinsic_call_args, 3, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "const_vec"));
 }
 
 LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name) {
