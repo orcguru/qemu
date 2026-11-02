@@ -51,6 +51,52 @@ LLVMAttributeRef g_attr_nounwind = NULL;
 TcgContext *g_ctx = NULL;
 TBAA g_tbaa;
 
+/* -------------------------------------------------------------------------
+ * Target architecture selection
+ *
+ * Historically the LLVM target was fixed at compile time by the host macro
+ * (__aarch64__ / __riscv).  It is now a runtime value so that '-t <arch>'
+ * can produce a cross-target result, while the default stays exactly what
+ * the host macro picked before.
+ * ------------------------------------------------------------------------- */
+typedef enum {
+    TARGET_ARCH_AARCH64 = 0,
+    TARGET_ARCH_RISCV64,
+} MapperTargetArch;
+
+#if defined(__aarch64__)
+int g_target_arch = TARGET_ARCH_AARCH64;
+#elif (defined(__riscv) && __riscv_xlen == 64)
+int g_target_arch = TARGET_ARCH_RISCV64;
+#else
+#error "mapper: unsupported host architecture (expected __aarch64__ or __riscv)"
+#endif
+
+static const char *target_arch_name(int arch) {
+    switch (arch) {
+        case TARGET_ARCH_AARCH64: return "aarch64";
+        case TARGET_ARCH_RISCV64: return "riscv64";
+    }
+    return "unknown";
+}
+
+/* Parse the argument of '-t'.  Returns 0 on success, -1 on error. */
+static int set_target_arch(const char *arg) {
+    if (!arg || !*arg) {
+        return -1;
+    }
+    if (!strcmp(arg, "aarch64") || !strcmp(arg, "arm64")) {
+        g_target_arch = TARGET_ARCH_AARCH64;
+        return 0;
+    }
+    if (!strcmp(arg, "riscv64") || !strcmp(arg, "riscv")) {
+        g_target_arch = TARGET_ARCH_RISCV64;
+        return 0;
+    }
+    fprintf(stderr, "Error: unknown target '%s' (supported: aarch64, riscv64)\n", arg);
+    return -1;
+}
+
 static inline void tbaa_tag(LLVMValueRef inst, const TBAA *t, TagType tag_ty) {
     LLVMSetMetadata(inst, t->kind, (tag_ty == CPU_TAG ? t->cpu_tag : (tag_ty == GUEST_TAG ? t->guest_tag : t->spill_tag)));
 }
@@ -62,29 +108,49 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
         case LLVMInt16: ty = LLVMInt16Type(); break;
         case LLVMInt32: ty = LLVMInt32Type(); break;
         case LLVMInt64: ty = LLVMInt64Type(); break;
-#if defined(__aarch64__)
-        case LLVMVector8xi8: ty = LLVMVectorType(LLVMInt8Type(), 8); break;
-        case LLVMVector4xi16: ty = LLVMVectorType(LLVMInt16Type(), 4); break;
-        case LLVMVector2xi32: ty = LLVMVectorType(LLVMInt32Type(), 2); break;
-        case LLVMVector1xi64: ty = LLVMVectorType(LLVMInt64Type(), 1); break;
-        case LLVMVector16xi8: ty = LLVMVectorType(LLVMInt8Type(), 16); break;
-        case LLVMVector8xi16: ty = LLVMVectorType(LLVMInt16Type(), 8); break;
-        case LLVMVector4xi32: ty = LLVMVectorType(LLVMInt32Type(), 4); break;
-        case LLVMVector2xi64: ty = LLVMVectorType(LLVMInt64Type(), 2); break;
-#elif (defined(__riscv) && __riscv_xlen == 64)
+        /* Fixed-width (AArch64/NEON) vs. scalable (RISC-V/RVV) vector types.
+         * On RISC-V the 64-bit and 128-bit TCG vector kinds collapse onto the
+         * same scalable type, exactly as the old #if/#elif branches did. */
         case LLVMVector8xi8:
+            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+                     ? LLVMScalableVectorType(LLVMInt8Type(), 8)
+                     : LLVMVectorType(LLVMInt8Type(), 8);
+            break;
         case LLVMVector16xi8:
-            ty = LLVMScalableVectorType(LLVMInt8Type(), 8); break;
+            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+                     ? LLVMScalableVectorType(LLVMInt8Type(), 8)
+                     : LLVMVectorType(LLVMInt8Type(), 16);
+            break;
         case LLVMVector4xi16:
+            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+                     ? LLVMScalableVectorType(LLVMInt16Type(), 4)
+                     : LLVMVectorType(LLVMInt16Type(), 4);
+            break;
         case LLVMVector8xi16:
-            ty = LLVMScalableVectorType(LLVMInt16Type(), 4); break;
+            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+                     ? LLVMScalableVectorType(LLVMInt16Type(), 4)
+                     : LLVMVectorType(LLVMInt16Type(), 8);
+            break;
         case LLVMVector2xi32:
+            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+                     ? LLVMScalableVectorType(LLVMInt32Type(), 2)
+                     : LLVMVectorType(LLVMInt32Type(), 2);
+            break;
         case LLVMVector4xi32:
-            ty = LLVMScalableVectorType(LLVMInt32Type(), 2); break;
+            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+                     ? LLVMScalableVectorType(LLVMInt32Type(), 2)
+                     : LLVMVectorType(LLVMInt32Type(), 4);
+            break;
         case LLVMVector1xi64:
+            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+                     ? LLVMScalableVectorType(LLVMInt64Type(), 1)
+                     : LLVMVectorType(LLVMInt64Type(), 1);
+            break;
         case LLVMVector2xi64:
-            ty = LLVMScalableVectorType(LLVMInt64Type(), 1); break;
-#endif
+            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+                     ? LLVMScalableVectorType(LLVMInt64Type(), 1)
+                     : LLVMVectorType(LLVMInt64Type(), 2);
+            break;
         case LLVMInvalidType:
             ty = LLVMVoidType(); break;
         default: assert(0);
@@ -530,11 +596,9 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
             assert(u->operands[i].kind == OP_VEC);
             sbuf_printf(&bm, " -DVEC%d=%s", (i - 2), qemuaot_default_param_name[XREG_MAX + u->operands[i].vec.idx]);
         }
-#if defined(__aarch64__)
-        const char *clang_cmd_head = "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O2 -emit-llvm";
-#elif (defined(__riscv) && __riscv_xlen == 64)
-        const char *clang_cmd_head = "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O2 -emit-llvm";
-#endif
+        const char *clang_cmd_head = (g_target_arch == TARGET_ARCH_RISCV64)
+            ? "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O2 -emit-llvm"
+            : "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O2 -emit-llvm";
         int cmd_sz = strlen(clang_cmd_head) + strlen(XMM_PARAM_DECLARE_COMMON) + strlen(XMM_PARAM_LIST) + 8 * 12 /* -DVEC/XY */ + strlen(g_output_path) + strlen(g_template_path) + strlen(dump_helper_buf) * 2 + strlen(dump_macro_buf) + 256 /*misc*/;
         char *clang_cmd = (char *)malloc(cmd_sz);
         snprintf(clang_cmd, cmd_sz, "%s -DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\" -DHELPER_NAME=%s %s %s/helper_templates/%s.c -o %s/%s.bc", clang_cmd_head, XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST, &dump_helper_buf[0], &dump_macro_buf[0], g_template_path, helper_str[h], g_output_path, &dump_helper_buf[0]);
@@ -798,9 +862,13 @@ int handle_func(TcgContext *ctx, int is_external) {
 }
 
 void print_usage(const char *progname) {
-    fprintf(stderr, "Usage: %s [-d] [-h] <input.tir>\n", progname);
+    fprintf(stderr, "Usage: %s [-d] [-t <arch>] [-h] <input.tir>\n", progname);
     fprintf(stderr, "  -d    Dump the mapped LLVM-IR module to stdout and exit without\n");
     fprintf(stderr, "        kicking off compilation (no passes, no object file)\n");
+    fprintf(stderr, "  -t <arch>\n");
+    fprintf(stderr, "        Select the LLVM target: aarch64 (alias: arm64) or\n");
+    fprintf(stderr, "        riscv64 (alias: riscv).  Default is the host the mapper\n");
+    fprintf(stderr, "        was compiled for (%s).\n", target_arch_name(g_target_arch));
     fprintf(stderr, "  -h    Print this help message\n");
 }
 
@@ -858,24 +926,32 @@ int init_llvm() {
     // Enable AArch64AOTStackSwitchPass/RISCVAOTStackSwitchPass
     int rc = setenv("LLVM_ENABLE_AOT_STACK_SWITCH", "1", 1);
     assert(rc == 0);
-#if defined(__aarch64__)
-    const char *default_triple = "aarch64-unknown-linux-gnu";
-    const char* features = "+neon";
+    /* Both backends are initialized unconditionally: '-t' can select either
+     * one, so the host macro no longer decides what is available.  This
+     * requires linking both AArch64 and RISC-V targets (e.g. the output of
+     * `llvm-config --libs` without target filtering, or a shared libLLVM). */
     LLVMInitializeAArch64TargetInfo();
     LLVMInitializeAArch64Target();
     LLVMInitializeAArch64TargetMC();
     LLVMInitializeAArch64AsmPrinter();
     LLVMInitializeAArch64AsmParser();
-#elif (defined(__riscv) && __riscv_xlen == 64)
-    const char *default_triple = "riscv64-unknown-linux-gnu";
-    //const char* features = "+m,+a,+f,+d,+v,+unaligned-scalar-mem,+unaligned-vector-mem";
-    const char* features = "+m,+a,+f,+d,+v";
     LLVMInitializeRISCVTargetInfo();
     LLVMInitializeRISCVTarget();
     LLVMInitializeRISCVTargetMC();
     LLVMInitializeRISCVAsmPrinter();
     LLVMInitializeRISCVAsmParser();
-#endif
+
+    const char *default_triple = NULL;
+    const char *features = NULL;
+    if (g_target_arch == TARGET_ARCH_RISCV64) {
+        default_triple = "riscv64-unknown-linux-gnu";
+        // Unfortunately on Spacemit(R) X60, following instruction requires alignment: vse64.v v30,(a4)
+        // features = "+m,+a,+f,+d,+v,+unaligned-scalar-mem,+unaligned-vector-mem";
+        features = "+m,+a,+f,+d,+v";
+    } else {
+        default_triple = "aarch64-unknown-linux-gnu";
+        features = "+neon";
+    }
     if (LLVMGetTargetFromTriple(default_triple, &target, &error_msg)) {
         fprintf(stderr, "Failed to get target from triple %s\n", error_msg);
         return -1;
@@ -889,22 +965,12 @@ int init_llvm() {
     g_attr_alwaysinline = LLVMCreateEnumAttribute(context, LLVMAlwaysInlineAttribute, 0);
     g_attr_nounwind = LLVMCreateEnumAttribute(context, LLVMGetEnumAttributeKindForName("nounwind", strlen("nounwind")), 0);
     const char *attr_key = "target-features";
-#if defined(__aarch64__)
-    const char *attr_value = "+neon";
-#elif (defined(__riscv) && __riscv_xlen == 64)
-    // Unfortunately on Spacemit(R) X60, following instruction requires alignment: vse64.v v30,(a4)
-    //const char *attr_value = "+m,+a,+f,+d,+v,+unaligned-scalar-mem,+unaligned-vector-mem";
-    const char *attr_value = "+m,+a,+f,+d,+v";
-#endif
+    const char *attr_value = (g_target_arch == TARGET_ARCH_RISCV64) ? "+m,+a,+f,+d,+v" : "+neon";
     size_t attr_key_len = strlen(attr_key);
     size_t attr_value_len = strlen(attr_value);
     g_attr_target_features = LLVMCreateStringAttribute(context, attr_key, attr_key_len, attr_value, attr_value_len);
 
-#if defined(__aarch64__)
-    LLVMSetTarget(g_module, "aarch64-unknown-linux-gnu");
-#elif (defined(__riscv) && __riscv_xlen == 64)
-    LLVMSetTarget(g_module, "riscv64-unknown-linux-gnu");
-#endif
+    LLVMSetTarget(g_module, default_triple);
 
     g_builder = LLVMCreateBuilder();
 
@@ -1023,11 +1089,19 @@ int main(int argc, char *argv[]) {
         rc = -1;
         goto exit;
     }
-    while ((opt = getopt(argc, argv, "dh")) != -1) {
+    while ((opt = getopt(argc, argv, "dht:")) != -1) {
         switch (opt) {
             case 'd':
                 /* Dump the mapped LLVM-IR module, skip compilation */
                 g_dump_ir = 1;
+                break;
+            case 't':
+                /* Select the LLVM target (default: host the mapper was built for) */
+                if (set_target_arch(optarg) != 0) {
+                    print_usage(argv[0]);
+                    rc = -1;
+                    goto exit;
+                }
                 break;
             case 'h':
                 print_usage(argv[0]);
