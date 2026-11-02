@@ -97,57 +97,131 @@ static int set_target_arch(const char *arg) {
     return -1;
 }
 
+/* -------------------------------------------------------------------------
+ * Vector kind selection (fixed vs. scalable)
+ *
+ * The default is per-target: AArch64/NEON uses fixed-width vectors, RISC-V
+ * uses scalable (RVV) vectors.  '-v' overrides that explicitly.
+ *
+ * The default is resolved lazily at query time (see mapper_use_scalable_vector
+ * below), so the relative order of '-t' and '-v' on the command line does not
+ * matter.
+ * ------------------------------------------------------------------------- */
+typedef enum {
+    VECTOR_KIND_DEFAULT = 0,   /* per-target default: aarch64 -> fixed, riscv64 -> scalable */
+    VECTOR_KIND_FIXED,
+    VECTOR_KIND_SCALABLE,
+} MapperVectorKind;
+
+/* Non-static so other translation units may consult it directly as well. */
+int g_vector_kind = VECTOR_KIND_DEFAULT;
+
+/* Per-target default for the vector kind. */
+static int default_scalable_for_arch(int arch) {
+    return (arch == TARGET_ARCH_RISCV64) ? 1 : 0;
+}
+
+/*
+ * Runtime query API.
+ *
+ * Returns non-zero when scalable (RVV-style) vector types should be used,
+ * zero when fixed-width (NEON-style) vector types should be used.
+ *
+ * This is the single place the vector kind is decided, so any new vector code
+ * path should ask here instead of testing g_target_arch / g_vector_kind.
+ *
+ * To use it from another translation unit, add to mapper.h (or locally):
+ *     extern int mapper_use_scalable_vector(void);
+ */
+int mapper_use_scalable_vector(void) {
+    switch (g_vector_kind) {
+        case VECTOR_KIND_SCALABLE: return 1;
+        case VECTOR_KIND_FIXED:    return 0;
+        default:                   return default_scalable_for_arch(g_target_arch);
+    }
+}
+
+/* Resolved vector kind, for diagnostics only. */
+const char *mapper_vector_kind_name(void) {
+    return mapper_use_scalable_vector() ? "scalable" : "fixed";
+}
+
+/* Parse the argument of '-v'.  Returns 0 on success, -1 on error. */
+static int set_vector_kind(const char *arg) {
+    if (!arg || !*arg) {
+        return -1;
+    }
+    if (!strcmp(arg, "fixed") || !strcmp(arg, "f")) {
+        g_vector_kind = VECTOR_KIND_FIXED;
+        return 0;
+    }
+    if (!strcmp(arg, "scalable") || !strcmp(arg, "s")) {
+        g_vector_kind = VECTOR_KIND_SCALABLE;
+        return 0;
+    }
+    if (!strcmp(arg, "default") || !strcmp(arg, "auto") || !strcmp(arg, "d")) {
+        g_vector_kind = VECTOR_KIND_DEFAULT;
+        return 0;
+    }
+    fprintf(stderr, "Error: unknown vector kind '%s' (supported: fixed, scalable, default)\n", arg);
+    return -1;
+}
+
 static inline void tbaa_tag(LLVMValueRef inst, const TBAA *t, TagType tag_ty) {
     LLVMSetMetadata(inst, t->kind, (tag_ty == CPU_TAG ? t->cpu_tag : (tag_ty == GUEST_TAG ? t->guest_tag : t->spill_tag)));
 }
 
 LLVMTypeRef get_llvm_type(LLVMType type) {
     LLVMTypeRef ty = NULL;
+    /* Resolved once per call: fixed (NEON) vs. scalable (RVV).  Default is
+     * per-target (aarch64 -> fixed, riscv64 -> scalable) and can be forced
+     * with '-v'. */
+    const int use_scalable = mapper_use_scalable_vector();
     switch (type) {
         case LLVMInt8: ty = LLVMInt8Type(); break;
         case LLVMInt16: ty = LLVMInt16Type(); break;
         case LLVMInt32: ty = LLVMInt32Type(); break;
         case LLVMInt64: ty = LLVMInt64Type(); break;
-        /* Fixed-width (AArch64/NEON) vs. scalable (RISC-V/RVV) vector types.
-         * On RISC-V the 64-bit and 128-bit TCG vector kinds collapse onto the
-         * same scalable type, exactly as the old #if/#elif branches did. */
+        /* Fixed-width vs. scalable vector types.  With scalable kinds the
+         * 64-bit and 128-bit TCG vector kinds collapse onto the same scalable
+         * type, exactly as the old #if/#elif branches did. */
         case LLVMVector8xi8:
-            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+            ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt8Type(), 8)
                      : LLVMVectorType(LLVMInt8Type(), 8);
             break;
         case LLVMVector16xi8:
-            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+            ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt8Type(), 8)
                      : LLVMVectorType(LLVMInt8Type(), 16);
             break;
         case LLVMVector4xi16:
-            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+            ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt16Type(), 4)
                      : LLVMVectorType(LLVMInt16Type(), 4);
             break;
         case LLVMVector8xi16:
-            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+            ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt16Type(), 4)
                      : LLVMVectorType(LLVMInt16Type(), 8);
             break;
         case LLVMVector2xi32:
-            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+            ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt32Type(), 2)
                      : LLVMVectorType(LLVMInt32Type(), 2);
             break;
         case LLVMVector4xi32:
-            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+            ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt32Type(), 2)
                      : LLVMVectorType(LLVMInt32Type(), 4);
             break;
         case LLVMVector1xi64:
-            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+            ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt64Type(), 1)
                      : LLVMVectorType(LLVMInt64Type(), 1);
             break;
         case LLVMVector2xi64:
-            ty = (g_target_arch == TARGET_ARCH_RISCV64)
+            ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt64Type(), 1)
                      : LLVMVectorType(LLVMInt64Type(), 2);
             break;
@@ -862,13 +936,20 @@ int handle_func(TcgContext *ctx, int is_external) {
 }
 
 void print_usage(const char *progname) {
-    fprintf(stderr, "Usage: %s [-d] [-t <arch>] [-h] <input.tir>\n", progname);
+    fprintf(stderr, "Usage: %s [-d] [-t <arch>] [-v <kind>] [-h] <input.tir>\n", progname);
     fprintf(stderr, "  -d    Dump the mapped LLVM-IR module to stdout and exit without\n");
     fprintf(stderr, "        kicking off compilation (no passes, no object file)\n");
     fprintf(stderr, "  -t <arch>\n");
     fprintf(stderr, "        Select the LLVM target: aarch64 (alias: arm64) or\n");
     fprintf(stderr, "        riscv64 (alias: riscv).  Default is the host the mapper\n");
     fprintf(stderr, "        was compiled for (%s).\n", target_arch_name(g_target_arch));
+    fprintf(stderr, "  -v <kind>\n");
+    fprintf(stderr, "        Select the LLVM vector kind: fixed (alias: f) or\n");
+    fprintf(stderr, "        scalable (alias: s); 'default' (alias: d, auto) restores\n");
+    fprintf(stderr, "        the per-target default.  The per-target default is\n");
+    fprintf(stderr, "        aarch64 -> fixed, riscv64 -> scalable.\n");
+    fprintf(stderr, "        Currently resolving to: %s (for %s).\n",
+            mapper_vector_kind_name(), target_arch_name(g_target_arch));
     fprintf(stderr, "  -h    Print this help message\n");
 }
 
@@ -923,9 +1004,6 @@ static void make_tbaa(LLVMContextRef C) {
 int init_llvm() {
     char *error_msg = NULL;
     LLVMTargetRef target;
-    // Enable AArch64AOTStackSwitchPass/RISCVAOTStackSwitchPass
-    int rc = setenv("LLVM_ENABLE_AOT_STACK_SWITCH", "1", 1);
-    assert(rc == 0);
     /* Both backends are initialized unconditionally: '-t' can select either
      * one, so the host macro no longer decides what is available.  This
      * requires linking both AArch64 and RISC-V targets (e.g. the output of
@@ -958,6 +1036,19 @@ int init_llvm() {
     }
     g_target_machine = LLVMCreateTargetMachine(target, default_triple, "generic", features,
                                              LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelDefault);
+
+    /* Sanity check: scalable vectors only make sense on a target that supports
+     * them.  AArch64 without SVE hard-aborts in the backend ("Scalarization of
+     * scalable vectors is not supported"), so complain now rather than there.
+     * Note the target features are intentionally NOT tied to the vector kind:
+     * fixed-width vectors on RISC-V still lower to RVV when +v is available. */
+    if (mapper_use_scalable_vector() && g_target_arch != TARGET_ARCH_RISCV64 &&
+        !(features && strstr(features, "sve"))) {
+        fprintf(stderr, "Warning: scalable vectors requested on %s, but the target "
+                        "features \"%s\" do not enable SVE; add +sve/+sve2 or pass "
+                        "'-v fixed' to avoid a backend abort.\n",
+                target_arch_name(g_target_arch), features ? features : "");
+    }
 
     g_module = LLVMModuleCreateWithName("qemuaot");
     LLVMContextRef context = LLVMGetModuleContext(g_module);
@@ -1089,7 +1180,7 @@ int main(int argc, char *argv[]) {
         rc = -1;
         goto exit;
     }
-    while ((opt = getopt(argc, argv, "dht:")) != -1) {
+    while ((opt = getopt(argc, argv, "dht:v:")) != -1) {
         switch (opt) {
             case 'd':
                 /* Dump the mapped LLVM-IR module, skip compilation */
@@ -1098,6 +1189,14 @@ int main(int argc, char *argv[]) {
             case 't':
                 /* Select the LLVM target (default: host the mapper was built for) */
                 if (set_target_arch(optarg) != 0) {
+                    print_usage(argv[0]);
+                    rc = -1;
+                    goto exit;
+                }
+                break;
+            case 'v':
+                /* Select fixed vs. scalable vectors (default: per-target) */
+                if (set_vector_kind(optarg) != 0) {
                     print_usage(argv[0]);
                     rc = -1;
                     goto exit;
