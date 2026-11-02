@@ -79,7 +79,7 @@ PRINTER_OBJS := $(COMMON_OBJS) printer.o
 all: tcg_mapper tcg_printer
 
 tcg_mapper: qemu_cpu_sizes.h $(MAPPER_OBJS)
-	gcc -o $@ $^ $(LDFLAGS) -lfl
+	gcc -o $@ $(MAPPER_OBJS) $(LDFLAGS) -lfl
 
 tcg_printer: $(PRINTER_OBJS)
 	gcc -o $@ $^ $(LDFLAGS) -lfl
@@ -99,9 +99,36 @@ parser.tab.c: parser.y
 helper_lookup.c: helpers.gperf
 	gperf -t -L ANSI-C -N lookup_helper $^ > helper_lookup.c
 
-qemu_cpu_sizes.h: check-qemu-cpu-size-build
+ifeq ($(wildcard qemu_cpu_sizes.h),)
+# Absent: pull in the sanity check so the failure message is a useful one.
+ qemu_cpu_sizes.h: check-qemu-cpu-size-build
+endif
+
+qemu_cpu_sizes.h:
+	@if [ -f "$@" ]; then \
+		echo "qemu_cpu_sizes.h: already present, keeping it"; \
+		echo "                  ('make qemu-cpu-sizes' to refresh, 'make clean' to drop)"; \
+		exit 0; \
+	fi; \
+	if [ -z "$(QEMU_CPU_SIZE_BUILD)" ]; then \
+		echo "ERROR: QEMU_CPU_SIZE_BUILD is not set."; \
+		echo "Usage: make QEMU_CPU_SIZE_BUILD=/path/to/qemu-build"; \
+		exit 1; \
+	fi; \
+	if [ ! -d "$(QEMU_CPU_SIZE_BUILD)" ]; then \
+		echo "ERROR: QEMU_CPU_SIZE_BUILD directory '$(QEMU_CPU_SIZE_BUILD)' does not exist."; \
+		exit 1; \
+	fi; \
+	echo "Generating qemu_cpu_sizes.h from $(QEMU_CPU_SIZE_BUILD) ..."; \
+	ninja -C $(QEMU_CPU_SIZE_BUILD) -t compdb > $(QEMU_CPU_SIZE_BUILD)/compile_commands.json; \
+	python3 gen_qemu_sizes.py --build-dir $(QEMU_CPU_SIZE_BUILD) --target i386 --out qemu_cpu_sizes.h; \
+	echo "Generated qemu_cpu_sizes.h (kept until 'make clean')"
+
+# Force a refresh even though the header already exists.
+qemu-cpu-sizes: check-qemu-cpu-size-build
 	ninja -C $(QEMU_CPU_SIZE_BUILD) -t compdb > $(QEMU_CPU_SIZE_BUILD)/compile_commands.json
 	python3 gen_qemu_sizes.py --build-dir $(QEMU_CPU_SIZE_BUILD) --target i386 --out qemu_cpu_sizes.h
+	@echo "Refreshed qemu_cpu_sizes.h from $(QEMU_CPU_SIZE_BUILD)"
 
 check-qemu-cpu-size-build:
 	@if [ -z "$(QEMU_CPU_SIZE_BUILD)" ]; then \
@@ -1481,6 +1508,7 @@ coverage-open: coverage-report
 	test-asm test-asm-update test-asm-san \
 	coverage cov-build cov-run cov-reset coverage-report coverage-open \
 	clean clean-all clean-local clean-qemu-source clean-template \
+	qemu-cpu-sizes check-qemu-cpu-size-build \
 	qemu-preprocess qemu-preprocess-tcg-runtime \
 	qemu-preprocess-cc-helper qemu-preprocess-int-helper \
 	qemu-preprocess-user-exec \
