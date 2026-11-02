@@ -469,12 +469,14 @@ templates: $(ANTLR_PARSE_CLASS) $(HELPER_TMPL_OUT)
 		done; \
 		echo "Copying all *.helper_templates/ folders into $(HELPER_TMPL_OUT)/ ..."; \
 		rm -rf "$(HELPER_TMPL_OUT)"; mkdir -p "$(HELPER_TMPL_OUT)"; \
-		shopt -s dotglob nullglob; \
 		for d in $(HT_DIRS); do \
 			[ -d "$$d" ] || continue; \
-			cp -f "$$d"/* "$(HELPER_TMPL_OUT)/" 2>/dev/null || true; \
+			for f in "$$d"/* "$$d"/.[!.]* "$$d"/..?*; do \
+				[ -e "$$f" ] || continue; \
+				cp -f "$$f" "$(HELPER_TMPL_OUT)/" 2>/dev/null || true; \
+			done; \
 		done; \
-		cp -f jmp_ind_callback.c $(HELPER_TMPL_OUT)/ \
+		cp -f jmp_ind_callback.c $(HELPER_TMPL_OUT)/; \
 		echo "Done. helper_templates ready in $(HELPER_TMPL_OUT)/."; \
 	fi
 
