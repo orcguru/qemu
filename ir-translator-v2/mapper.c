@@ -173,43 +173,32 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
         case LLVMInt16: ty = LLVMInt16Type(); break;
         case LLVMInt32: ty = LLVMInt32Type(); break;
         case LLVMInt64: ty = LLVMInt64Type(); break;
-        /* Fixed-width vs. scalable vector types.  With scalable kinds the
-         * 64-bit and 128-bit TCG vector kinds collapse onto the same scalable
-         * type, exactly as the old #if/#elif branches did. */
         case LLVMVector8xi8:
-            ty = (use_scalable)
-                     ? LLVMScalableVectorType(LLVMInt8Type(), 8)
-                     : LLVMVectorType(LLVMInt8Type(), 8);
+            ty = LLVMVectorType(LLVMInt8Type(), 8);
+            break;
+        case LLVMVector4xi16:
+            ty = LLVMVectorType(LLVMInt16Type(), 4);
+            break;
+        case LLVMVector2xi32:
+            ty = LLVMVectorType(LLVMInt32Type(), 2);
+            break;
+        case LLVMVector1xi64:
+            ty = LLVMVectorType(LLVMInt64Type(), 1);
             break;
         case LLVMVector16xi8:
             ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt8Type(), 8)
                      : LLVMVectorType(LLVMInt8Type(), 16);
             break;
-        case LLVMVector4xi16:
-            ty = (use_scalable)
-                     ? LLVMScalableVectorType(LLVMInt16Type(), 4)
-                     : LLVMVectorType(LLVMInt16Type(), 4);
-            break;
         case LLVMVector8xi16:
             ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt16Type(), 4)
                      : LLVMVectorType(LLVMInt16Type(), 8);
             break;
-        case LLVMVector2xi32:
-            ty = (use_scalable)
-                     ? LLVMScalableVectorType(LLVMInt32Type(), 2)
-                     : LLVMVectorType(LLVMInt32Type(), 2);
-            break;
         case LLVMVector4xi32:
             ty = (use_scalable)
                      ? LLVMScalableVectorType(LLVMInt32Type(), 2)
                      : LLVMVectorType(LLVMInt32Type(), 4);
-            break;
-        case LLVMVector1xi64:
-            ty = (use_scalable)
-                     ? LLVMScalableVectorType(LLVMInt64Type(), 1)
-                     : LLVMVectorType(LLVMInt64Type(), 1);
             break;
         case LLVMVector2xi64:
             ty = (use_scalable)
