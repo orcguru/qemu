@@ -40,3 +40,4 @@ ir-translator-v2/collect_helper_templates/parser/*.tokens
 ir-translator-v2/collect_helper_templates/parser/*.java
 ir-translator-v2/collect_helper_templates/parser/antlr-4.9.3-complete.jar
 ir-translator-v2/tests/translate_to_llvm_ir/*.bc
+ir-translator-v2/helper_templates
