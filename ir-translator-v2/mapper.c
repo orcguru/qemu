@@ -51,19 +51,6 @@ LLVMAttributeRef g_attr_nounwind = NULL;
 TcgContext *g_ctx = NULL;
 TBAA g_tbaa;
 
-/* -------------------------------------------------------------------------
- * Target architecture selection
- *
- * Historically the LLVM target was fixed at compile time by the host macro
- * (__aarch64__ / __riscv).  It is now a runtime value so that '-t <arch>'
- * can produce a cross-target result, while the default stays exactly what
- * the host macro picked before.
- * ------------------------------------------------------------------------- */
-typedef enum {
-    TARGET_ARCH_AARCH64 = 0,
-    TARGET_ARCH_RISCV64,
-} MapperTargetArch;
-
 #if defined(__aarch64__)
 int g_target_arch = TARGET_ARCH_AARCH64;
 #elif (defined(__riscv) && __riscv_xlen == 64)
@@ -95,6 +82,10 @@ static int set_target_arch(const char *arg) {
     }
     fprintf(stderr, "Error: unknown target '%s' (supported: aarch64, riscv64)\n", arg);
     return -1;
+}
+
+int get_target_arch(void) {
+    return g_target_arch;
 }
 
 /* -------------------------------------------------------------------------

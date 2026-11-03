@@ -595,9 +595,15 @@ static void setup_env_for_stack_switch(LLVMBuilderRef builder, StackAlloca *stac
     LLVMTypeRef asm_param_types[] = {get_llvm_type(LLVMInt64)};
     LLVMTypeRef asm_function_type = LLVMFunctionType(LLVMVoidType(), asm_param_types, 1, 0);
     char asm_string[128];
+    char constraint_string[128];
     // Copy env to the reserved register
-    sprintf(asm_string, "mov x16, $0");
-    const char *constraint_string = "r,~{x16}";
+    if (get_target_arch() == TARGET_ARCH_AARCH64) {
+        sprintf(asm_string, "mov x16, $0");
+        sprintf(constraint_string, "r,~{x16}");
+    } else {
+        sprintf(asm_string, "mv x7, $0");
+        sprintf(constraint_string, "r,~{x7}");
+    }
     LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_function_type, asm_string, constraint_string, /* has_side_effects */ 0, /* is_align_stack */ 0);
     LLVMValueRef asm_param_list[] = {LLVMBuildPtrToInt(builder, stack->env, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "env"))};
     LLVMBuildCall2(builder, asm_function_type, inline_asm, asm_param_list, 1, "");

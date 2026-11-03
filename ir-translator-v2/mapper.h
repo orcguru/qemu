@@ -37,6 +37,11 @@ typedef struct {
     unsigned     kind;          /* MDKindID of "tbaa" */
 } TBAA;
 
+typedef enum {
+    TARGET_ARCH_AARCH64 = 0,
+    TARGET_ARCH_RISCV64,
+} MapperTargetArch;
+
 LLVMTypeRef get_llvm_type(LLVMType type);
 LLVMValueRef create_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef ret_ty, LLVMTypeRef *arg_types, int cnt);
 LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *intrinsic_types, int cnt);
@@ -54,6 +59,7 @@ LLVMValueRef get_or_add_func_with_default_cc(HelperType h, const UnifiedInstr *u
 LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name);
 char *get_func_name(unsigned long hex_offset, int sub_idx, char *buf, int buf_size);
 LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix);
+int get_target_arch(void);
 int mapper_use_scalable_vector(void);
 
 #define GET_ALIGNMENT_FROM_TYPE(type)       (type <= LLVMInt64 ? 8 : 16)
