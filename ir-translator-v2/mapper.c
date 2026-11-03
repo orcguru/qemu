@@ -1044,15 +1044,13 @@ static void make_tbaa(LLVMContextRef C) {
 int init_llvm() {
     char *error_msg = NULL;
     LLVMTargetRef target;
-    /* Both backends are initialized unconditionally: '-t' can select either
-     * one, so the host macro no longer decides what is available.  This
-     * requires linking both AArch64 and RISC-V targets (e.g. the output of
-     * `llvm-config --libs` without target filtering, or a shared libLLVM). */
+#if defined(__aarch64__)
     LLVMInitializeAArch64TargetInfo();
     LLVMInitializeAArch64Target();
     LLVMInitializeAArch64TargetMC();
     LLVMInitializeAArch64AsmPrinter();
     LLVMInitializeAArch64AsmParser();
+#endif
     LLVMInitializeRISCVTargetInfo();
     LLVMInitializeRISCVTarget();
     LLVMInitializeRISCVTargetMC();
