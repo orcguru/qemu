@@ -262,7 +262,6 @@ LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const c
     LLVMTypeRef intrinsic_types[] = {scalable_vec_type, get_llvm_type(LLVMInt64)};
     char intrinsic_func_name[128] = {0};
     snprintf(intrinsic_func_name, sizeof(intrinsic_func_name), "llvm.vector.extract.v%di%d.nxv%di%d", llvm_vector_elem_bit_counts[ty * 2], llvm_vector_elem_bit_counts[ty * 2 + 1], (64 / llvm_vector_elem_bit_counts[elem_ty * 2 + 1]), llvm_vector_elem_bit_counts[elem_ty * 2 + 1]);
-    printf("%s\n", intrinsic_func_name);
     LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func_name, intrinsic_lookup_types, 3);
     LLVMValueRef index_0 = LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0);
     LLVMValueRef intrinsic_call_args[] = {val, index_0};
