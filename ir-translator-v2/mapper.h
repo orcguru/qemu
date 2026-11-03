@@ -53,6 +53,8 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
 LLVMValueRef get_or_add_func_with_default_cc(HelperType h, const UnifiedInstr *u);
 LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name);
 char *get_func_name(unsigned long hex_offset, int sub_idx, char *buf, int buf_size);
+LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix);
+int mapper_use_scalable_vector(void);
 
 #define GET_ALIGNMENT_FROM_TYPE(type)       (type <= LLVMInt64 ? 8 : 16)
 

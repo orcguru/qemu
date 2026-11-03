@@ -453,7 +453,12 @@ void translate_dup_vec(LLVMBuilderRef builder, StackAlloca *stack, const Unified
             assert(0);
         }
     } else {
-        elem = LLVMBuildExtractElement(builder, get_input_val_for_operand(&u->operands[1], stack, prefix), LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "elem"));
+        assert(u->operands[1].kind == OP_VEC);
+        LLVMValueRef v = get_input_val_for_operand(&u->operands[1], stack, prefix);
+        if (mapper_use_scalable_vector()) {
+            v = extract_from_scalable_vector(v, tcg_ty, prefix);
+        }
+        elem = LLVMBuildExtractElement(builder, v, LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "elem"));
     }
     uint8_t elem_cnt = llvm_vector_elem_bit_counts[tcg_ty * 2];
     LLVMValueRef out = get_const_vector(0, tcg_ty, prefix);

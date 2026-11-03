@@ -247,6 +247,36 @@ LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *
     return LLVMGetIntrinsicDeclaration(g_module, id, intrinsic_types, cnt);
 }
 
+static LLVMValueRef insert_into_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType elem_ty = OPC_VECTOR_TO_FIXED(ty);
+    LLVMTypeRef scalable_vec_type = get_llvm_type(ty);
+    LLVMTypeRef fixed_vec_type = LLVMVectorType(get_llvm_type(elem_ty), llvm_vector_elem_bit_counts[ty * 2]);
+    LLVMTypeRef intrinsic_types[] = {scalable_vec_type, fixed_vec_type, get_llvm_type(LLVMInt64)};
+    char intrinsic_func_name[128] = {0};
+    snprintf(intrinsic_func_name, sizeof(intrinsic_func_name), "llvm.vector.insert.nxv%di%d.v%di%d", (64 / llvm_vector_elem_bit_counts[elem_ty * 2 + 1]), llvm_vector_elem_bit_counts[elem_ty * 2 + 1], llvm_vector_elem_bit_counts[ty * 2], llvm_vector_elem_bit_counts[ty * 2 + 1]);
+    LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func_name, intrinsic_types, 3);
+    LLVMValueRef index_0 = LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0);
+    LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(scalable_vec_type), val, index_0};
+    LLVMTypeRef fn_type = LLVMFunctionType(scalable_vec_type, intrinsic_types, 3, 0);
+    return LLVMBuildCall2(g_builder, fn_type, fn, intrinsic_call_args, 3, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "vector_insert"));
+}
+
+LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix) {
+    char var_name[32] = {0};
+    LLVMType elem_ty = OPC_VECTOR_TO_FIXED(ty);
+    LLVMTypeRef scalable_vec_type = get_llvm_type(ty);
+    LLVMTypeRef fixed_vec_type = LLVMVectorType(get_llvm_type(elem_ty), llvm_vector_elem_bit_counts[ty * 2]);
+    LLVMTypeRef intrinsic_types[] = {scalable_vec_type, get_llvm_type(LLVMInt64)};
+    char intrinsic_func_name[128] = {0};
+    snprintf(intrinsic_func_name, sizeof(intrinsic_func_name), "llvm.vector.extract.v%di%d.nxv%di%d", llvm_vector_elem_bit_counts[ty * 2], llvm_vector_elem_bit_counts[ty * 2 + 1], (64 / llvm_vector_elem_bit_counts[elem_ty * 2 + 1]), llvm_vector_elem_bit_counts[elem_ty * 2 + 1]);
+    LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func_name, intrinsic_types, 2);
+    LLVMValueRef index_0 = LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0);
+    LLVMValueRef intrinsic_call_args[] = {val, index_0};
+    LLVMTypeRef fn_type = LLVMFunctionType(fixed_vec_type, intrinsic_types, 2, 0);
+    return LLVMBuildCall2(g_builder, fn_type, fn, intrinsic_call_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "vector_extract"));
+}
+
 LLVMValueRef get_const_vector(unsigned long c, LLVMType ty, const char *prefix) {
     LLVMValueRef constants[16];
     int elem_cnt = llvm_vector_elem_bit_counts[ty * 2];
@@ -254,21 +284,11 @@ LLVMValueRef get_const_vector(unsigned long c, LLVMType ty, const char *prefix) 
         constants[i] = LLVMConstInt(get_llvm_type(OPC_VECTOR_TO_FIXED(ty)), c, 0);
     }
     LLVMValueRef ret = LLVMConstVector(constants, elem_cnt);
-    if (!mapper_use_scalable_vector())
+    if (!mapper_use_scalable_vector()) {
         return ret;
-    // Scalable Vector
-    char var_name[32] = {0};
-    LLVMType elem_ty = OPC_VECTOR_TO_FIXED(ty);
-    LLVMTypeRef ret_type = get_llvm_type(ty);
-    LLVMTypeRef fixed_vec_type = LLVMVectorType(get_llvm_type(elem_ty), llvm_vector_elem_bit_counts[ty * 2]);
-    LLVMTypeRef intrinsic_types[] = {ret_type, fixed_vec_type, get_llvm_type(LLVMInt64)};
-    char intrinsic_func_name[128] = {0};
-    snprintf(intrinsic_func_name, sizeof(intrinsic_func_name), "llvm.vector.insert.nxv%di%d.v%di%d", (64 / llvm_vector_elem_bit_counts[elem_ty * 2 + 1]), llvm_vector_elem_bit_counts[elem_ty * 2 + 1], llvm_vector_elem_bit_counts[ty * 2], llvm_vector_elem_bit_counts[ty * 2 + 1]);
-    LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func_name, intrinsic_types, 3);
-    LLVMValueRef index_0 = LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0);
-    LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(ret_type), ret, index_0};
-    LLVMTypeRef fn_type = LLVMFunctionType(ret_type, intrinsic_types, 3, 0);
-    return LLVMBuildCall2(g_builder, fn_type, fn, intrinsic_call_args, 3, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "const_vec"));
+    } else {
+        return insert_into_scalable_vector(ret, ty, prefix);
+    }
 }
 
 LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name) {
@@ -345,8 +365,11 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
                 imm = imm >> bit_cnt;
             }
             val = LLVMConstVector(constants, elem_cnt);
-            return val;
-            // FIXME: scalable vector
+            if (!mapper_use_scalable_vector()) {
+                return val;
+            } else {
+                return insert_into_scalable_vector(val, ty, prefix);
+            }
         }
     } else if ((op->kind == OP_SLOT && op->slot.type == SUB_SLOT_ENVVAR) || op->kind == OP_ENV) {
         LLVMType op_ty = op->kind == OP_SLOT ? op->slot.op_type : op->env.op_type;
@@ -367,7 +390,9 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
             int elem_cnt = (llvm_vector_elem_bit_counts[stack_ty * 2 + 1] * llvm_vector_elem_bit_counts[stack_ty * 2]) / llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1];
             LLVMType load_ty = get_vector_type_for_elem(elem_cnt, llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1]);
             val = load_from_stack_as_type(&stack->vector, op->vec.idx, load_ty, prefix, &var_name[0]);
-            // FIXME: scalable vector
+            if (mapper_use_scalable_vector()) {
+                val = extract_from_scalable_vector(val, load_ty, prefix);
+            }
             val = LLVMBuildExtractElement(g_builder, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ee"));
             return val;
         } else {
