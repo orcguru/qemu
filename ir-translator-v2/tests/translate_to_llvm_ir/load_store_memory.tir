@@ -91,6 +91,7 @@ st32_i64 loc5,loc2,$0x1
 st32_i64 loc5,loc2,$0x4
 st32_i64 loc5,loc2,$0xd
 ld_vec v64,e32,loc22,env,$0x6a0
+ld_vec v128,e32,loc22,env,$0x6a0
 st_vec v64,e8,loc22,env,$0x360
 ld_vec v128,e16,loc23,env,$0x6a0
 st_vec v64,e32,loc23,env,$0x360
