@@ -473,236 +473,239 @@ entry:
 ; ======== TCG [71] ld_vec v64,e32,[t13],v26 ========
   %T71.v26 = load <2 x i32>, ptr %v26.stack, align 16, !tbaa !0, !tcg.op !78
   store <2 x i32> %T71.v26, ptr %tmp13.stack, align 16, !tbaa !0, !tcg.op !78
-; ======== TCG [72] st_vec v64,e8,t13,v0 ========
-  %T72.tmp13 = load <8 x i8>, ptr %tmp13.stack, align 16, !tbaa !0, !tcg.op !79
-  store <8 x i8> %T72.tmp13, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !79
-; ======== TCG [73] ld_vec v128,e16,[t14],v26 ========
-  %T73.v26 = load <8 x i16>, ptr %v26.stack, align 16, !tbaa !0, !tcg.op !80
-  store <8 x i16> %T73.v26, ptr %tmp14.stack, align 16, !tbaa !0, !tcg.op !80
-; ======== TCG [74] st_vec v64,e32,t14,v0 ========
-  %T74.tmp14 = load <2 x i32>, ptr %tmp14.stack, align 16, !tbaa !0, !tcg.op !81
-  store <2 x i32> %T74.tmp14, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !81
-; ======== TCG [75] st_vec v64,e8,t13,v0:o1 ========
-  %T75.tmp13 = load <8 x i8>, ptr %tmp13.stack, align 16, !tbaa !0, !tcg.op !82
-  %T75.envptr = getelementptr i8, ptr %env, i64 865, !tcg.op !82
-  %T75.envptr28 = getelementptr i8, ptr %env, i64 864, !tcg.op !82
-  %T75.v0 = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !82
-  store <2 x i64> %T75.v0, ptr %T75.envptr28, align 16, !tbaa !4, !tcg.op !82
-  store <8 x i8> %T75.tmp13, ptr %T75.envptr, align 1, !tbaa !4, !tcg.op !82
-  %T75.envptr29 = getelementptr i8, ptr %env, i64 864, !tcg.op !82
-  %T75.envval = load <2 x i64>, ptr %T75.envptr29, align 16, !tbaa !4, !tcg.op !82
-  store <2 x i64> %T75.envval, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !82
-; ======== TCG [76] st_vec v64,e8,t13,v0:o9 ========
+; ======== TCG [72] ld_vec v128,e32,[t13],v26 ========
+  %T72.v26 = load <4 x i32>, ptr %v26.stack, align 16, !tbaa !0, !tcg.op !79
+  store <4 x i32> %T72.v26, ptr %tmp13.stack, align 16, !tbaa !0, !tcg.op !79
+; ======== TCG [73] st_vec v64,e8,t13,v0 ========
+  %T73.tmp13 = load <8 x i8>, ptr %tmp13.stack, align 16, !tbaa !0, !tcg.op !80
+  store <8 x i8> %T73.tmp13, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !80
+; ======== TCG [74] ld_vec v128,e16,[t14],v26 ========
+  %T74.v26 = load <8 x i16>, ptr %v26.stack, align 16, !tbaa !0, !tcg.op !81
+  store <8 x i16> %T74.v26, ptr %tmp14.stack, align 16, !tbaa !0, !tcg.op !81
+; ======== TCG [75] st_vec v64,e32,t14,v0 ========
+  %T75.tmp14 = load <2 x i32>, ptr %tmp14.stack, align 16, !tbaa !0, !tcg.op !82
+  store <2 x i32> %T75.tmp14, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !82
+; ======== TCG [76] st_vec v64,e8,t13,v0:o1 ========
   %T76.tmp13 = load <8 x i8>, ptr %tmp13.stack, align 16, !tbaa !0, !tcg.op !83
-  %T76.envptr = getelementptr i8, ptr %env, i64 873, !tcg.op !83
-  %T76.envptr30 = getelementptr i8, ptr %env, i64 864, !tcg.op !83
+  %T76.envptr = getelementptr i8, ptr %env, i64 865, !tcg.op !83
+  %T76.envptr28 = getelementptr i8, ptr %env, i64 864, !tcg.op !83
   %T76.v0 = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !83
-  store <2 x i64> %T76.v0, ptr %T76.envptr30, align 16, !tbaa !4, !tcg.op !83
-  %T76.envptr31 = getelementptr i8, ptr %env, i64 880, !tcg.op !83
-  %T76.v1 = load <2 x i64>, ptr %v1.stack, align 16, !tbaa !0, !tcg.op !83
-  store <2 x i64> %T76.v1, ptr %T76.envptr31, align 16, !tbaa !4, !tcg.op !83
+  store <2 x i64> %T76.v0, ptr %T76.envptr28, align 16, !tbaa !4, !tcg.op !83
   store <8 x i8> %T76.tmp13, ptr %T76.envptr, align 1, !tbaa !4, !tcg.op !83
-  %T76.envptr32 = getelementptr i8, ptr %env, i64 864, !tcg.op !83
-  %T76.envval = load <2 x i64>, ptr %T76.envptr32, align 16, !tbaa !4, !tcg.op !83
+  %T76.envptr29 = getelementptr i8, ptr %env, i64 864, !tcg.op !83
+  %T76.envval = load <2 x i64>, ptr %T76.envptr29, align 16, !tbaa !4, !tcg.op !83
   store <2 x i64> %T76.envval, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !83
-  %T76.envptr33 = getelementptr i8, ptr %env, i64 880, !tcg.op !83
-  %T76.envval34 = load <2 x i64>, ptr %T76.envptr33, align 16, !tbaa !4, !tcg.op !83
-  store <2 x i64> %T76.envval34, ptr %v1.stack, align 16, !tbaa !0, !tcg.op !83
-; ======== TCG [77] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC1B,0x2 ========
-  %T77.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !84
-  %T77.tmp7.ptr = inttoptr i64 %T77.tmp7 to ptr, !tcg.op !84
-  %T77.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !84
-  %T77.tmp8.trunc = trunc i64 %T77.tmp8 to i8, !tcg.op !84
-  store i8 %T77.tmp8.trunc, ptr %T77.tmp7.ptr, align 1, !tbaa !24, !tcg.op !84
-; ======== TCG [78] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC1B,0x2 ========
+; ======== TCG [77] st_vec v64,e8,t13,v0:o9 ========
+  %T77.tmp13 = load <8 x i8>, ptr %tmp13.stack, align 16, !tbaa !0, !tcg.op !84
+  %T77.envptr = getelementptr i8, ptr %env, i64 873, !tcg.op !84
+  %T77.envptr30 = getelementptr i8, ptr %env, i64 864, !tcg.op !84
+  %T77.v0 = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !84
+  store <2 x i64> %T77.v0, ptr %T77.envptr30, align 16, !tbaa !4, !tcg.op !84
+  %T77.envptr31 = getelementptr i8, ptr %env, i64 880, !tcg.op !84
+  %T77.v1 = load <2 x i64>, ptr %v1.stack, align 16, !tbaa !0, !tcg.op !84
+  store <2 x i64> %T77.v1, ptr %T77.envptr31, align 16, !tbaa !4, !tcg.op !84
+  store <8 x i8> %T77.tmp13, ptr %T77.envptr, align 1, !tbaa !4, !tcg.op !84
+  %T77.envptr32 = getelementptr i8, ptr %env, i64 864, !tcg.op !84
+  %T77.envval = load <2 x i64>, ptr %T77.envptr32, align 16, !tbaa !4, !tcg.op !84
+  store <2 x i64> %T77.envval, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !84
+  %T77.envptr33 = getelementptr i8, ptr %env, i64 880, !tcg.op !84
+  %T77.envval34 = load <2 x i64>, ptr %T77.envptr33, align 16, !tbaa !4, !tcg.op !84
+  store <2 x i64> %T77.envval34, ptr %v1.stack, align 16, !tbaa !0, !tcg.op !84
+; ======== TCG [78] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC1B,0x2 ========
   %T78.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !85
   %T78.tmp7.ptr = inttoptr i64 %T78.tmp7 to ptr, !tcg.op !85
   %T78.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !85
   %T78.tmp8.trunc = trunc i64 %T78.tmp8 to i8, !tcg.op !85
   store i8 %T78.tmp8.trunc, ptr %T78.tmp7.ptr, align 1, !tbaa !24, !tcg.op !85
-; ======== TCG [79] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC2B,0x2 ========
+; ======== TCG [79] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC1B,0x2 ========
   %T79.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !86
   %T79.tmp7.ptr = inttoptr i64 %T79.tmp7 to ptr, !tcg.op !86
   %T79.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !86
-  %T79.tmp8.trunc = trunc i64 %T79.tmp8 to i16, !tcg.op !86
-  store i16 %T79.tmp8.trunc, ptr %T79.tmp7.ptr, align 1, !tbaa !24, !tcg.op !86
-; ======== TCG [80] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC2B,0x2 ========
+  %T79.tmp8.trunc = trunc i64 %T79.tmp8 to i8, !tcg.op !86
+  store i8 %T79.tmp8.trunc, ptr %T79.tmp7.ptr, align 1, !tbaa !24, !tcg.op !86
+; ======== TCG [80] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC2B,0x2 ========
   %T80.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !87
   %T80.tmp7.ptr = inttoptr i64 %T80.tmp7 to ptr, !tcg.op !87
   %T80.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !87
   %T80.tmp8.trunc = trunc i64 %T80.tmp8 to i16, !tcg.op !87
   store i16 %T80.tmp8.trunc, ptr %T80.tmp7.ptr, align 1, !tbaa !24, !tcg.op !87
-; ======== TCG [81] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC4B,0x2 ========
+; ======== TCG [81] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC2B,0x2 ========
   %T81.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !88
   %T81.tmp7.ptr = inttoptr i64 %T81.tmp7 to ptr, !tcg.op !88
   %T81.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !88
-  %T81.tmp8.trunc = trunc i64 %T81.tmp8 to i32, !tcg.op !88
-  store i32 %T81.tmp8.trunc, ptr %T81.tmp7.ptr, align 1, !tbaa !24, !tcg.op !88
-; ======== TCG [82] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC4B,0x2 ========
+  %T81.tmp8.trunc = trunc i64 %T81.tmp8 to i16, !tcg.op !88
+  store i16 %T81.tmp8.trunc, ptr %T81.tmp7.ptr, align 1, !tbaa !24, !tcg.op !88
+; ======== TCG [82] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC4B,0x2 ========
   %T82.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !89
   %T82.tmp7.ptr = inttoptr i64 %T82.tmp7 to ptr, !tcg.op !89
   %T82.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !89
   %T82.tmp8.trunc = trunc i64 %T82.tmp8 to i32, !tcg.op !89
   store i32 %T82.tmp8.trunc, ptr %T82.tmp7.ptr, align 1, !tbaa !24, !tcg.op !89
-; ======== TCG [83] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC8B,0x2 ========
+; ======== TCG [83] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC4B,0x2 ========
   %T83.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !90
   %T83.tmp7.ptr = inttoptr i64 %T83.tmp7 to ptr, !tcg.op !90
   %T83.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !90
-  store i64 %T83.tmp8, ptr %T83.tmp7.ptr, align 1, !tbaa !24, !tcg.op !90
-; ======== TCG [84] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC1B,0x2 ========
+  %T83.tmp8.trunc = trunc i64 %T83.tmp8 to i32, !tcg.op !90
+  store i32 %T83.tmp8.trunc, ptr %T83.tmp7.ptr, align 1, !tbaa !24, !tcg.op !90
+; ======== TCG [84] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC8B,0x2 ========
   %T84.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !91
   %T84.tmp7.ptr = inttoptr i64 %T84.tmp7 to ptr, !tcg.op !91
   %T84.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !91
-  %T84.tmp8.trunc = trunc i64 %T84.tmp8 to i8, !tcg.op !91
-  store i8 %T84.tmp8.trunc, ptr %T84.tmp7.ptr, align 1, !tbaa !24, !tcg.op !91
-; ======== TCG [85] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC1B,0x2 ========
+  store i64 %T84.tmp8, ptr %T84.tmp7.ptr, align 1, !tbaa !24, !tcg.op !91
+; ======== TCG [85] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC1B,0x2 ========
   %T85.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !92
   %T85.tmp7.ptr = inttoptr i64 %T85.tmp7 to ptr, !tcg.op !92
   %T85.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !92
   %T85.tmp8.trunc = trunc i64 %T85.tmp8 to i8, !tcg.op !92
   store i8 %T85.tmp8.trunc, ptr %T85.tmp7.ptr, align 1, !tbaa !24, !tcg.op !92
-; ======== TCG [86] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC2B,0x2 ========
+; ======== TCG [86] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC1B,0x2 ========
   %T86.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !93
   %T86.tmp7.ptr = inttoptr i64 %T86.tmp7 to ptr, !tcg.op !93
   %T86.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !93
-  %T86.tmp8.trunc = trunc i64 %T86.tmp8 to i16, !tcg.op !93
-  store i16 %T86.tmp8.trunc, ptr %T86.tmp7.ptr, align 2, !tbaa !24, !tcg.op !93
-; ======== TCG [87] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC2B,0x2 ========
+  %T86.tmp8.trunc = trunc i64 %T86.tmp8 to i8, !tcg.op !93
+  store i8 %T86.tmp8.trunc, ptr %T86.tmp7.ptr, align 1, !tbaa !24, !tcg.op !93
+; ======== TCG [87] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC2B,0x2 ========
   %T87.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !94
   %T87.tmp7.ptr = inttoptr i64 %T87.tmp7 to ptr, !tcg.op !94
   %T87.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !94
   %T87.tmp8.trunc = trunc i64 %T87.tmp8 to i16, !tcg.op !94
   store i16 %T87.tmp8.trunc, ptr %T87.tmp7.ptr, align 2, !tbaa !24, !tcg.op !94
-; ======== TCG [88] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC4B,0x2 ========
+; ======== TCG [88] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC2B,0x2 ========
   %T88.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !95
   %T88.tmp7.ptr = inttoptr i64 %T88.tmp7 to ptr, !tcg.op !95
   %T88.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !95
-  %T88.tmp8.trunc = trunc i64 %T88.tmp8 to i32, !tcg.op !95
-  store i32 %T88.tmp8.trunc, ptr %T88.tmp7.ptr, align 4, !tbaa !24, !tcg.op !95
-; ======== TCG [89] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC4B,0x2 ========
+  %T88.tmp8.trunc = trunc i64 %T88.tmp8 to i16, !tcg.op !95
+  store i16 %T88.tmp8.trunc, ptr %T88.tmp7.ptr, align 2, !tbaa !24, !tcg.op !95
+; ======== TCG [89] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC4B,0x2 ========
   %T89.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !96
   %T89.tmp7.ptr = inttoptr i64 %T89.tmp7 to ptr, !tcg.op !96
   %T89.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !96
   %T89.tmp8.trunc = trunc i64 %T89.tmp8 to i32, !tcg.op !96
   store i32 %T89.tmp8.trunc, ptr %T89.tmp7.ptr, align 4, !tbaa !24, !tcg.op !96
-; ======== TCG [90] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
+; ======== TCG [90] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC4B,0x2 ========
   %T90.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !97
   %T90.tmp7.ptr = inttoptr i64 %T90.tmp7 to ptr, !tcg.op !97
   %T90.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !97
-  store i64 %T90.tmp8, ptr %T90.tmp7.ptr, align 8, !tbaa !24, !tcg.op !97
-; ======== TCG [91] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_2:ZERO:SRC8B,0x2 ========
+  %T90.tmp8.trunc = trunc i64 %T90.tmp8 to i32, !tcg.op !97
+  store i32 %T90.tmp8.trunc, ptr %T90.tmp7.ptr, align 4, !tbaa !24, !tcg.op !97
+; ======== TCG [91] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
   %T91.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !98
   %T91.tmp7.ptr = inttoptr i64 %T91.tmp7 to ptr, !tcg.op !98
   %T91.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !98
-  store i64 %T91.tmp8, ptr %T91.tmp7.ptr, align 2, !tbaa !24, !tcg.op !98
-; ======== TCG [92] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_4:ZERO:SRC8B,0x2 ========
+  store i64 %T91.tmp8, ptr %T91.tmp7.ptr, align 8, !tbaa !24, !tcg.op !98
+; ======== TCG [92] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_2:ZERO:SRC8B,0x2 ========
   %T92.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !99
   %T92.tmp7.ptr = inttoptr i64 %T92.tmp7 to ptr, !tcg.op !99
   %T92.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !99
-  store i64 %T92.tmp8, ptr %T92.tmp7.ptr, align 4, !tbaa !24, !tcg.op !99
-; ======== TCG [93] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_8:ZERO:SRC8B,0x2 ========
+  store i64 %T92.tmp8, ptr %T92.tmp7.ptr, align 2, !tbaa !24, !tcg.op !99
+; ======== TCG [93] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_4:ZERO:SRC8B,0x2 ========
   %T93.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !100
   %T93.tmp7.ptr = inttoptr i64 %T93.tmp7 to ptr, !tcg.op !100
   %T93.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !100
-  store i64 %T93.tmp8, ptr %T93.tmp7.ptr, align 8, !tbaa !24, !tcg.op !100
-; ======== TCG [94] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC8B,0x2 ========
+  store i64 %T93.tmp8, ptr %T93.tmp7.ptr, align 4, !tbaa !24, !tcg.op !100
+; ======== TCG [94] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_8:ZERO:SRC8B,0x2 ========
   %T94.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !101
   %T94.tmp7.ptr = inttoptr i64 %T94.tmp7 to ptr, !tcg.op !101
   %T94.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !101
-  store i64 %T94.tmp8, ptr %T94.tmp7.ptr, align 16, !tbaa !24, !tcg.op !101
-; ======== TCG [95] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_32:ZERO:SRC8B,0x2 ========
+  store i64 %T94.tmp8, ptr %T94.tmp7.ptr, align 8, !tbaa !24, !tcg.op !101
+; ======== TCG [95] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC8B,0x2 ========
   %T95.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !102
   %T95.tmp7.ptr = inttoptr i64 %T95.tmp7 to ptr, !tcg.op !102
   %T95.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !102
-  store i64 %T95.tmp8, ptr %T95.tmp7.ptr, align 32, !tbaa !24, !tcg.op !102
-; ======== TCG [96] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_64:ZERO:SRC8B,0x2 ========
+  store i64 %T95.tmp8, ptr %T95.tmp7.ptr, align 16, !tbaa !24, !tcg.op !102
+; ======== TCG [96] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_32:ZERO:SRC8B,0x2 ========
   %T96.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !103
   %T96.tmp7.ptr = inttoptr i64 %T96.tmp7 to ptr, !tcg.op !103
   %T96.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !103
-  store i64 %T96.tmp8, ptr %T96.tmp7.ptr, align 64, !tbaa !24, !tcg.op !103
-; ======== TCG [97] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC1B,0x2 ========
+  store i64 %T96.tmp8, ptr %T96.tmp7.ptr, align 32, !tbaa !24, !tcg.op !103
+; ======== TCG [97] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_64:ZERO:SRC8B,0x2 ========
   %T97.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !104
   %T97.tmp7.ptr = inttoptr i64 %T97.tmp7 to ptr, !tcg.op !104
-  %T97.tmp9 = load i32, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !104
-  %T97.tmp9.trunc = trunc i32 %T97.tmp9 to i8, !tcg.op !104
-  store i8 %T97.tmp9.trunc, ptr %T97.tmp7.ptr, align 1, !tbaa !24, !tcg.op !104
-; ======== TCG [98] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC1B,0x2 ========
+  %T97.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !104
+  store i64 %T97.tmp8, ptr %T97.tmp7.ptr, align 64, !tbaa !24, !tcg.op !104
+; ======== TCG [98] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC1B,0x2 ========
   %T98.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !105
   %T98.tmp7.ptr = inttoptr i64 %T98.tmp7 to ptr, !tcg.op !105
   %T98.tmp9 = load i32, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !105
   %T98.tmp9.trunc = trunc i32 %T98.tmp9 to i8, !tcg.op !105
   store i8 %T98.tmp9.trunc, ptr %T98.tmp7.ptr, align 1, !tbaa !24, !tcg.op !105
-; ======== TCG [99] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC2B,0x2 ========
+; ======== TCG [99] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC1B,0x2 ========
   %T99.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !106
   %T99.tmp7.ptr = inttoptr i64 %T99.tmp7 to ptr, !tcg.op !106
   %T99.tmp9 = load i32, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !106
-  %T99.tmp9.trunc = trunc i32 %T99.tmp9 to i16, !tcg.op !106
-  store i16 %T99.tmp9.trunc, ptr %T99.tmp7.ptr, align 1, !tbaa !24, !tcg.op !106
-; ======== TCG [100] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC2B,0x2 ========
+  %T99.tmp9.trunc = trunc i32 %T99.tmp9 to i8, !tcg.op !106
+  store i8 %T99.tmp9.trunc, ptr %T99.tmp7.ptr, align 1, !tbaa !24, !tcg.op !106
+; ======== TCG [100] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC2B,0x2 ========
   %T100.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !107
   %T100.tmp7.ptr = inttoptr i64 %T100.tmp7 to ptr, !tcg.op !107
   %T100.tmp9 = load i32, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !107
   %T100.tmp9.trunc = trunc i32 %T100.tmp9 to i16, !tcg.op !107
   store i16 %T100.tmp9.trunc, ptr %T100.tmp7.ptr, align 1, !tbaa !24, !tcg.op !107
-; ======== TCG [101] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC4B,0x2 ========
+; ======== TCG [101] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC2B,0x2 ========
   %T101.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !108
   %T101.tmp7.ptr = inttoptr i64 %T101.tmp7 to ptr, !tcg.op !108
   %T101.tmp9 = load i32, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !108
-  store i32 %T101.tmp9, ptr %T101.tmp7.ptr, align 1, !tbaa !24, !tcg.op !108
-; ======== TCG [102] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC4B,0x2 ========
+  %T101.tmp9.trunc = trunc i32 %T101.tmp9 to i16, !tcg.op !108
+  store i16 %T101.tmp9.trunc, ptr %T101.tmp7.ptr, align 1, !tbaa !24, !tcg.op !108
+; ======== TCG [102] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC4B,0x2 ========
   %T102.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !109
   %T102.tmp7.ptr = inttoptr i64 %T102.tmp7 to ptr, !tcg.op !109
   %T102.tmp9 = load i32, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !109
   store i32 %T102.tmp9, ptr %T102.tmp7.ptr, align 1, !tbaa !24, !tcg.op !109
-; ======== TCG [103] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC8B,0x2 ========
+; ======== TCG [103] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC4B,0x2 ========
   %T103.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !110
   %T103.tmp7.ptr = inttoptr i64 %T103.tmp7 to ptr, !tcg.op !110
   %T103.tmp9 = load i32, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !110
-  %T103.tmp9.zext = zext i32 %T103.tmp9 to i64, !tcg.op !110
-  store i64 %T103.tmp9.zext, ptr %T103.tmp7.ptr, align 1, !tbaa !24, !tcg.op !110
-; ======== TCG [104] qemu_st_i64 t8,t7,attr-stg:ATOM_NONE:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
+  store i32 %T103.tmp9, ptr %T103.tmp7.ptr, align 1, !tbaa !24, !tcg.op !110
+; ======== TCG [104] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC8B,0x2 ========
   %T104.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !111
   %T104.tmp7.ptr = inttoptr i64 %T104.tmp7 to ptr, !tcg.op !111
-  %T104.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !111
-  store i64 %T104.tmp8, ptr %T104.tmp7.ptr, align 8, !tbaa !24, !tcg.op !111
-; ======== TCG [105] qemu_st_i64 t8,t7,attr-stg:ATOM_SUBALIGN:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
+  %T104.tmp9 = load i32, ptr %tmp9.stack, align 8, !tbaa !0, !tcg.op !111
+  %T104.tmp9.zext = zext i32 %T104.tmp9 to i64, !tcg.op !111
+  store i64 %T104.tmp9.zext, ptr %T104.tmp7.ptr, align 1, !tbaa !24, !tcg.op !111
+; ======== TCG [105] qemu_st_i64 t8,t7,attr-stg:ATOM_NONE:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
   %T105.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !112
   %T105.tmp7.ptr = inttoptr i64 %T105.tmp7 to ptr, !tcg.op !112
   %T105.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !112
   store i64 %T105.tmp8, ptr %T105.tmp7.ptr, align 8, !tbaa !24, !tcg.op !112
-; ======== TCG [106] qemu_st_i64 t8,t7,attr-stg:ATOM_WITHIN16_PAIR:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
+; ======== TCG [106] qemu_st_i64 t8,t7,attr-stg:ATOM_SUBALIGN:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
   %T106.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !113
   %T106.tmp7.ptr = inttoptr i64 %T106.tmp7 to ptr, !tcg.op !113
   %T106.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !113
   store i64 %T106.tmp8, ptr %T106.tmp7.ptr, align 8, !tbaa !24, !tcg.op !113
-; ======== TCG [107] qemu_st_i64 t8,t7,attr-stg:ATOM_WITHIN16:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
+; ======== TCG [107] qemu_st_i64 t8,t7,attr-stg:ATOM_WITHIN16_PAIR:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
   %T107.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !114
   %T107.tmp7.ptr = inttoptr i64 %T107.tmp7 to ptr, !tcg.op !114
   %T107.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !114
   store i64 %T107.tmp8, ptr %T107.tmp7.ptr, align 8, !tbaa !24, !tcg.op !114
-; ======== TCG [108] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN_PAIR:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
+; ======== TCG [108] qemu_st_i64 t8,t7,attr-stg:ATOM_WITHIN16:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
   %T108.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !115
   %T108.tmp7.ptr = inttoptr i64 %T108.tmp7 to ptr, !tcg.op !115
   %T108.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !115
   store i64 %T108.tmp8, ptr %T108.tmp7.ptr, align 8, !tbaa !24, !tcg.op !115
-; ======== TCG [109] qemu_st2_i128 t10,t11,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC16B,0x2 ========
+; ======== TCG [109] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN_PAIR:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2 ========
   %T109.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !116
   %T109.tmp7.ptr = inttoptr i64 %T109.tmp7 to ptr, !tcg.op !116
-  %T109.tmp10 = load i64, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !116
-  store i64 %T109.tmp10, ptr %T109.tmp7.ptr, align 1, !tbaa !24, !tcg.op !116
-  %T109.addr_high_val = add i64 %T109.tmp7, 8, !tcg.op !116
-  %T109.addr_high_val.ptr = inttoptr i64 %T109.addr_high_val to ptr, !tcg.op !116
-  %T109.tmp11 = load i64, ptr %tmp11.stack, align 8, !tbaa !0, !tcg.op !116
-  store i64 %T109.tmp11, ptr %T109.addr_high_val.ptr, align 8, !tbaa !24, !tcg.op !116
-; ======== TCG [110] qemu_st2_i128 t10,t11,t7,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC16B,0x2 ========
+  %T109.tmp8 = load i64, ptr %tmp8.stack, align 8, !tbaa !0, !tcg.op !116
+  store i64 %T109.tmp8, ptr %T109.tmp7.ptr, align 8, !tbaa !24, !tcg.op !116
+; ======== TCG [110] qemu_st2_i128 t10,t11,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC16B,0x2 ========
   %T110.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !117
   %T110.tmp7.ptr = inttoptr i64 %T110.tmp7 to ptr, !tcg.op !117
   %T110.tmp10 = load i64, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !117
-  store i64 %T110.tmp10, ptr %T110.tmp7.ptr, align 16, !tbaa !24, !tcg.op !117
+  store i64 %T110.tmp10, ptr %T110.tmp7.ptr, align 1, !tbaa !24, !tcg.op !117
   %T110.addr_high_val = add i64 %T110.tmp7, 8, !tcg.op !117
   %T110.addr_high_val.ptr = inttoptr i64 %T110.addr_high_val to ptr, !tcg.op !117
   %T110.tmp11 = load i64, ptr %tmp11.stack, align 8, !tbaa !0, !tcg.op !117
   store i64 %T110.tmp11, ptr %T110.addr_high_val.ptr, align 8, !tbaa !24, !tcg.op !117
+; ======== TCG [111] qemu_st2_i128 t10,t11,t7,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC16B,0x2 ========
+  %T111.tmp7 = load i64, ptr %tmp7.stack, align 8, !tbaa !0, !tcg.op !118
+  %T111.tmp7.ptr = inttoptr i64 %T111.tmp7 to ptr, !tcg.op !118
+  %T111.tmp10 = load i64, ptr %tmp10.stack, align 8, !tbaa !0, !tcg.op !118
+  store i64 %T111.tmp10, ptr %T111.tmp7.ptr, align 16, !tbaa !24, !tcg.op !118
+  %T111.addr_high_val = add i64 %T111.tmp7, 8, !tcg.op !118
+  %T111.addr_high_val.ptr = inttoptr i64 %T111.addr_high_val to ptr, !tcg.op !118
+  %T111.tmp11 = load i64, ptr %tmp11.stack, align 8, !tbaa !0, !tcg.op !118
+  store i64 %T111.tmp11, ptr %T111.addr_high_val.ptr, align 8, !tbaa !24, !tcg.op !118
 }
 
 attributes #0 = { noinline nounwind "target-features"="+neon" }
@@ -786,42 +789,43 @@ attributes #0 = { noinline nounwind "target-features"="+neon" }
 !76 = !{!"[69] st32_i64 t2,v18,0x4"}
 !77 = !{!"[70] st32_i64 t2,v18,0xd"}
 !78 = !{!"[71] ld_vec v64,e32,[t13],v26"}
-!79 = !{!"[72] st_vec v64,e8,t13,v0"}
-!80 = !{!"[73] ld_vec v128,e16,[t14],v26"}
-!81 = !{!"[74] st_vec v64,e32,t14,v0"}
-!82 = !{!"[75] st_vec v64,e8,t13,v0:o1"}
-!83 = !{!"[76] st_vec v64,e8,t13,v0:o9"}
-!84 = !{!"[77] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC1B,0x2"}
-!85 = !{!"[78] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC1B,0x2"}
-!86 = !{!"[79] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC2B,0x2"}
-!87 = !{!"[80] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC2B,0x2"}
-!88 = !{!"[81] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC4B,0x2"}
-!89 = !{!"[82] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC4B,0x2"}
-!90 = !{!"[83] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC8B,0x2"}
-!91 = !{!"[84] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC1B,0x2"}
-!92 = !{!"[85] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC1B,0x2"}
-!93 = !{!"[86] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC2B,0x2"}
-!94 = !{!"[87] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC2B,0x2"}
-!95 = !{!"[88] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC4B,0x2"}
-!96 = !{!"[89] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC4B,0x2"}
-!97 = !{!"[90] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
-!98 = !{!"[91] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_2:ZERO:SRC8B,0x2"}
-!99 = !{!"[92] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_4:ZERO:SRC8B,0x2"}
-!100 = !{!"[93] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_8:ZERO:SRC8B,0x2"}
-!101 = !{!"[94] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC8B,0x2"}
-!102 = !{!"[95] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_32:ZERO:SRC8B,0x2"}
-!103 = !{!"[96] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_64:ZERO:SRC8B,0x2"}
-!104 = !{!"[97] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC1B,0x2"}
-!105 = !{!"[98] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC1B,0x2"}
-!106 = !{!"[99] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC2B,0x2"}
-!107 = !{!"[100] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC2B,0x2"}
-!108 = !{!"[101] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC4B,0x2"}
-!109 = !{!"[102] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC4B,0x2"}
-!110 = !{!"[103] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC8B,0x2"}
-!111 = !{!"[104] qemu_st_i64 t8,t7,attr-stg:ATOM_NONE:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
-!112 = !{!"[105] qemu_st_i64 t8,t7,attr-stg:ATOM_SUBALIGN:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
-!113 = !{!"[106] qemu_st_i64 t8,t7,attr-stg:ATOM_WITHIN16_PAIR:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
-!114 = !{!"[107] qemu_st_i64 t8,t7,attr-stg:ATOM_WITHIN16:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
-!115 = !{!"[108] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN_PAIR:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
-!116 = !{!"[109] qemu_st2_i128 t10,t11,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC16B,0x2"}
-!117 = !{!"[110] qemu_st2_i128 t10,t11,t7,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC16B,0x2"}
+!79 = !{!"[72] ld_vec v128,e32,[t13],v26"}
+!80 = !{!"[73] st_vec v64,e8,t13,v0"}
+!81 = !{!"[74] ld_vec v128,e16,[t14],v26"}
+!82 = !{!"[75] st_vec v64,e32,t14,v0"}
+!83 = !{!"[76] st_vec v64,e8,t13,v0:o1"}
+!84 = !{!"[77] st_vec v64,e8,t13,v0:o9"}
+!85 = !{!"[78] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC1B,0x2"}
+!86 = !{!"[79] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC1B,0x2"}
+!87 = !{!"[80] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC2B,0x2"}
+!88 = !{!"[81] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC2B,0x2"}
+!89 = !{!"[82] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC4B,0x2"}
+!90 = !{!"[83] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC4B,0x2"}
+!91 = !{!"[84] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC8B,0x2"}
+!92 = !{!"[85] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC1B,0x2"}
+!93 = !{!"[86] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC1B,0x2"}
+!94 = !{!"[87] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC2B,0x2"}
+!95 = !{!"[88] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC2B,0x2"}
+!96 = !{!"[89] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC4B,0x2"}
+!97 = !{!"[90] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:SIGN:SRC4B,0x2"}
+!98 = !{!"[91] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
+!99 = !{!"[92] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_2:ZERO:SRC8B,0x2"}
+!100 = !{!"[93] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_4:ZERO:SRC8B,0x2"}
+!101 = !{!"[94] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_8:ZERO:SRC8B,0x2"}
+!102 = !{!"[95] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC8B,0x2"}
+!103 = !{!"[96] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_32:ZERO:SRC8B,0x2"}
+!104 = !{!"[97] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN:ALIGN_64:ZERO:SRC8B,0x2"}
+!105 = !{!"[98] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC1B,0x2"}
+!106 = !{!"[99] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC1B,0x2"}
+!107 = !{!"[100] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC2B,0x2"}
+!108 = !{!"[101] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC2B,0x2"}
+!109 = !{!"[102] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC4B,0x2"}
+!110 = !{!"[103] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:SIGN:SRC4B,0x2"}
+!111 = !{!"[104] qemu_st_i32 t9,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC8B,0x2"}
+!112 = !{!"[105] qemu_st_i64 t8,t7,attr-stg:ATOM_NONE:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
+!113 = !{!"[106] qemu_st_i64 t8,t7,attr-stg:ATOM_SUBALIGN:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
+!114 = !{!"[107] qemu_st_i64 t8,t7,attr-stg:ATOM_WITHIN16_PAIR:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
+!115 = !{!"[108] qemu_st_i64 t8,t7,attr-stg:ATOM_WITHIN16:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
+!116 = !{!"[109] qemu_st_i64 t8,t7,attr-stg:ATOM_IFALIGN_PAIR:ALIGN_MEM_SIZE:ZERO:SRC8B,0x2"}
+!117 = !{!"[110] qemu_st2_i128 t10,t11,t7,attr-stg:ATOM_IFALIGN:UNALIGNED:ZERO:SRC16B,0x2"}
+!118 = !{!"[111] qemu_st2_i128 t10,t11,t7,attr-stg:ATOM_IFALIGN:ALIGN_16:ZERO:SRC16B,0x2"}
