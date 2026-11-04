@@ -10,7 +10,7 @@
 	.variant_cc	Fx0
 Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
-	vsetvli	a1, zero, e8, m1, ta, ma
+	vsetivli	zero, 16, e8, m1, ta, ma
 	vmv1r.v	v28, v0
 	vmslt.vv	v0, v12, v14
 	vmerge.vvm	v12, v18, v16, v0

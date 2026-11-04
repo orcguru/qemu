@@ -26,161 +26,59 @@ Fx0:                                    # @Fx0
 	mv	a2, s2
 	sd	a3, 104(sp)                     # 8-byte Folded Spill
 	li	a3, 0
-	csrr	t3, vlenb
-	li	ra, 27
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 544
 	vs1r.v	v27, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 26
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 528
 	vs1r.v	v26, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 25
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 512
 	vs1r.v	v25, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 24
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 496
 	vs1r.v	v24, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 23
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 480
 	vs1r.v	v23, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 22
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 464
 	vs1r.v	v22, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 21
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 448
 	vs1r.v	v21, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 20
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 432
 	vs1r.v	v20, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 19
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 416
 	vs1r.v	v19, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 18
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 400
 	vs1r.v	v18, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	slli	ra, t3, 4
-	add	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 384
 	vs1r.v	v17, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	slli	t3, t3, 4
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 368
 	vs1r.v	v16, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	slli	ra, t3, 4
-	sub	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 352
 	vs1r.v	v15, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 14
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 336
 	vs1r.v	v14, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 13
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 320
 	vs1r.v	v13, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 12
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 304
 	vs1r.v	v12, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 11
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 288
 	vs1r.v	v11, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 10
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 272
 	vs1r.v	v10, (t3)                       # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	slli	ra, t3, 3
-	add	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 256
 	vs1r.v	v9, (t3)                        # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	slli	t3, t3, 3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 240
 	vs1r.v	v8, (t3)                        # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	slli	ra, t3, 3
-	sub	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 224
 	vs1r.v	v7, (t3)                        # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	li	ra, 6
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 208
 	vs1r.v	v6, (t3)                        # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	slli	ra, t3, 2
-	add	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 192
 	vs1r.v	v5, (t3)                        # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	slli	t3, t3, 2
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 176
 	vs1r.v	v4, (t3)                        # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	slli	ra, t3, 1
-	add	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 160
 	vs1r.v	v3, (t3)                        # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	slli	t3, t3, 1
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 144
 	vs1r.v	v2, (t3)                        # vscale x 8-byte Folded Spill
-	csrr	t3, vlenb
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 128
 	vs1r.v	v1, (t3)                        # vscale x 8-byte Folded Spill
 	addi	t3, sp, 112
 	vs1r.v	v0, (t3)                        # vscale x 8-byte Folded Spill
@@ -238,161 +136,59 @@ Fx0:                                    # @Fx0
 	ld	s11, 88(sp)                     # 8-byte Folded Reload
 	addi	t3, sp, 112
 	vl1r.v	v0, (t3)                        # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 128
 	vl1r.v	v1, (t3)                        # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	slli	t3, t3, 1
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 144
 	vl1r.v	v2, (t3)                        # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	slli	ra, t3, 1
-	add	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 160
 	vl1r.v	v3, (t3)                        # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	slli	t3, t3, 2
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 176
 	vl1r.v	v4, (t3)                        # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	slli	ra, t3, 2
-	add	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 192
 	vl1r.v	v5, (t3)                        # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 6
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 208
 	vl1r.v	v6, (t3)                        # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	slli	ra, t3, 3
-	sub	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 224
 	vl1r.v	v7, (t3)                        # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	slli	t3, t3, 3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 240
 	vl1r.v	v8, (t3)                        # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	slli	ra, t3, 3
-	add	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 256
 	vl1r.v	v9, (t3)                        # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 10
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 272
 	vl1r.v	v10, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 11
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 288
 	vl1r.v	v11, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 12
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 304
 	vl1r.v	v12, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 13
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 320
 	vl1r.v	v13, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 14
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 336
 	vl1r.v	v14, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	slli	ra, t3, 4
-	sub	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 352
 	vl1r.v	v15, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	slli	t3, t3, 4
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 368
 	vl1r.v	v16, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	slli	ra, t3, 4
-	add	t3, ra, t3
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 384
 	vl1r.v	v17, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 18
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 400
 	vl1r.v	v18, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 19
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 416
 	vl1r.v	v19, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 20
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 432
 	vl1r.v	v20, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 21
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 448
 	vl1r.v	v21, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 22
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 464
 	vl1r.v	v22, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 23
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 480
 	vl1r.v	v23, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 24
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 496
 	vl1r.v	v24, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 25
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 512
 	vl1r.v	v25, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 26
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 528
 	vl1r.v	v26, (t3)                       # vscale x 8-byte Folded Reload
-	csrr	t3, vlenb
-	li	ra, 27
-	mul	t3, t3, ra
-	add	t3, sp, t3
-	addi	t3, t3, 112
+	addi	t3, sp, 544
 	vl1r.v	v27, (t3)                       # vscale x 8-byte Folded Reload
 	bnez	a1, .LBB0_3
 # %bb.2:                                # %divs2.done

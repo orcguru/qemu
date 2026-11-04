@@ -10,9 +10,7 @@
 	.variant_cc	Fx0
 Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
-	csrr	a1, vlenb
-	slli	a1, a1, 1
-	add	a1, sp, a1
+	addi	a1, sp, 32
 	addi	a1, a1, 16
 	addi	a2, sp, 16
 	vs1r.v	v12, (a1)

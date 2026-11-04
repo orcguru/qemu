@@ -10,7 +10,7 @@
 	.variant_cc	Fx0
 Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
-	vsetvli	a1, zero, e8, m1, ta, ma
+	vsetivli	zero, 16, e8, m1, ta, ma
 	vsadd.vv	v12, v12, v14
 	tail	Fx55aa
 .Lfunc_end0:
