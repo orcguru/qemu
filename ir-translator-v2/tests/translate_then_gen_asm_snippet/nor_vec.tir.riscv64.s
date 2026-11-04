@@ -12,6 +12,7 @@ Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
 	vsetivli	zero, 2, e64, m1, ta, ma
 	vor.vv	v12, v14, v12
+	vsetivli	zero, 16, e8, m1, ta, ma
 	vnot.v	v12, v12
 	tail	Fx55aa
 .Lfunc_end0:

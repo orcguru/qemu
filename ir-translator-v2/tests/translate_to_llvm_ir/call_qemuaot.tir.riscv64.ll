@@ -13,29 +13,33 @@ entry:
   %cc_op.stack = alloca i32, align 8
   store i32 %cc_op, ptr %cc_op.stack, align 8, !tbaa !7
   %v10.stack = alloca <vscale x 1 x i64>, align 16
-  store <vscale x 1 x i64> %xmm5, ptr %v10.stack, align 16, !tbaa !7
+  %setup_stack.vector_extract = call <2 x i64> @llvm.vector.extract.v2i64.nxv1i64.i64(<vscale x 1 x i64> %xmm5, i64 0)
+  store <2 x i64> %setup_stack.vector_extract, ptr %v10.stack, align 16, !tbaa !7
   %tmp0.stack = alloca <vscale x 1 x i64>, align 16
   %tmp1.stack = alloca i64, align 8
   %tmp2.stack = alloca ptr, align 8
   %tmp3.stack = alloca ptr, align 8
   %env = getelementptr i8, ptr %cpu, i64 11488
 ; ======== TCG [0] ld_vec v128,e8,[t0],v10 ========
-  %T0.v10 = load <vscale x 8 x i8>, ptr %v10.stack, align 16, !tbaa !7, !tcg.op !10
-  store <vscale x 8 x i8> %T0.v10, ptr %tmp0.stack, align 16, !tbaa !7, !tcg.op !10
+  %T0.v10 = load <16 x i8>, ptr %v10.stack, align 16, !tbaa !7, !tcg.op !10
+  %T0.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T0.v10, i64 0), !tcg.op !10
+  %T0.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T0.vector_insert, i64 0), !tcg.op !10
+  store <16 x i8> %T0.vector_extract, ptr %tmp0.stack, align 16, !tbaa !7, !tcg.op !10
 ; ======== TCG [1] func_addr t3,helper_cc_compute_c ========
   store ptr @helper_cc_compute_c, ptr %tmp3.stack, align 8, !tbaa !7, !tcg.op !11
 ; ======== TCG [2] call_qemuaot t3,[t0],cc_dst,cc_src,cc_src2(env),cc_op VEC_ARGS: ========
   %T2.cc_src.stack = load i64, ptr %cc_src.stack, align 8, !tbaa !7, !tcg.op !12
   %T2.cc_dst.stack = load i64, ptr %cc_dst.stack, align 8, !tbaa !7, !tcg.op !12
   %T2.cc_op.stack = load i32, ptr %cc_op.stack, align 8, !tbaa !7, !tcg.op !12
-  %T2.v10.stack = load <vscale x 1 x i64>, ptr %v10.stack, align 16, !tbaa !7, !tcg.op !12
+  %T2.v10.stack = load <2 x i64>, ptr %v10.stack, align 16, !tbaa !7, !tcg.op !12
+  %T2.vector_insert = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T2.v10.stack, i64 0), !tcg.op !12
   %T2.cc_dst = load i64, ptr %cc_dst.stack, align 8, !tbaa !7, !tcg.op !12
   %T2.cc_src = load i64, ptr %cc_src.stack, align 8, !tbaa !7, !tcg.op !12
   %T2.envptr = getelementptr i8, ptr %env, i64 160, !tcg.op !12
   %T2.cc_src2 = load i64, ptr %T2.envptr, align 16, !tbaa !13, !tcg.op !12
   %T2.cc_op = load i32, ptr %cc_op.stack, align 8, !tbaa !7, !tcg.op !12
   %T2.loaded_fn = load ptr, ptr %tmp3.stack, align 8, !tcg.op !12
-  %T2.cr = call qemuaot i64 %T2.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %T2.cc_src.stack, i64 %T2.cc_dst.stack, i32 %T2.cc_op.stack, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %T2.v10.stack, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr %cpu, i64 %T2.cc_dst, i64 %T2.cc_src, i64 %T2.cc_src2, i32 %T2.cc_op), !tcg.op !12
+  %T2.cr = call qemuaot i64 %T2.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %T2.cc_src.stack, i64 %T2.cc_dst.stack, i32 %T2.cc_op.stack, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %T2.vector_insert, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr %cpu, i64 %T2.cc_dst, i64 %T2.cc_src, i64 %T2.cc_src2, i32 %T2.cc_op), !tcg.op !12
   store i64 %T2.cr, ptr %tmp0.stack, align 16, !tbaa !7, !tcg.op !12
 ; ======== TCG [3] mov_i64 [t1],t0 ========
   %T3.tmp0 = load i64, ptr %tmp0.stack, align 16, !tbaa !7, !tcg.op !15
@@ -46,14 +50,24 @@ entry:
   %T5.cc_src.stack = load i64, ptr %cc_src.stack, align 8, !tbaa !7, !tcg.op !17
   %T5.cc_dst.stack = load i64, ptr %cc_dst.stack, align 8, !tbaa !7, !tcg.op !17
   %T5.cc_op.stack = load i32, ptr %cc_op.stack, align 8, !tbaa !7, !tcg.op !17
-  %T5.v10.stack = load <vscale x 1 x i64>, ptr %v10.stack, align 16, !tbaa !7, !tcg.op !17
+  %T5.v10.stack = load <2 x i64>, ptr %v10.stack, align 16, !tbaa !7, !tcg.op !17
+  %T5.vector_insert = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T5.v10.stack, i64 0), !tcg.op !17
   %T5.loaded_fn = load ptr, ptr %tmp2.stack, align 8, !tcg.op !17
-  tail call qemuaot void %T5.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %T5.cc_src.stack, i64 %T5.cc_dst.stack, i32 %T5.cc_op.stack, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %T5.v10.stack, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr %cpu), !tcg.op !17
+  tail call qemuaot void %T5.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %T5.cc_src.stack, i64 %T5.cc_dst.stack, i32 %T5.cc_op.stack, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %T5.vector_insert, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr %cpu), !tcg.op !17
   ret void, !tcg.op !17
 }
 
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare <2 x i64> @llvm.vector.extract.v2i64.nxv1i64.i64(<vscale x 1 x i64>, i64 immarg) #1
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8>, <16 x i8>, i64 immarg) #1
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8>, i64 immarg) #1
+
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_addb(i8 noundef zeroext %dst, i8 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_addb(i8 noundef zeroext %dst, i8 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp ult i8 %dst, %src1
   %conv2 = zext i1 %cmp to i32
@@ -61,7 +75,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_adcb(i8 noundef zeroext %dst, i8 noundef zeroext %src1, i8 noundef zeroext %src3, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_adcb(i8 noundef zeroext %dst, i8 noundef zeroext %src1, i8 noundef zeroext %src3, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %conv = zext i8 %src1 to i32
   %conv1 = zext i8 %src3 to i32
@@ -73,7 +87,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_subb(i8 noundef zeroext %dst, i8 noundef zeroext %src2, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_subb(i8 noundef zeroext %dst, i8 noundef zeroext %src2, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %0 = xor i8 %src2, -1
   %cmp = icmp ugt i8 %dst, %0
@@ -82,7 +96,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_sbbb(i8 noundef zeroext %dst, i8 noundef zeroext %src2, i8 noundef zeroext %src3, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_sbbb(i8 noundef zeroext %dst, i8 noundef zeroext %src2, i8 noundef zeroext %src3, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %conv = zext i8 %src2 to i32
   %conv1 = zext i8 %src3 to i32
@@ -96,7 +110,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_shlb(i8 noundef zeroext %dst, i8 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_shlb(i8 noundef zeroext %dst, i8 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %0 = lshr i8 %src1, 7
   %shr = zext nneg i8 %0 to i32
@@ -104,7 +118,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_bmilgb(i8 noundef zeroext %dst, i8 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_bmilgb(i8 noundef zeroext %dst, i8 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp eq i8 %src1, 0
   %conv1 = zext i1 %cmp to i32
@@ -112,7 +126,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_blsib(i8 noundef zeroext %dst, i8 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_blsib(i8 noundef zeroext %dst, i8 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp ne i8 %src1, 0
   %conv1 = zext i1 %cmp to i32
@@ -120,7 +134,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_addw(i16 noundef zeroext %dst, i16 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_addw(i16 noundef zeroext %dst, i16 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp ult i16 %dst, %src1
   %conv2 = zext i1 %cmp to i32
@@ -128,7 +142,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_adcw(i16 noundef zeroext %dst, i16 noundef zeroext %src1, i16 noundef zeroext %src3, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_adcw(i16 noundef zeroext %dst, i16 noundef zeroext %src1, i16 noundef zeroext %src3, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %conv = zext i16 %src1 to i32
   %conv1 = zext i16 %src3 to i32
@@ -140,7 +154,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_subw(i16 noundef zeroext %dst, i16 noundef zeroext %src2, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_subw(i16 noundef zeroext %dst, i16 noundef zeroext %src2, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %0 = xor i16 %src2, -1
   %cmp = icmp ugt i16 %dst, %0
@@ -149,7 +163,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_sbbw(i16 noundef zeroext %dst, i16 noundef zeroext %src2, i16 noundef zeroext %src3, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_sbbw(i16 noundef zeroext %dst, i16 noundef zeroext %src2, i16 noundef zeroext %src3, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %conv = zext i16 %src2 to i32
   %conv1 = zext i16 %src3 to i32
@@ -163,7 +177,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_shlw(i16 noundef zeroext %dst, i16 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_shlw(i16 noundef zeroext %dst, i16 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %0 = lshr i16 %src1, 15
   %shr = zext nneg i16 %0 to i32
@@ -171,7 +185,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_bmilgw(i16 noundef zeroext %dst, i16 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_bmilgw(i16 noundef zeroext %dst, i16 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp eq i16 %src1, 0
   %conv1 = zext i1 %cmp to i32
@@ -179,7 +193,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_blsiw(i16 noundef zeroext %dst, i16 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_blsiw(i16 noundef zeroext %dst, i16 noundef zeroext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp ne i16 %src1, 0
   %conv1 = zext i1 %cmp to i32
@@ -187,7 +201,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_addl(i32 noundef signext %dst, i32 noundef signext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_addl(i32 noundef signext %dst, i32 noundef signext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp ult i32 %dst, %src1
   %conv = zext i1 %cmp to i32
@@ -195,7 +209,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_adcl(i32 noundef signext %dst, i32 noundef signext %src1, i32 noundef signext %src3, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_adcl(i32 noundef signext %dst, i32 noundef signext %src1, i32 noundef signext %src3, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %conv = zext i32 %src1 to i64
   %conv1 = zext i32 %src3 to i64
@@ -207,7 +221,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_subl(i32 noundef signext %dst, i32 noundef signext %src2, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_subl(i32 noundef signext %dst, i32 noundef signext %src2, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %0 = xor i32 %src2, -1
   %cmp = icmp ugt i32 %dst, %0
@@ -216,7 +230,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_sbbl(i32 noundef signext %dst, i32 noundef signext %src2, i32 noundef signext %src3, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_sbbl(i32 noundef signext %dst, i32 noundef signext %src2, i32 noundef signext %src3, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %conv = zext i32 %src2 to i64
   %conv1 = zext i32 %src3 to i64
@@ -230,14 +244,14 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_shll(i32 noundef signext %dst, i32 noundef signext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_shll(i32 noundef signext %dst, i32 noundef signext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %shr = lshr i32 %src1, 31
   ret i32 %shr
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_bmilgl(i32 noundef signext %dst, i32 noundef signext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_bmilgl(i32 noundef signext %dst, i32 noundef signext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp eq i32 %src1, 0
   %conv = zext i1 %cmp to i32
@@ -245,7 +259,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_blsil(i32 noundef signext %dst, i32 noundef signext %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_blsil(i32 noundef signext %dst, i32 noundef signext %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp ne i32 %src1, 0
   %conv = zext i1 %cmp to i32
@@ -253,7 +267,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_addq(i64 noundef %dst, i64 noundef %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_addq(i64 noundef %dst, i64 noundef %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp ult i64 %dst, %src1
   %conv = zext i1 %cmp to i32
@@ -261,7 +275,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_adcq(i64 noundef %dst, i64 noundef %src1, i64 noundef %src3, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_adcq(i64 noundef %dst, i64 noundef %src1, i64 noundef %src3, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %tobool.not = icmp eq i64 %src3, 0
   %cmp = icmp ule i64 %dst, %src1
@@ -272,7 +286,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_subq(i64 noundef %dst, i64 noundef %src2, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_subq(i64 noundef %dst, i64 noundef %src2, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %0 = xor i64 %src2, -1
   %cmp = icmp ugt i64 %dst, %0
@@ -281,7 +295,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_sbbq(i64 noundef %dst, i64 noundef %src2, i64 noundef %src3, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_sbbq(i64 noundef %dst, i64 noundef %src2, i64 noundef %src3, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %add = add i64 %src2, %dst
   %add1 = add i64 %add, %src3
@@ -294,7 +308,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_shlq(i64 noundef %dst, i64 noundef %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_shlq(i64 noundef %dst, i64 noundef %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %shr = lshr i64 %src1, 63
   %conv = trunc nuw nsw i64 %shr to i32
@@ -302,7 +316,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_bmilgq(i64 noundef %dst, i64 noundef %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_bmilgq(i64 noundef %dst, i64 noundef %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp eq i64 %src1, 0
   %conv = zext i1 %cmp to i32
@@ -310,7 +324,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot signext i32 @compute_c_blsiq(i64 noundef %dst, i64 noundef %src1, ptr noundef %cpu_param) local_unnamed_addr #1 {
+define weak qemuaot signext i32 @compute_c_blsiq(i64 noundef %dst, i64 noundef %src1, ptr noundef %cpu_param) local_unnamed_addr #2 {
 entry:
   %cmp = icmp ne i64 %src1, 0
   %conv = zext i1 %cmp to i32
@@ -318,7 +332,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind vscale_range(2,1024)
-define weak qemuaot i64 @helper_cc_compute_c(i64 noundef %rax, i64 noundef %rcx, i64 noundef %rdx, i64 noundef %rbx, i64 noundef %rsp, i64 noundef %rbp, i64 noundef %rsi, i64 noundef %rdi, i64 noundef %r8, i64 noundef %r9, i64 noundef %r10, i64 noundef %r11, i64 noundef %r12, i64 noundef %r13, i64 noundef %r14, i64 noundef %r15, i64 noundef %qemuaot_src1, i64 noundef %qemuaot_dst, i32 noundef signext %qemuaot_op, i64 noundef %rip, <vscale x 1 x i64> noundef %xmm0.coerce, <vscale x 1 x i64> noundef %ymm0_h.coerce, <vscale x 1 x i64> noundef %xmm1.coerce, <vscale x 1 x i64> noundef %ymm1_h.coerce, <vscale x 1 x i64> noundef %xmm2.coerce, <vscale x 1 x i64> noundef %ymm2_h.coerce, <vscale x 1 x i64> noundef %xmm3.coerce, <vscale x 1 x i64> noundef %ymm3_h.coerce, <vscale x 1 x i64> noundef %xmm4.coerce, <vscale x 1 x i64> noundef %ymm4_h.coerce, <vscale x 1 x i64> noundef %xmm5.coerce, <vscale x 1 x i64> noundef %ymm5_h.coerce, <vscale x 1 x i64> noundef %xmm6.coerce, <vscale x 1 x i64> noundef %ymm6_h.coerce, <vscale x 1 x i64> noundef %xmm7.coerce, <vscale x 1 x i64> noundef %ymm7_h.coerce, <vscale x 1 x i64> noundef %xmm8.coerce, <vscale x 1 x i64> noundef %ymm8_h.coerce, <vscale x 1 x i64> noundef %xmm9.coerce, <vscale x 1 x i64> noundef %ymm9_h.coerce, <vscale x 1 x i64> noundef %xmm10.coerce, <vscale x 1 x i64> noundef %ymm10_h.coerce, <vscale x 1 x i64> noundef %xmm11.coerce, <vscale x 1 x i64> noundef %ymm11_h.coerce, <vscale x 1 x i64> noundef %xmm12.coerce, <vscale x 1 x i64> noundef %ymm12_h.coerce, <vscale x 1 x i64> noundef %xmm13.coerce, <vscale x 1 x i64> noundef %ymm13_h.coerce, ptr noundef %cpu_param, i64 noundef %dst, i64 noundef %src1, i64 noundef %src2, i32 noundef signext %op, i64 noundef %normal_return) local_unnamed_addr #1 {
+define weak qemuaot i64 @helper_cc_compute_c(i64 noundef %rax, i64 noundef %rcx, i64 noundef %rdx, i64 noundef %rbx, i64 noundef %rsp, i64 noundef %rbp, i64 noundef %rsi, i64 noundef %rdi, i64 noundef %r8, i64 noundef %r9, i64 noundef %r10, i64 noundef %r11, i64 noundef %r12, i64 noundef %r13, i64 noundef %r14, i64 noundef %r15, i64 noundef %qemuaot_src1, i64 noundef %qemuaot_dst, i32 noundef signext %qemuaot_op, i64 noundef %rip, <vscale x 1 x i64> noundef %xmm0.coerce, <vscale x 1 x i64> noundef %ymm0_h.coerce, <vscale x 1 x i64> noundef %xmm1.coerce, <vscale x 1 x i64> noundef %ymm1_h.coerce, <vscale x 1 x i64> noundef %xmm2.coerce, <vscale x 1 x i64> noundef %ymm2_h.coerce, <vscale x 1 x i64> noundef %xmm3.coerce, <vscale x 1 x i64> noundef %ymm3_h.coerce, <vscale x 1 x i64> noundef %xmm4.coerce, <vscale x 1 x i64> noundef %ymm4_h.coerce, <vscale x 1 x i64> noundef %xmm5.coerce, <vscale x 1 x i64> noundef %ymm5_h.coerce, <vscale x 1 x i64> noundef %xmm6.coerce, <vscale x 1 x i64> noundef %ymm6_h.coerce, <vscale x 1 x i64> noundef %xmm7.coerce, <vscale x 1 x i64> noundef %ymm7_h.coerce, <vscale x 1 x i64> noundef %xmm8.coerce, <vscale x 1 x i64> noundef %ymm8_h.coerce, <vscale x 1 x i64> noundef %xmm9.coerce, <vscale x 1 x i64> noundef %ymm9_h.coerce, <vscale x 1 x i64> noundef %xmm10.coerce, <vscale x 1 x i64> noundef %ymm10_h.coerce, <vscale x 1 x i64> noundef %xmm11.coerce, <vscale x 1 x i64> noundef %ymm11_h.coerce, <vscale x 1 x i64> noundef %xmm12.coerce, <vscale x 1 x i64> noundef %ymm12_h.coerce, <vscale x 1 x i64> noundef %xmm13.coerce, <vscale x 1 x i64> noundef %ymm13_h.coerce, ptr noundef %cpu_param, i64 noundef %dst, i64 noundef %src1, i64 noundef %src2, i32 noundef signext %op, i64 noundef %normal_return) local_unnamed_addr #2 {
 entry:
   switch i32 %op, label %cleanup [
     i32 51, label %sw.bb161
@@ -599,12 +613,16 @@ cleanup:                                          ; preds = %entry, %sw.bb161, %
   ret i64 %retval.0
 }
 
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64>, <2 x i64>, i64 immarg) #1
+
 ; Function Attrs: nounwind
-declare qemuaot void @Fx55aa(i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32, i64, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, ptr align 8 dereferenceable(26544)) #2 section ".text.Fx55aa"
+declare qemuaot void @Fx55aa(i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32, i64, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, ptr align 8 dereferenceable(26544)) #3 section ".text.Fx55aa"
 
 attributes #0 = { noinline nounwind "target-features"="+m,+a,+f,+d,+v" }
-attributes #1 = { alwaysinline nounwind vscale_range(2,1024) "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="generic-rv64" "target-features"="+64bit,+a,+d,+f,+m,+relax,+v,+zaamo,+zalrsc,+zicsr,+zmmul,+zve32f,+zve32x,+zve64d,+zve64f,+zve64x,+zvl128b,+zvl32b,+zvl64b,-b,-c,-e,-experimental-p,-experimental-smctr,-experimental-ssctr,-experimental-svukte,-experimental-xqccmp,-experimental-xqcia,-experimental-xqciac,-experimental-xqcibi,-experimental-xqcibm,-experimental-xqcicli,-experimental-xqcicm,-experimental-xqcics,-experimental-xqcicsr,-experimental-xqciint,-experimental-xqciio,-experimental-xqcilb,-experimental-xqcili,-experimental-xqcilia,-experimental-xqcilo,-experimental-xqcilsm,-experimental-xqcisim,-experimental-xqcisls,-experimental-xqcisync,-experimental-xrivosvisni,-experimental-xrivosvizip,-experimental-xsfmclic,-experimental-xsfsclic,-experimental-zalasr,-experimental-zicfilp,-experimental-zicfiss,-experimental-zvbc32e,-experimental-zvkgs,-experimental-zvqdotq,-h,-q,-sdext,-sdtrig,-sha,-shcounterenw,-shgatpa,-shlcofideleg,-shtvala,-shvsatpa,-shvstvala,-shvstvecd,-smaia,-smcdeleg,-smcntrpmf,-smcsrind,-smdbltrp,-smepmp,-smmpm,-smnpm,-smrnmi,-smstateen,-ssaia,-ssccfg,-ssccptr,-sscofpmf,-sscounterenw,-sscsrind,-ssdbltrp,-ssnpm,-sspm,-ssqosid,-ssstateen,-ssstrict,-sstc,-sstvala,-sstvecd,-ssu64xl,-supm,-svade,-svadu,-svbare,-svinval,-svnapot,-svpbmt,-svvptc,-xandesperf,-xandesvbfhcvt,-xandesvdot,-xandesvpackfph,-xandesvsintload,-xcvalu,-xcvbi,-xcvbitmanip,-xcvelw,-xcvmac,-xcvmem,-xcvsimd,-xmipscbop,-xmipscmov,-xmipslsp,-xsfcease,-xsfmm128t,-xsfmm16t,-xsfmm32a16f,-xsfmm32a32f,-xsfmm32a8f,-xsfmm32a8i,-xsfmm32t,-xsfmm64a64f,-xsfmm64t,-xsfmmbase,-xsfvcp,-xsfvfnrclipxfqf,-xsfvfwmaccqqq,-xsfvqmaccdod,-xsfvqmaccqoq,-xsifivecdiscarddlone,-xsifivecflushdlone,-xtheadba,-xtheadbb,-xtheadbs,-xtheadcmo,-xtheadcondmov,-xtheadfmemidx,-xtheadmac,-xtheadmemidx,-xtheadmempair,-xtheadsync,-xtheadvdot,-xventanacondops,-xwchc,-za128rs,-za64rs,-zabha,-zacas,-zama16b,-zawrs,-zba,-zbb,-zbc,-zbkb,-zbkc,-zbkx,-zbs,-zca,-zcb,-zcd,-zce,-zcf,-zclsd,-zcmop,-zcmp,-zcmt,-zdinx,-zfa,-zfbfmin,-zfh,-zfhmin,-zfinx,-zhinx,-zhinxmin,-zic64b,-zicbom,-zicbop,-zicboz,-ziccamoa,-ziccamoc,-ziccif,-zicclsm,-ziccrse,-zicntr,-zicond,-zifencei,-zihintntl,-zihintpause,-zihpm,-zilsd,-zimop,-zk,-zkn,-zknd,-zkne,-zknh,-zkr,-zks,-zksed,-zksh,-zkt,-ztso,-zvbb,-zvbc,-zvfbfmin,-zvfbfwma,-zvfh,-zvfhmin,-zvkb,-zvkg,-zvkn,-zvknc,-zvkned,-zvkng,-zvknha,-zvknhb,-zvks,-zvksc,-zvksed,-zvksg,-zvksh,-zvkt,-zvl1024b,-zvl16384b,-zvl2048b,-zvl256b,-zvl32768b,-zvl4096b,-zvl512b,-zvl65536b,-zvl8192b" }
-attributes #2 = { nounwind "target-features"="+m,+a,+f,+d,+v" }
+attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+attributes #2 = { alwaysinline nounwind vscale_range(2,1024) "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="generic-rv64" "target-features"="+64bit,+a,+d,+f,+m,+relax,+v,+zaamo,+zalrsc,+zicsr,+zmmul,+zve32f,+zve32x,+zve64d,+zve64f,+zve64x,+zvl128b,+zvl32b,+zvl64b,-b,-c,-e,-experimental-p,-experimental-smctr,-experimental-ssctr,-experimental-svukte,-experimental-xqccmp,-experimental-xqcia,-experimental-xqciac,-experimental-xqcibi,-experimental-xqcibm,-experimental-xqcicli,-experimental-xqcicm,-experimental-xqcics,-experimental-xqcicsr,-experimental-xqciint,-experimental-xqciio,-experimental-xqcilb,-experimental-xqcili,-experimental-xqcilia,-experimental-xqcilo,-experimental-xqcilsm,-experimental-xqcisim,-experimental-xqcisls,-experimental-xqcisync,-experimental-xrivosvisni,-experimental-xrivosvizip,-experimental-xsfmclic,-experimental-xsfsclic,-experimental-zalasr,-experimental-zicfilp,-experimental-zicfiss,-experimental-zvbc32e,-experimental-zvkgs,-experimental-zvqdotq,-h,-q,-sdext,-sdtrig,-sha,-shcounterenw,-shgatpa,-shlcofideleg,-shtvala,-shvsatpa,-shvstvala,-shvstvecd,-smaia,-smcdeleg,-smcntrpmf,-smcsrind,-smdbltrp,-smepmp,-smmpm,-smnpm,-smrnmi,-smstateen,-ssaia,-ssccfg,-ssccptr,-sscofpmf,-sscounterenw,-sscsrind,-ssdbltrp,-ssnpm,-sspm,-ssqosid,-ssstateen,-ssstrict,-sstc,-sstvala,-sstvecd,-ssu64xl,-supm,-svade,-svadu,-svbare,-svinval,-svnapot,-svpbmt,-svvptc,-xandesperf,-xandesvbfhcvt,-xandesvdot,-xandesvpackfph,-xandesvsintload,-xcvalu,-xcvbi,-xcvbitmanip,-xcvelw,-xcvmac,-xcvmem,-xcvsimd,-xmipscbop,-xmipscmov,-xmipslsp,-xsfcease,-xsfmm128t,-xsfmm16t,-xsfmm32a16f,-xsfmm32a32f,-xsfmm32a8f,-xsfmm32a8i,-xsfmm32t,-xsfmm64a64f,-xsfmm64t,-xsfmmbase,-xsfvcp,-xsfvfnrclipxfqf,-xsfvfwmaccqqq,-xsfvqmaccdod,-xsfvqmaccqoq,-xsifivecdiscarddlone,-xsifivecflushdlone,-xtheadba,-xtheadbb,-xtheadbs,-xtheadcmo,-xtheadcondmov,-xtheadfmemidx,-xtheadmac,-xtheadmemidx,-xtheadmempair,-xtheadsync,-xtheadvdot,-xventanacondops,-xwchc,-za128rs,-za64rs,-zabha,-zacas,-zama16b,-zawrs,-zba,-zbb,-zbc,-zbkb,-zbkc,-zbkx,-zbs,-zca,-zcb,-zcd,-zce,-zcf,-zclsd,-zcmop,-zcmp,-zcmt,-zdinx,-zfa,-zfbfmin,-zfh,-zfhmin,-zfinx,-zhinx,-zhinxmin,-zic64b,-zicbom,-zicbop,-zicboz,-ziccamoa,-ziccamoc,-ziccif,-zicclsm,-ziccrse,-zicntr,-zicond,-zifencei,-zihintntl,-zihintpause,-zihpm,-zilsd,-zimop,-zk,-zkn,-zknd,-zkne,-zknh,-zkr,-zks,-zksed,-zksh,-zkt,-ztso,-zvbb,-zvbc,-zvfbfmin,-zvfbfwma,-zvfh,-zvfhmin,-zvkb,-zvkg,-zvkn,-zvknc,-zvkned,-zvkng,-zvknha,-zvknhb,-zvks,-zvksc,-zvksed,-zvksg,-zvksh,-zvkt,-zvl1024b,-zvl16384b,-zvl2048b,-zvl256b,-zvl32768b,-zvl4096b,-zvl512b,-zvl65536b,-zvl8192b" }
+attributes #3 = { nounwind "target-features"="+m,+a,+f,+d,+v" }
 
 !llvm.ident = !{!0}
 !llvm.module.flags = !{!1, !2, !3, !5, !6}

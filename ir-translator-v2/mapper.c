@@ -261,6 +261,7 @@ LLVMValueRef insert_into_scalable_vector(LLVMValueRef val, LLVMType ty, const ch
 
 LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix) {
     char var_name[32] = {0};
+    //printf("ty:%s\n", LLVMPrintTypeToString(LLVMTypeOf(val)));
     LLVMType elem_ty = OPC_VECTOR_TO_INT(ty);
     LLVMTypeRef scalable_vec_type = get_llvm_type(ty);
     LLVMTypeRef fixed_vec_type = LLVMVectorType(get_llvm_type(elem_ty), llvm_vector_elem_bit_counts[ty * 2]);
@@ -293,6 +294,10 @@ LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, 
     char var_name[32] = {0};
     if (as->tcg_ty[idx] == LLVMInvalidType) {
         if (as->f_argument[idx]) {
+            if (mapper_use_scalable_vector() && ty >= LLVMVector16xi8 && ty != LLVMVector2xi64) {
+                // Need bitcast for extract_from_scalable_vector
+                return LLVMBuildBitCast(g_builder, as->f_argument[idx], get_llvm_type(ty), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "bc"));
+            }
             return as->f_argument[idx];
         }
     }

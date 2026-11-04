@@ -6,7 +6,8 @@ target triple = "riscv64-unknown-linux-gnu"
 define qemuaot void @Fx0(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %xmm5, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr align 8 dereferenceable(26544) %cpu) #0 section ".text.Fx0" {
 entry:
   %v10.stack = alloca <vscale x 1 x i64>, align 16
-  store <vscale x 1 x i64> %xmm5, ptr %v10.stack, align 16, !tbaa !0
+  %setup_stack.vector_extract = call <2 x i64> @llvm.vector.extract.v2i64.nxv1i64.i64(<vscale x 1 x i64> %xmm5, i64 0)
+  store <2 x i64> %setup_stack.vector_extract, ptr %v10.stack, align 16, !tbaa !0
   %tmp0.stack = alloca i64, align 8
   %tmp1.stack = alloca i64, align 8
   %tmp2.stack = alloca i64, align 8
@@ -23,14 +24,18 @@ entry:
   %T2.out = add i64 %T2.env, 1184, !tcg.op !5
   store i64 %T2.out, ptr %tmp6.stack, align 8, !tbaa !0, !tcg.op !5
 ; ======== TCG [3] tail_call_qemuaot t4,env,t6,0x42,t5 VEC_ARGS: ========
-  %T3.v10.stack = load <vscale x 1 x i64>, ptr %v10.stack, align 16, !tbaa !0, !tcg.op !6
+  %T3.v10.stack = load <2 x i64>, ptr %v10.stack, align 16, !tbaa !0, !tcg.op !6
+  %T3.vector_insert = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T3.v10.stack, i64 0), !tcg.op !6
   %T3.env = ptrtoint ptr %env to i64, !tcg.op !6
   %T3.tmp6 = load i64, ptr %tmp6.stack, align 8, !tbaa !0, !tcg.op !6
   %T3.tmp5 = load i64, ptr %tmp5.stack, align 8, !tbaa !0, !tcg.op !6
   %T3.loaded_fn = load ptr, ptr %tmp4.stack, align 8, !tcg.op !6
-  tail call qemuaot void %T3.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %T3.v10.stack, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr %cpu, i64 %T3.env, i64 %T3.tmp6, i64 66, i64 %T3.tmp5), !tcg.op !6
+  tail call qemuaot void %T3.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %T3.vector_insert, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr %cpu, i64 %T3.env, i64 %T3.tmp6, i64 66, i64 %T3.tmp5), !tcg.op !6
   ret void, !tcg.op !6
 }
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare <2 x i64> @llvm.vector.extract.v2i64.nxv1i64.i64(<vscale x 1 x i64>, i64 immarg) #1
 
 ; Function Attrs: noinline nounwind
 define qemuaot void @trampoline_helper_rdrand(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %xmm5, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr align 8 dereferenceable(26544) %cpu, i64 %arg0, i64 %arg1, i64 %arg2, i64 %nc) #0 section ".text.trampoline_helper_rdrand" {
@@ -83,7 +88,8 @@ entry:
   %rcx.stack = alloca i64, align 8
   %rax.stack = alloca i64, align 8
   %v10.stack = alloca <vscale x 1 x i64>, align 16
-  store <vscale x 1 x i64> %xmm5, ptr %v10.stack, align 16, !tbaa !0
+  %setup_stack.vector_extract = call <2 x i64> @llvm.vector.extract.v2i64.nxv1i64.i64(<vscale x 1 x i64> %xmm5, i64 0)
+  store <2 x i64> %setup_stack.vector_extract, ptr %v10.stack, align 16, !tbaa !0
   %tmp0.stack = alloca i64, align 8
   %tmp1.stack = alloca i64, align 8
   %tmp2.stack = alloca i64, align 8
@@ -150,90 +156,146 @@ entry:
   %T19.envptr = getelementptr i8, ptr %env, i64 128, !tcg.op !28
   store i64 %rip, ptr %T19.envptr, align 16, !tbaa !8, !tcg.op !28
 ; ======== TCG [20] st_vec v128,e8,v0,env:0x360 ========
+  %T20.bc = bitcast <vscale x 1 x i64> %xmm0 to <vscale x 8 x i8>, !tcg.op !29
   %T20.envptr = getelementptr i8, ptr %env, i64 864, !tcg.op !29
-  store <vscale x 1 x i64> %xmm0, ptr %T20.envptr, align 16, !tbaa !8, !tcg.op !29
+  %T20.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T20.bc, i64 0), !tcg.op !29
+  store <16 x i8> %T20.vector_extract, ptr %T20.envptr, align 16, !tbaa !8, !tcg.op !29
 ; ======== TCG [21] st_vec v128,e8,v1,env:0x370 ========
+  %T21.bc = bitcast <vscale x 1 x i64> %ymm0_h to <vscale x 8 x i8>, !tcg.op !30
   %T21.envptr = getelementptr i8, ptr %env, i64 880, !tcg.op !30
-  store <vscale x 1 x i64> %ymm0_h, ptr %T21.envptr, align 16, !tbaa !8, !tcg.op !30
+  %T21.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T21.bc, i64 0), !tcg.op !30
+  store <16 x i8> %T21.vector_extract, ptr %T21.envptr, align 16, !tbaa !8, !tcg.op !30
 ; ======== TCG [22] st_vec v128,e8,v2,env:0x3a0 ========
+  %T22.bc = bitcast <vscale x 1 x i64> %xmm1 to <vscale x 8 x i8>, !tcg.op !31
   %T22.envptr = getelementptr i8, ptr %env, i64 928, !tcg.op !31
-  store <vscale x 1 x i64> %xmm1, ptr %T22.envptr, align 16, !tbaa !8, !tcg.op !31
+  %T22.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T22.bc, i64 0), !tcg.op !31
+  store <16 x i8> %T22.vector_extract, ptr %T22.envptr, align 16, !tbaa !8, !tcg.op !31
 ; ======== TCG [23] st_vec v128,e8,v3,env:0x3b0 ========
+  %T23.bc = bitcast <vscale x 1 x i64> %ymm1_h to <vscale x 8 x i8>, !tcg.op !32
   %T23.envptr = getelementptr i8, ptr %env, i64 944, !tcg.op !32
-  store <vscale x 1 x i64> %ymm1_h, ptr %T23.envptr, align 16, !tbaa !8, !tcg.op !32
+  %T23.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T23.bc, i64 0), !tcg.op !32
+  store <16 x i8> %T23.vector_extract, ptr %T23.envptr, align 16, !tbaa !8, !tcg.op !32
 ; ======== TCG [24] st_vec v128,e8,v4,env:0x3e0 ========
+  %T24.bc = bitcast <vscale x 1 x i64> %xmm2 to <vscale x 8 x i8>, !tcg.op !33
   %T24.envptr = getelementptr i8, ptr %env, i64 992, !tcg.op !33
-  store <vscale x 1 x i64> %xmm2, ptr %T24.envptr, align 16, !tbaa !8, !tcg.op !33
+  %T24.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T24.bc, i64 0), !tcg.op !33
+  store <16 x i8> %T24.vector_extract, ptr %T24.envptr, align 16, !tbaa !8, !tcg.op !33
 ; ======== TCG [25] st_vec v128,e8,v5,env:0x3f0 ========
+  %T25.bc = bitcast <vscale x 1 x i64> %ymm2_h to <vscale x 8 x i8>, !tcg.op !34
   %T25.envptr = getelementptr i8, ptr %env, i64 1008, !tcg.op !34
-  store <vscale x 1 x i64> %ymm2_h, ptr %T25.envptr, align 16, !tbaa !8, !tcg.op !34
+  %T25.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T25.bc, i64 0), !tcg.op !34
+  store <16 x i8> %T25.vector_extract, ptr %T25.envptr, align 16, !tbaa !8, !tcg.op !34
 ; ======== TCG [26] st_vec v128,e8,v6,env:0x420 ========
+  %T26.bc = bitcast <vscale x 1 x i64> %xmm3 to <vscale x 8 x i8>, !tcg.op !35
   %T26.envptr = getelementptr i8, ptr %env, i64 1056, !tcg.op !35
-  store <vscale x 1 x i64> %xmm3, ptr %T26.envptr, align 16, !tbaa !8, !tcg.op !35
+  %T26.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T26.bc, i64 0), !tcg.op !35
+  store <16 x i8> %T26.vector_extract, ptr %T26.envptr, align 16, !tbaa !8, !tcg.op !35
 ; ======== TCG [27] st_vec v128,e8,v7,env:0x430 ========
+  %T27.bc = bitcast <vscale x 1 x i64> %ymm3_h to <vscale x 8 x i8>, !tcg.op !36
   %T27.envptr = getelementptr i8, ptr %env, i64 1072, !tcg.op !36
-  store <vscale x 1 x i64> %ymm3_h, ptr %T27.envptr, align 16, !tbaa !8, !tcg.op !36
+  %T27.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T27.bc, i64 0), !tcg.op !36
+  store <16 x i8> %T27.vector_extract, ptr %T27.envptr, align 16, !tbaa !8, !tcg.op !36
 ; ======== TCG [28] st_vec v128,e8,v8,env:0x460 ========
+  %T28.bc = bitcast <vscale x 1 x i64> %xmm4 to <vscale x 8 x i8>, !tcg.op !37
   %T28.envptr = getelementptr i8, ptr %env, i64 1120, !tcg.op !37
-  store <vscale x 1 x i64> %xmm4, ptr %T28.envptr, align 16, !tbaa !8, !tcg.op !37
+  %T28.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T28.bc, i64 0), !tcg.op !37
+  store <16 x i8> %T28.vector_extract, ptr %T28.envptr, align 16, !tbaa !8, !tcg.op !37
 ; ======== TCG [29] st_vec v128,e8,v9,env:0x470 ========
+  %T29.bc = bitcast <vscale x 1 x i64> %ymm4_h to <vscale x 8 x i8>, !tcg.op !38
   %T29.envptr = getelementptr i8, ptr %env, i64 1136, !tcg.op !38
-  store <vscale x 1 x i64> %ymm4_h, ptr %T29.envptr, align 16, !tbaa !8, !tcg.op !38
+  %T29.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T29.bc, i64 0), !tcg.op !38
+  store <16 x i8> %T29.vector_extract, ptr %T29.envptr, align 16, !tbaa !8, !tcg.op !38
 ; ======== TCG [30] st_vec v128,e8,v10,env:0x4a0 ========
-  %T30.v10 = load <vscale x 8 x i8>, ptr %v10.stack, align 16, !tbaa !0, !tcg.op !39
+  %T30.v10 = load <16 x i8>, ptr %v10.stack, align 16, !tbaa !0, !tcg.op !39
+  %T30.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T30.v10, i64 0), !tcg.op !39
   %T30.envptr = getelementptr i8, ptr %env, i64 1184, !tcg.op !39
-  store <vscale x 8 x i8> %T30.v10, ptr %T30.envptr, align 16, !tbaa !8, !tcg.op !39
+  %T30.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T30.vector_insert, i64 0), !tcg.op !39
+  store <16 x i8> %T30.vector_extract, ptr %T30.envptr, align 16, !tbaa !8, !tcg.op !39
 ; ======== TCG [31] st_vec v128,e8,v11,env:0x4b0 ========
+  %T31.bc = bitcast <vscale x 1 x i64> %ymm5_h to <vscale x 8 x i8>, !tcg.op !40
   %T31.envptr = getelementptr i8, ptr %env, i64 1200, !tcg.op !40
-  store <vscale x 1 x i64> %ymm5_h, ptr %T31.envptr, align 16, !tbaa !8, !tcg.op !40
+  %T31.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T31.bc, i64 0), !tcg.op !40
+  store <16 x i8> %T31.vector_extract, ptr %T31.envptr, align 16, !tbaa !8, !tcg.op !40
 ; ======== TCG [32] st_vec v128,e8,v12,env:0x4e0 ========
+  %T32.bc = bitcast <vscale x 1 x i64> %xmm6 to <vscale x 8 x i8>, !tcg.op !41
   %T32.envptr = getelementptr i8, ptr %env, i64 1248, !tcg.op !41
-  store <vscale x 1 x i64> %xmm6, ptr %T32.envptr, align 16, !tbaa !8, !tcg.op !41
+  %T32.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T32.bc, i64 0), !tcg.op !41
+  store <16 x i8> %T32.vector_extract, ptr %T32.envptr, align 16, !tbaa !8, !tcg.op !41
 ; ======== TCG [33] st_vec v128,e8,v13,env:0x4f0 ========
+  %T33.bc = bitcast <vscale x 1 x i64> %ymm6_h to <vscale x 8 x i8>, !tcg.op !42
   %T33.envptr = getelementptr i8, ptr %env, i64 1264, !tcg.op !42
-  store <vscale x 1 x i64> %ymm6_h, ptr %T33.envptr, align 16, !tbaa !8, !tcg.op !42
+  %T33.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T33.bc, i64 0), !tcg.op !42
+  store <16 x i8> %T33.vector_extract, ptr %T33.envptr, align 16, !tbaa !8, !tcg.op !42
 ; ======== TCG [34] st_vec v128,e8,v14,env:0x520 ========
+  %T34.bc = bitcast <vscale x 1 x i64> %xmm7 to <vscale x 8 x i8>, !tcg.op !43
   %T34.envptr = getelementptr i8, ptr %env, i64 1312, !tcg.op !43
-  store <vscale x 1 x i64> %xmm7, ptr %T34.envptr, align 16, !tbaa !8, !tcg.op !43
+  %T34.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T34.bc, i64 0), !tcg.op !43
+  store <16 x i8> %T34.vector_extract, ptr %T34.envptr, align 16, !tbaa !8, !tcg.op !43
 ; ======== TCG [35] st_vec v128,e8,v15,env:0x530 ========
+  %T35.bc = bitcast <vscale x 1 x i64> %ymm7_h to <vscale x 8 x i8>, !tcg.op !44
   %T35.envptr = getelementptr i8, ptr %env, i64 1328, !tcg.op !44
-  store <vscale x 1 x i64> %ymm7_h, ptr %T35.envptr, align 16, !tbaa !8, !tcg.op !44
+  %T35.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T35.bc, i64 0), !tcg.op !44
+  store <16 x i8> %T35.vector_extract, ptr %T35.envptr, align 16, !tbaa !8, !tcg.op !44
 ; ======== TCG [36] st_vec v128,e8,v16,env:0x560 ========
+  %T36.bc = bitcast <vscale x 1 x i64> %xmm8 to <vscale x 8 x i8>, !tcg.op !45
   %T36.envptr = getelementptr i8, ptr %env, i64 1376, !tcg.op !45
-  store <vscale x 1 x i64> %xmm8, ptr %T36.envptr, align 16, !tbaa !8, !tcg.op !45
+  %T36.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T36.bc, i64 0), !tcg.op !45
+  store <16 x i8> %T36.vector_extract, ptr %T36.envptr, align 16, !tbaa !8, !tcg.op !45
 ; ======== TCG [37] st_vec v128,e8,v17,env:0x570 ========
+  %T37.bc = bitcast <vscale x 1 x i64> %ymm8_h to <vscale x 8 x i8>, !tcg.op !46
   %T37.envptr = getelementptr i8, ptr %env, i64 1392, !tcg.op !46
-  store <vscale x 1 x i64> %ymm8_h, ptr %T37.envptr, align 16, !tbaa !8, !tcg.op !46
+  %T37.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T37.bc, i64 0), !tcg.op !46
+  store <16 x i8> %T37.vector_extract, ptr %T37.envptr, align 16, !tbaa !8, !tcg.op !46
 ; ======== TCG [38] st_vec v128,e8,v18,env:0x5a0 ========
+  %T38.bc = bitcast <vscale x 1 x i64> %xmm9 to <vscale x 8 x i8>, !tcg.op !47
   %T38.envptr = getelementptr i8, ptr %env, i64 1440, !tcg.op !47
-  store <vscale x 1 x i64> %xmm9, ptr %T38.envptr, align 16, !tbaa !8, !tcg.op !47
+  %T38.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T38.bc, i64 0), !tcg.op !47
+  store <16 x i8> %T38.vector_extract, ptr %T38.envptr, align 16, !tbaa !8, !tcg.op !47
 ; ======== TCG [39] st_vec v128,e8,v19,env:0x5b0 ========
+  %T39.bc = bitcast <vscale x 1 x i64> %ymm9_h to <vscale x 8 x i8>, !tcg.op !48
   %T39.envptr = getelementptr i8, ptr %env, i64 1456, !tcg.op !48
-  store <vscale x 1 x i64> %ymm9_h, ptr %T39.envptr, align 16, !tbaa !8, !tcg.op !48
+  %T39.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T39.bc, i64 0), !tcg.op !48
+  store <16 x i8> %T39.vector_extract, ptr %T39.envptr, align 16, !tbaa !8, !tcg.op !48
 ; ======== TCG [40] st_vec v128,e8,v20,env:0x5e0 ========
+  %T40.bc = bitcast <vscale x 1 x i64> %xmm10 to <vscale x 8 x i8>, !tcg.op !49
   %T40.envptr = getelementptr i8, ptr %env, i64 1504, !tcg.op !49
-  store <vscale x 1 x i64> %xmm10, ptr %T40.envptr, align 16, !tbaa !8, !tcg.op !49
+  %T40.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T40.bc, i64 0), !tcg.op !49
+  store <16 x i8> %T40.vector_extract, ptr %T40.envptr, align 16, !tbaa !8, !tcg.op !49
 ; ======== TCG [41] st_vec v128,e8,v21,env:0x5f0 ========
+  %T41.bc = bitcast <vscale x 1 x i64> %ymm10_h to <vscale x 8 x i8>, !tcg.op !50
   %T41.envptr = getelementptr i8, ptr %env, i64 1520, !tcg.op !50
-  store <vscale x 1 x i64> %ymm10_h, ptr %T41.envptr, align 16, !tbaa !8, !tcg.op !50
+  %T41.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T41.bc, i64 0), !tcg.op !50
+  store <16 x i8> %T41.vector_extract, ptr %T41.envptr, align 16, !tbaa !8, !tcg.op !50
 ; ======== TCG [42] st_vec v128,e8,v22,env:0x620 ========
+  %T42.bc = bitcast <vscale x 1 x i64> %xmm11 to <vscale x 8 x i8>, !tcg.op !51
   %T42.envptr = getelementptr i8, ptr %env, i64 1568, !tcg.op !51
-  store <vscale x 1 x i64> %xmm11, ptr %T42.envptr, align 16, !tbaa !8, !tcg.op !51
+  %T42.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T42.bc, i64 0), !tcg.op !51
+  store <16 x i8> %T42.vector_extract, ptr %T42.envptr, align 16, !tbaa !8, !tcg.op !51
 ; ======== TCG [43] st_vec v128,e8,v23,env:0x630 ========
+  %T43.bc = bitcast <vscale x 1 x i64> %ymm11_h to <vscale x 8 x i8>, !tcg.op !52
   %T43.envptr = getelementptr i8, ptr %env, i64 1584, !tcg.op !52
-  store <vscale x 1 x i64> %ymm11_h, ptr %T43.envptr, align 16, !tbaa !8, !tcg.op !52
+  %T43.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T43.bc, i64 0), !tcg.op !52
+  store <16 x i8> %T43.vector_extract, ptr %T43.envptr, align 16, !tbaa !8, !tcg.op !52
 ; ======== TCG [44] st_vec v128,e8,v24,env:0x660 ========
+  %T44.bc = bitcast <vscale x 1 x i64> %xmm12 to <vscale x 8 x i8>, !tcg.op !53
   %T44.envptr = getelementptr i8, ptr %env, i64 1632, !tcg.op !53
-  store <vscale x 1 x i64> %xmm12, ptr %T44.envptr, align 16, !tbaa !8, !tcg.op !53
+  %T44.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T44.bc, i64 0), !tcg.op !53
+  store <16 x i8> %T44.vector_extract, ptr %T44.envptr, align 16, !tbaa !8, !tcg.op !53
 ; ======== TCG [45] st_vec v128,e8,v25,env:0x670 ========
+  %T45.bc = bitcast <vscale x 1 x i64> %ymm12_h to <vscale x 8 x i8>, !tcg.op !54
   %T45.envptr = getelementptr i8, ptr %env, i64 1648, !tcg.op !54
-  store <vscale x 1 x i64> %ymm12_h, ptr %T45.envptr, align 16, !tbaa !8, !tcg.op !54
+  %T45.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T45.bc, i64 0), !tcg.op !54
+  store <16 x i8> %T45.vector_extract, ptr %T45.envptr, align 16, !tbaa !8, !tcg.op !54
 ; ======== TCG [46] st_vec v128,e8,v26,env:0x6a0 ========
+  %T46.bc = bitcast <vscale x 1 x i64> %xmm13 to <vscale x 8 x i8>, !tcg.op !55
   %T46.envptr = getelementptr i8, ptr %env, i64 1696, !tcg.op !55
-  store <vscale x 1 x i64> %xmm13, ptr %T46.envptr, align 16, !tbaa !8, !tcg.op !55
+  %T46.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T46.bc, i64 0), !tcg.op !55
+  store <16 x i8> %T46.vector_extract, ptr %T46.envptr, align 16, !tbaa !8, !tcg.op !55
 ; ======== TCG [47] st_vec v128,e8,v27,env:0x6b0 ========
+  %T47.bc = bitcast <vscale x 1 x i64> %ymm13_h to <vscale x 8 x i8>, !tcg.op !56
   %T47.envptr = getelementptr i8, ptr %env, i64 1712, !tcg.op !56
-  store <vscale x 1 x i64> %ymm13_h, ptr %T47.envptr, align 16, !tbaa !8, !tcg.op !56
+  %T47.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T47.bc, i64 0), !tcg.op !56
+  store <16 x i8> %T47.vector_extract, ptr %T47.envptr, align 16, !tbaa !8, !tcg.op !56
 ; ======== TCG [48] call_default helper_rdrand,[t1],arg0,arg1,arg2 ========
   %T48.env = ptrtoint ptr %env to i64, !tcg.op !57
   call void asm "mv x7, $0", "r,~{x7}"(i64 %T48.env), !tcg.op !57
@@ -321,116 +383,172 @@ entry:
   store i64 %T68.envval, ptr %rip.stack, align 8, !tbaa !0, !tcg.op !77
 ; ======== TCG [69] ld_vec v128,e8,[v0],env:0x360 ========
   %T69.envptr = getelementptr i8, ptr %env, i64 864, !tcg.op !78
-  %T69.envval = load <vscale x 8 x i8>, ptr %T69.envptr, align 16, !tbaa !8, !tcg.op !78
-  store <vscale x 8 x i8> %T69.envval, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !78
+  %T69.envval = load <16 x i8>, ptr %T69.envptr, align 16, !tbaa !8, !tcg.op !78
+  %T69.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T69.envval, i64 0), !tcg.op !78
+  %T69.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T69.vector_insert, i64 0), !tcg.op !78
+  store <16 x i8> %T69.vector_extract, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !78
 ; ======== TCG [70] ld_vec v128,e8,[v1],env:0x370 ========
   %T70.envptr = getelementptr i8, ptr %env, i64 880, !tcg.op !79
-  %T70.envval = load <vscale x 8 x i8>, ptr %T70.envptr, align 16, !tbaa !8, !tcg.op !79
-  store <vscale x 8 x i8> %T70.envval, ptr %v1.stack, align 16, !tbaa !0, !tcg.op !79
+  %T70.envval = load <16 x i8>, ptr %T70.envptr, align 16, !tbaa !8, !tcg.op !79
+  %T70.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T70.envval, i64 0), !tcg.op !79
+  %T70.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T70.vector_insert, i64 0), !tcg.op !79
+  store <16 x i8> %T70.vector_extract, ptr %v1.stack, align 16, !tbaa !0, !tcg.op !79
 ; ======== TCG [71] ld_vec v128,e8,[v2],env:0x3a0 ========
   %T71.envptr = getelementptr i8, ptr %env, i64 928, !tcg.op !80
-  %T71.envval = load <vscale x 8 x i8>, ptr %T71.envptr, align 16, !tbaa !8, !tcg.op !80
-  store <vscale x 8 x i8> %T71.envval, ptr %v2.stack, align 16, !tbaa !0, !tcg.op !80
+  %T71.envval = load <16 x i8>, ptr %T71.envptr, align 16, !tbaa !8, !tcg.op !80
+  %T71.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T71.envval, i64 0), !tcg.op !80
+  %T71.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T71.vector_insert, i64 0), !tcg.op !80
+  store <16 x i8> %T71.vector_extract, ptr %v2.stack, align 16, !tbaa !0, !tcg.op !80
 ; ======== TCG [72] ld_vec v128,e8,[v3],env:0x3b0 ========
   %T72.envptr = getelementptr i8, ptr %env, i64 944, !tcg.op !81
-  %T72.envval = load <vscale x 8 x i8>, ptr %T72.envptr, align 16, !tbaa !8, !tcg.op !81
-  store <vscale x 8 x i8> %T72.envval, ptr %v3.stack, align 16, !tbaa !0, !tcg.op !81
+  %T72.envval = load <16 x i8>, ptr %T72.envptr, align 16, !tbaa !8, !tcg.op !81
+  %T72.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T72.envval, i64 0), !tcg.op !81
+  %T72.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T72.vector_insert, i64 0), !tcg.op !81
+  store <16 x i8> %T72.vector_extract, ptr %v3.stack, align 16, !tbaa !0, !tcg.op !81
 ; ======== TCG [73] ld_vec v128,e8,[v4],env:0x3e0 ========
   %T73.envptr = getelementptr i8, ptr %env, i64 992, !tcg.op !82
-  %T73.envval = load <vscale x 8 x i8>, ptr %T73.envptr, align 16, !tbaa !8, !tcg.op !82
-  store <vscale x 8 x i8> %T73.envval, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !82
+  %T73.envval = load <16 x i8>, ptr %T73.envptr, align 16, !tbaa !8, !tcg.op !82
+  %T73.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T73.envval, i64 0), !tcg.op !82
+  %T73.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T73.vector_insert, i64 0), !tcg.op !82
+  store <16 x i8> %T73.vector_extract, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !82
 ; ======== TCG [74] ld_vec v128,e8,[v5],env:0x3f0 ========
   %T74.envptr = getelementptr i8, ptr %env, i64 1008, !tcg.op !83
-  %T74.envval = load <vscale x 8 x i8>, ptr %T74.envptr, align 16, !tbaa !8, !tcg.op !83
-  store <vscale x 8 x i8> %T74.envval, ptr %v5.stack, align 16, !tbaa !0, !tcg.op !83
+  %T74.envval = load <16 x i8>, ptr %T74.envptr, align 16, !tbaa !8, !tcg.op !83
+  %T74.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T74.envval, i64 0), !tcg.op !83
+  %T74.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T74.vector_insert, i64 0), !tcg.op !83
+  store <16 x i8> %T74.vector_extract, ptr %v5.stack, align 16, !tbaa !0, !tcg.op !83
 ; ======== TCG [75] ld_vec v128,e8,[v6],env:0x420 ========
   %T75.envptr = getelementptr i8, ptr %env, i64 1056, !tcg.op !84
-  %T75.envval = load <vscale x 8 x i8>, ptr %T75.envptr, align 16, !tbaa !8, !tcg.op !84
-  store <vscale x 8 x i8> %T75.envval, ptr %v6.stack, align 16, !tbaa !0, !tcg.op !84
+  %T75.envval = load <16 x i8>, ptr %T75.envptr, align 16, !tbaa !8, !tcg.op !84
+  %T75.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T75.envval, i64 0), !tcg.op !84
+  %T75.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T75.vector_insert, i64 0), !tcg.op !84
+  store <16 x i8> %T75.vector_extract, ptr %v6.stack, align 16, !tbaa !0, !tcg.op !84
 ; ======== TCG [76] ld_vec v128,e8,[v7],env:0x430 ========
   %T76.envptr = getelementptr i8, ptr %env, i64 1072, !tcg.op !85
-  %T76.envval = load <vscale x 8 x i8>, ptr %T76.envptr, align 16, !tbaa !8, !tcg.op !85
-  store <vscale x 8 x i8> %T76.envval, ptr %v7.stack, align 16, !tbaa !0, !tcg.op !85
+  %T76.envval = load <16 x i8>, ptr %T76.envptr, align 16, !tbaa !8, !tcg.op !85
+  %T76.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T76.envval, i64 0), !tcg.op !85
+  %T76.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T76.vector_insert, i64 0), !tcg.op !85
+  store <16 x i8> %T76.vector_extract, ptr %v7.stack, align 16, !tbaa !0, !tcg.op !85
 ; ======== TCG [77] ld_vec v128,e8,[v8],env:0x460 ========
   %T77.envptr = getelementptr i8, ptr %env, i64 1120, !tcg.op !86
-  %T77.envval = load <vscale x 8 x i8>, ptr %T77.envptr, align 16, !tbaa !8, !tcg.op !86
-  store <vscale x 8 x i8> %T77.envval, ptr %v8.stack, align 16, !tbaa !0, !tcg.op !86
+  %T77.envval = load <16 x i8>, ptr %T77.envptr, align 16, !tbaa !8, !tcg.op !86
+  %T77.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T77.envval, i64 0), !tcg.op !86
+  %T77.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T77.vector_insert, i64 0), !tcg.op !86
+  store <16 x i8> %T77.vector_extract, ptr %v8.stack, align 16, !tbaa !0, !tcg.op !86
 ; ======== TCG [78] ld_vec v128,e8,[v9],env:0x470 ========
   %T78.envptr = getelementptr i8, ptr %env, i64 1136, !tcg.op !87
-  %T78.envval = load <vscale x 8 x i8>, ptr %T78.envptr, align 16, !tbaa !8, !tcg.op !87
-  store <vscale x 8 x i8> %T78.envval, ptr %v9.stack, align 16, !tbaa !0, !tcg.op !87
+  %T78.envval = load <16 x i8>, ptr %T78.envptr, align 16, !tbaa !8, !tcg.op !87
+  %T78.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T78.envval, i64 0), !tcg.op !87
+  %T78.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T78.vector_insert, i64 0), !tcg.op !87
+  store <16 x i8> %T78.vector_extract, ptr %v9.stack, align 16, !tbaa !0, !tcg.op !87
 ; ======== TCG [79] ld_vec v128,e8,[v10],env:0x4a0 ========
   %T79.envptr = getelementptr i8, ptr %env, i64 1184, !tcg.op !88
-  %T79.envval = load <vscale x 8 x i8>, ptr %T79.envptr, align 16, !tbaa !8, !tcg.op !88
-  store <vscale x 8 x i8> %T79.envval, ptr %v10.stack, align 16, !tbaa !0, !tcg.op !88
+  %T79.envval = load <16 x i8>, ptr %T79.envptr, align 16, !tbaa !8, !tcg.op !88
+  %T79.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T79.envval, i64 0), !tcg.op !88
+  %T79.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T79.vector_insert, i64 0), !tcg.op !88
+  store <16 x i8> %T79.vector_extract, ptr %v10.stack, align 16, !tbaa !0, !tcg.op !88
 ; ======== TCG [80] ld_vec v128,e8,[v11],env:0x4b0 ========
   %T80.envptr = getelementptr i8, ptr %env, i64 1200, !tcg.op !89
-  %T80.envval = load <vscale x 8 x i8>, ptr %T80.envptr, align 16, !tbaa !8, !tcg.op !89
-  store <vscale x 8 x i8> %T80.envval, ptr %v11.stack, align 16, !tbaa !0, !tcg.op !89
+  %T80.envval = load <16 x i8>, ptr %T80.envptr, align 16, !tbaa !8, !tcg.op !89
+  %T80.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T80.envval, i64 0), !tcg.op !89
+  %T80.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T80.vector_insert, i64 0), !tcg.op !89
+  store <16 x i8> %T80.vector_extract, ptr %v11.stack, align 16, !tbaa !0, !tcg.op !89
 ; ======== TCG [81] ld_vec v128,e8,[v12],env:0x4e0 ========
   %T81.envptr = getelementptr i8, ptr %env, i64 1248, !tcg.op !90
-  %T81.envval = load <vscale x 8 x i8>, ptr %T81.envptr, align 16, !tbaa !8, !tcg.op !90
-  store <vscale x 8 x i8> %T81.envval, ptr %v12.stack, align 16, !tbaa !0, !tcg.op !90
+  %T81.envval = load <16 x i8>, ptr %T81.envptr, align 16, !tbaa !8, !tcg.op !90
+  %T81.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T81.envval, i64 0), !tcg.op !90
+  %T81.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T81.vector_insert, i64 0), !tcg.op !90
+  store <16 x i8> %T81.vector_extract, ptr %v12.stack, align 16, !tbaa !0, !tcg.op !90
 ; ======== TCG [82] ld_vec v128,e8,[v13],env:0x4f0 ========
   %T82.envptr = getelementptr i8, ptr %env, i64 1264, !tcg.op !91
-  %T82.envval = load <vscale x 8 x i8>, ptr %T82.envptr, align 16, !tbaa !8, !tcg.op !91
-  store <vscale x 8 x i8> %T82.envval, ptr %v13.stack, align 16, !tbaa !0, !tcg.op !91
+  %T82.envval = load <16 x i8>, ptr %T82.envptr, align 16, !tbaa !8, !tcg.op !91
+  %T82.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T82.envval, i64 0), !tcg.op !91
+  %T82.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T82.vector_insert, i64 0), !tcg.op !91
+  store <16 x i8> %T82.vector_extract, ptr %v13.stack, align 16, !tbaa !0, !tcg.op !91
 ; ======== TCG [83] ld_vec v128,e8,[v14],env:0x520 ========
   %T83.envptr = getelementptr i8, ptr %env, i64 1312, !tcg.op !92
-  %T83.envval = load <vscale x 8 x i8>, ptr %T83.envptr, align 16, !tbaa !8, !tcg.op !92
-  store <vscale x 8 x i8> %T83.envval, ptr %v14.stack, align 16, !tbaa !0, !tcg.op !92
+  %T83.envval = load <16 x i8>, ptr %T83.envptr, align 16, !tbaa !8, !tcg.op !92
+  %T83.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T83.envval, i64 0), !tcg.op !92
+  %T83.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T83.vector_insert, i64 0), !tcg.op !92
+  store <16 x i8> %T83.vector_extract, ptr %v14.stack, align 16, !tbaa !0, !tcg.op !92
 ; ======== TCG [84] ld_vec v128,e8,[v15],env:0x530 ========
   %T84.envptr = getelementptr i8, ptr %env, i64 1328, !tcg.op !93
-  %T84.envval = load <vscale x 8 x i8>, ptr %T84.envptr, align 16, !tbaa !8, !tcg.op !93
-  store <vscale x 8 x i8> %T84.envval, ptr %v15.stack, align 16, !tbaa !0, !tcg.op !93
+  %T84.envval = load <16 x i8>, ptr %T84.envptr, align 16, !tbaa !8, !tcg.op !93
+  %T84.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T84.envval, i64 0), !tcg.op !93
+  %T84.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T84.vector_insert, i64 0), !tcg.op !93
+  store <16 x i8> %T84.vector_extract, ptr %v15.stack, align 16, !tbaa !0, !tcg.op !93
 ; ======== TCG [85] ld_vec v128,e8,[v16],env:0x560 ========
   %T85.envptr = getelementptr i8, ptr %env, i64 1376, !tcg.op !94
-  %T85.envval = load <vscale x 8 x i8>, ptr %T85.envptr, align 16, !tbaa !8, !tcg.op !94
-  store <vscale x 8 x i8> %T85.envval, ptr %v16.stack, align 16, !tbaa !0, !tcg.op !94
+  %T85.envval = load <16 x i8>, ptr %T85.envptr, align 16, !tbaa !8, !tcg.op !94
+  %T85.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T85.envval, i64 0), !tcg.op !94
+  %T85.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T85.vector_insert, i64 0), !tcg.op !94
+  store <16 x i8> %T85.vector_extract, ptr %v16.stack, align 16, !tbaa !0, !tcg.op !94
 ; ======== TCG [86] ld_vec v128,e8,[v17],env:0x570 ========
   %T86.envptr = getelementptr i8, ptr %env, i64 1392, !tcg.op !95
-  %T86.envval = load <vscale x 8 x i8>, ptr %T86.envptr, align 16, !tbaa !8, !tcg.op !95
-  store <vscale x 8 x i8> %T86.envval, ptr %v17.stack, align 16, !tbaa !0, !tcg.op !95
+  %T86.envval = load <16 x i8>, ptr %T86.envptr, align 16, !tbaa !8, !tcg.op !95
+  %T86.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T86.envval, i64 0), !tcg.op !95
+  %T86.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T86.vector_insert, i64 0), !tcg.op !95
+  store <16 x i8> %T86.vector_extract, ptr %v17.stack, align 16, !tbaa !0, !tcg.op !95
 ; ======== TCG [87] ld_vec v128,e8,[v18],env:0x5a0 ========
   %T87.envptr = getelementptr i8, ptr %env, i64 1440, !tcg.op !96
-  %T87.envval = load <vscale x 8 x i8>, ptr %T87.envptr, align 16, !tbaa !8, !tcg.op !96
-  store <vscale x 8 x i8> %T87.envval, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !96
+  %T87.envval = load <16 x i8>, ptr %T87.envptr, align 16, !tbaa !8, !tcg.op !96
+  %T87.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T87.envval, i64 0), !tcg.op !96
+  %T87.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T87.vector_insert, i64 0), !tcg.op !96
+  store <16 x i8> %T87.vector_extract, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !96
 ; ======== TCG [88] ld_vec v128,e8,[v19],env:0x5b0 ========
   %T88.envptr = getelementptr i8, ptr %env, i64 1456, !tcg.op !97
-  %T88.envval = load <vscale x 8 x i8>, ptr %T88.envptr, align 16, !tbaa !8, !tcg.op !97
-  store <vscale x 8 x i8> %T88.envval, ptr %v19.stack, align 16, !tbaa !0, !tcg.op !97
+  %T88.envval = load <16 x i8>, ptr %T88.envptr, align 16, !tbaa !8, !tcg.op !97
+  %T88.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T88.envval, i64 0), !tcg.op !97
+  %T88.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T88.vector_insert, i64 0), !tcg.op !97
+  store <16 x i8> %T88.vector_extract, ptr %v19.stack, align 16, !tbaa !0, !tcg.op !97
 ; ======== TCG [89] ld_vec v128,e8,[v20],env:0x5e0 ========
   %T89.envptr = getelementptr i8, ptr %env, i64 1504, !tcg.op !98
-  %T89.envval = load <vscale x 8 x i8>, ptr %T89.envptr, align 16, !tbaa !8, !tcg.op !98
-  store <vscale x 8 x i8> %T89.envval, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !98
+  %T89.envval = load <16 x i8>, ptr %T89.envptr, align 16, !tbaa !8, !tcg.op !98
+  %T89.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T89.envval, i64 0), !tcg.op !98
+  %T89.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T89.vector_insert, i64 0), !tcg.op !98
+  store <16 x i8> %T89.vector_extract, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !98
 ; ======== TCG [90] ld_vec v128,e8,[v21],env:0x5f0 ========
   %T90.envptr = getelementptr i8, ptr %env, i64 1520, !tcg.op !99
-  %T90.envval = load <vscale x 8 x i8>, ptr %T90.envptr, align 16, !tbaa !8, !tcg.op !99
-  store <vscale x 8 x i8> %T90.envval, ptr %v21.stack, align 16, !tbaa !0, !tcg.op !99
+  %T90.envval = load <16 x i8>, ptr %T90.envptr, align 16, !tbaa !8, !tcg.op !99
+  %T90.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T90.envval, i64 0), !tcg.op !99
+  %T90.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T90.vector_insert, i64 0), !tcg.op !99
+  store <16 x i8> %T90.vector_extract, ptr %v21.stack, align 16, !tbaa !0, !tcg.op !99
 ; ======== TCG [91] ld_vec v128,e8,[v22],env:0x620 ========
   %T91.envptr = getelementptr i8, ptr %env, i64 1568, !tcg.op !100
-  %T91.envval = load <vscale x 8 x i8>, ptr %T91.envptr, align 16, !tbaa !8, !tcg.op !100
-  store <vscale x 8 x i8> %T91.envval, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !100
+  %T91.envval = load <16 x i8>, ptr %T91.envptr, align 16, !tbaa !8, !tcg.op !100
+  %T91.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T91.envval, i64 0), !tcg.op !100
+  %T91.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T91.vector_insert, i64 0), !tcg.op !100
+  store <16 x i8> %T91.vector_extract, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !100
 ; ======== TCG [92] ld_vec v128,e8,[v23],env:0x630 ========
   %T92.envptr = getelementptr i8, ptr %env, i64 1584, !tcg.op !101
-  %T92.envval = load <vscale x 8 x i8>, ptr %T92.envptr, align 16, !tbaa !8, !tcg.op !101
-  store <vscale x 8 x i8> %T92.envval, ptr %v23.stack, align 16, !tbaa !0, !tcg.op !101
+  %T92.envval = load <16 x i8>, ptr %T92.envptr, align 16, !tbaa !8, !tcg.op !101
+  %T92.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T92.envval, i64 0), !tcg.op !101
+  %T92.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T92.vector_insert, i64 0), !tcg.op !101
+  store <16 x i8> %T92.vector_extract, ptr %v23.stack, align 16, !tbaa !0, !tcg.op !101
 ; ======== TCG [93] ld_vec v128,e8,[v24],env:0x660 ========
   %T93.envptr = getelementptr i8, ptr %env, i64 1632, !tcg.op !102
-  %T93.envval = load <vscale x 8 x i8>, ptr %T93.envptr, align 16, !tbaa !8, !tcg.op !102
-  store <vscale x 8 x i8> %T93.envval, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !102
+  %T93.envval = load <16 x i8>, ptr %T93.envptr, align 16, !tbaa !8, !tcg.op !102
+  %T93.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T93.envval, i64 0), !tcg.op !102
+  %T93.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T93.vector_insert, i64 0), !tcg.op !102
+  store <16 x i8> %T93.vector_extract, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !102
 ; ======== TCG [94] ld_vec v128,e8,[v25],env:0x670 ========
   %T94.envptr = getelementptr i8, ptr %env, i64 1648, !tcg.op !103
-  %T94.envval = load <vscale x 8 x i8>, ptr %T94.envptr, align 16, !tbaa !8, !tcg.op !103
-  store <vscale x 8 x i8> %T94.envval, ptr %v25.stack, align 16, !tbaa !0, !tcg.op !103
+  %T94.envval = load <16 x i8>, ptr %T94.envptr, align 16, !tbaa !8, !tcg.op !103
+  %T94.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T94.envval, i64 0), !tcg.op !103
+  %T94.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T94.vector_insert, i64 0), !tcg.op !103
+  store <16 x i8> %T94.vector_extract, ptr %v25.stack, align 16, !tbaa !0, !tcg.op !103
 ; ======== TCG [95] ld_vec v128,e8,[v26],env:0x6a0 ========
   %T95.envptr = getelementptr i8, ptr %env, i64 1696, !tcg.op !104
-  %T95.envval = load <vscale x 8 x i8>, ptr %T95.envptr, align 16, !tbaa !8, !tcg.op !104
-  store <vscale x 8 x i8> %T95.envval, ptr %v26.stack, align 16, !tbaa !0, !tcg.op !104
+  %T95.envval = load <16 x i8>, ptr %T95.envptr, align 16, !tbaa !8, !tcg.op !104
+  %T95.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T95.envval, i64 0), !tcg.op !104
+  %T95.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T95.vector_insert, i64 0), !tcg.op !104
+  store <16 x i8> %T95.vector_extract, ptr %v26.stack, align 16, !tbaa !0, !tcg.op !104
 ; ======== TCG [96] ld_vec v128,e8,[v27],env:0x6b0 ========
   %T96.envptr = getelementptr i8, ptr %env, i64 1712, !tcg.op !105
-  %T96.envval = load <vscale x 8 x i8>, ptr %T96.envptr, align 16, !tbaa !8, !tcg.op !105
-  store <vscale x 8 x i8> %T96.envval, ptr %v27.stack, align 16, !tbaa !0, !tcg.op !105
+  %T96.envval = load <16 x i8>, ptr %T96.envptr, align 16, !tbaa !8, !tcg.op !105
+  %T96.vector_insert = call <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8> poison, <16 x i8> %T96.envval, i64 0), !tcg.op !105
+  %T96.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T96.vector_insert, i64 0), !tcg.op !105
+  store <16 x i8> %T96.vector_extract, ptr %v27.stack, align 16, !tbaa !0, !tcg.op !105
 ; ======== TCG [97] tail_call_qemuaot __last_arg__,t1 VEC_ARGS: ========
   %T97.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !106
   %T97.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !106
@@ -452,37 +570,65 @@ entry:
   %T97.cc_dst.stack = load i64, ptr %cc_dst.stack, align 8, !tbaa !0, !tcg.op !106
   %T97.cc_op.stack = load i32, ptr %cc_op.stack, align 8, !tbaa !0, !tcg.op !106
   %T97.rip.stack = load i64, ptr %rip.stack, align 8, !tbaa !0, !tcg.op !106
-  %T97.v0.stack = load <vscale x 1 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v1.stack = load <vscale x 1 x i64>, ptr %v1.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v2.stack = load <vscale x 1 x i64>, ptr %v2.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v3.stack = load <vscale x 1 x i64>, ptr %v3.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v4.stack = load <vscale x 1 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v5.stack = load <vscale x 1 x i64>, ptr %v5.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v6.stack = load <vscale x 1 x i64>, ptr %v6.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v7.stack = load <vscale x 1 x i64>, ptr %v7.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v8.stack = load <vscale x 1 x i64>, ptr %v8.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v9.stack = load <vscale x 1 x i64>, ptr %v9.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v10.stack = load <vscale x 1 x i64>, ptr %v10.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v11.stack = load <vscale x 1 x i64>, ptr %v11.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v12.stack = load <vscale x 1 x i64>, ptr %v12.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v13.stack = load <vscale x 1 x i64>, ptr %v13.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v14.stack = load <vscale x 1 x i64>, ptr %v14.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v15.stack = load <vscale x 1 x i64>, ptr %v15.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v16.stack = load <vscale x 1 x i64>, ptr %v16.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v17.stack = load <vscale x 1 x i64>, ptr %v17.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v18.stack = load <vscale x 1 x i64>, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v19.stack = load <vscale x 1 x i64>, ptr %v19.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v20.stack = load <vscale x 1 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v21.stack = load <vscale x 1 x i64>, ptr %v21.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v22.stack = load <vscale x 1 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v23.stack = load <vscale x 1 x i64>, ptr %v23.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v24.stack = load <vscale x 1 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v25.stack = load <vscale x 1 x i64>, ptr %v25.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v26.stack = load <vscale x 1 x i64>, ptr %v26.stack, align 16, !tbaa !0, !tcg.op !106
-  %T97.v27.stack = load <vscale x 1 x i64>, ptr %v27.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.v0.stack = load <2 x i64>, ptr %v0.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v0.stack, i64 0), !tcg.op !106
+  %T97.v1.stack = load <2 x i64>, ptr %v1.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert1 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v1.stack, i64 0), !tcg.op !106
+  %T97.v2.stack = load <2 x i64>, ptr %v2.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert2 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v2.stack, i64 0), !tcg.op !106
+  %T97.v3.stack = load <2 x i64>, ptr %v3.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert3 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v3.stack, i64 0), !tcg.op !106
+  %T97.v4.stack = load <2 x i64>, ptr %v4.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert4 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v4.stack, i64 0), !tcg.op !106
+  %T97.v5.stack = load <2 x i64>, ptr %v5.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert5 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v5.stack, i64 0), !tcg.op !106
+  %T97.v6.stack = load <2 x i64>, ptr %v6.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert6 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v6.stack, i64 0), !tcg.op !106
+  %T97.v7.stack = load <2 x i64>, ptr %v7.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert7 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v7.stack, i64 0), !tcg.op !106
+  %T97.v8.stack = load <2 x i64>, ptr %v8.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert8 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v8.stack, i64 0), !tcg.op !106
+  %T97.v9.stack = load <2 x i64>, ptr %v9.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert9 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v9.stack, i64 0), !tcg.op !106
+  %T97.v10.stack = load <2 x i64>, ptr %v10.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert10 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v10.stack, i64 0), !tcg.op !106
+  %T97.v11.stack = load <2 x i64>, ptr %v11.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert11 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v11.stack, i64 0), !tcg.op !106
+  %T97.v12.stack = load <2 x i64>, ptr %v12.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert12 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v12.stack, i64 0), !tcg.op !106
+  %T97.v13.stack = load <2 x i64>, ptr %v13.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert13 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v13.stack, i64 0), !tcg.op !106
+  %T97.v14.stack = load <2 x i64>, ptr %v14.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert14 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v14.stack, i64 0), !tcg.op !106
+  %T97.v15.stack = load <2 x i64>, ptr %v15.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert15 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v15.stack, i64 0), !tcg.op !106
+  %T97.v16.stack = load <2 x i64>, ptr %v16.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert16 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v16.stack, i64 0), !tcg.op !106
+  %T97.v17.stack = load <2 x i64>, ptr %v17.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert17 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v17.stack, i64 0), !tcg.op !106
+  %T97.v18.stack = load <2 x i64>, ptr %v18.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert18 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v18.stack, i64 0), !tcg.op !106
+  %T97.v19.stack = load <2 x i64>, ptr %v19.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert19 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v19.stack, i64 0), !tcg.op !106
+  %T97.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert20 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v20.stack, i64 0), !tcg.op !106
+  %T97.v21.stack = load <2 x i64>, ptr %v21.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert21 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v21.stack, i64 0), !tcg.op !106
+  %T97.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert22 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v22.stack, i64 0), !tcg.op !106
+  %T97.v23.stack = load <2 x i64>, ptr %v23.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert23 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v23.stack, i64 0), !tcg.op !106
+  %T97.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert24 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v24.stack, i64 0), !tcg.op !106
+  %T97.v25.stack = load <2 x i64>, ptr %v25.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert25 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v25.stack, i64 0), !tcg.op !106
+  %T97.v26.stack = load <2 x i64>, ptr %v26.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert26 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v26.stack, i64 0), !tcg.op !106
+  %T97.v27.stack = load <2 x i64>, ptr %v27.stack, align 16, !tbaa !0, !tcg.op !106
+  %T97.vector_insert27 = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T97.v27.stack, i64 0), !tcg.op !106
   %T97.tmp1 = load i64, ptr %tmp1.stack, align 8, !tbaa !0, !tcg.op !106
   %T97.loaded_fn = inttoptr i64 %nc to ptr, !tcg.op !106
-  tail call qemuaot void %T97.loaded_fn(i64 %T97.rax.stack, i64 %T97.rcx.stack, i64 %T97.rdx.stack, i64 %T97.rbx.stack, i64 %T97.rsp.stack, i64 %T97.rbp.stack, i64 %T97.rsi.stack, i64 %T97.rdi.stack, i64 %T97.r8.stack, i64 %T97.r9.stack, i64 %T97.r10.stack, i64 %T97.r11.stack, i64 %T97.r12.stack, i64 %T97.r13.stack, i64 %T97.r14.stack, i64 %T97.r15.stack, i64 %T97.cc_src.stack, i64 %T97.cc_dst.stack, i32 %T97.cc_op.stack, i64 %T97.rip.stack, <vscale x 1 x i64> %T97.v0.stack, <vscale x 1 x i64> %T97.v1.stack, <vscale x 1 x i64> %T97.v2.stack, <vscale x 1 x i64> %T97.v3.stack, <vscale x 1 x i64> %T97.v4.stack, <vscale x 1 x i64> %T97.v5.stack, <vscale x 1 x i64> %T97.v6.stack, <vscale x 1 x i64> %T97.v7.stack, <vscale x 1 x i64> %T97.v8.stack, <vscale x 1 x i64> %T97.v9.stack, <vscale x 1 x i64> %T97.v10.stack, <vscale x 1 x i64> %T97.v11.stack, <vscale x 1 x i64> %T97.v12.stack, <vscale x 1 x i64> %T97.v13.stack, <vscale x 1 x i64> %T97.v14.stack, <vscale x 1 x i64> %T97.v15.stack, <vscale x 1 x i64> %T97.v16.stack, <vscale x 1 x i64> %T97.v17.stack, <vscale x 1 x i64> %T97.v18.stack, <vscale x 1 x i64> %T97.v19.stack, <vscale x 1 x i64> %T97.v20.stack, <vscale x 1 x i64> %T97.v21.stack, <vscale x 1 x i64> %T97.v22.stack, <vscale x 1 x i64> %T97.v23.stack, <vscale x 1 x i64> %T97.v24.stack, <vscale x 1 x i64> %T97.v25.stack, <vscale x 1 x i64> %T97.v26.stack, <vscale x 1 x i64> %T97.v27.stack, ptr %cpu, i64 %T97.tmp1), !tcg.op !106
+  tail call qemuaot void %T97.loaded_fn(i64 %T97.rax.stack, i64 %T97.rcx.stack, i64 %T97.rdx.stack, i64 %T97.rbx.stack, i64 %T97.rsp.stack, i64 %T97.rbp.stack, i64 %T97.rsi.stack, i64 %T97.rdi.stack, i64 %T97.r8.stack, i64 %T97.r9.stack, i64 %T97.r10.stack, i64 %T97.r11.stack, i64 %T97.r12.stack, i64 %T97.r13.stack, i64 %T97.r14.stack, i64 %T97.r15.stack, i64 %T97.cc_src.stack, i64 %T97.cc_dst.stack, i32 %T97.cc_op.stack, i64 %T97.rip.stack, <vscale x 1 x i64> %T97.vector_insert, <vscale x 1 x i64> %T97.vector_insert1, <vscale x 1 x i64> %T97.vector_insert2, <vscale x 1 x i64> %T97.vector_insert3, <vscale x 1 x i64> %T97.vector_insert4, <vscale x 1 x i64> %T97.vector_insert5, <vscale x 1 x i64> %T97.vector_insert6, <vscale x 1 x i64> %T97.vector_insert7, <vscale x 1 x i64> %T97.vector_insert8, <vscale x 1 x i64> %T97.vector_insert9, <vscale x 1 x i64> %T97.vector_insert10, <vscale x 1 x i64> %T97.vector_insert11, <vscale x 1 x i64> %T97.vector_insert12, <vscale x 1 x i64> %T97.vector_insert13, <vscale x 1 x i64> %T97.vector_insert14, <vscale x 1 x i64> %T97.vector_insert15, <vscale x 1 x i64> %T97.vector_insert16, <vscale x 1 x i64> %T97.vector_insert17, <vscale x 1 x i64> %T97.vector_insert18, <vscale x 1 x i64> %T97.vector_insert19, <vscale x 1 x i64> %T97.vector_insert20, <vscale x 1 x i64> %T97.vector_insert21, <vscale x 1 x i64> %T97.vector_insert22, <vscale x 1 x i64> %T97.vector_insert23, <vscale x 1 x i64> %T97.vector_insert24, <vscale x 1 x i64> %T97.vector_insert25, <vscale x 1 x i64> %T97.vector_insert26, <vscale x 1 x i64> %T97.vector_insert27, ptr %cpu, i64 %T97.tmp1), !tcg.op !106
   ret void, !tcg.op !106
 }
 
@@ -490,7 +636,8 @@ entry:
 define qemuaot void @Fx0_1(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %xmm5, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr align 8 dereferenceable(26544) %cpu, i64 %rv) #0 section ".text.Fx0_1" {
 entry:
   %v10.stack = alloca <vscale x 1 x i64>, align 16
-  store <vscale x 1 x i64> %xmm5, ptr %v10.stack, align 16, !tbaa !0
+  %setup_stack.vector_extract = call <2 x i64> @llvm.vector.extract.v2i64.nxv1i64.i64(<vscale x 1 x i64> %xmm5, i64 0)
+  store <2 x i64> %setup_stack.vector_extract, ptr %v10.stack, align 16, !tbaa !0
   %tmp0.stack = alloca i64, align 8
   %tmp1.stack = alloca i64, align 8
   %tmp2.stack = alloca i64, align 8
@@ -505,19 +652,30 @@ entry:
 ; ======== TCG [2] func_addr t3,0x55aa,0x0 ========
   store ptr @Fx55aa, ptr %tmp3.stack, align 8, !tbaa !0, !tcg.op !109
 ; ======== TCG [3] tail_call_qemuaot t3 VEC_ARGS: ========
-  %T3.v10.stack = load <vscale x 1 x i64>, ptr %v10.stack, align 16, !tbaa !0, !tcg.op !110
+  %T3.v10.stack = load <2 x i64>, ptr %v10.stack, align 16, !tbaa !0, !tcg.op !110
+  %T3.vector_insert = call <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64> poison, <2 x i64> %T3.v10.stack, i64 0), !tcg.op !110
   %T3.loaded_fn = load ptr, ptr %tmp3.stack, align 8, !tcg.op !110
-  tail call qemuaot void %T3.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %T3.v10.stack, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr %cpu), !tcg.op !110
+  tail call qemuaot void %T3.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %rip, <vscale x 1 x i64> %xmm0, <vscale x 1 x i64> %ymm0_h, <vscale x 1 x i64> %xmm1, <vscale x 1 x i64> %ymm1_h, <vscale x 1 x i64> %xmm2, <vscale x 1 x i64> %ymm2_h, <vscale x 1 x i64> %xmm3, <vscale x 1 x i64> %ymm3_h, <vscale x 1 x i64> %xmm4, <vscale x 1 x i64> %ymm4_h, <vscale x 1 x i64> %T3.vector_insert, <vscale x 1 x i64> %ymm5_h, <vscale x 1 x i64> %xmm6, <vscale x 1 x i64> %ymm6_h, <vscale x 1 x i64> %xmm7, <vscale x 1 x i64> %ymm7_h, <vscale x 1 x i64> %xmm8, <vscale x 1 x i64> %ymm8_h, <vscale x 1 x i64> %xmm9, <vscale x 1 x i64> %ymm9_h, <vscale x 1 x i64> %xmm10, <vscale x 1 x i64> %ymm10_h, <vscale x 1 x i64> %xmm11, <vscale x 1 x i64> %ymm11_h, <vscale x 1 x i64> %xmm12, <vscale x 1 x i64> %ymm12_h, <vscale x 1 x i64> %xmm13, <vscale x 1 x i64> %ymm13_h, ptr %cpu), !tcg.op !110
   ret void, !tcg.op !110
 }
 
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare <vscale x 1 x i64> @llvm.vector.insert.nxv1i64.v2i64.i64(<vscale x 1 x i64>, <2 x i64>, i64 immarg) #1
+
 ; Function Attrs: nounwind
-declare qemuaot void @Fx55aa(i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32, i64, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, ptr align 8 dereferenceable(26544)) #1 section ".text.Fx55aa"
+declare qemuaot void @Fx55aa(i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32, i64, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i64>, ptr align 8 dereferenceable(26544)) #2 section ".text.Fx55aa"
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8>, i64 immarg) #1
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare <vscale x 8 x i8> @llvm.vector.insert.nxv8i8.v16i8.i64(<vscale x 8 x i8>, <16 x i8>, i64 immarg) #1
 
 declare i64 @helper_rdrand(i64, i64, i64)
 
 attributes #0 = { noinline nounwind "target-features"="+m,+a,+f,+d,+v" }
-attributes #1 = { nounwind "target-features"="+m,+a,+f,+d,+v" }
+attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+attributes #2 = { nounwind "target-features"="+m,+a,+f,+d,+v" }
 
 !0 = !{!1, !1, i64 0}
 !1 = !{!"SpillSlo", !2}

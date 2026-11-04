@@ -18,7 +18,7 @@ Fx0:                                    # @Fx0
 	vand.vv	v29, v12, v16
 	vnot.v	v12, v12
 	vand.vv	v12, v18, v12
-	vor.vv	v12, v12, v29
+	vor.vv	v12, v29, v12
 	vmv1r.v	v0, v28
 	tail	Fx55aa
 .Lfunc_end0:

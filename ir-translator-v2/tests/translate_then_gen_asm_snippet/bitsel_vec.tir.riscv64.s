@@ -12,6 +12,7 @@ Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
 	vsetivli	zero, 2, e64, m1, ta, ma
 	vand.vv	v28, v14, v12
+	vsetivli	zero, 16, e8, m1, ta, ma
 	vnot.v	v12, v12
 	vand.vv	v12, v16, v12
 	vor.vv	v12, v12, v28

@@ -101,12 +101,12 @@ while.end:                                        ; preds = %while.body
 
 if.then31:                                        ; preds = %while.end
   %3 = inttoptr i64 %2 to ptr
-  tail call qemuaot void %3(i64 noundef %rax, i64 noundef %rcx, i64 noundef %rdx, i64 noundef %rbx, i64 noundef %rsp, i64 noundef %rbp, i64 noundef %rsi, i64 noundef %rdi, i64 noundef %r8, i64 noundef %r9, i64 noundef %r10, i64 noundef %r11, i64 noundef %r12, i64 noundef %r13, i64 noundef %r14, i64 noundef %r15, i64 noundef %src, i64 noundef %dst, i32 noundef signext %op, i64 noundef %target_addr, <vscale x 1 x i64> noundef %xmm0.coerce, <vscale x 1 x i64> noundef %ymm0_h.coerce, <vscale x 1 x i64> noundef %xmm1.coerce, <vscale x 1 x i64> noundef %ymm1_h.coerce, <vscale x 1 x i64> noundef %xmm2.coerce, <vscale x 1 x i64> noundef %ymm2_h.coerce, <vscale x 1 x i64> noundef %xmm3.coerce, <vscale x 1 x i64> noundef %ymm3_h.coerce, <vscale x 1 x i64> noundef %xmm4.coerce, <vscale x 1 x i64> noundef %ymm4_h.coerce, <vscale x 1 x i64> noundef %xmm5.coerce, <vscale x 1 x i64> noundef %ymm5_h.coerce, <vscale x 1 x i64> noundef %xmm6.coerce, <vscale x 1 x i64> noundef %ymm6_h.coerce, <vscale x 1 x i64> noundef %xmm7.coerce, <vscale x 1 x i64> noundef %ymm7_h.coerce, <vscale x 1 x i64> noundef %xmm8.coerce, <vscale x 1 x i64> noundef %ymm8_h.coerce, <vscale x 1 x i64> noundef %xmm9.coerce, <vscale x 1 x i64> noundef %ymm9_h.coerce, <vscale x 1 x i64> noundef %xmm10.coerce, <vscale x 1 x i64> noundef %ymm10_h.coerce, <vscale x 1 x i64> noundef %xmm11.coerce, <vscale x 1 x i64> noundef %ymm11_h.coerce, <vscale x 1 x i64> noundef %xmm12.coerce, <vscale x 1 x i64> noundef %ymm12_h.coerce, <vscale x 1 x i64> noundef %xmm13.coerce, <vscale x 1 x i64> noundef %ymm13_h.coerce, i64 noundef %cpu_param) #3
+  tail call qemuaot void %3(i64 noundef %rax, i64 noundef %rcx, i64 noundef %rdx, i64 noundef %rbx, i64 noundef %rsp, i64 noundef %rbp, i64 noundef %rsi, i64 noundef %rdi, i64 noundef %r8, i64 noundef %r9, i64 noundef %r10, i64 noundef %r11, i64 noundef %r12, i64 noundef %r13, i64 noundef %r14, i64 noundef %r15, i64 noundef %src, i64 noundef %dst, i32 noundef signext %op, i64 noundef %target_addr, <vscale x 1 x i64> noundef %xmm0.coerce, <vscale x 1 x i64> noundef %ymm0_h.coerce, <vscale x 1 x i64> noundef %xmm1.coerce, <vscale x 1 x i64> noundef %ymm1_h.coerce, <vscale x 1 x i64> noundef %xmm2.coerce, <vscale x 1 x i64> noundef %ymm2_h.coerce, <vscale x 1 x i64> noundef %xmm3.coerce, <vscale x 1 x i64> noundef %ymm3_h.coerce, <vscale x 1 x i64> noundef %xmm4.coerce, <vscale x 1 x i64> noundef %ymm4_h.coerce, <vscale x 1 x i64> noundef %xmm5.coerce, <vscale x 1 x i64> noundef %ymm5_h.coerce, <vscale x 1 x i64> noundef %xmm6.coerce, <vscale x 1 x i64> noundef %ymm6_h.coerce, <vscale x 1 x i64> noundef %xmm7.coerce, <vscale x 1 x i64> noundef %ymm7_h.coerce, <vscale x 1 x i64> noundef %xmm8.coerce, <vscale x 1 x i64> noundef %ymm8_h.coerce, <vscale x 1 x i64> noundef %xmm9.coerce, <vscale x 1 x i64> noundef %ymm9_h.coerce, <vscale x 1 x i64> noundef %xmm10.coerce, <vscale x 1 x i64> noundef %ymm10_h.coerce, <vscale x 1 x i64> noundef %xmm11.coerce, <vscale x 1 x i64> noundef %ymm11_h.coerce, <vscale x 1 x i64> noundef %xmm12.coerce, <vscale x 1 x i64> noundef %ymm12_h.coerce, <vscale x 1 x i64> noundef %xmm13.coerce, <vscale x 1 x i64> noundef %ymm13_h.coerce, i64 noundef %cpu_param) #4
   br label %cleanup
 
 if.else:                                          ; preds = %if.end, %entry, %while.end
   %4 = inttoptr i64 %trampoline_helper_jit to ptr
-  tail call qemuaot void %4(i64 noundef %rax, i64 noundef %rcx, i64 noundef %rdx, i64 noundef %rbx, i64 noundef %rsp, i64 noundef %rbp, i64 noundef %rsi, i64 noundef %rdi, i64 noundef %r8, i64 noundef %r9, i64 noundef %r10, i64 noundef %r11, i64 noundef %r12, i64 noundef %r13, i64 noundef %r14, i64 noundef %r15, i64 noundef %src, i64 noundef %dst, i32 noundef signext %op, i64 noundef %target_addr, <vscale x 1 x i64> noundef %xmm0.coerce, <vscale x 1 x i64> noundef %ymm0_h.coerce, <vscale x 1 x i64> noundef %xmm1.coerce, <vscale x 1 x i64> noundef %ymm1_h.coerce, <vscale x 1 x i64> noundef %xmm2.coerce, <vscale x 1 x i64> noundef %ymm2_h.coerce, <vscale x 1 x i64> noundef %xmm3.coerce, <vscale x 1 x i64> noundef %ymm3_h.coerce, <vscale x 1 x i64> noundef %xmm4.coerce, <vscale x 1 x i64> noundef %ymm4_h.coerce, <vscale x 1 x i64> noundef %xmm5.coerce, <vscale x 1 x i64> noundef %ymm5_h.coerce, <vscale x 1 x i64> noundef %xmm6.coerce, <vscale x 1 x i64> noundef %ymm6_h.coerce, <vscale x 1 x i64> noundef %xmm7.coerce, <vscale x 1 x i64> noundef %ymm7_h.coerce, <vscale x 1 x i64> noundef %xmm8.coerce, <vscale x 1 x i64> noundef %ymm8_h.coerce, <vscale x 1 x i64> noundef %xmm9.coerce, <vscale x 1 x i64> noundef %ymm9_h.coerce, <vscale x 1 x i64> noundef %xmm10.coerce, <vscale x 1 x i64> noundef %ymm10_h.coerce, <vscale x 1 x i64> noundef %xmm11.coerce, <vscale x 1 x i64> noundef %ymm11_h.coerce, <vscale x 1 x i64> noundef %xmm12.coerce, <vscale x 1 x i64> noundef %ymm12_h.coerce, <vscale x 1 x i64> noundef %xmm13.coerce, <vscale x 1 x i64> noundef %ymm13_h.coerce, i64 noundef %cpu_param, i64 noundef %env, i64 noundef %target_addr) #3
+  tail call qemuaot void %4(i64 noundef %rax, i64 noundef %rcx, i64 noundef %rdx, i64 noundef %rbx, i64 noundef %rsp, i64 noundef %rbp, i64 noundef %rsi, i64 noundef %rdi, i64 noundef %r8, i64 noundef %r9, i64 noundef %r10, i64 noundef %r11, i64 noundef %r12, i64 noundef %r13, i64 noundef %r14, i64 noundef %r15, i64 noundef %src, i64 noundef %dst, i32 noundef signext %op, i64 noundef %target_addr, <vscale x 1 x i64> noundef %xmm0.coerce, <vscale x 1 x i64> noundef %ymm0_h.coerce, <vscale x 1 x i64> noundef %xmm1.coerce, <vscale x 1 x i64> noundef %ymm1_h.coerce, <vscale x 1 x i64> noundef %xmm2.coerce, <vscale x 1 x i64> noundef %ymm2_h.coerce, <vscale x 1 x i64> noundef %xmm3.coerce, <vscale x 1 x i64> noundef %ymm3_h.coerce, <vscale x 1 x i64> noundef %xmm4.coerce, <vscale x 1 x i64> noundef %ymm4_h.coerce, <vscale x 1 x i64> noundef %xmm5.coerce, <vscale x 1 x i64> noundef %ymm5_h.coerce, <vscale x 1 x i64> noundef %xmm6.coerce, <vscale x 1 x i64> noundef %ymm6_h.coerce, <vscale x 1 x i64> noundef %xmm7.coerce, <vscale x 1 x i64> noundef %ymm7_h.coerce, <vscale x 1 x i64> noundef %xmm8.coerce, <vscale x 1 x i64> noundef %ymm8_h.coerce, <vscale x 1 x i64> noundef %xmm9.coerce, <vscale x 1 x i64> noundef %ymm9_h.coerce, <vscale x 1 x i64> noundef %xmm10.coerce, <vscale x 1 x i64> noundef %ymm10_h.coerce, <vscale x 1 x i64> noundef %xmm11.coerce, <vscale x 1 x i64> noundef %ymm11_h.coerce, <vscale x 1 x i64> noundef %xmm12.coerce, <vscale x 1 x i64> noundef %ymm12_h.coerce, <vscale x 1 x i64> noundef %xmm13.coerce, <vscale x 1 x i64> noundef %ymm13_h.coerce, i64 noundef %cpu_param, i64 noundef %env, i64 noundef %target_addr) #4
   br label %cleanup
 
 cleanup:                                          ; preds = %if.else, %if.then31
@@ -184,89 +184,145 @@ entry:
   %T19.envptr = getelementptr i8, ptr %env, i64 128, !tcg.op !56
   store i64 %T19.rip, ptr %T19.envptr, align 16, !tbaa !11, !tcg.op !56
 ; ======== TCG [20] st_vec v128,e8,v0,env:0x360 ========
+  %T20.bc = bitcast <vscale x 1 x i64> %xmm0 to <vscale x 8 x i8>, !tcg.op !57
   %T20.envptr = getelementptr i8, ptr %env, i64 864, !tcg.op !57
-  store <vscale x 1 x i64> %xmm0, ptr %T20.envptr, align 16, !tbaa !11, !tcg.op !57
+  %T20.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T20.bc, i64 0), !tcg.op !57
+  store <16 x i8> %T20.vector_extract, ptr %T20.envptr, align 16, !tbaa !11, !tcg.op !57
 ; ======== TCG [21] st_vec v128,e8,v1,env:0x370 ========
+  %T21.bc = bitcast <vscale x 1 x i64> %ymm0_h to <vscale x 8 x i8>, !tcg.op !58
   %T21.envptr = getelementptr i8, ptr %env, i64 880, !tcg.op !58
-  store <vscale x 1 x i64> %ymm0_h, ptr %T21.envptr, align 16, !tbaa !11, !tcg.op !58
+  %T21.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T21.bc, i64 0), !tcg.op !58
+  store <16 x i8> %T21.vector_extract, ptr %T21.envptr, align 16, !tbaa !11, !tcg.op !58
 ; ======== TCG [22] st_vec v128,e8,v2,env:0x3a0 ========
+  %T22.bc = bitcast <vscale x 1 x i64> %xmm1 to <vscale x 8 x i8>, !tcg.op !59
   %T22.envptr = getelementptr i8, ptr %env, i64 928, !tcg.op !59
-  store <vscale x 1 x i64> %xmm1, ptr %T22.envptr, align 16, !tbaa !11, !tcg.op !59
+  %T22.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T22.bc, i64 0), !tcg.op !59
+  store <16 x i8> %T22.vector_extract, ptr %T22.envptr, align 16, !tbaa !11, !tcg.op !59
 ; ======== TCG [23] st_vec v128,e8,v3,env:0x3b0 ========
+  %T23.bc = bitcast <vscale x 1 x i64> %ymm1_h to <vscale x 8 x i8>, !tcg.op !60
   %T23.envptr = getelementptr i8, ptr %env, i64 944, !tcg.op !60
-  store <vscale x 1 x i64> %ymm1_h, ptr %T23.envptr, align 16, !tbaa !11, !tcg.op !60
+  %T23.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T23.bc, i64 0), !tcg.op !60
+  store <16 x i8> %T23.vector_extract, ptr %T23.envptr, align 16, !tbaa !11, !tcg.op !60
 ; ======== TCG [24] st_vec v128,e8,v4,env:0x3e0 ========
+  %T24.bc = bitcast <vscale x 1 x i64> %xmm2 to <vscale x 8 x i8>, !tcg.op !61
   %T24.envptr = getelementptr i8, ptr %env, i64 992, !tcg.op !61
-  store <vscale x 1 x i64> %xmm2, ptr %T24.envptr, align 16, !tbaa !11, !tcg.op !61
+  %T24.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T24.bc, i64 0), !tcg.op !61
+  store <16 x i8> %T24.vector_extract, ptr %T24.envptr, align 16, !tbaa !11, !tcg.op !61
 ; ======== TCG [25] st_vec v128,e8,v5,env:0x3f0 ========
+  %T25.bc = bitcast <vscale x 1 x i64> %ymm2_h to <vscale x 8 x i8>, !tcg.op !62
   %T25.envptr = getelementptr i8, ptr %env, i64 1008, !tcg.op !62
-  store <vscale x 1 x i64> %ymm2_h, ptr %T25.envptr, align 16, !tbaa !11, !tcg.op !62
+  %T25.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T25.bc, i64 0), !tcg.op !62
+  store <16 x i8> %T25.vector_extract, ptr %T25.envptr, align 16, !tbaa !11, !tcg.op !62
 ; ======== TCG [26] st_vec v128,e8,v6,env:0x420 ========
+  %T26.bc = bitcast <vscale x 1 x i64> %xmm3 to <vscale x 8 x i8>, !tcg.op !63
   %T26.envptr = getelementptr i8, ptr %env, i64 1056, !tcg.op !63
-  store <vscale x 1 x i64> %xmm3, ptr %T26.envptr, align 16, !tbaa !11, !tcg.op !63
+  %T26.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T26.bc, i64 0), !tcg.op !63
+  store <16 x i8> %T26.vector_extract, ptr %T26.envptr, align 16, !tbaa !11, !tcg.op !63
 ; ======== TCG [27] st_vec v128,e8,v7,env:0x430 ========
+  %T27.bc = bitcast <vscale x 1 x i64> %ymm3_h to <vscale x 8 x i8>, !tcg.op !64
   %T27.envptr = getelementptr i8, ptr %env, i64 1072, !tcg.op !64
-  store <vscale x 1 x i64> %ymm3_h, ptr %T27.envptr, align 16, !tbaa !11, !tcg.op !64
+  %T27.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T27.bc, i64 0), !tcg.op !64
+  store <16 x i8> %T27.vector_extract, ptr %T27.envptr, align 16, !tbaa !11, !tcg.op !64
 ; ======== TCG [28] st_vec v128,e8,v8,env:0x460 ========
+  %T28.bc = bitcast <vscale x 1 x i64> %xmm4 to <vscale x 8 x i8>, !tcg.op !65
   %T28.envptr = getelementptr i8, ptr %env, i64 1120, !tcg.op !65
-  store <vscale x 1 x i64> %xmm4, ptr %T28.envptr, align 16, !tbaa !11, !tcg.op !65
+  %T28.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T28.bc, i64 0), !tcg.op !65
+  store <16 x i8> %T28.vector_extract, ptr %T28.envptr, align 16, !tbaa !11, !tcg.op !65
 ; ======== TCG [29] st_vec v128,e8,v9,env:0x470 ========
+  %T29.bc = bitcast <vscale x 1 x i64> %ymm4_h to <vscale x 8 x i8>, !tcg.op !66
   %T29.envptr = getelementptr i8, ptr %env, i64 1136, !tcg.op !66
-  store <vscale x 1 x i64> %ymm4_h, ptr %T29.envptr, align 16, !tbaa !11, !tcg.op !66
+  %T29.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T29.bc, i64 0), !tcg.op !66
+  store <16 x i8> %T29.vector_extract, ptr %T29.envptr, align 16, !tbaa !11, !tcg.op !66
 ; ======== TCG [30] st_vec v128,e8,v10,env:0x4a0 ========
+  %T30.bc = bitcast <vscale x 1 x i64> %xmm5 to <vscale x 8 x i8>, !tcg.op !67
   %T30.envptr = getelementptr i8, ptr %env, i64 1184, !tcg.op !67
-  store <vscale x 1 x i64> %xmm5, ptr %T30.envptr, align 16, !tbaa !11, !tcg.op !67
+  %T30.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T30.bc, i64 0), !tcg.op !67
+  store <16 x i8> %T30.vector_extract, ptr %T30.envptr, align 16, !tbaa !11, !tcg.op !67
 ; ======== TCG [31] st_vec v128,e8,v11,env:0x4b0 ========
+  %T31.bc = bitcast <vscale x 1 x i64> %ymm5_h to <vscale x 8 x i8>, !tcg.op !68
   %T31.envptr = getelementptr i8, ptr %env, i64 1200, !tcg.op !68
-  store <vscale x 1 x i64> %ymm5_h, ptr %T31.envptr, align 16, !tbaa !11, !tcg.op !68
+  %T31.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T31.bc, i64 0), !tcg.op !68
+  store <16 x i8> %T31.vector_extract, ptr %T31.envptr, align 16, !tbaa !11, !tcg.op !68
 ; ======== TCG [32] st_vec v128,e8,v12,env:0x4e0 ========
+  %T32.bc = bitcast <vscale x 1 x i64> %xmm6 to <vscale x 8 x i8>, !tcg.op !69
   %T32.envptr = getelementptr i8, ptr %env, i64 1248, !tcg.op !69
-  store <vscale x 1 x i64> %xmm6, ptr %T32.envptr, align 16, !tbaa !11, !tcg.op !69
+  %T32.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T32.bc, i64 0), !tcg.op !69
+  store <16 x i8> %T32.vector_extract, ptr %T32.envptr, align 16, !tbaa !11, !tcg.op !69
 ; ======== TCG [33] st_vec v128,e8,v13,env:0x4f0 ========
+  %T33.bc = bitcast <vscale x 1 x i64> %ymm6_h to <vscale x 8 x i8>, !tcg.op !70
   %T33.envptr = getelementptr i8, ptr %env, i64 1264, !tcg.op !70
-  store <vscale x 1 x i64> %ymm6_h, ptr %T33.envptr, align 16, !tbaa !11, !tcg.op !70
+  %T33.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T33.bc, i64 0), !tcg.op !70
+  store <16 x i8> %T33.vector_extract, ptr %T33.envptr, align 16, !tbaa !11, !tcg.op !70
 ; ======== TCG [34] st_vec v128,e8,v14,env:0x520 ========
+  %T34.bc = bitcast <vscale x 1 x i64> %xmm7 to <vscale x 8 x i8>, !tcg.op !71
   %T34.envptr = getelementptr i8, ptr %env, i64 1312, !tcg.op !71
-  store <vscale x 1 x i64> %xmm7, ptr %T34.envptr, align 16, !tbaa !11, !tcg.op !71
+  %T34.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T34.bc, i64 0), !tcg.op !71
+  store <16 x i8> %T34.vector_extract, ptr %T34.envptr, align 16, !tbaa !11, !tcg.op !71
 ; ======== TCG [35] st_vec v128,e8,v15,env:0x530 ========
+  %T35.bc = bitcast <vscale x 1 x i64> %ymm7_h to <vscale x 8 x i8>, !tcg.op !72
   %T35.envptr = getelementptr i8, ptr %env, i64 1328, !tcg.op !72
-  store <vscale x 1 x i64> %ymm7_h, ptr %T35.envptr, align 16, !tbaa !11, !tcg.op !72
+  %T35.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T35.bc, i64 0), !tcg.op !72
+  store <16 x i8> %T35.vector_extract, ptr %T35.envptr, align 16, !tbaa !11, !tcg.op !72
 ; ======== TCG [36] st_vec v128,e8,v16,env:0x560 ========
+  %T36.bc = bitcast <vscale x 1 x i64> %xmm8 to <vscale x 8 x i8>, !tcg.op !73
   %T36.envptr = getelementptr i8, ptr %env, i64 1376, !tcg.op !73
-  store <vscale x 1 x i64> %xmm8, ptr %T36.envptr, align 16, !tbaa !11, !tcg.op !73
+  %T36.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T36.bc, i64 0), !tcg.op !73
+  store <16 x i8> %T36.vector_extract, ptr %T36.envptr, align 16, !tbaa !11, !tcg.op !73
 ; ======== TCG [37] st_vec v128,e8,v17,env:0x570 ========
+  %T37.bc = bitcast <vscale x 1 x i64> %ymm8_h to <vscale x 8 x i8>, !tcg.op !74
   %T37.envptr = getelementptr i8, ptr %env, i64 1392, !tcg.op !74
-  store <vscale x 1 x i64> %ymm8_h, ptr %T37.envptr, align 16, !tbaa !11, !tcg.op !74
+  %T37.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T37.bc, i64 0), !tcg.op !74
+  store <16 x i8> %T37.vector_extract, ptr %T37.envptr, align 16, !tbaa !11, !tcg.op !74
 ; ======== TCG [38] st_vec v128,e8,v18,env:0x5a0 ========
+  %T38.bc = bitcast <vscale x 1 x i64> %xmm9 to <vscale x 8 x i8>, !tcg.op !75
   %T38.envptr = getelementptr i8, ptr %env, i64 1440, !tcg.op !75
-  store <vscale x 1 x i64> %xmm9, ptr %T38.envptr, align 16, !tbaa !11, !tcg.op !75
+  %T38.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T38.bc, i64 0), !tcg.op !75
+  store <16 x i8> %T38.vector_extract, ptr %T38.envptr, align 16, !tbaa !11, !tcg.op !75
 ; ======== TCG [39] st_vec v128,e8,v19,env:0x5b0 ========
+  %T39.bc = bitcast <vscale x 1 x i64> %ymm9_h to <vscale x 8 x i8>, !tcg.op !76
   %T39.envptr = getelementptr i8, ptr %env, i64 1456, !tcg.op !76
-  store <vscale x 1 x i64> %ymm9_h, ptr %T39.envptr, align 16, !tbaa !11, !tcg.op !76
+  %T39.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T39.bc, i64 0), !tcg.op !76
+  store <16 x i8> %T39.vector_extract, ptr %T39.envptr, align 16, !tbaa !11, !tcg.op !76
 ; ======== TCG [40] st_vec v128,e8,v20,env:0x5e0 ========
+  %T40.bc = bitcast <vscale x 1 x i64> %xmm10 to <vscale x 8 x i8>, !tcg.op !77
   %T40.envptr = getelementptr i8, ptr %env, i64 1504, !tcg.op !77
-  store <vscale x 1 x i64> %xmm10, ptr %T40.envptr, align 16, !tbaa !11, !tcg.op !77
+  %T40.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T40.bc, i64 0), !tcg.op !77
+  store <16 x i8> %T40.vector_extract, ptr %T40.envptr, align 16, !tbaa !11, !tcg.op !77
 ; ======== TCG [41] st_vec v128,e8,v21,env:0x5f0 ========
+  %T41.bc = bitcast <vscale x 1 x i64> %ymm10_h to <vscale x 8 x i8>, !tcg.op !78
   %T41.envptr = getelementptr i8, ptr %env, i64 1520, !tcg.op !78
-  store <vscale x 1 x i64> %ymm10_h, ptr %T41.envptr, align 16, !tbaa !11, !tcg.op !78
+  %T41.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T41.bc, i64 0), !tcg.op !78
+  store <16 x i8> %T41.vector_extract, ptr %T41.envptr, align 16, !tbaa !11, !tcg.op !78
 ; ======== TCG [42] st_vec v128,e8,v22,env:0x620 ========
+  %T42.bc = bitcast <vscale x 1 x i64> %xmm11 to <vscale x 8 x i8>, !tcg.op !79
   %T42.envptr = getelementptr i8, ptr %env, i64 1568, !tcg.op !79
-  store <vscale x 1 x i64> %xmm11, ptr %T42.envptr, align 16, !tbaa !11, !tcg.op !79
+  %T42.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T42.bc, i64 0), !tcg.op !79
+  store <16 x i8> %T42.vector_extract, ptr %T42.envptr, align 16, !tbaa !11, !tcg.op !79
 ; ======== TCG [43] st_vec v128,e8,v23,env:0x630 ========
+  %T43.bc = bitcast <vscale x 1 x i64> %ymm11_h to <vscale x 8 x i8>, !tcg.op !80
   %T43.envptr = getelementptr i8, ptr %env, i64 1584, !tcg.op !80
-  store <vscale x 1 x i64> %ymm11_h, ptr %T43.envptr, align 16, !tbaa !11, !tcg.op !80
+  %T43.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T43.bc, i64 0), !tcg.op !80
+  store <16 x i8> %T43.vector_extract, ptr %T43.envptr, align 16, !tbaa !11, !tcg.op !80
 ; ======== TCG [44] st_vec v128,e8,v24,env:0x660 ========
+  %T44.bc = bitcast <vscale x 1 x i64> %xmm12 to <vscale x 8 x i8>, !tcg.op !81
   %T44.envptr = getelementptr i8, ptr %env, i64 1632, !tcg.op !81
-  store <vscale x 1 x i64> %xmm12, ptr %T44.envptr, align 16, !tbaa !11, !tcg.op !81
+  %T44.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T44.bc, i64 0), !tcg.op !81
+  store <16 x i8> %T44.vector_extract, ptr %T44.envptr, align 16, !tbaa !11, !tcg.op !81
 ; ======== TCG [45] st_vec v128,e8,v25,env:0x670 ========
+  %T45.bc = bitcast <vscale x 1 x i64> %ymm12_h to <vscale x 8 x i8>, !tcg.op !82
   %T45.envptr = getelementptr i8, ptr %env, i64 1648, !tcg.op !82
-  store <vscale x 1 x i64> %ymm12_h, ptr %T45.envptr, align 16, !tbaa !11, !tcg.op !82
+  %T45.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T45.bc, i64 0), !tcg.op !82
+  store <16 x i8> %T45.vector_extract, ptr %T45.envptr, align 16, !tbaa !11, !tcg.op !82
 ; ======== TCG [46] st_vec v128,e8,v26,env:0x6a0 ========
+  %T46.bc = bitcast <vscale x 1 x i64> %xmm13 to <vscale x 8 x i8>, !tcg.op !83
   %T46.envptr = getelementptr i8, ptr %env, i64 1696, !tcg.op !83
-  store <vscale x 1 x i64> %xmm13, ptr %T46.envptr, align 16, !tbaa !11, !tcg.op !83
+  %T46.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T46.bc, i64 0), !tcg.op !83
+  store <16 x i8> %T46.vector_extract, ptr %T46.envptr, align 16, !tbaa !11, !tcg.op !83
 ; ======== TCG [47] st_vec v128,e8,v27,env:0x6b0 ========
+  %T47.bc = bitcast <vscale x 1 x i64> %ymm13_h to <vscale x 8 x i8>, !tcg.op !84
   %T47.envptr = getelementptr i8, ptr %env, i64 1712, !tcg.op !84
-  store <vscale x 1 x i64> %ymm13_h, ptr %T47.envptr, align 16, !tbaa !11, !tcg.op !84
+  %T47.vector_extract = call <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8> %T47.bc, i64 0), !tcg.op !84
+  store <16 x i8> %T47.vector_extract, ptr %T47.envptr, align 16, !tbaa !11, !tcg.op !84
 ; ======== TCG [48] tail_call_default helper_jit,arg0,arg1 ========
   %T48.env = ptrtoint ptr %env to i64, !tcg.op !85
   call void asm "mv x7, $0", "r,~{x7}"(i64 %T48.env), !tcg.op !85
@@ -274,12 +330,16 @@ entry:
   ret void, !tcg.op !85
 }
 
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare <16 x i8> @llvm.vector.extract.v16i8.nxv8i8.i64(<vscale x 8 x i8>, i64 immarg) #3
+
 declare void @helper_jit(i64, i64)
 
 attributes #0 = { noinline nounwind "target-features"="+m,+a,+f,+d,+v" }
 attributes #1 = { nounwind "target-features"="+m,+a,+f,+d,+v" }
 attributes #2 = { nounwind vscale_range(2,1024) "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="generic-rv64" "target-features"="+64bit,+a,+d,+f,+m,+relax,+v,+zaamo,+zalrsc,+zicsr,+zmmul,+zve32f,+zve32x,+zve64d,+zve64f,+zve64x,+zvl128b,+zvl32b,+zvl64b,-b,-c,-e,-experimental-p,-experimental-smctr,-experimental-ssctr,-experimental-svukte,-experimental-xqccmp,-experimental-xqcia,-experimental-xqciac,-experimental-xqcibi,-experimental-xqcibm,-experimental-xqcicli,-experimental-xqcicm,-experimental-xqcics,-experimental-xqcicsr,-experimental-xqciint,-experimental-xqciio,-experimental-xqcilb,-experimental-xqcili,-experimental-xqcilia,-experimental-xqcilo,-experimental-xqcilsm,-experimental-xqcisim,-experimental-xqcisls,-experimental-xqcisync,-experimental-xrivosvisni,-experimental-xrivosvizip,-experimental-xsfmclic,-experimental-xsfsclic,-experimental-zalasr,-experimental-zicfilp,-experimental-zicfiss,-experimental-zvbc32e,-experimental-zvkgs,-experimental-zvqdotq,-h,-q,-sdext,-sdtrig,-sha,-shcounterenw,-shgatpa,-shlcofideleg,-shtvala,-shvsatpa,-shvstvala,-shvstvecd,-smaia,-smcdeleg,-smcntrpmf,-smcsrind,-smdbltrp,-smepmp,-smmpm,-smnpm,-smrnmi,-smstateen,-ssaia,-ssccfg,-ssccptr,-sscofpmf,-sscounterenw,-sscsrind,-ssdbltrp,-ssnpm,-sspm,-ssqosid,-ssstateen,-ssstrict,-sstc,-sstvala,-sstvecd,-ssu64xl,-supm,-svade,-svadu,-svbare,-svinval,-svnapot,-svpbmt,-svvptc,-xandesperf,-xandesvbfhcvt,-xandesvdot,-xandesvpackfph,-xandesvsintload,-xcvalu,-xcvbi,-xcvbitmanip,-xcvelw,-xcvmac,-xcvmem,-xcvsimd,-xmipscbop,-xmipscmov,-xmipslsp,-xsfcease,-xsfmm128t,-xsfmm16t,-xsfmm32a16f,-xsfmm32a32f,-xsfmm32a8f,-xsfmm32a8i,-xsfmm32t,-xsfmm64a64f,-xsfmm64t,-xsfmmbase,-xsfvcp,-xsfvfnrclipxfqf,-xsfvfwmaccqqq,-xsfvqmaccdod,-xsfvqmaccqoq,-xsifivecdiscarddlone,-xsifivecflushdlone,-xtheadba,-xtheadbb,-xtheadbs,-xtheadcmo,-xtheadcondmov,-xtheadfmemidx,-xtheadmac,-xtheadmemidx,-xtheadmempair,-xtheadsync,-xtheadvdot,-xventanacondops,-xwchc,-za128rs,-za64rs,-zabha,-zacas,-zama16b,-zawrs,-zba,-zbb,-zbc,-zbkb,-zbkc,-zbkx,-zbs,-zca,-zcb,-zcd,-zce,-zcf,-zclsd,-zcmop,-zcmp,-zcmt,-zdinx,-zfa,-zfbfmin,-zfh,-zfhmin,-zfinx,-zhinx,-zhinxmin,-zic64b,-zicbom,-zicbop,-zicboz,-ziccamoa,-ziccamoc,-ziccif,-zicclsm,-ziccrse,-zicntr,-zicond,-zifencei,-zihintntl,-zihintpause,-zihpm,-zilsd,-zimop,-zk,-zkn,-zknd,-zkne,-zknh,-zkr,-zks,-zksed,-zksh,-zkt,-ztso,-zvbb,-zvbc,-zvfbfmin,-zvfbfwma,-zvfh,-zvfhmin,-zvkb,-zvkg,-zvkn,-zvknc,-zvkned,-zvkng,-zvknha,-zvknhb,-zvks,-zvksc,-zvksed,-zvksg,-zvksh,-zvkt,-zvl1024b,-zvl16384b,-zvl2048b,-zvl256b,-zvl32768b,-zvl4096b,-zvl512b,-zvl65536b,-zvl8192b" }
-attributes #3 = { nounwind }
+attributes #3 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+attributes #4 = { nounwind }
 
 !llvm.ident = !{!0}
 !llvm.module.flags = !{!1, !2, !3, !5, !6}

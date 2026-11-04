@@ -10,9 +10,8 @@
 	.variant_cc	Fx0
 Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
-	addi	a1, sp, 16
-	vs1r.v	v12, (a1)
-	lh	a6, 16(sp)
+	vsetivli	zero, 1, e16, m1, ta, ma
+	vmv.x.s	a6, v12
 	tail	Fx55aa
 .Lfunc_end0:
 	.size	Fx0, .Lfunc_end0-Fx0
