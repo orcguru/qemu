@@ -164,9 +164,6 @@ static inline void tbaa_tag(LLVMValueRef inst, const TBAA *t, TagType tag_ty) {
 
 LLVMTypeRef get_llvm_type(LLVMType type) {
     LLVMTypeRef ty = NULL;
-    /* Resolved once per call: fixed (NEON) vs. scalable (RVV).  Default is
-     * per-target (aarch64 -> fixed, riscv64 -> scalable) and can be forced
-     * with '-v'. */
     const int use_scalable = mapper_use_scalable_vector();
     switch (type) {
         case LLVMInt8: ty = LLVMInt8Type(); break;
@@ -212,6 +209,26 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
     return ty;
 }
 
+static LLVMTypeRef get_llvm_fixed_vector_type(LLVMType type) {
+    LLVMTypeRef ty = NULL;
+    switch (type) {
+        case LLVMVector16xi8:
+            ty = LLVMVectorType(LLVMInt8Type(), 16);
+            break;
+        case LLVMVector8xi16:
+            ty = LLVMVectorType(LLVMInt16Type(), 8);
+            break;
+        case LLVMVector4xi32:
+            ty = LLVMVectorType(LLVMInt32Type(), 4);
+            break;
+        case LLVMVector2xi64:
+            ty = LLVMVectorType(LLVMInt64Type(), 2);
+            break;
+        default: assert(0);
+    }
+    return ty;
+}
+
 LLVMValueRef create_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef ret_ty, LLVMTypeRef *arg_types, int cnt) {
     LLVMValueRef func = LLVMGetNamedFunction(g_module, intrinsic_name);
     if (!func) {
@@ -227,9 +244,9 @@ LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *
     return LLVMGetIntrinsicDeclaration(g_module, id, intrinsic_types, cnt);
 }
 
-static LLVMValueRef insert_into_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix) {
+LLVMValueRef insert_into_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix) {
     char var_name[32] = {0};
-    LLVMType elem_ty = OPC_VECTOR_TO_FIXED(ty);
+    LLVMType elem_ty = OPC_VECTOR_TO_INT(ty);
     LLVMTypeRef scalable_vec_type = get_llvm_type(ty);
     LLVMTypeRef fixed_vec_type = LLVMVectorType(get_llvm_type(elem_ty), llvm_vector_elem_bit_counts[ty * 2]);
     LLVMTypeRef intrinsic_types[] = {scalable_vec_type, fixed_vec_type, get_llvm_type(LLVMInt64)};
@@ -244,7 +261,7 @@ static LLVMValueRef insert_into_scalable_vector(LLVMValueRef val, LLVMType ty, c
 
 LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix) {
     char var_name[32] = {0};
-    LLVMType elem_ty = OPC_VECTOR_TO_FIXED(ty);
+    LLVMType elem_ty = OPC_VECTOR_TO_INT(ty);
     LLVMTypeRef scalable_vec_type = get_llvm_type(ty);
     LLVMTypeRef fixed_vec_type = LLVMVectorType(get_llvm_type(elem_ty), llvm_vector_elem_bit_counts[ty * 2]);
     LLVMTypeRef intrinsic_lookup_types[] = {fixed_vec_type, scalable_vec_type, get_llvm_type(LLVMInt64)};
@@ -262,7 +279,7 @@ LLVMValueRef get_const_vector(unsigned long c, LLVMType ty, const char *prefix) 
     LLVMValueRef constants[16];
     int elem_cnt = llvm_vector_elem_bit_counts[ty * 2];
     for (int i = 0; i < elem_cnt; i++) {
-        constants[i] = LLVMConstInt(get_llvm_type(OPC_VECTOR_TO_FIXED(ty)), c, 0);
+        constants[i] = LLVMConstInt(get_llvm_type(OPC_VECTOR_TO_INT(ty)), c, 0);
     }
     LLVMValueRef ret = LLVMConstVector(constants, elem_cnt);
     if (!mapper_use_scalable_vector()) {
@@ -280,7 +297,12 @@ LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, 
         }
     }
     assert((as->tcg_ty[idx] <= LLVMInt64 && ty <= as->tcg_ty[idx]) || (as->tcg_ty[idx] <= LLVMVector1xi64 && ty <= LLVMVector1xi64) || as->tcg_ty[idx] <= LLVMVector2xi64 || as->tcg_ty[idx] == LLVMFuncPtr);
-    return build_load_with_alignment(g_builder, get_llvm_type(ty), as->alloca[idx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, reg_name), as->align[idx], SPILL_TAG);
+    if (mapper_use_scalable_vector() && ty >= LLVMVector16xi8) {
+        LLVMValueRef val = build_load_with_alignment(g_builder, get_llvm_fixed_vector_type(ty), as->alloca[idx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, reg_name), as->align[idx], SPILL_TAG);
+        return insert_into_scalable_vector(val, ty, prefix);
+    } else {
+        return build_load_with_alignment(g_builder, get_llvm_type(ty), as->alloca[idx], assemble_name_2(&var_name[0], sizeof(var_name), prefix, reg_name), as->align[idx], SPILL_TAG);
+    }
 }
 
 static LLVMType get_vector_type_for_elem(int elem_cnt, int elem_bits) {
@@ -342,7 +364,7 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
                 if (i == elem_half_cnt) {
                     imm = op->imm.val;
                 }
-                constants[i] = LLVMConstInt(get_llvm_type(OPC_VECTOR_TO_FIXED(ty)), bit_cnt < 64 ? (imm & ((1UL << bit_cnt) - 1)) : imm, 0);
+                constants[i] = LLVMConstInt(get_llvm_type(OPC_VECTOR_TO_INT(ty)), bit_cnt < 64 ? (imm & ((1UL << bit_cnt) - 1)) : imm, 0);
                 imm = imm >> bit_cnt;
             }
             val = LLVMConstVector(constants, elem_cnt);
@@ -356,7 +378,12 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
         LLVMType op_ty = op->kind == OP_SLOT ? op->slot.op_type : op->env.op_type;
         LLVMValueRef offset = LLVMConstInt(get_llvm_type(LLVMInt64), op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset, 0);
         LLVMValueRef ptr = LLVMBuildGEP2(g_builder, LLVMInt8Type(), stack->env, &offset, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "envptr"));
-        val = build_load_with_alignment(g_builder, get_llvm_type(op_ty), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, op->kind == OP_SLOT ? envvar_type_str[op->slot.idx] : "envval"), GET_ALIGNMENT_FROM_OFFSET(op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset), CPU_TAG);
+        if (mapper_use_scalable_vector() && op_ty >= LLVMVector16xi8) {
+            val = build_load_with_alignment(g_builder, get_llvm_fixed_vector_type(op_ty), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, op->kind == OP_SLOT ? envvar_type_str[op->slot.idx] : "envval"), GET_ALIGNMENT_FROM_OFFSET(op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset), CPU_TAG);
+            val = insert_into_scalable_vector(val, op_ty, prefix);
+        } else {
+            val = build_load_with_alignment(g_builder, get_llvm_type(op_ty), ptr, assemble_name_2(&var_name[0], sizeof(var_name), prefix, op->kind == OP_SLOT ? envvar_type_str[op->slot.idx] : "envval"), GET_ALIGNMENT_FROM_OFFSET(op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset), CPU_TAG);
+        }
         return val;
     } else if (op->kind == OP_VEC) {
         snprintf(&var_name[0], sizeof(var_name), "v%d", op->vec.idx);
@@ -371,7 +398,7 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
             int elem_cnt = (llvm_vector_elem_bit_counts[stack_ty * 2 + 1] * llvm_vector_elem_bit_counts[stack_ty * 2]) / llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1];
             LLVMType load_ty = get_vector_type_for_elem(elem_cnt, llvm_vector_elem_bit_counts[op->vec.op_type * 2 + 1]);
             val = load_from_stack_as_type(&stack->vector, op->vec.idx, load_ty, prefix, &var_name[0]);
-            if (mapper_use_scalable_vector()) {
+            if (mapper_use_scalable_vector() && load_ty >= LLVMVector16xi8) {
                 val = extract_from_scalable_vector(val, load_ty, prefix);
             }
             val = LLVMBuildExtractElement(g_builder, val, index, assemble_name_2(&var_name[0], sizeof(var_name), LLVMGetValueName(val), "ee"));
@@ -386,6 +413,9 @@ LLVMValueRef get_input_val_for_operand(const Operand *op, StackAlloca *stack, co
             int env_offset = get_vec_offset(op->vec.idx);
             LLVMValueRef offset = LLVMConstInt(get_llvm_type(LLVMInt64), env_offset, 0);
             LLVMValueRef ptr = LLVMBuildGEP2(g_builder, LLVMInt8Type(), stack->env, &offset, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "envptr"));
+            if (mapper_use_scalable_vector() && op_vec.vec.op_type >= LLVMVector16xi8) {
+                val = extract_from_scalable_vector(val, op_vec.vec.op_type, prefix);
+            }
             build_store_with_alignment(g_builder, val, ptr, GET_ALIGNMENT_FROM_OFFSET(env_offset), CPU_TAG);
 
             // Load new data
@@ -438,13 +468,21 @@ static void add_stack_alloca_force_writeback(AllocaWithState *as, int idx, LLVMT
         as->alloca[idx] = LLVMBuildAlloca(g_builder, as->llvm_ty[idx], default_name);
         as->align[idx] = GET_ALIGNMENT_FROM_TYPE(as->tcg_ty[idx]);
         LLVMSetAlignment(as->alloca[idx], as->align[idx]);
-        build_store_with_alignment(g_builder, LLVMGetParam(parent_fn, param_idx), as->alloca[idx], as->align[idx], SPILL_TAG);
+        LLVMValueRef val = LLVMGetParam(parent_fn, param_idx);
+        if (mapper_use_scalable_vector() && default_ty >= LLVMVector16xi8) {
+            val = extract_from_scalable_vector(val, default_ty, prefix);
+        }
+        build_store_with_alignment(g_builder, val, as->alloca[idx], as->align[idx], SPILL_TAG);
         LLVMPositionBuilderAtEnd(g_builder, current);
     }
     // Write-back stack alloca
     LLVMValueRef offset = LLVMConstInt(get_llvm_type(LLVMInt64), env_offset, 0);
     LLVMValueRef ptr = LLVMBuildGEP2(g_builder, LLVMInt8Type(), stack->env, &offset, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "envptr"));
-    build_store_with_alignment(g_builder, get_input_val_for_operand(op, stack, prefix), ptr, GET_ALIGNMENT_FROM_OFFSET(env_offset), CPU_TAG);
+    LLVMValueRef val = get_input_val_for_operand(op, stack, prefix);
+    if (mapper_use_scalable_vector() && default_ty >= LLVMVector16xi8) {
+        val = extract_from_scalable_vector(val, default_ty, prefix);
+    }
+    build_store_with_alignment(g_builder, val, ptr, GET_ALIGNMENT_FROM_OFFSET(env_offset), CPU_TAG);
 }
 
 static void add_stack_alloca_force_update(AllocaWithState *as, int idx, LLVMType default_ty, int param_idx, const char *default_name, int env_offset, const Operand *op, StackAlloca *stack, const char *prefix) {
@@ -507,6 +545,9 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
         } else {
             assert(val_ty == stack_ty);
         }
+        if (mapper_use_scalable_vector() && val_ty >= LLVMVector16xi8) {
+            val = extract_from_scalable_vector(val, val_ty, prefix);
+        }
         build_store_with_alignment(g_builder, val, op->kind == OP_SLOT ? stack->tmp.alloca[op->slot.idx] : stack->vector.alloca[op->vec.idx], op->kind == OP_SLOT ? stack->tmp.align[op->slot.idx] : stack->vector.align[op->vec.idx], SPILL_TAG);
         return;
     }
@@ -559,6 +600,9 @@ void do_store(const Operand *op, LLVMValueRef val, StackAlloca *stack, const cha
         }
 
         // The potential store clobber
+        if (mapper_use_scalable_vector() && op_ty >= LLVMVector16xi8) {
+            val = extract_from_scalable_vector(val, op_ty, prefix);
+        }
         build_store_with_alignment(g_builder, val, ptr, GET_ALIGNMENT_FROM_OFFSET(op->kind == OP_SLOT ? envvar_offsets[op->slot.idx] : op->env.offset), CPU_TAG);
 
         // Check possibility of alias with xreg/vector
@@ -797,7 +841,11 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F, FuncInstrList *
             stack->vector.alloca[i] = LLVMBuildAlloca(g_builder, stack->vector.llvm_ty[i], qemuaot_default_stack_alloca_name[XREG_MAX + i]);
             stack->vector.align[i] = GET_ALIGNMENT_FROM_TYPE(stack->vector.tcg_ty[i]);
             LLVMSetAlignment(stack->vector.alloca[i], stack->vector.align[i]);
-            build_store_with_alignment(g_builder, LLVMGetParam(F, (XREG_MAX + i)), stack->vector.alloca[i], stack->vector.align[i], SPILL_TAG);
+            LLVMValueRef val = LLVMGetParam(F, (XREG_MAX + i));
+            if (mapper_use_scalable_vector()) {
+                val = extract_from_scalable_vector(val, stack->vector.tcg_ty[i], "setup_stack");
+            }
+            build_store_with_alignment(g_builder, val, stack->vector.alloca[i], stack->vector.align[i], SPILL_TAG);
         }
         stack->vector.f_argument[i] = LLVMGetParam(F, (XREG_MAX + i));
     }

@@ -58,6 +58,7 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
 LLVMValueRef get_or_add_func_with_default_cc(HelperType h, const UnifiedInstr *u);
 LLVMValueRef load_from_stack_as_type(AllocaWithState *as, int idx, LLVMType ty, const char *prefix, const char *reg_name);
 char *get_func_name(unsigned long hex_offset, int sub_idx, char *buf, int buf_size);
+LLVMValueRef insert_into_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix);
 LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix);
 int get_target_arch(void);
 int mapper_use_scalable_vector(void);
@@ -66,6 +67,6 @@ int mapper_use_scalable_vector(void);
 
 #define GET_ALIGNMENT_FROM_OFFSET(off)      ((off) % 16 == 0 ? 16 : ((off) % 8 == 0 ? 8 : ((off) % 4 == 0 ? 4 : ((off) % 2 == 0 ? 2 : 1))))
 
-#define OPC_VECTOR_TO_FIXED(T)      (((T - LLVMTypeBegin) % 4) + LLVMTypeBegin)
+#define OPC_VECTOR_TO_INT(T)                (((T - LLVMTypeBegin) % 4) + LLVMTypeBegin)
 
 #endif
