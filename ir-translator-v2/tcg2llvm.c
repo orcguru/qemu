@@ -242,13 +242,25 @@ void translate_binary_intrinsic(LLVMBuilderRef builder, StackAlloca *stack, cons
     char var_name[32] = {0};
     LLVMType tcg_ty = get_operand_type(&u->operands[0]);
     LLVMTypeRef llvm_ty = get_llvm_type(tcg_ty);
+    if (mapper_use_scalable_vector() && tcg_ty >= LLVMVector16xi8) {
+        llvm_ty = get_llvm_fixed_vector_type(tcg_ty);
+    }
     LLVMTypeRef intrinsic_types[] = {llvm_ty, llvm_ty};
     LLVMValueRef fn = get_intrinsic_declaration(intrinsic_func, intrinsic_types, 2);
     LLVMTypeRef fn_type  = LLVMFunctionType(llvm_ty, intrinsic_types, 2, 0);
     LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
+    if (mapper_use_scalable_vector() && tcg_ty >= LLVMVector16xi8) {
+        in1 = extract_from_scalable_vector(in1, tcg_ty, prefix);
+    }
     LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
+    if (mapper_use_scalable_vector() && tcg_ty >= LLVMVector16xi8) {
+        in2 = extract_from_scalable_vector(in2, tcg_ty, prefix);
+    }
     LLVMValueRef intrinsic_call_args[] = {in1, in2};
     LLVMValueRef out = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    if (mapper_use_scalable_vector() && tcg_ty >= LLVMVector16xi8) {
+        out = insert_into_scalable_vector(out, tcg_ty, prefix);
+    }
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 

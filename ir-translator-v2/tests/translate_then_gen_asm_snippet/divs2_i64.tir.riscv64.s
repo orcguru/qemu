@@ -34,59 +34,163 @@ Fx0:                                    # @Fx0
 	mv	a0, a6
 	mv	a1, a7
 	mv	a2, s2
-	addi	ra, sp, 544
-	vs1r.v	v27, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 528
-	vs1r.v	v26, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 512
-	vs1r.v	v25, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 496
-	vs1r.v	v24, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 480
-	vs1r.v	v23, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 464
-	vs1r.v	v22, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 448
-	vs1r.v	v21, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 432
-	vs1r.v	v20, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 416
-	vs1r.v	v19, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 400
-	vs1r.v	v18, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 384
-	vs1r.v	v17, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 368
-	vs1r.v	v16, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 352
-	vs1r.v	v15, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 336
-	vs1r.v	v14, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 320
-	vs1r.v	v13, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 304
-	vs1r.v	v12, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 288
-	vs1r.v	v11, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 272
-	vs1r.v	v10, (ra)                       # vscale x 8-byte Folded Spill
-	addi	ra, sp, 256
-	vs1r.v	v9, (ra)                        # vscale x 8-byte Folded Spill
-	addi	ra, sp, 240
-	vs1r.v	v8, (ra)                        # vscale x 8-byte Folded Spill
-	addi	ra, sp, 224
-	vs1r.v	v7, (ra)                        # vscale x 8-byte Folded Spill
-	addi	ra, sp, 208
-	vs1r.v	v6, (ra)                        # vscale x 8-byte Folded Spill
-	addi	ra, sp, 192
-	vs1r.v	v5, (ra)                        # vscale x 8-byte Folded Spill
-	addi	ra, sp, 176
-	vs1r.v	v4, (ra)                        # vscale x 8-byte Folded Spill
-	addi	ra, sp, 160
+	sd	a4, 8(sp)                       # 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 27
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v27, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 26
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v26, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 25
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v25, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 24
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v24, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 23
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v23, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 22
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v22, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 21
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v21, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 20
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v20, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 19
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v19, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 18
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v18, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	slli	ra, a4, 4
+	add	a4, ra, a4
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v17, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	slli	a4, a4, 4
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v16, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	slli	ra, a4, 4
+	sub	a4, ra, a4
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v15, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 14
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v14, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 13
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v13, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 12
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v12, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 11
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v11, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 10
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v10, (a4)                       # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	slli	ra, a4, 3
+	add	a4, ra, a4
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v9, (a4)                        # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	slli	a4, a4, 3
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v8, (a4)                        # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	slli	ra, a4, 3
+	sub	a4, ra, a4
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v7, (a4)                        # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	li	ra, 6
+	mul	a4, a4, ra
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v6, (a4)                        # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	slli	ra, a4, 2
+	add	a4, ra, a4
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v5, (a4)                        # vscale x 8-byte Folded Spill
+	csrr	a4, vlenb
+	slli	a4, a4, 2
+	add	a4, sp, a4
+	addi	a4, a4, 112
+	vs1r.v	v4, (a4)                        # vscale x 8-byte Folded Spill
+	csrr	ra, vlenb
+	slli	a4, ra, 1
+	add	ra, a4, ra
+	ld	a4, 8(sp)                       # 8-byte Folded Reload
+	add	ra, sp, ra
+	addi	ra, ra, 112
 	vs1r.v	v3, (ra)                        # vscale x 8-byte Folded Spill
-	addi	ra, sp, 144
+	csrr	ra, vlenb
+	slli	ra, ra, 1
+	add	ra, sp, ra
+	addi	ra, ra, 112
 	vs1r.v	v2, (ra)                        # vscale x 8-byte Folded Spill
-	addi	ra, sp, 128
+	csrr	ra, vlenb
+	add	ra, sp, ra
+	addi	ra, ra, 112
 	vs1r.v	v1, (ra)                        # vscale x 8-byte Folded Spill
 	addi	ra, sp, 112
 	vs1r.v	v0, (ra)                        # vscale x 8-byte Folded Spill
@@ -143,59 +247,161 @@ Fx0:                                    # @Fx0
 	ld	s1, 96(sp)                      # 8-byte Folded Reload
 	addi	a2, sp, 112
 	vl1r.v	v0, (a2)                        # vscale x 8-byte Folded Reload
-	addi	a2, sp, 128
+	csrr	a2, vlenb
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v1, (a2)                        # vscale x 8-byte Folded Reload
-	addi	a2, sp, 144
+	csrr	a2, vlenb
+	slli	a2, a2, 1
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v2, (a2)                        # vscale x 8-byte Folded Reload
-	addi	a2, sp, 160
+	csrr	a2, vlenb
+	slli	ra, a2, 1
+	add	a2, ra, a2
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v3, (a2)                        # vscale x 8-byte Folded Reload
-	addi	a2, sp, 176
+	csrr	a2, vlenb
+	slli	a2, a2, 2
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v4, (a2)                        # vscale x 8-byte Folded Reload
-	addi	a2, sp, 192
+	csrr	a2, vlenb
+	slli	ra, a2, 2
+	add	a2, ra, a2
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v5, (a2)                        # vscale x 8-byte Folded Reload
-	addi	a2, sp, 208
+	csrr	a2, vlenb
+	li	ra, 6
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v6, (a2)                        # vscale x 8-byte Folded Reload
-	addi	a2, sp, 224
+	csrr	a2, vlenb
+	slli	ra, a2, 3
+	sub	a2, ra, a2
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v7, (a2)                        # vscale x 8-byte Folded Reload
-	addi	a2, sp, 240
+	csrr	a2, vlenb
+	slli	a2, a2, 3
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v8, (a2)                        # vscale x 8-byte Folded Reload
-	addi	a2, sp, 256
+	csrr	a2, vlenb
+	slli	ra, a2, 3
+	add	a2, ra, a2
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v9, (a2)                        # vscale x 8-byte Folded Reload
-	addi	a2, sp, 272
+	csrr	a2, vlenb
+	li	ra, 10
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v10, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 288
+	csrr	a2, vlenb
+	li	ra, 11
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v11, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 304
+	csrr	a2, vlenb
+	li	ra, 12
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v12, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 320
+	csrr	a2, vlenb
+	li	ra, 13
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v13, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 336
+	csrr	a2, vlenb
+	li	ra, 14
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v14, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 352
+	csrr	a2, vlenb
+	slli	ra, a2, 4
+	sub	a2, ra, a2
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v15, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 368
+	csrr	a2, vlenb
+	slli	a2, a2, 4
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v16, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 384
+	csrr	a2, vlenb
+	slli	ra, a2, 4
+	add	a2, ra, a2
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v17, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 400
+	csrr	a2, vlenb
+	li	ra, 18
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v18, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 416
+	csrr	a2, vlenb
+	li	ra, 19
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v19, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 432
+	csrr	a2, vlenb
+	li	ra, 20
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v20, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 448
+	csrr	a2, vlenb
+	li	ra, 21
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v21, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 464
+	csrr	a2, vlenb
+	li	ra, 22
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v22, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 480
+	csrr	a2, vlenb
+	li	ra, 23
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v23, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 496
+	csrr	a2, vlenb
+	li	ra, 24
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v24, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 512
+	csrr	a2, vlenb
+	li	ra, 25
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v25, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 528
+	csrr	a2, vlenb
+	li	ra, 26
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v26, (a2)                       # vscale x 8-byte Folded Reload
-	addi	a2, sp, 544
+	csrr	a2, vlenb
+	li	ra, 27
+	mul	a2, a2, ra
+	add	a2, sp, a2
+	addi	a2, a2, 112
 	vl1r.v	v27, (a2)                       # vscale x 8-byte Folded Reload
 	srai	a2, a0, 63
 	bne	a1, a2, .LBB0_6
@@ -225,108 +431,305 @@ Fx0:                                    # @Fx0
 	.variant_cc	trampoline_helper_raise_exception
 trampoline_helper_raise_exception:      # @trampoline_helper_raise_exception
 # %bb.0:                                # %entry
-	sd	a2, 88(sp)                      # 8-byte Folded Spill
-	sd	a1, 80(sp)                      # 8-byte Folded Spill
-	sd	a0, 64(sp)                      # 8-byte Folded Spill
-	sd	t1, 72(sp)                      # 8-byte Folded Spill
-	sd	t0, 48(sp)                      # 8-byte Folded Spill
-	sd	a5, 56(sp)                      # 8-byte Folded Spill
-	sd	t6, 40(sp)                      # 8-byte Folded Spill
-	sd	t5, 32(sp)                      # 8-byte Folded Spill
-	sd	t4, 24(sp)                      # 8-byte Folded Spill
-	sd	s1, 16(sp)                      # 8-byte Folded Spill
-	sd	s11, 8(sp)                      # 8-byte Folded Spill
-	sd	s10, 0(sp)                      # 8-byte Folded Spill
-	mv	s11, s8
-	mv	s10, s7
-	mv	s8, s6
-	mv	s7, s5
-	mv	s6, s4
-	mv	s5, s3
-	mv	s4, s2
-	mv	s3, a7
-	mv	s2, a6
-	lui	a3, 3
-	li	a4, 25
-	addi	t6, a3, -800
-	addi	ra, a3, 64
-	slli	s1, a4, 9
-	addi	a7, a3, 128
-	addi	t0, a3, 192
-	addi	t1, a3, 256
-	addi	t3, a3, 320
-	addi	t4, a3, 384
-	addi	t5, a3, 448
-	addi	a6, a3, 576
-	addi	a5, a3, 640
-	addi	a4, a3, 704
-	addi	a2, a3, 768
-	addi	a1, a3, 832
-	addi	a0, a3, 896
-	add	a3, s9, t6
-	add	ra, s9, ra
-	add	a7, s9, a7
-	add	t0, s9, t0
-	add	t1, s9, t1
-	add	t3, s9, t3
-	add	t4, s9, t4
-	add	t5, s9, t5
-	add	s1, s9, s1
-	add	a6, s9, a6
-	add	a5, s9, a5
-	add	a4, s9, a4
-	add	a2, s9, a2
-	add	a1, s9, a1
-	add	a0, s9, a0
-	sd	s2, 0(a3)
-	sd	s3, 8(a3)
-	sd	s4, 16(a3)
-	sd	s5, 24(a3)
-	sd	s6, 32(a3)
-	sd	s7, 40(a3)
-	sd	s8, 48(a3)
-	sd	s10, 56(a3)
-	sd	s11, 64(a3)
-	ld	t6, 0(sp)                       # 8-byte Folded Reload
-	sd	t6, 72(a3)
-	ld	t6, 8(sp)                       # 8-byte Folded Reload
-	sd	t6, 80(a3)
-	ld	t6, 16(sp)                      # 8-byte Folded Reload
-	sd	t6, 88(a3)
-	ld	t6, 24(sp)                      # 8-byte Folded Reload
-	sd	t6, 96(a3)
-	ld	t6, 32(sp)                      # 8-byte Folded Reload
-	sd	t6, 104(a3)
-	ld	t6, 40(sp)                      # 8-byte Folded Reload
-	sd	t6, 112(a3)
+	sd	a2, 120(sp)                     # 8-byte Folded Spill
+	sd	a1, 112(sp)                     # 8-byte Folded Spill
+	mv	a1, s9
+	sd	a0, 96(sp)                      # 8-byte Folded Spill
+	sd	t1, 104(sp)                     # 8-byte Folded Spill
+	sd	t0, 80(sp)                      # 8-byte Folded Spill
+	sd	a5, 88(sp)                      # 8-byte Folded Spill
+	sd	t6, 72(sp)                      # 8-byte Folded Spill
+	sd	t5, 64(sp)                      # 8-byte Folded Spill
+	sd	t4, 56(sp)                      # 8-byte Folded Spill
+	sd	s1, 48(sp)                      # 8-byte Folded Spill
+	sd	s11, 40(sp)                     # 8-byte Folded Spill
+	sd	s10, 32(sp)                     # 8-byte Folded Spill
+	sd	s8, 24(sp)                      # 8-byte Folded Spill
+	mv	s11, s7
+	mv	s10, s6
+	mv	s8, s5
+	mv	s7, s4
+	mv	s6, s3
+	mv	s5, s2
+	mv	s4, a7
+	mv	s3, a6
+	vsetivli	zero, 1, e8, m1, ta, ma
+	vmv1r.v	v28, v27
+	csrr	a0, vlenb
+	li	a2, 14
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v28, (a0)                       # vscale x 16-byte Folded Spill
+	csrr	a0, vlenb
+	slli	a0, a0, 4
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v26, (a0)                       # vscale x 16-byte Folded Spill
+	vmv1r.v	v26, v25
+	csrr	a0, vlenb
+	li	a2, 10
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v26, (a0)                       # vscale x 16-byte Folded Spill
+	csrr	a0, vlenb
+	li	a2, 12
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v24, (a0)                       # vscale x 16-byte Folded Spill
+	vmv1r.v	v30, v23
+	csrr	a0, vlenb
+	slli	a0, a0, 3
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v22, (a0)                       # vscale x 16-byte Folded Spill
+	vmv1r.v	v28, v21
+	csrr	a0, vlenb
+	li	a2, 6
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v20, (a0)                       # vscale x 16-byte Folded Spill
+	vmv1r.v	v26, v19
+	csrr	a0, vlenb
+	slli	a0, a0, 2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v18, (a0)                       # vscale x 16-byte Folded Spill
+	vmv1r.v	v24, v17
+	csrr	a0, vlenb
+	slli	a0, a0, 1
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v16, (a0)                       # vscale x 16-byte Folded Spill
+	vmv1r.v	v22, v15
+	addi	a0, sp, 128
+	vs2r.v	v14, (a0)                       # vscale x 16-byte Folded Spill
+	vmv1r.v	v20, v13
+	csrr	a0, vlenb
+	li	a2, 22
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v12, (a0)                       # vscale x 16-byte Folded Spill
+	vmv1r.v	v18, v11
+	csrr	a0, vlenb
+	li	a2, 20
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v10, (a0)                       # vscale x 16-byte Folded Spill
+	vmv1r.v	v16, v9
+	csrr	a0, vlenb
+	li	a2, 18
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v8, (a0)                        # vscale x 16-byte Folded Spill
+	vmv1r.v	v14, v7
+	vmv1r.v	v12, v5
+	vmv1r.v	v10, v3
+	vmv1r.v	v8, v1
+	li	a0, 32
+	vsetvli	zero, a0, e8, m2, ta, ma
+	vslideup.vi	v0, v8, 16
+	vslideup.vi	v2, v10, 16
+	vslideup.vi	v4, v12, 16
+	vslideup.vi	v6, v14, 16
+	csrr	a0, vlenb
+	li	a2, 18
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vl2r.v	v8, (a0)                        # vscale x 16-byte Folded Reload
+	vslideup.vi	v8, v16, 16
+	csrr	a0, vlenb
+	li	a2, 18
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v8, (a0)                        # vscale x 16-byte Folded Spill
+	csrr	a0, vlenb
+	li	a2, 20
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vl2r.v	v8, (a0)                        # vscale x 16-byte Folded Reload
+	vslideup.vi	v8, v18, 16
+	csrr	a0, vlenb
+	li	a2, 20
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v8, (a0)                        # vscale x 16-byte Folded Spill
+	csrr	a0, vlenb
+	li	a2, 22
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vl2r.v	v8, (a0)                        # vscale x 16-byte Folded Reload
+	vslideup.vi	v8, v20, 16
+	csrr	a0, vlenb
+	li	a2, 22
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vs2r.v	v8, (a0)                        # vscale x 16-byte Folded Spill
+	addi	a0, sp, 128
+	vl2r.v	v20, (a0)                       # vscale x 16-byte Folded Reload
+	vslideup.vi	v20, v22, 16
+	csrr	a0, vlenb
+	slli	a0, a0, 1
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vl2r.v	v18, (a0)                       # vscale x 16-byte Folded Reload
+	vslideup.vi	v18, v24, 16
+	csrr	a0, vlenb
+	slli	a0, a0, 2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vl2r.v	v16, (a0)                       # vscale x 16-byte Folded Reload
+	vslideup.vi	v16, v26, 16
+	csrr	a0, vlenb
+	li	a2, 6
+	mul	a0, a0, a2
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vl2r.v	v14, (a0)                       # vscale x 16-byte Folded Reload
+	vslideup.vi	v14, v28, 16
+	csrr	a0, vlenb
+	slli	a0, a0, 3
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vl2r.v	v12, (a0)                       # vscale x 16-byte Folded Reload
+	vslideup.vi	v12, v30, 16
+	lui	a0, 3
+	li	t6, 25
+	addi	a3, a0, -800
+	slli	s1, t6, 9
+	addi	t1, a0, 64
+	addi	a2, a0, 128
+	addi	a4, a0, 192
+	addi	a5, a0, 256
+	addi	a6, a0, 320
+	addi	a7, a0, 384
+	addi	ra, a0, 448
+	addi	t5, a0, 576
+	addi	t6, a0, 640
+	addi	t3, a0, 704
+	addi	t4, a0, 768
+	addi	t0, a0, 832
+	addi	s9, a0, 896
+	add	a3, a1, a3
+	add	t1, a1, t1
+	add	a2, a1, a2
+	add	a4, a1, a4
+	add	a5, a1, a5
+	add	a0, a1, a6
+	add	a7, a1, a7
+	add	s2, a1, ra
+	add	s1, a1, s1
+	add	ra, a1, t5
+	add	a6, a1, t6
+	add	t3, a1, t3
+	add	t4, a1, t4
+	add	t0, a1, t0
+	add	s9, a1, s9
+	sd	s3, 0(a3)
+	sd	s4, 8(a3)
+	sd	s5, 16(a3)
+	sd	s6, 24(a3)
+	sd	s7, 32(a3)
+	sd	s8, 40(a3)
+	sd	s10, 48(a3)
+	sd	s11, 56(a3)
+	ld	a1, 24(sp)                      # 8-byte Folded Reload
+	sd	a1, 64(a3)
+	ld	a1, 32(sp)                      # 8-byte Folded Reload
+	sd	a1, 72(a3)
+	ld	a1, 40(sp)                      # 8-byte Folded Reload
+	sd	a1, 80(a3)
+	ld	a1, 48(sp)                      # 8-byte Folded Reload
+	sd	a1, 88(a3)
+	csrr	a1, vlenb
+	li	t5, 10
+	mul	a1, a1, t5
+	add	a1, sp, a1
+	addi	a1, a1, 128
+	vl2r.v	v8, (a1)                        # vscale x 16-byte Folded Reload
+	csrr	a1, vlenb
+	li	t5, 14
+	mul	a1, a1, t5
+	add	a1, sp, a1
+	addi	a1, a1, 128
+	vl2r.v	v22, (a1)                       # vscale x 16-byte Folded Reload
+	csrr	a1, vlenb
+	li	t5, 12
+	mul	a1, a1, t5
+	add	a1, sp, a1
+	addi	a1, a1, 128
+	vl2r.v	v10, (a1)                       # vscale x 16-byte Folded Reload
+	vslideup.vi	v10, v8, 16
+	csrr	a1, vlenb
+	slli	a1, a1, 4
+	add	a1, sp, a1
+	addi	a1, a1, 128
+	vl2r.v	v8, (a1)                        # vscale x 16-byte Folded Reload
+	vslideup.vi	v8, v22, 16
+	ld	a1, 56(sp)                      # 8-byte Folded Reload
+	sd	a1, 96(a3)
+	ld	a1, 64(sp)                      # 8-byte Folded Reload
+	sd	a1, 104(a3)
+	ld	a1, 72(sp)                      # 8-byte Folded Reload
+	sd	a1, 112(a3)
 	sd	gp, 120(a3)
-	ld	t6, 64(sp)                      # 8-byte Folded Reload
-	sd	t6, 128(a3)
-	ld	t6, 48(sp)                      # 8-byte Folded Reload
-	sd	t6, 144(a3)
-	ld	t6, 56(sp)                      # 8-byte Folded Reload
-	sd	t6, 152(a3)
-	ld	t6, 72(sp)                      # 8-byte Folded Reload
-	sw	t6, 168(a3)
-	vs2r.v	v0, (ra)
-	vs2r.v	v2, (a7)
-	vs2r.v	v4, (t0)
-	vs2r.v	v6, (t1)
-	vs2r.v	v8, (t3)
-	vs2r.v	v10, (t4)
-	vs2r.v	v12, (t5)
-	vs2r.v	v14, (s1)
-	vs2r.v	v16, (a6)
-	vs2r.v	v18, (a5)
-	vs2r.v	v20, (a4)
-	vs2r.v	v22, (a2)
-	vs2r.v	v24, (a1)
-	vs2r.v	v26, (a0)
+	ld	a1, 96(sp)                      # 8-byte Folded Reload
+	sd	a1, 128(a3)
+	ld	a1, 80(sp)                      # 8-byte Folded Reload
+	sd	a1, 144(a3)
+	ld	a1, 88(sp)                      # 8-byte Folded Reload
+	sd	a1, 152(a3)
+	ld	a1, 104(sp)                     # 8-byte Folded Reload
+	sw	a1, 168(a3)
+	vse8.v	v0, (t1)
+	vse8.v	v2, (a2)
+	vse8.v	v4, (a4)
+	vse8.v	v6, (a5)
+	csrr	a1, vlenb
+	li	a2, 18
+	mul	a1, a1, a2
+	add	a1, sp, a1
+	addi	a1, a1, 128
+	vl2r.v	v22, (a1)                       # vscale x 16-byte Folded Reload
+	vse8.v	v22, (a0)
+	csrr	a0, vlenb
+	li	a1, 20
+	mul	a0, a0, a1
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vl2r.v	v22, (a0)                       # vscale x 16-byte Folded Reload
+	vse8.v	v22, (a7)
+	csrr	a0, vlenb
+	li	a1, 22
+	mul	a0, a0, a1
+	add	a0, sp, a0
+	addi	a0, a0, 128
+	vl2r.v	v22, (a0)                       # vscale x 16-byte Folded Reload
+	vse8.v	v22, (s2)
+	vse8.v	v20, (s1)
+	vse8.v	v18, (ra)
+	vse8.v	v16, (a6)
+	vse8.v	v14, (t3)
+	vse8.v	v12, (t4)
+	vse8.v	v10, (t0)
+	vse8.v	v8, (s9)
 	#APP
 	mv	t2, a3
 	#NO_APP
-	ld	a0, 80(sp)                      # 8-byte Folded Reload
-	ld	a1, 88(sp)                      # 8-byte Folded Reload
+	ld	a0, 112(sp)                     # 8-byte Folded Reload
+	ld	a1, 120(sp)                     # 8-byte Folded Reload
 	sd	sp, -64(t2)
 	ld	sp, -56(t2)
 	ld	tp, -80(t2)

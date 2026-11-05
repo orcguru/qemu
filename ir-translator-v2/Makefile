@@ -992,7 +992,7 @@ OPT ?= $(LLVM_PATH)/bin/opt
 LLC ?= $(LLVM_PATH)/bin/llc
 
 OPT_FLAGS  ?= -O2
-LLC_FLAGS  ?= -O2 -filetype=asm --verify-machineinstrs -riscv-v-vector-bits-min=128 -riscv-v-vector-bits-max=128
+LLC_FLAGS  ?= -O2 -filetype=asm --verify-machineinstrs -riscv-v-vector-bits-min=128 -riscv-v-vector-bits-max=256
 
 # Optional normalisation applied to the .s before comparing / recording.
 # Empty by default.  Example:

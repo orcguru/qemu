@@ -209,7 +209,7 @@ LLVMTypeRef get_llvm_type(LLVMType type) {
     return ty;
 }
 
-static LLVMTypeRef get_llvm_fixed_vector_type(LLVMType type) {
+LLVMTypeRef get_llvm_fixed_vector_type(LLVMType type) {
     LLVMTypeRef ty = NULL;
     switch (type) {
         case LLVMVector16xi8:

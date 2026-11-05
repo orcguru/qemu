@@ -11,9 +11,10 @@
 Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
 	addi	a1, sp, 16
-	vs1r.v	v12, (a1)
+	vsetivli	zero, 2, e64, m1, ta, ma
+	vse64.v	v12, (a1)
 	sb	a6, 16(sp)
-	vl1re64.v	v12, (a1)
+	vle64.v	v12, (a1)
 	tail	Fx55aa
 .Lfunc_end0:
 	.size	Fx0, .Lfunc_end0-Fx0

@@ -13,8 +13,8 @@ Fx0:                                    # @Fx0
 	lui	a1, 4
 	addi	a1, a1, -1984
 	add	a1, s9, a1
-	vs1r.v	v14, (a1)
-	vsetivli	zero, 1, e8, m1, ta, ma
+	vsetivli	zero, 2, e64, m1, ta, ma
+	vse64.v	v14, (a1)
 	vmv1r.v	v0, v12
 	vmv1r.v	v26, v14
 	tail	Fx55aa

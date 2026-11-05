@@ -43,6 +43,7 @@ typedef enum {
 } MapperTargetArch;
 
 LLVMTypeRef get_llvm_type(LLVMType type);
+LLVMTypeRef get_llvm_fixed_vector_type(LLVMType type);
 LLVMValueRef create_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef ret_ty, LLVMTypeRef *arg_types, int cnt);
 LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *intrinsic_types, int cnt);
 LLVMValueRef get_const_vector(unsigned long c, LLVMType ty, const char *prefix);

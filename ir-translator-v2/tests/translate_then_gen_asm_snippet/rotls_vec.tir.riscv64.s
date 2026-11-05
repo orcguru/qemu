@@ -45,7 +45,7 @@ Fx0:                                    # @Fx0
 	vslideup.vi	v28, v29, 14
 	vsetivli	zero, 16, e8, m1, tu, ma
 	vslideup.vi	v28, v29, 15
-	vsetvli	zero, zero, e8, m1, ta, ma
+	vsetvli	a1, zero, e8, m1, ta, ma
 	vand.vi	v29, v28, 7
 	vrsub.vi	v28, v28, 0
 	vsll.vv	v29, v12, v29
