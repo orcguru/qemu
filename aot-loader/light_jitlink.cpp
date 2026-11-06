@@ -211,44 +211,6 @@ void MinimalJITLinker::buildSymbolTable(const MinimalELF64Parser& parser, void *
     }
 }
 
-typedef struct {
-    uint32_t left;
-    uint32_t right;
-    uint8_t  color;
-    uint8_t  _pad[3];
-    uint64_t key;
-    uint64_t value;
-    uint32_t _pad2;
-} __attribute__((packed, aligned(8))) RBNode;
-
-typedef struct {
-    uint32_t root_index;
-    uint32_t node_count;
-    RBNode nodes[];
-} FuncMapSection;
-
-uint64_t lookup_function(const FuncMapSection* funcmap, uint64_t guest_pc) {
-    if (!funcmap || funcmap->root_index == 0xFFFFFFFF) {
-        return 0;
-    }
-    
-    uint32_t current = funcmap->root_index;
-    
-    while (current != 0xFFFFFFFF) {
-        const RBNode* node = &funcmap->nodes[current];
-        
-        if (guest_pc == node->key) {
-            return node->value;
-        } else if (guest_pc < node->key) {
-            current = node->left;
-        } else {
-            current = node->right;
-        }
-    }
-    
-    return 0;
-}
-
 uint64_t MinimalJITLinker::readSymbolValueFromELFFile(const MinimalELF64Parser& parser, const std::string& symName) {
     for (size_t i = 0; ; i++) {
         auto shdr = parser.getSectionHeader(i);
@@ -285,7 +247,6 @@ uint64_t MinimalJITLinker::readSymbolValueFromELFFile(const MinimalELF64Parser& 
 
 bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
                                               uint64_t startCode,
-                                              void (*register_mapping)(uint64_t, uint64_t, uint64_t),
                                               void (*log_message)(const char *),
                                               const char *AotFile,
                                               void *(*g_malloc0)(uint64_t),
@@ -311,7 +272,6 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
         return false;
     }
 
-    uint64_t *funcmap_ptr = NULL;
     uint64_t *helpermap_ptr = NULL;
     size_t helpermap_size = 0;
     int progbits_cnt = 0;
@@ -369,7 +329,6 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
 #endif
 
             memcpy(dst, src, shdr->sh_size);
-            funcmap_ptr = helpermap_ptr;
             helpermap_ptr = (uint64_t *)dst;
             helpermap_size = shdr->sh_size;
             (void)helpermap_ptr;
@@ -382,21 +341,6 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
     }
     uint64_t x64_exec_end = readSymbolValueFromELFFile(parser, "x64_exec_end");
     assert(x64_exec_end != 0);
-
-    if (register_mapping) {
-        assert(funcmap_ptr);
-        *aot_code_base_ptr = (uint64_t)memory;
-        *funcmap_rbtree_root_ptr = (uint64_t)funcmap_ptr;
-#ifdef DEBUG_FIX_FUNCMAP
-        for (uint64_t x64di = 0; x64di < x64_exec_end; ++x64di) {
-            uint64_t host_delta = lookup_function((const FuncMapSection *)funcmap_ptr, x64di);
-            if (host_delta) {
-                uint64_t host_addr = (uint64_t)memory + host_delta;
-                register_mapping(startCode, x64di, host_addr);
-            }
-        }
-#endif
-    }
 
     for (size_t i = 0; ; i++) {
         auto shdr = parser.getSectionHeader(i);
@@ -1424,7 +1368,6 @@ void MinimalJITLinker::detectArchitecture(const MinimalELF64Parser& parser) {
 
 bool MinimalJITLinker::link(const char* objectData, size_t objectSize, uint64_t baseAddress,
                             uint64_t startCode,
-                            void (*register_mapping)(uint64_t, uint64_t, uint64_t),
                             void (*log_message)(const char *),
                             const char *AotFile,
                             void *(*g_malloc0)(uint64_t),
@@ -1466,7 +1409,7 @@ bool MinimalJITLinker::link(const char* objectData, size_t objectSize, uint64_t 
 
     buildSymbolTable(parser, HelperFuncs, HelperFuncsCnt);
 
-    if (!copySectionsAndRelocate(parser, startCode, register_mapping, log_message, AotFile, g_malloc0, aot_code_base_ptr, funcmap_rbtree_root_ptr)) {
+    if (!copySectionsAndRelocate(parser, startCode, log_message, AotFile, g_malloc0, aot_code_base_ptr, funcmap_rbtree_root_ptr)) {
         fprintf(stderr, "ERROR:Failed to copy sections and relocate\n");
         return false;
     }

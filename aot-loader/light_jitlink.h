@@ -166,7 +166,6 @@ public:
     
     bool link(const char* objectData, size_t objectSize, uint64_t baseAddress,
               uint64_t startCode,
-              void (*register_mapping)(uint64_t, uint64_t, uint64_t),
               void (*log_message)(const char *),
               const char *AotFile,
               void *(*g_malloc0)(uint64_t),
@@ -183,7 +182,6 @@ private:
     uint64_t readSymbolValueFromELFFile(const MinimalELF64Parser& parser, const std::string& symName);
     bool copySectionsAndRelocate(const MinimalELF64Parser& parser,
                                 uint64_t startCode,
-                                void (*register_mapping)(uint64_t, uint64_t, uint64_t),
                                 void (*log_message)(const char *),
                                 const char *AotFile,
                                 void *(*g_malloc0)(uint64_t),

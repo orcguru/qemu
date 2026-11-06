@@ -28,12 +28,6 @@
 // FIXME: sync below magic with split_tcg_ir.pl for performance evaluation
 #define ELF_ADDRESS_RANGE   0x200000
 
-typedef struct CodeFragment {
-    uint64_t target_addr;
-    uint64_t host_addr;
-    struct CodeFragment *next;
-} CodeFragment;
-
 typedef struct JitRecord {
     uint64_t jit_pc;
     struct JitRecord *next;

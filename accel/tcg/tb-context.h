@@ -35,9 +35,17 @@ struct TBContext {
     /* statistics */
     unsigned tb_flush_count;
     unsigned tb_phys_invalidate_count;
+
 #ifdef AOT
-    QemuMutex aot_lock;
-    GHashTable *aot_htable;
+    /*
+     * hashtable for indirect branch lookup
+     * - readers: AOT threads
+     * - writers: helper_jit and cpu_exec_loop
+     */
+    gpointer        cur;       /* published GHashTable*; written only under wlock */
+    gatomicrefcount readers;   /* 1 = permanent root ref; >1 = AOT readers in CS */
+    GMutex          wlock;     /* serializes publish + retire + steal */
+    GPtrArray      *retired;   /* unpublished snapshots awaiting grace period */
 #endif
 };
 

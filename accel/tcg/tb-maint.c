@@ -66,8 +66,10 @@ void tb_htable_init(void)
 
     qht_init(&tb_ctx.htable, tb_cmp, CODE_GEN_HTABLE_SIZE, mode);
 #ifdef AOT
-    qemu_mutex_init(&tb_ctx.aot_lock);
-    tb_ctx.aot_htable = g_hash_table_new(NULL, NULL);
+    g_atomic_ref_count_init(&tb_ctx.readers);
+    g_atomic_pointer_set(&tb_ctx.cur, g_hash_table_new(NULL, NULL));
+    g_mutex_init(&tb_ctx.wlock);
+    tb_ctx.retired = g_ptr_array_new();
 #endif
 }
 
@@ -970,60 +972,84 @@ void tb_phys_invalidate(TranslationBlock *tb, tb_page_addr_t page_addr)
 
 #ifdef AOT
 #include "tcg/tcg-aot.h"
+// cpu_exec_loop query
 uint64_t tb_aot_lookup_host_addr(uint64_t target_addr)
 {
-    CodeFragment *frag = g_hash_table_lookup(tb_ctx.aot_htable, (gconstpointer)target_addr);
-    if (!frag) {
-        return 0;
-    }
-    while (frag) {
-        if (frag->target_addr == target_addr) {
-            return frag->host_addr;
-        }
-        frag = frag->next;
-    }
-    return 0;
+    GHashTable *cur;
+    uint64_t ret = 0;
+
+    g_mutex_lock(&tb_ctx.wlock);
+    cur = g_atomic_pointer_get(&tb_ctx.cur);
+    ret = (uint64_t)g_hash_table_lookup(cur, (gconstpointer)target_addr);
+    g_mutex_unlock(&tb_ctx.wlock);
+
+    return ret;
 }
 
-extern unsigned long qemu_legacy_log_func;
-extern unsigned long qemu_aot_target;
+void ht_drain_retired(void) {
+    GPtrArray *empty   = g_ptr_array_new();  /* allocate BEFORE taking the lock */
+    GPtrArray *victims = NULL;
+
+    g_mutex_lock(&tb_ctx.wlock);
+
+    /* The ONLY place the grace period is decided. Re-evaluate HERE, under the
+       lock, at the exact moment we detach -- never reuse a cached result. */
+    if (tb_ctx.retired->len > 0 &&
+        g_atomic_ref_count_compare(&tb_ctx.readers, 1)) {
+        victims = tb_ctx.retired;
+        tb_ctx.retired = empty;                /* steal: list is now empty */
+        empty = NULL;                        /* ownership transferred */
+    }
+
+    g_mutex_unlock(&tb_ctx.wlock);
+
+    if (empty)
+        g_ptr_array_free(empty, TRUE);
+
+    if (!victims)
+        return;   /* readers active, or another writer already drained */
+
+    /* Free OUTSIDE the lock: g_hash_table_unref may run destroy notifiers,
+       free(), or even re-enter ht_insert(). */
+    for (guint i = 0; i < victims->len; ++i)
+        g_hash_table_unref((GHashTable *)victims->pdata[i]);
+    g_ptr_array_free(victims, TRUE);
+}
+
+static GHashTable *
+ht_clone_and_insert(GHashTable *old, gpointer key, gpointer val)
+{
+    GHashTable     *n;
+    GHashTableIter  it;
+    gpointer        k, v;
+
+    n = g_hash_table_new(NULL, NULL);
+
+    g_hash_table_iter_init(&it, old);
+    while (g_hash_table_iter_next(&it, &k, &v))
+        g_hash_table_insert(n, k, v);
+
+    g_hash_table_insert(n, key, val);
+
+    return n;
+}
 
 void tb_aot_insert(uint64_t start, uint64_t offset, uint64_t host_addr)
 {
     uint64_t target_addr = start + offset;
     qemu_log_mask(LOG_AOT, "%s %lx (%lx + %lx) %016lx\n", __FUNCTION__, target_addr, start, offset, host_addr);
-    if (target_addr == qemu_legacy_log_func) {
-        qemu_aot_target = host_addr;
-        qemu_log_mask(LOG_AOT, "Found debug candidate, skip register...\n");
-        return;
-    }
-    // First check (lock-free)
-    if (!g_hash_table_contains(tb_ctx.aot_htable, (gconstpointer)target_addr) || !tb_aot_lookup_host_addr(target_addr)) {
-        qemu_mutex_lock(&tb_ctx.aot_lock);
-        // Second check (under lock)
-        if (!g_hash_table_contains(tb_ctx.aot_htable, (gconstpointer)target_addr)) {
-            CodeFragment *frag = g_malloc(sizeof(CodeFragment));
-            frag->target_addr = target_addr;
-            frag->host_addr = host_addr;
-            frag->next = NULL;
-            g_hash_table_insert(tb_ctx.aot_htable, (gpointer)target_addr, (gpointer)frag);
-        } else if (!tb_aot_lookup_host_addr(target_addr)) {
-            CodeFragment *frag = g_hash_table_lookup(tb_ctx.aot_htable, (gconstpointer)target_addr);
-            assert(frag);
-            CodeFragment *prev_frag = NULL;
-            while (frag) {
-                assert(frag->target_addr != target_addr);
-                prev_frag = frag;
-                frag = frag->next;
-            }
-            CodeFragment *new_frag = g_malloc(sizeof(CodeFragment));
-            new_frag->target_addr = target_addr;
-            new_frag->host_addr = host_addr;
-            new_frag->next = NULL;
-            qatomic_set_mb(&prev_frag->next, new_frag);
-        }
-        qemu_mutex_unlock(&tb_ctx.aot_lock);
-    }
+
+    GHashTable *old, *n;
+
+    /* publish + retire are ONE atomic step w.r.t. other writers */
+    g_mutex_lock(&tb_ctx.wlock);
+    old = g_atomic_pointer_get(&tb_ctx.cur);
+    n = ht_clone_and_insert(old, (gpointer)target_addr, (gpointer)host_addr);  /* fully built, still PRIVATE */
+    g_atomic_pointer_set(&tb_ctx.cur, n);        /* cur no longer == old */
+    g_ptr_array_add(tb_ctx.retired, old);        /* retire under the SAME lock */
+    g_mutex_unlock(&tb_ctx.wlock);
+
+    ht_drain_retired();                        /* non-blocking try */
 }
 
 void tb_aot_log_funcmap(const char *name, uint64_t host_addr)
