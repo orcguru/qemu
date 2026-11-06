@@ -477,6 +477,7 @@ templates: $(ANTLR_PARSE_CLASS) $(HELPER_TMPL_OUT)
 			done; \
 		done; \
 		cp -f jmp_ind_callback.c $(HELPER_TMPL_OUT)/; \
+		cp -f qemu_cpu_sizes.h $(HELPER_TMPL_OUT)/; \
 		echo "Done. helper_templates ready in $(HELPER_TMPL_OUT)/."; \
 	fi
 

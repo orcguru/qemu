@@ -810,7 +810,7 @@ LLVMValueRef build_load_with_alignment(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMVal
 }
 
 LLVMValueRef get_env(LLVMValueRef F) {
-    LLVMValueRef env_off = LLVMConstInt(LLVMInt64Type(), QEMU_SIZEOF_CPUSTATE, 0);
+    LLVMValueRef env_off = LLVMConstInt(LLVMInt64Type(), QEMU_OFFSETOF_ENV_IN_ARCHCPU, 0);
     return LLVMBuildGEP2(g_builder, LLVMInt8Type(), LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT)), &env_off, 1, "env");
 }
 
