@@ -231,102 +231,199 @@ target_ulong HELPER(rdpid)(CPUX86State *env)
 #ifdef AOT
 #include "tcg/tcg-aot.h"
 
-#define LARGE_SHADOW_MAP        1
-//#define DUMP_CTR_COUNTER        1
-#define CTR_CALLBACK_TOTAL      0
-#define CTR_CALLBACK_OOR        1
-#define CTR_CALLBACK_INVAOT1    2
-#define CTR_CALLBACK_INVAOT2    3
-#define CTR_CALLBACK_COLLID     4
-#define CTR_CALLBACK_DUP        5
-#define CTR_CALLBACK_HIT        6
-#define CTR_CALLBACK_SAMPLE1    7
-#define CTR_CALLBACK_SAMPLE2    8
-#define CTR_HELPER_TOTAL        9
-#define CTR_HELPER_OOR          10
-#define CTR_HELPER_EMP          11
-#define CTR_HELPER_INVAOT       12
-#define CTR_HELPER_HIT          13
-#define CTR_COUNT               14
+/* GLIB - Library of useful routines for C programming
+ * Copyright (C) 1995-1997  Peter Mattis, Spencer Kimball and Josh MacDonald
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, see <http://www.gnu.org/licenses/>.
+ */
 
-typedef __attribute__((qemuaot,nothrow)) void (*FuncPtrType1)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, v2long xmm0, v2long ymm0_h, v2long xmm1, v2long ymm1_h, v2long xmm2, v2long ymm2_h, v2long xmm3, v2long ymm3_h, v2long xmm4, v2long ymm4_h, v2long xmm5, v2long ymm5_h, v2long xmm6, v2long ymm6_h, v2long xmm7, v2long ymm7_h, v2long xmm8, v2long ymm8_h, v2long xmm9, v2long ymm9_h, v2long xmm10, v2long ymm10_h, v2long xmm11, v2long ymm11_h, v2long xmm12, v2long ymm12_h, v2long xmm13, v2long ymm13_h, v2long xmm14, v2long ymm14_h, v2long xmm15, v2long ymm15_h);
+/*
+ * Modified by the GLib Team and others 1997-2000.  See the AUTHORS
+ * file for a list of people on the GLib Team.  See the ChangeLog
+ * files for a list of changes.  These files are distributed with
+ * GLib at ftp://ftp.gtk.org/pub/gtk/.
+ */
 
-__attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, v2long xmm0, v2long ymm0_h, v2long xmm1, v2long ymm1_h, v2long xmm2, v2long ymm2_h, v2long xmm3, v2long ymm3_h, v2long xmm4, v2long ymm4_h, v2long xmm5, v2long ymm5_h, v2long xmm6, v2long ymm6_h, v2long xmm7, v2long ymm7_h, v2long xmm8, v2long ymm8_h, v2long xmm9, v2long ymm9_h, v2long xmm10, v2long ymm10_h, v2long xmm11, v2long ymm11_h, v2long xmm12, v2long ymm12_h, v2long xmm13, v2long ymm13_h, v2long xmm14, v2long ymm14_h, v2long xmm15, v2long ymm15_h, unsigned long target_addr, unsigned long shadow_array_entry, unsigned long shadow_map, unsigned long jmp_ind_callback, unsigned long trampoline_helper_jit)
+#include <glib/gtypes.h>
+
+typedef struct _GHashTable  GHashTable;
+
+typedef unsigned long __attribute__((__vector_size__(16))) v2long;
+
+#if defined(__GNUC__) && __GNUC__ > 6
+#pragma GCC diagnostic ignored "-Wduplicated-branches"
+#endif
+
+#define HASH_TABLE_MIN_SHIFT 3  /* 1 << 3 == 8 buckets */
+
+#define UNUSED_HASH_VALUE 0
+#define TOMBSTONE_HASH_VALUE 1
+#define HASH_IS_UNUSED(h_) ((h_) == UNUSED_HASH_VALUE)
+#define HASH_IS_TOMBSTONE(h_) ((h_) == TOMBSTONE_HASH_VALUE)
+#define HASH_IS_REAL(h_) ((h_) >= 2)
+
+/* If int is smaller than void * on our arch, we start out with
+ * int-sized keys and values and resize to pointer-sized entries as
+ * needed. This saves a good amount of memory when the HT is being
+ * used with e.g. GUINT_TO_POINTER(). */
+
+#define BIG_ENTRY_SIZE (__SIZEOF_POINTER__)
+#define SMALL_ENTRY_SIZE (__SIZEOF_INT__)
+
+/* NB: The USE_SMALL_ARRAYS code assumes pointers are at most 8 bytes. */
+#if SMALL_ENTRY_SIZE < BIG_ENTRY_SIZE && BIG_ENTRY_SIZE <= 8
+# define USE_SMALL_ARRAYS
+#endif
+
+struct _GHashTable
 {
-    unsigned long *ptr = (unsigned long *)shadow_map;
-    unsigned long x64_elf_exec_start = ptr[0];
-    unsigned long x64_delta_end = ptr[1];
-#ifdef DUMP_CTR_COUNTER
-    unsigned long *counters = (unsigned long *)(shadow_map+32);
-    counters[CTR_HELPER_TOTAL] += 1;
+  gsize            size;
+  gint             mod;
+  guint            mask;
+  guint            nnodes;
+  guint            noccupied;  /* nnodes + tombstones */
+
+  guint            have_big_keys : 1;
+  guint            have_big_values : 1;
+
+  gpointer         keys;
+  guint           *hashes;
+  gpointer         values;
+
+  GHashFunc        hash_func;
+  GEqualFunc       key_equal_func;
+  gatomicrefcount  ref_count;
+#ifndef G_DISABLE_ASSERT
+  /*
+   * Tracks the structure of the hash table, not its contents: is only
+   * incremented when a node is added or removed (is not incremented
+   * when the key or data of a node is modified).
+   */
+  int              version;
 #endif
-    unsigned long x64_delta = target_addr - x64_elf_exec_start;
-#ifdef LARGE_SHADOW_MAP
-    if (x64_delta < x64_delta_end) {
-        unsigned long *map_ptr = (unsigned long *)(shadow_map + 8 * (4 + CTR_COUNT));
-        if (map_ptr[x64_delta]) {
-#ifdef DUMP_CTR_COUNTER
-            counters[CTR_HELPER_HIT] += 1;
+  GDestroyNotify   key_destroy_func;
+  GDestroyNotify   value_destroy_func;
+};
+
+static __attribute__((always_inline)) inline gpointer
+g_hash_table_fetch_key_or_value (gpointer a, guint index, gboolean is_big)
+{
+#ifndef USE_SMALL_ARRAYS
+  is_big = TRUE;
 #endif
-            FuncPtrType1 func_ptr = (FuncPtrType1)map_ptr[x64_delta];
-            return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);
-        } else {
-#ifdef DUMP_CTR_COUNTER
-            counters[CTR_HELPER_EMP] += 1;
-#endif
-        }
-    } else {
-#ifdef DUMP_CTR_COUNTER
-        counters[CTR_HELPER_OOR] += 1;
-#endif
-    }
-#else
-    unsigned long host_exec_start = ptr[2];
-    unsigned long aux_array = ptr[3];
-    if (x64_delta < x64_delta_end) {
-        unsigned long x64_delta = target_addr - x64_elf_exec_start;
-        unsigned int *map_ptr = (unsigned int *)(shadow_map + 8 * (4 + CTR_COUNT));
-        size_t x64_delta_idx = (x64_delta >> 2);
-        size_t x64_delta_shift = ((x64_delta & 0x3) << 3);
-        unsigned int host_delta;
-        unsigned int high = map_ptr[x64_delta_idx + 1];
-        unsigned int low = map_ptr[x64_delta_idx];
-        unsigned long combined = ((unsigned long)high << 32) | low;
-        host_delta = (combined >> x64_delta_shift) & 0xffffffff;
-        if (host_delta != 0) {
-            ptr = (unsigned long *)aux_array;
-            unsigned char *bit_array_ptr = (unsigned char *)(aux_array+8);
-            if ((host_delta >> 3) < ptr[0]) {
-                unsigned long idx = host_delta >> 3;
-                unsigned char shift = host_delta % 8;
-                if (bit_array_ptr[idx] & (1 << shift)) {
-#ifdef DUMP_CTR_COUNTER
-                    counters[CTR_HELPER_HIT] += 1;
-#endif
-                    FuncPtrType1 func_ptr = (FuncPtrType1)(host_exec_start + host_delta);
-                    return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, target_addr, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h);
-                } else {
-#ifdef DUMP_CTR_COUNTER
-                    counters[CTR_HELPER_INVAOT] += 1;
-#endif
-                }
-            } else {
-#ifdef DUMP_CTR_COUNTER
-                counters[CTR_HELPER_INVAOT] += 1;
-#endif
+  return is_big ? *(((gpointer *) a) + index) : GUINT_TO_POINTER (*(((guint *) a) + index));
+}
+
+static __attribute__((always_inline)) inline guint
+g_hash_table_hash_to_index (GHashTable *hash_table, guint hash)
+{
+  /* Multiply the hash by a small prime before applying the modulo. This
+   * prevents the table from becoming densely packed, even with a poor hash
+   * function. A densely packed table would have poor performance on
+   * workloads with many failed lookups or a high degree of churn. */
+  return (hash * 11) % hash_table->mod;
+}
+
+static __attribute__((always_inline)) guint
+g_direct_hash_qemuaot (gconstpointer v)
+{
+  return GPOINTER_TO_UINT (v);
+}
+
+static __attribute__((always_inline)) inline guint
+g_hash_table_lookup_node_qemuaot (GHashTable    *hash_table,
+                          gconstpointer  key,
+                          guint         *hash_return)
+{
+  guint node_index;
+  guint node_hash;
+  guint hash_value;
+  guint first_tombstone = 0;
+  gboolean have_tombstone = FALSE;
+  guint step = 0;
+
+  hash_value = g_direct_hash_qemuaot (key);
+  if (G_UNLIKELY (!HASH_IS_REAL (hash_value)))
+    hash_value = 2;
+
+  *hash_return = hash_value;
+
+  node_index = g_hash_table_hash_to_index (hash_table, hash_value);
+  node_hash = hash_table->hashes[node_index];
+
+  while (!HASH_IS_UNUSED (node_hash))
+    {
+      /* We first check if our full hash values
+       * are equal so we can avoid calling the full-blown
+       * key equality function in most cases.
+       */
+      if (node_hash == hash_value)
+        {
+          gpointer node_key = g_hash_table_fetch_key_or_value (hash_table->keys, node_index, hash_table->have_big_keys);
+
+          if (node_key == key)
+            {
+              return node_index;
             }
-        } else {
-#ifdef DUMP_CTR_COUNTER
-            counters[CTR_HELPER_EMP] += 1;
-#endif
         }
-    } else {
-#ifdef DUMP_CTR_COUNTER
-        counters[CTR_HELPER_OOR] += 1;
-#endif
+      else if (HASH_IS_TOMBSTONE (node_hash) && !have_tombstone)
+        {
+          first_tombstone = node_index;
+          have_tombstone = TRUE;
+        }
+
+      step++;
+      node_index += step;
+      node_index &= hash_table->mask;
+      node_hash = hash_table->hashes[node_index];
     }
-#endif
-    return g_hash_table_lookup_qemuaot(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, xmm14, ymm14_h, xmm15, ymm15_h, (unsigned long)tb_ctx.aot_htable, target_addr, jmp_ind_callback, trampoline_helper_jit, shadow_array_entry, shadow_map);
+
+  if (have_tombstone)
+    return first_tombstone;
+
+  return node_index;
+}
+
+typedef __attribute__((qemuaot)) void (*FuncPtrType)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, v2long xmm0, v2long ymm0_h, v2long xmm1, v2long ymm1_h, v2long xmm2, v2long ymm2_h, v2long xmm3, v2long ymm3_h, v2long xmm4, v2long ymm4_h, v2long xmm5, v2long ymm5_h, v2long xmm6, v2long ymm6_h, v2long xmm7, v2long ymm7_h, v2long xmm8, v2long ymm8_h, v2long xmm9, v2long ymm9_h, v2long xmm10, v2long ymm10_h, v2long xmm11, v2long ymm11_h, v2long xmm12, v2long ymm12_h, v2long xmm13, v2long ymm13_h, unsigned long cpu, unsigned long hash_table, unsigned long key, unsigned long trampoline_helper_jit);
+
+__attribute__((qemuaot,always_inline)) void g_hash_table_lookup_qemuaot (unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, v2long xmm0, v2long ymm0_h, v2long xmm1, v2long ymm1_h, v2long xmm2, v2long ymm2_h, v2long xmm3, v2long ymm3_h, v2long xmm4, v2long ymm4_h, v2long xmm5, v2long ymm5_h, v2long xmm6, v2long ymm6_h, v2long xmm7, v2long ymm7_h, v2long xmm8, v2long ymm8_h, v2long xmm9, v2long ymm9_h, v2long xmm10, v2long ymm10_h, v2long xmm11, v2long ymm11_h, v2long xmm12, v2long ymm12_h, v2long xmm13, v2long ymm13_h, unsigned long cpu,
+                                     unsigned long hash_table_ptr, unsigned long key_ptr, unsigned long trampoline_helper_jit, unsigned long jmp_ind_callback)
+{
+  guint node_index;
+  guint node_hash;
+
+  GHashTable *hash_table = (GHashTable *)hash_table_ptr;
+  gconstpointer key = (gconstpointer)key_ptr;
+
+  node_index = g_hash_table_lookup_node_qemuaot (hash_table, key, &node_hash);
+
+  gpointer gptr = HASH_IS_REAL (hash_table->hashes[node_index])
+    ? g_hash_table_fetch_key_or_value (hash_table->values, node_index, hash_table->have_big_values)
+    : NULL;
+  unsigned long ptr = (unsigned long)gptr;
+  unsigned long jmp_dest = (unsigned long)key;
+  FuncPtrType func_ptr = (FuncPtrType)jmp_ind_callback;
+  return func_ptr(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, cpu, jmp_dest, ptr, trampoline_helper_jit);
+}
+
+typedef __attribute__((qemuaot,nothrow)) void (*FuncPtrType1)(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, v2long xmm0, v2long ymm0_h, v2long xmm1, v2long ymm1_h, v2long xmm2, v2long ymm2_h, v2long xmm3, v2long ymm3_h, v2long xmm4, v2long ymm4_h, v2long xmm5, v2long ymm5_h, v2long xmm6, v2long ymm6_h, v2long xmm7, v2long ymm7_h, v2long xmm8, v2long ymm8_h, v2long xmm9, v2long ymm9_h, v2long xmm10, v2long ymm10_h, v2long xmm11, v2long ymm11_h, v2long xmm12, v2long ymm12_h, v2long xmm13, v2long ymm13_h, unsigned long cpu);
+
+__attribute__((qemuaot)) void helper_jmp_ind(unsigned long rax, unsigned long rcx, unsigned long rdx, unsigned long rbx, unsigned long rsp, unsigned long rbp, unsigned long rsi, unsigned long rdi, unsigned long r8, unsigned long r9, unsigned long r10, unsigned long r11, unsigned long r12, unsigned long r13, unsigned long r14, unsigned long r15, unsigned long src, unsigned long dst, int op, unsigned long rip, v2long xmm0, v2long ymm0_h, v2long xmm1, v2long ymm1_h, v2long xmm2, v2long ymm2_h, v2long xmm3, v2long ymm3_h, v2long xmm4, v2long ymm4_h, v2long xmm5, v2long ymm5_h, v2long xmm6, v2long ymm6_h, v2long xmm7, v2long ymm7_h, v2long xmm8, v2long ymm8_h, v2long xmm9, v2long ymm9_h, v2long xmm10, v2long ymm10_h, v2long xmm11, v2long ymm11_h, v2long xmm12, v2long ymm12_h, v2long xmm13, v2long ymm13_h, unsigned long cpu, unsigned long env, unsigned long target_addr, unsigned long trampoline_helper_jit, unsigned long jmp_ind_callback)
+{
+    return g_hash_table_lookup_qemuaot(rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15, src, dst, op, rip, xmm0, ymm0_h, xmm1, ymm1_h, xmm2, ymm2_h, xmm3, ymm3_h, xmm4, ymm4_h, xmm5, ymm5_h, xmm6, ymm6_h, xmm7, ymm7_h, xmm8, ymm8_h, xmm9, ymm9_h, xmm10, ymm10_h, xmm11, ymm11_h, xmm12, ymm12_h, xmm13, ymm13_h, cpu, (unsigned long)tb_ctx.aot_htable, target_addr, trampoline_helper_jit, jmp_ind_callback);
 }
 
 void register_for_aot_helper(const char *name, uint64_t addr, const char *ret_type);
