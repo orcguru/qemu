@@ -66,10 +66,10 @@ void tb_htable_init(void)
 
     qht_init(&tb_ctx.htable, tb_cmp, CODE_GEN_HTABLE_SIZE, mode);
 #ifdef AOT
-    g_atomic_ref_count_init(&tb_ctx.readers);
-    g_atomic_pointer_set(&tb_ctx.cur, g_hash_table_new(NULL, NULL));
     g_mutex_init(&tb_ctx.wlock);
     tb_ctx.retired = g_ptr_array_new();
+    g_atomic_ref_count_init(&tb_ctx.readers);
+    g_atomic_pointer_set(&tb_ctx.cur, g_hash_table_new(NULL, NULL));
 #endif
 }
 
