@@ -745,7 +745,7 @@ LLVM_TIR_DIR    := tests/translate_to_llvm_ir
 LLVM_TIR_FILES  := $(sort $(wildcard $(LLVM_TIR_DIR)/*.tir))
 LLVM_TIR_OUTDIR := $(LLVM_TIR_DIR)/out/$(TEST_ARCH)
 
-LLVM_ANNOTATE ?= ./llvm_annotate.py
+LLVM_ANNOTATE ?= ./scripts/llvm_annotate.py
 PYTHON        ?= python3
 MAPPER_FLAGS  ?= -d
 
