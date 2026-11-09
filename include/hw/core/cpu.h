@@ -369,7 +369,7 @@ typedef struct __attribute__((packed)) StackRecord {
 
 typedef struct __attribute__((packed)) InstrExecCounters {
     uint64_t aot_cnt;
-    uint64_t *aot_visit_ptr;
+    uint64_t reserved;
 } InstrExecCounters;
 
 typedef struct __attribute__((packed)) InstrExecCountersGroup2 {

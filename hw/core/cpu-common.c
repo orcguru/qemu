@@ -71,8 +71,6 @@ CPUState *cpu_create(const char *typename)
 #ifdef AOT
     // tcg_target_qemu_aot_prologue initializes tpbr for RISCV64
     cpu->neg.iec.aot_cnt = 0;
-    cpu->neg.iec.aot_visit_ptr = (uint64_t *)g_malloc0(8*ELF_ADDRESS_RANGE);
-    assert(cpu->neg.iec.aot_visit_ptr);
     cpu->neg.iec2.jmp_ind_callback_cnt = 0;
     cpu->neg.iec2.trampoline_cnt = 0;
     cpu->neg.iec2.helper1_cnt = 0;
@@ -98,9 +96,10 @@ CPUState *cpu_create(const char *typename)
     assert(ret == 0);
     ret = mprotect((void *)(ptr + (AOT_STACK_SIZE - qemu_real_host_page_size())), qemu_real_host_page_size(), PROT_NONE);
     assert(ret == 0);
-    cpu->neg.sr.aot_stack = (ptr + qemu_real_host_page_size());
+    // FIXME: reuse host stack, reserve some space for AOT spills
+    cpu->neg.sr.aot_stack = (ptr + AOT_STACK_SIZE / 2);
     cpu->neg.sr.runtime_stack = -1UL;
-    qemu_log_mask(LOG_AOT, "%s aot_stack:[%lx - %lx)\n", __FUNCTION__, cpu->neg.sr.aot_stack, (cpu->neg.sr.aot_stack + AOT_STACK_SIZE - 2*qemu_real_host_page_size()));
+    qemu_log_mask(LOG_AOT, "%s aot_stack:[%lx - %lx)\n", __FUNCTION__, (ptr + qemu_real_host_page_size()), ((ptr + qemu_real_host_page_size()) + AOT_STACK_SIZE - 2*qemu_real_host_page_size()));
 #endif
     return cpu;
 }

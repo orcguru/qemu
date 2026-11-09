@@ -25,14 +25,6 @@
 #ifndef TCG_AOT_H
 #define TCG_AOT_H
 
-// FIXME: sync below magic with split_tcg_ir.pl for performance evaluation
-#define ELF_ADDRESS_RANGE   0x200000
-
-typedef struct JitRecord {
-    uint64_t jit_pc;
-    struct JitRecord *next;
-} JitRecord;
-
 typedef struct helper_func {
   const char *name;
   uint64_t addr;

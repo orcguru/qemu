@@ -3289,26 +3289,16 @@ static bool parse_elf_properties(const ImageSource *src,
 #ifdef AOT
 #include "tcg/tcg-aot.h"
 #include <pthread.h>
-extern void *invoke_lightlink(const char *, uint64_t, void (*)(const char *, uint64_t), void (*)(const char *), void *(*)(uint64_t), void *, size_t, int, const char *, uint64_t *, uint64_t *);
+extern void *invoke_lightlink(const char *, uint64_t, void (*)(const char *, uint64_t), void (*)(const char *), void *(*)(uint64_t), void *, size_t, const char *, uint64_t *, uint64_t *);
 extern helper_func_t helper_funcs[];
 extern size_t helper_funcs_count;
-extern int enable_llvm_debug;
 extern pthread_mutex_t aot_range_info_mutex;
 extern aot_range_info_t *aot_info_list;
 
-const char *qemu_legacy_load_target = "DUMMY_LIB";
-unsigned long qemu_legacy_log_func = 0;
-unsigned long qemu_aot_target = 0;
-unsigned long qemu_aot_target_exec_cnt = 0;
-
-// load_aot_image should have been called with aot_range_info_mutex locked
 void load_aot_image(const char *image_name, unsigned long start_code, unsigned long end_code, unsigned long entry);
 void load_aot_image(const char *image_name, unsigned long start_code, unsigned long end_code, unsigned long entry)
 {
     qemu_log_mask(LOG_AOT, "%s %s start_code:%lx entry:%lx\n", __FUNCTION__, image_name, start_code, entry);
-    if (strstr(image_name, qemu_legacy_load_target)) {
-        qemu_legacy_log_func += start_code;
-    }
     char aotnamebuf[PATH_MAX];
     snprintf(aotnamebuf, PATH_MAX, "%s.aot", image_name);
     int fp = open(aotnamebuf, O_RDONLY);
@@ -3348,7 +3338,7 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
     qemu_log_mask(LOG_AOT, "%s on %s with entry_info:%s\n", "invoke_lightlink", aotnamebuf, entry_func);
     uint64_t aot_code_base = 0;
     FuncMapSection *funcmap_rbtree_root = NULL;
-    invoke_lightlink((const char *)aotnamebuf, start_code, tb_aot_log_funcmap, tb_aot_log_message, g_malloc0, (void *)helper_funcs, helper_funcs_count, enable_llvm_debug, (const char *)entry_func, &aot_code_base, (uint64_t *)&funcmap_rbtree_root);
+    invoke_lightlink((const char *)aotnamebuf, start_code, tb_aot_log_funcmap, tb_aot_log_message, g_malloc0, (void *)helper_funcs, helper_funcs_count, (const char *)entry_func, &aot_code_base, (uint64_t *)&funcmap_rbtree_root);
 
     aot_range_info_t *info_ptr = g_malloc(sizeof(aot_range_info_t));
     info_ptr->x_addr_range_begin = start_code;
@@ -3361,6 +3351,8 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
     info_ptr->aot_code_base = aot_code_base;
     info_ptr->funcmap_rbtree_root = funcmap_rbtree_root;
     info_ptr->next = NULL;
+
+    pthread_mutex_lock(&aot_range_info_mutex);
     if (!aot_info_list) {
         aot_info_list = info_ptr;
     } else {
@@ -3370,6 +3362,7 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
         }
         info_ptr2->next = info_ptr;
     }
+    pthread_mutex_unlock(&aot_range_info_mutex);
 }
 #endif
 
@@ -3807,9 +3800,7 @@ static void load_elf_interp(const char *filename, struct image_info *info,
 
     load_elf_image(filename, &src, info, &ehdr, NULL);
 #ifdef AOT
-    pthread_mutex_lock(&aot_range_info_mutex);
     load_aot_image(filename, info->start_code, info->end_code, info->entry);
-    pthread_mutex_unlock(&aot_range_info_mutex);
 #endif
 }
 
@@ -4077,9 +4068,7 @@ int load_elf_binary(struct linux_binprm *bprm, struct image_info *info)
 
     load_elf_image(bprm->filename, &bprm->src, info, &ehdr, &elf_interpreter);
 #ifdef AOT
-    pthread_mutex_lock(&aot_range_info_mutex);
     load_aot_image(bprm->filename, info->start_code, info->end_code, info->entry);
-    pthread_mutex_unlock(&aot_range_info_mutex);
 #endif
 
     /* Do this so that we can load the interpreter, if need be.  We will

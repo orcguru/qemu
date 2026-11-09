@@ -294,12 +294,6 @@ enum {
     USES_CC_SRCT = 8,
 };
 
-#ifdef AOT
-#include "tcg/tcg-aot.h"
-extern int collect_jit_ir;
-extern jit_ir_dump_info_t jid;
-#endif
-
 /* Bit set if the global variable is live after setting CC_OP to X.  */
 static const uint8_t cc_op_live_[] = {
     [CC_OP_DYNAMIC] = USES_CC_DST | USES_CC_SRC | USES_CC_SRC2,
@@ -4021,12 +4015,6 @@ static const TranslatorOps i386_tr_ops = {
     .translate_insn     = i386_tr_translate_insn,
     .tb_stop            = i386_tr_tb_stop,
 };
-
-#ifdef AOT
-#include "tcg/tcg-aot.h"
-extern int collect_jit_ir;
-extern jit_ir_dump_info_t jid;
-#endif
 
 void x86_translate_code(CPUState *cpu, TranslationBlock *tb,
                         int *max_insns, vaddr pc, void *host_pc)

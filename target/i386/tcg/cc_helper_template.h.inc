@@ -44,7 +44,7 @@
 
 /* dynamic flags computation */
 
-static __attribute__((always_inline)) uint32_t glue(compute_all_cout, SUFFIX)(DATA_TYPE dst, DATA_TYPE carries)
+static uint32_t glue(compute_all_cout, SUFFIX)(DATA_TYPE dst, DATA_TYPE carries)
 {
     uint32_t af_cf, pf, zf, sf, of;
 

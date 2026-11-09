@@ -3635,6 +3635,7 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
 
     tcg_out_st(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -56);
     tcg_out_ld(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -64);
+    tcg_out_mov(s, TCG_TYPE_PTR, TCG_AREG0, tcg_target_call_iarg_regs[3]);
     tcg_out_insn(s, 3207, BR, TCG_REG_TMP0);
 
     /*

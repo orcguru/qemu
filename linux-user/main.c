@@ -268,12 +268,6 @@ CPUArchState *cpu_copy(CPUArchState *env)
     return new_env;
 }
 
-int enable_llvm_debug = 0;
-static void handle_arg_llvm_debug(const char *arg)
-{
-    enable_llvm_debug = 1;
-}
-
 static void handle_arg_help(const char *arg)
 {
     usage(EXIT_SUCCESS);
@@ -379,12 +373,6 @@ static void handle_arg_cpu(const char *arg)
         list_cpus();
         exit(EXIT_FAILURE);
     }
-}
-
-extern unsigned long qemu_aot_target_exec_cnt;
-static void handle_qemu_aot_target_exec_cnt(const char *arg)
-{
-    qemu_aot_target_exec_cnt = (unsigned long)atoll(arg);
 }
 
 static void handle_arg_guest_base(const char *arg)
@@ -501,10 +489,6 @@ struct qemu_argument {
 };
 
 static const struct qemu_argument arg_table[] = {
-    {"a",          "",                 false, handle_arg_llvm_debug,
-     "",           "enable LLVM-JITLINK debug"},
-    {"qemu_aot_target_exec_cnt",        "",         true,  handle_qemu_aot_target_exec_cnt,
-     "count",      "set global variable qemu_aot_target_exec_cnt"},
     {"h",          "",                 false, handle_arg_help,
      "",           "print this help"},
     {"help",       "",                 false, handle_arg_help,

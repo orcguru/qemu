@@ -9234,7 +9234,7 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
 #endif
 
 #ifdef AOT
-    tcg_cflags_set(cs, CF_PCREL | CF_NOIRQ | CF_NO_GOTO_TB);
+    tcg_cflags_set(cs, CF_PCREL | CF_NOIRQ | CF_NO_GOTO_TB | CF_PARALLEL);
 #endif
     /*
      * x-vendor-cpuid-only and v2 should be initernal only. But

@@ -261,18 +261,10 @@ hit:
     return tb;
 }
 
-extern unsigned long qemu_legacy_log_func;
-unsigned long log_cnt = 0;
-
 static void log_cpu_exec(vaddr pc, CPUState *cpu,
                          const TranslationBlock *tb)
 {
-    if (qemu_log_in_addr_range(pc) && (qemu_legacy_log_func == 0 || log_cnt || pc == qemu_legacy_log_func)) {
-        if (log_cnt) {
-            log_cnt -= 1;
-        } else if (pc == qemu_legacy_log_func) {
-            log_cnt = 30;
-        }
+    if (qemu_log_in_addr_range(pc)) {
         qemu_log_mask(CPU_LOG_EXEC,
                       "Trace %d: %p [%08" PRIx64
                       "/%016" VADDR_PRIx "/%08x/%08x] %s\n",
@@ -443,7 +435,7 @@ cpu_tb_exec(CPUState *cpu, TranslationBlock *itb, int *tb_exit)
     }
 
     qemu_thread_jit_execute();
-    ret = tcg_qemu_tb_exec(cpu_env(cpu), tb_ptr, 0);
+    ret = tcg_qemu_tb_exec(cpu_env(cpu), tb_ptr, 0, 0);
     cpu->neg.can_do_io = true;
     qemu_plugin_disable_mem_helpers(cpu);
     /*
@@ -921,10 +913,10 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
 /* main execution loop */
 #ifdef AOT
 #include "tcg/tcg-aot.h"
+extern pthread_mutex_t aot_range_info_mutex;
 extern aot_range_info_t *aot_info_list;
-extern unsigned long qemu_aot_target;
-extern unsigned long qemu_aot_target_exec_cnt;
 
+pthread_mutex_t jit_mutex = PTHREAD_MUTEX_INITIALIZER;
 int collect_jit_ir = 0;
 jit_ir_dump_info_t jid;
 extern uint64_t lookup_function(const FuncMapSection* funcmap, uint64_t guest_pc);
@@ -963,11 +955,12 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
             }
 
 #ifdef AOT
-            collect_jit_ir = 0;
             uint64_t entry = tb_aot_lookup_host_addr(s.pc);
             if (entry) {
-                tcg_qemu_aot_exec(cpu_env(cpu), (void *)entry, (void *)s.pc);
+                tcg_qemu_aot_exec(cpu_env(cpu), (void *)entry, (void *)s.pc, cpu);
+                assert(0);
             } else {
+                pthread_mutex_lock(&aot_range_info_mutex);
                 aot_range_info_t *info_ptr = aot_info_list;
                 while (info_ptr) {
                     if (info_ptr->x_addr_range_begin <= s.pc && s.pc < info_ptr->x_addr_range_end) {
@@ -975,44 +968,20 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
                     }
                     info_ptr = info_ptr->next;
                 }
+                pthread_mutex_unlock(&aot_range_info_mutex);
                 if (info_ptr) {
                     uint64_t aot_delta = lookup_function(info_ptr->funcmap_rbtree_root, (s.pc - info_ptr->x_addr_range_begin));
                     if (aot_delta) {
                         tb_aot_insert(info_ptr->x_addr_range_begin, (s.pc - info_ptr->x_addr_range_begin), (info_ptr->aot_code_base + aot_delta));
-                        tcg_qemu_aot_exec(cpu_env(cpu), (void *)(info_ptr->aot_code_base + aot_delta), (void *)s.pc);
+                        tcg_qemu_aot_exec(cpu_env(cpu), (void *)(info_ptr->aot_code_base + aot_delta), (void *)s.pc, cpu);
+                        assert(0);
                     }
 
+                    // Fallback to JIT
+                    pthread_mutex_lock(&jit_mutex);
                     if (!g_hash_table_contains((GHashTable *)info_ptr->jit_hash, (gconstpointer)s.pc)) {
-                        JitRecord *jr = g_malloc(sizeof(JitRecord));
-                        assert(jr);
-                        jr->jit_pc = 0;
-                        jr->next = NULL;
-                        g_hash_table_insert((GHashTable *)info_ptr->jit_hash, (gpointer)s.pc, (gpointer)jr);
-                    }
-                    JitRecord *jr = g_hash_table_lookup((GHashTable *)info_ptr->jit_hash, (gconstpointer)s.pc);
-                    assert(jr);
-                    int found = 0;
-
-                    JitRecord *jr_loop_ptr = jr;
-                    while (jr_loop_ptr) {
-                        if (jr_loop_ptr->jit_pc == s.pc) {
-                            found = 1;
-                            break;
-                        }
-                        jr_loop_ptr = jr_loop_ptr->next;
-                    }
-
-                    if (!found) {
+                        g_hash_table_insert((GHashTable *)info_ptr->jit_hash, (gpointer)s.pc, (gpointer)s.pc);
                         qemu_log_mask(LOG_AOT, "QEMU TCG JIT on %s offset:%lx\n", info_ptr->elf_name, (s.pc - info_ptr->x_addr_range_begin));
-                        JitRecord *jr_entry = g_malloc(sizeof(JitRecord));
-                        assert(jr_entry);
-                        jr_entry->jit_pc = s.pc;
-                        jr_entry->next = NULL;
-                        while (jr->next != NULL) {
-                            jr = jr->next;
-                        }
-                        jr->next = jr_entry;
-
                         jid.x_load_addr = info_ptr->x_addr_range_begin;
                         if (!info_ptr->jit_ir_fd) {
                             char jit_ir_name[512];
@@ -1023,13 +992,6 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
                         }
                         jid.jit_ir_fd = info_ptr->jit_ir_fd;
                         collect_jit_ir = 1;
-                    }
-                    if (s.pc == qemu_legacy_log_func) {
-                        if (qemu_aot_target_exec_cnt != 0) {
-                            qemu_aot_target_exec_cnt -= 1;
-                            qemu_log_mask(LOG_AOT, "%s do trigger\n", __FUNCTION__);
-                            tcg_qemu_aot_exec(cpu_env(cpu), (void *)qemu_aot_target, (void *)s.pc);
-                        }
                     }
                 }
             }
@@ -1052,6 +1014,10 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
                 jc->array[h].pc = s.pc;
                 qatomic_set(&jc->array[h].tb, tb);
             }
+#ifdef AOT
+            collect_jit_ir = 0;
+            pthread_mutex_unlock(&jit_mutex);
+#endif
 
 #ifndef CONFIG_USER_ONLY
             /*

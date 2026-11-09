@@ -456,7 +456,6 @@ extern void bswap_shdr(struct elf_shdr *shdr, int shnum);
 pthread_mutex_t aot_range_info_mutex = PTHREAD_MUTEX_INITIALIZER;
 aot_range_info_t *aot_info_list = NULL;
 
-// Caller should grab the lock
 void find_and_load_missing_aot(uintptr_t x_addr)
 {
     qemu_log_mask(LOG_AOT, "%s x_addr:%lx\n", __FUNCTION__, x_addr);
@@ -619,6 +618,8 @@ void helper_jit(CPUX86State *env, unsigned long target)
         }
         info_ptr = info_ptr->next;
     }
+    pthread_mutex_unlock(&aot_range_info_mutex);
+
     if (!info_ptr) {
         find_and_load_missing_aot(target);
     } else {
@@ -627,7 +628,6 @@ void helper_jit(CPUX86State *env, unsigned long target)
             tb_aot_insert(info_ptr->x_addr_range_begin, (target - info_ptr->x_addr_range_begin), (info_ptr->aot_code_base + aot_delta));
         }
     }
-    pthread_mutex_unlock(&aot_range_info_mutex);
 
     CPUState *cs = env_cpu(env);
     cs->exception_index = EXCP_TCGJIT;
@@ -668,12 +668,6 @@ const char *x64_reg_name[16] = {"RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI",
 const char *segment_base_name[6] = {"ES_BASE", "CS_BASE", "SS_BASE", "DS_BASE", "FS_BASE", "GS_BASE"};
 unsigned long dump_cnt = 0;
 
-//#define DUMP_SHADOW_JUMP_TABLE  1
-#ifdef DUMP_SHADOW_JUMP_TABLE
-unsigned long prev_rip = -1UL;
-unsigned long prev_func = -1UL;
-#endif
-
 void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
 {
     uint64_t *shadow_stack_pointer_ptr = (uint64_t *)((unsigned long)env - 8);
@@ -681,16 +675,6 @@ void helper_dump_registers(CPUX86State *env, unsigned long func_offset)
     uint64_t shadow_stack_pointer_upper_bound = (*(uint64_t *)((unsigned long)env - 24)) + 16;  // remove margin
     assert(shadow_stack_pointer_lower_bound < shadow_stack_pointer_ptr[0]);
     assert(shadow_stack_pointer_ptr[0] <= shadow_stack_pointer_upper_bound);
-#ifdef DUMP_SHADOW_JUMP_TABLE
-    unsigned long *shadow_jt_flag_ptr = (unsigned long *)((unsigned long)env - 120);
-    if (*shadow_jt_flag_ptr != 0) {
-        qemu_log_mask(LOG_AOT, "SHADOW_JT %lx/%lx -> %lx/%lx - %ld\n", prev_rip, prev_func, env->eip, func_offset, *shadow_jt_flag_ptr);
-        *shadow_jt_flag_ptr = 0;
-    }
-    prev_rip = env->eip;
-    prev_func = func_offset;
-    return;
-#endif
 
     if (!last_env) {
         last_env = (CPUX86State **)calloc(sizeof(CPUX86State *), (MAX_PID+1));
