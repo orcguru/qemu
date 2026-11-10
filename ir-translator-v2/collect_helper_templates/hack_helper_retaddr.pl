@@ -12,6 +12,9 @@ open OUT, "> $ARGV[0].updated" or die "Cannot open $ARGV[0].update for write!\n"
 while (<IN>) {
   my $line = $_;
   chomp($line);
+  if ($line =~ /__thread uintptr_t helper_retaddr;/) {
+    next;
+  }
   if ($line =~ /^\s+helper_retaddr\s+=\s+(.*)$/) {
     my $exp = $1;
     print OUT "    unsigned long *ptr = (unsigned long *)(env - 32);\n";

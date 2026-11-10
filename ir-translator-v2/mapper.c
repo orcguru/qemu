@@ -671,7 +671,13 @@ LLVMValueRef get_or_add_func_with_qemuaot_cc(const char *name, unsigned long hex
         LLVMAddAttributeAtIndex(F, -1, g_attr_nounwind);
         LLVMSetFunctionCallConv(F, QEMUAOT_CC);
         char sec_name[128] = {0};
-        sprintf(sec_name, ".text.%s", name);
+        if (strncmp(name, "trampoline_", 11) == 0) {
+            sprintf(sec_name, ".text.trampoline");
+        } else if (strncmp(name, "helper_", 7) == 0) {
+            sprintf(sec_name, ".text.helper");
+        } else {
+            sprintf(sec_name, ".text.%s", name);
+        }
         LLVMSetSection(F, sec_name);
         for (int i = 0; i < (XREG_MAX + 2 * XMM_COUNT); ++i) {
             LLVMSetValueName(LLVMGetParam(F, i), qemuaot_default_param_name[i]);
@@ -741,8 +747,8 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
             sbuf_printf(&bm, " -DVEC%d=%s", (i - 2), qemuaot_default_param_name[XREG_MAX + u->operands[i].vec.idx]);
         }
         const char *clang_cmd_head = (g_target_arch == TARGET_ARCH_RISCV64)
-            ? "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O2 -emit-llvm"
-            : "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O2 -emit-llvm";
+            ? "clang -mno-outline-atomics -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O2 -emit-llvm"
+            : "clang -mno-outline-atomics -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O2 -emit-llvm";
         int cmd_sz = strlen(clang_cmd_head) + strlen(XMM_PARAM_DECLARE_COMMON) + strlen(XMM_PARAM_LIST) + 8 * 12 /* -DVEC/XY */ + strlen(g_output_path) + strlen(g_template_path) + strlen(dump_helper_buf) * 2 + strlen(dump_macro_buf) + 256 /*misc*/;
         char *clang_cmd = (char *)malloc(cmd_sz);
         snprintf(clang_cmd, cmd_sz, "%s -DXMM_PARAM_DECLARE_COMMON=\"%s\" -DXMM_PARAM_LIST=\"%s\" -DHELPER_NAME=%s %s %s/helper_templates/%s.c -o %s/%s.bc", clang_cmd_head, XMM_PARAM_DECLARE_COMMON, XMM_PARAM_LIST, &dump_helper_buf[0], &dump_macro_buf[0], g_template_path, helper_str[h], g_output_path, &dump_helper_buf[0]);
