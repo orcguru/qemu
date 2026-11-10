@@ -17,7 +17,7 @@ Fx0:                                    // @Fx0
 .Lfunc_end0:
 	.size	Fx0, .Lfunc_end0-Fx0
                                         // -- End function
-	.section	.text.trampoline_helper_fsave,"ax",@progbits
+	.section	.text.trampoline,"ax",@progbits
 	.globl	trampoline_helper_fsave         // -- Begin function trampoline_helper_fsave
 	.p2align	2
 	.type	trampoline_helper_fsave,@function

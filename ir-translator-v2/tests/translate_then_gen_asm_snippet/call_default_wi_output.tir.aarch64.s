@@ -16,7 +16,7 @@ Fx0:                                    // @Fx0
 .Lfunc_end0:
 	.size	Fx0, .Lfunc_end0-Fx0
                                         // -- End function
-	.section	.text.trampoline_helper_rdrand,"ax",@progbits
+	.section	.text.trampoline,"ax",@progbits
 	.globl	trampoline_helper_rdrand        // -- Begin function trampoline_helper_rdrand
 	.p2align	2
 	.type	trampoline_helper_rdrand,@function
