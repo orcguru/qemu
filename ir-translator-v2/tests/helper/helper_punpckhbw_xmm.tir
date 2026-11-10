@@ -1,0 +1,41 @@
+XMM0:$0x360
+XMM1:$0x3a0
+XMM2:$0x3e0
+XMM3:$0x420
+XMM4:$0x460
+XMM5:$0x4a0
+XMM6:$0x4e0
+XMM7:$0x520
+XMM8:$0x560
+XMM9:$0x5a0
+XMM10:$0x5e0
+XMM11:$0x620
+XMM12:$0x660
+XMM13:$0x6a0
+XMM14:$0x6e0
+XMM15:$0x720
+XMM_t0:$0xb60
+
+EXTERNAL:$0x7b0:
+add_i64 loc1,env,$0x3a0
+add_i64 loc2,env,$0x3e0
+add_i64 loc3,env,$0x420
+mov_i64 loc4,$0x0706050403020100
+st_i64 loc4,env,$0x3a0
+mov_i64 loc4,$0x8786858483828180
+st_i64 loc4,env,$0x3a8
+mov_i64 loc4,$0x4746454443424140
+st_i64 loc4,env,$0x3e0
+mov_i64 loc4,$0xc7c6c5c4c3c2c1c0
+st_i64 loc4,env,$0x3e8
+jmp_direct $0x7b2
+
+EXTERNAL:$0x7b2:
+add_i64 loc1,env,$0x3a0
+add_i64 loc2,env,$0x3e0
+add_i64 loc3,env,$0x420
+call punpckhbw_xmm,$0x0,$0,env,loc3,loc1,loc2
+call dump_registers,$0x0,$0,env,$0x0
+mov_i64 rdi,$0x7f
+mov_i64 rax,$0xe7
+call syscall,$0x0,$0,env,$0x2
