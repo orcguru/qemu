@@ -3578,6 +3578,7 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
 
     tcg_out_mov(s, TCG_TYPE_PTR, TCG_AREG0, tcg_target_call_iarg_regs[0]);
     tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_TMP0, tcg_target_call_iarg_regs[1]);
+    tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_TMP1, tcg_target_call_iarg_regs[3]);
     tcg_out_mov(s, TCG_TYPE_PTR, CONTEXT_RIP, tcg_target_call_iarg_regs[2]);
 
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RAX, TCG_AREG0, 0);  // rax
@@ -3633,9 +3634,11 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V30, TCG_AREG0, 0x720 + 0*16);
     tcg_out_ld(s, TCG_TYPE_V128, TCG_REG_V31, TCG_AREG0, 0x720 + 1*16);
 
-    tcg_out_st(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -56);
-    tcg_out_ld(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -64);
-    tcg_out_mov(s, TCG_TYPE_PTR, TCG_AREG0, tcg_target_call_iarg_regs[3]);
+    tcg_out_addi_ptr(s, TCG_REG_TMP2, TCG_REG_SP, 0);
+    tcg_out_st(s, TCG_TYPE_I64, TCG_REG_TMP2, TCG_AREG0, -56);
+    tcg_out_ld(s, TCG_TYPE_I64, TCG_REG_TMP2, TCG_AREG0, -64);
+    tcg_out_addi_ptr(s, TCG_REG_SP, TCG_REG_TMP2, 0);
+    tcg_out_mov(s, TCG_TYPE_PTR, TCG_AREG0, TCG_REG_TMP1);
     tcg_out_insn(s, 3207, BR, TCG_REG_TMP0);
 
     /*

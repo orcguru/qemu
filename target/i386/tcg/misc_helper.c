@@ -587,7 +587,7 @@ void find_and_load_missing_aot(uintptr_t x_addr)
 
 uint64_t lookup_function(const FuncMapSection* funcmap, uint64_t guest_pc) {
     if (!funcmap || funcmap->root_index == 0xFFFFFFFF) {
-        return 0;
+        return -1ULL;
     }
     uint32_t current = funcmap->root_index;
     while (current != 0xFFFFFFFF) {
@@ -601,7 +601,7 @@ uint64_t lookup_function(const FuncMapSection* funcmap, uint64_t guest_pc) {
         }
     }
 
-    return 0;
+    return -1ULL;
 }
 
 extern void tb_aot_insert(uint64_t start, uint64_t offset, uint64_t host_addr);
@@ -624,7 +624,7 @@ void helper_jit(CPUX86State *env, unsigned long target)
         find_and_load_missing_aot(target);
     } else {
         uint64_t aot_delta = lookup_function(info_ptr->funcmap_rbtree_root, (target - info_ptr->x_addr_range_begin));
-        if (aot_delta) {
+        if (aot_delta != -1ULL) {
             tb_aot_insert(info_ptr->x_addr_range_begin, (target - info_ptr->x_addr_range_begin), (info_ptr->aot_code_base + aot_delta));
         }
     }

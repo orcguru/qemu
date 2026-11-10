@@ -272,16 +272,15 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
         return false;
     }
 
+    uint64_t *funcmap_ptr = NULL;
     uint64_t *helpermap_ptr = NULL;
     size_t helpermap_size = 0;
     int progbits_cnt = 0;
     uint64_t host_exec_start = 0;
     uint64_t host_exec_size = 0;
-    uint64_t *shadow_map_ptr = 0;
     for (size_t i = 0; ; i++) {
         auto shdr = parser.getSectionHeader(i);
         if (!shdr) break;
-        auto shdr_next = parser.getSectionHeader(i+1);
 
         if (shdr->sh_type == 1 && shdr->sh_size > 0) {
             progbits_cnt += 1;
@@ -300,10 +299,6 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
             }
 
             char* dst = memory + offset;
-            if (shdr_next && shdr_next->sh_type == 8 && shdr_next->sh_size > 0) {
-                // If next section is .bss, then current is .data, and shadow_map_ptr is located at the head
-                shadow_map_ptr = (uint64_t *)dst;
-            }
 
             // FIXME: the first section is .text
             if (progbits_cnt == 1) {
@@ -329,6 +324,7 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
 #endif
 
             memcpy(dst, src, shdr->sh_size);
+            funcmap_ptr = helpermap_ptr;
             helpermap_ptr = (uint64_t *)dst;
             helpermap_size = shdr->sh_size;
             (void)helpermap_ptr;
@@ -339,8 +335,10 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
             }
         }
     }
-    uint64_t x64_exec_end = readSymbolValueFromELFFile(parser, "x64_exec_end");
-    assert(x64_exec_end != 0);
+
+    assert(funcmap_ptr);
+    *aot_code_base_ptr = (uint64_t)memory;
+    *funcmap_rbtree_root_ptr = (uint64_t)funcmap_ptr;
 
     for (size_t i = 0; ; i++) {
         auto shdr = parser.getSectionHeader(i);
@@ -355,10 +353,6 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
                 return false;
             }
 
-            char* dst = memory + offset;
-            // Set the address of shadow_map into shadow_map_ptr located in previous section
-            *shadow_map_ptr = (uint64_t)dst;
-
 #ifdef DEBUG
             std::cout << "DEBUG: Zeroing NOBITS section at addr=0x" << std::hex << shdr->sh_addr
                      << ", offset=0x" << offset
@@ -366,21 +360,6 @@ bool MinimalJITLinker::copySectionsAndRelocate(const MinimalELF64Parser& parser,
                      << ", dst=0x" << std::hex << (uint64_t)dst << std::endl;
 #endif
 
-            // Setup shadow_map
-            volatile uint64_t *x64_elf_exec_start = (uint64_t *)dst;
-            volatile uint64_t *x64_delta_end = (uint64_t *)(dst + 8);
-            volatile uint64_t *host_exec_start_ptr = (uint64_t *)(dst + 16);
-            volatile uint64_t *aux_array_ptr = (uint64_t *)(dst + 24);
-            *x64_elf_exec_start = startCode;
-            *x64_delta_end = x64_exec_end;
-            *host_exec_start_ptr = host_exec_start;
-            *aux_array_ptr = 0;
-            if (log_message) {
-                std::ostringstream os;
-                os << AotFile << " .bss start:" << std::hex << std::showbase << reinterpret_cast<uintptr_t>(dst) << " length:" << shdr->sh_size << "\n";
-                std::string bss_log = os.str();
-                log_message(bss_log.c_str());
-            }
         }
     }
 
@@ -767,6 +746,20 @@ bool MinimalJITLinker::applyRelocation(uint32_t type, char* location,
         result = (instr & ~(0xFFF << 10)) | (((value & 0xFF8) >> 3) << 10);
         *reinterpret_cast<uint32_t*>(location) = result;
         break;
+
+    case 299: // R_AARCH64_LDST128_ABS_LO12_NC
+        instr = *reinterpret_cast<uint32_t*>(location);
+        // For 128-bit load/store, the immediate is the byte offset divided by 16.
+        // lo12 bits [11:4] hold the scaled offset; shift into bits [21:10].
+        result = (instr & ~(0xFFF << 10)) | (((value & 0xFF0) >> 4) << 10);
+        *reinterpret_cast<uint32_t*>(location) = result;
+#ifdef DEBUG
+        std::cout << "DEBUG: R_AARCH64_LDST128_ABS_LO12_NC:" << std::endl
+                  << "  location=0x" << std::hex << reinterpret_cast<uint64_t>(location) << std::endl
+                  << "  value=0x" << value << std::endl
+                  << "  scaled_imm=0x" << ((value & 0xFF0) >> 4) << std::dec << std::endl;
+#endif
+            break;
 
     case 35:
         {

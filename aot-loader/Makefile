@@ -13,7 +13,7 @@ endif
 CC := $(CROSS_COMPILE)g++
 AR := $(CROSS_COMPILE)ar
 
-CFLAGS = -O2 -g -Wall -fPIC
+CFLAGS = -O0 -g -Wall -fPIC
 
 ifeq ($(ARCH_TARGET),riscv64)
     CFLAGS += -march=rv64gv

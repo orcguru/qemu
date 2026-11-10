@@ -971,7 +971,7 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
                 pthread_mutex_unlock(&aot_range_info_mutex);
                 if (info_ptr) {
                     uint64_t aot_delta = lookup_function(info_ptr->funcmap_rbtree_root, (s.pc - info_ptr->x_addr_range_begin));
-                    if (aot_delta) {
+                    if (aot_delta != -1ULL) {
                         tb_aot_insert(info_ptr->x_addr_range_begin, (s.pc - info_ptr->x_addr_range_begin), (info_ptr->aot_code_base + aot_delta));
                         tcg_qemu_aot_exec(cpu_env(cpu), (void *)(info_ptr->aot_code_base + aot_delta), (void *)s.pc, cpu);
                         assert(0);

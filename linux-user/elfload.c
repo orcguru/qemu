@@ -3289,7 +3289,7 @@ static bool parse_elf_properties(const ImageSource *src,
 #ifdef AOT
 #include "tcg/tcg-aot.h"
 #include <pthread.h>
-extern void *invoke_lightlink(const char *, uint64_t, void (*)(const char *, uint64_t), void (*)(const char *), void *(*)(uint64_t), void *, size_t, const char *, uint64_t *, uint64_t *);
+extern void *invoke_lightlink(const char *, uint64_t, void (*)(const char *, uint64_t), void (*)(const char *), void *(*)(uint64_t), void *, size_t, uint64_t *, uint64_t *);
 extern helper_func_t helper_funcs[];
 extern size_t helper_funcs_count;
 extern pthread_mutex_t aot_range_info_mutex;
@@ -3333,12 +3333,9 @@ void load_aot_image(const char *image_name, unsigned long start_code, unsigned l
         }
         tag_end += 1;
     }
-    char entry_func[128] = {0};
-    sprintf(entry_func, "--entry=%s_func_0", tag_start);
-    qemu_log_mask(LOG_AOT, "%s on %s with entry_info:%s\n", "invoke_lightlink", aotnamebuf, entry_func);
     uint64_t aot_code_base = 0;
     FuncMapSection *funcmap_rbtree_root = NULL;
-    invoke_lightlink((const char *)aotnamebuf, start_code, tb_aot_log_funcmap, tb_aot_log_message, g_malloc0, (void *)helper_funcs, helper_funcs_count, (const char *)entry_func, &aot_code_base, (uint64_t *)&funcmap_rbtree_root);
+    invoke_lightlink((const char *)aotnamebuf, start_code, tb_aot_log_funcmap, tb_aot_log_message, g_malloc0, (void *)helper_funcs, helper_funcs_count, &aot_code_base, (uint64_t *)&funcmap_rbtree_root);
 
     aot_range_info_t *info_ptr = g_malloc(sizeof(aot_range_info_t));
     info_ptr->x_addr_range_begin = start_code;

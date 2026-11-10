@@ -112,7 +112,6 @@ uint64_t invoke_lightlink(const char *AotFile,
                          void *(*g_malloc0)(uint64_t),
                          void *HelperFuncs,
                          size_t HelperFuncsCnt,
-                         const char *entry,
                          uint64_t *aot_code_base_ptr,
                          uint64_t *funcmap_rbtree_root_ptr) {
     if (!AotFile) {
