@@ -747,7 +747,7 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
             sbuf_printf(&bm, " -DVEC%d=%s", (i - 2), qemuaot_default_param_name[XREG_MAX + u->operands[i].vec.idx]);
         }
         const char *clang_cmd_head = (g_target_arch == TARGET_ARCH_RISCV64)
-            ? "clang -mno-outline-atomics -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O2 -emit-llvm"
+            ? "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O2 -emit-llvm"
             : "clang -mno-outline-atomics -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=aarch64-unknown-linux-gnu -mcpu=apple-m2 -fPIC -O2 -emit-llvm";
         int cmd_sz = strlen(clang_cmd_head) + strlen(XMM_PARAM_DECLARE_COMMON) + strlen(XMM_PARAM_LIST) + 8 * 12 /* -DVEC/XY */ + strlen(g_output_path) + strlen(g_template_path) + strlen(dump_helper_buf) * 2 + strlen(dump_macro_buf) + 256 /*misc*/;
         char *clang_cmd = (char *)malloc(cmd_sz);
