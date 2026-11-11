@@ -25,7 +25,7 @@ Fx0:                                    # @Fx0
 	.option	pop
 	.option	push
 	.option	arch, +a, +d, +f, +m, +v, +zaamo, +zalrsc, +zicsr, +zmmul, +zve32f, +zve32x, +zve64d, +zve64f, +zve64x, +zvl128b, +zvl32b, +zvl64b
-	.section	.text.trampoline_helper_rdrand,"ax",@progbits
+	.section	.text.trampoline,"ax",@progbits
 	.globl	trampoline_helper_rdrand        # -- Begin function trampoline_helper_rdrand
 	.p2align	2
 	.type	trampoline_helper_rdrand,@function
