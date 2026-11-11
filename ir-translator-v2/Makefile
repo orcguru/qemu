@@ -513,6 +513,7 @@ clean-local:
 	rm -rf collect_helper_templates/*.o.E.helper_templates
 	rm -rf tests/translate_to_llvm_ir/out
 	rm -rf tests/translate_then_gen_asm_snippet/out
+	rm -rf tests/helper/out
 	rm -rf .san .cov coverage
 	rm -f *.gcda *.gcno *.gcov
 	rm -f tests/expand_tcg_ir/*.err tests/expand_tcg_ir/*.exp.tmp
@@ -528,15 +529,17 @@ clean-all: clean clean-template
 # ============================================================================
 # Testing infrastructure
 #
-# Three suites:
+# Four suites:
 #   1. tests/expand_tcg_ir        -> tcg_printer, compared against .exp
 #   2. tests/translate_to_llvm_ir -> tcg_mapper + llvm_annotate.py, compared
 #      against a *host-arch specific* golden .ll file
 #   3. tests/translate_then_gen_asm_snippet
 #                                 -> tcg_mapper + opt + llc, compared against a
 #                                    *host-arch specific* golden .s file
+#   4. tests/helper               -> full AOT pipeline + qemu-x86_64, final
+#                                    register dump compared against .exp
 #
-# Both suites normally run the plain binaries.  The *-san targets re-run them
+# The suites normally run the plain binaries.  The *-san targets re-run them
 # against sanitizer-instrumented copies (see the "sanitizers" section below);
 # that is the supported way to hunt memory bugs on this tree.
 # ============================================================================
@@ -698,7 +701,7 @@ test-expand-tcg-ir-update: $(TCG_PRINTER)
 # another machine.
 #
 # Handy invocations:
-#   make test                              # both suites
+#   make test                              # all four suites
 #   make test-llvm-ir                      # only the LLVM-IR suite
 #   make test-llvm-ir ONLY=load_store      # subset (substring of case name)
 #   make test-llvm-ir TEST_ARCH=riscv64    # compare against another arch's copy
@@ -1209,6 +1212,246 @@ test-asm-update: $(TCG_MAPPER)
 	echo "-------------------------------------------------------------------"; \
 	echo "translate_then_gen_asm_snippet update: $$updated updated, $$failed failed"; \
 	exit $$rc
+# ----------------------------------------------------------------------------
+# Suite 4: tests/helper  (end-to-end helper execution under qemu-x86_64)
+#
+# Every case is a <helper_name>.tir file plus a <helper_name>.exp file holding
+# the expected final CPU state.  The .exp results are stable over time, so
+# unlike the other suites there is deliberately NO *-update target here.
+#
+# Per case, the scratch directory is rebuilt from scratch and the full AOT
+# pipeline is run (exactly the manual sequence):
+#
+#     rm -rf tests/helper/out/scratch
+#     mkdir  tests/helper/out/scratch
+#     cp     tests/helper/<name>.tir tests/helper/out/scratch/
+#     ./tcg_mapper tests/helper/out/scratch/<name>.tir
+#     ./scripts/native_link_obj.pl tests/helper/out/scratch
+#     cp     tests/helper/example tests/helper/out/scratch
+#     <aot-patch-script> tests/helper/out/scratch/example.aot
+#     qemu-x86_64 -d aot -D tests/helper/out/scratch/aot.log \
+#                          tests/helper/out/scratch/example
+#
+# NOTES:
+#   * tcg_mapper is invoked WITHOUT -d here (unlike suites 2 and 3).
+#   * qemu-x86_64 is a user-mode emulator: it returns the GUEST's exit status,
+#     which is routinely non-zero for these harnesses.  The authoritative
+#     success signal is the register dump in aot.log, NOT the process status.
+#     The exit code is saved to <name>.qemu.exitcode for debugging; set
+#     HELPER_QEMU_STRICT=1 if you want a non-zero status to fail the case.
+#
+# The register dump is the LAST line containing "FUNC=" (QEMU writes helper
+# lookup tables and AOT load messages before it, and may append trailing
+# diagnostics after it - so searching for the dump line is safer than an
+# unconditional `tail -n 1`).  Each .exp line has the form
+#
+#     <REG>:$0x<hexvalue>          e.g. XMM3:$0xc787c686c585c484c383c282c181c080
+#
+# and the dump has
+#
+#     <REG>=<hexvalue>             e.g. XMM3=c383c282c181c080-c787c686c585c484
+#
+# IMPORTANT - vector width: the dump prints 128-bit registers as
+# "<low 8 bytes>-<high 8 bytes>".  The .exp holds the value in the usual
+# high-then-low order, so the checker REVERSES the two halves before comparing:
+#
+#     c383c282c181c080-c787c686c585c484
+#         -> c787c686c585c484 c383c282c181c080
+#         -> 0xc787c686c585c484c383c282c181c080   == the .exp value
+#
+# Comparison is done on normalised tokens: the optional "$"/"0x" prefix is
+# stripped, hex is lowercased, leading zeros are dropped (so RAX=000...0
+# matches an .exp of 0x0), and vector halves are swapped.  Both sides are
+# written out as <REG>=<value> files and diff -u'd, so a mismatch shows a
+# readable register-by-register diff rather than a wall of QEMU output.
+#
+# Only the AOT patch script is architecture dependent:
+#   aarch64 -> aarch64_update_aot.pl
+#   riscv64 -> riscv64_update_aot.pl
+# Everything else (tcg_mapper, linking, example, qemu-x86_64, .exp) is shared.
+# Override any of the paths on the command line if your layout differs.
+#
+# Handy invocations:
+#   make test-helper                       # this suite only
+#   make test-helper ONLY=punpckhbw        # subset (substring of case name)
+#   make test-helper TEST_ARCH=riscv64     # pick the riscv64 patch script
+#   make test-helper HELPER_QEMU=/path/to/qemu-x86_64
+#   make test-helper HELPER_QEMU_STRICT=1  # fail on non-zero qemu exit code
+#
+# Artifacts (kept for inspection, cleaned by `make clean`):
+#   tests/helper/out/scratch/                     <- last case's working dir
+#   tests/helper/out/<name>.aot.log              <- copy of that case's dump
+#   tests/helper/out/<name>.{exp,act}.norm       <- normalised, diffed
+#   tests/helper/out/<name>.diff
+#   tests/helper/out/<name>.{mapper,link,aot,qemu}.{out,err}
+#   tests/helper/out/<name>.qemu.exitcode     <- qemu's (guest) exit status
+# ----------------------------------------------------------------------------
+
+HELPER_DIR       := tests/helper
+HELPER_TIR_FILES := $(sort $(wildcard $(HELPER_DIR)/*.tir))
+HELPER_OUT       := $(HELPER_DIR)/out
+HELPER_SCRATCH   := $(HELPER_OUT)/scratch
+
+HELPER_EXAMPLE   ?= $(HELPER_DIR)/example
+HELPER_LINK_OBJ  ?= ./scripts/native_link_obj.pl
+HELPER_QEMU      ?= /home/felix/Build/qemu/qemu-x86_64
+HELPER_AOT_DIR   ?= /home/felix/Github/script-barn/ir-translator
+
+# qemu-user propagates the GUEST's exit status, and these AOT harness guests
+# routinely exit non-zero on purpose (the AOT block ends the run).  An empty
+# .qemu.err plus a complete register dump in aot.log means execution succeeded,
+# so by default the exit status is recorded but NOT treated as a failure.
+# Set HELPER_QEMU_STRICT=1 to restore strict exit-code checking (useful when
+# debugging a QEMU build that crashes before writing the dump).
+HELPER_QEMU_STRICT ?= 0
+
+# riscv64 is the ONLY difference: a different AOT patch script.
+ifeq ($(TEST_ARCH),riscv64)
+HELPER_AOT_SCRIPT ?= $(HELPER_AOT_DIR)/riscv64_update_aot.pl
+else
+HELPER_AOT_SCRIPT ?= $(HELPER_AOT_DIR)/aarch64_update_aot.pl
+endif
+
+# Optional subset filter: make test-helper ONLY=punpckhbw
+ifeq ($(ONLY),)
+HELPER_CASES := $(HELPER_TIR_FILES)
+else
+HELPER_CASES := $(foreach f,$(HELPER_TIR_FILES),\
+	$(if $(findstring $(ONLY),$(basename $(notdir $f))),$f))
+endif
+
+# Run the whole AOT pipeline for every case and check the final register dump.
+# REPEAT is intentionally not supported here: each run rebuilds scratch and
+# launches QEMU, which is expensive; the other suites cover flakiness already.
+# NOTE: the early-exit checks and the main loop must live in ONE shell.  Each
+# tab-prefixed recipe line is its own shell, so an `exit 0` in a separate line
+# would only end that shell while make happily ran the following lines anyway.
+# (Each `if` below is therefore closed before the next line continues with `\`.)
+test-helper: $(TCG_MAPPER)
+	@if [ -z "$(HELPER_CASES)" ]; then \
+		echo "No .tir case found under $(HELPER_DIR)/"; \
+		exit 0; \
+	fi; \
+	missing=""; \
+	for p in "$(HELPER_EXAMPLE)" "$(HELPER_LINK_OBJ)" "$(HELPER_AOT_SCRIPT)" "$(HELPER_QEMU)"; do \
+		[ -e "$$p" ] || missing="$$missing $$p"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo "SKIP: tests/helper - missing prerequisite(s):$$missing"; \
+		echo "      override with HELPER_EXAMPLE= HELPER_LINK_OBJ= HELPER_AOT_SCRIPT= HELPER_QEMU="; \
+		exit 0; \
+	fi; \
+	mkdir -p "$(HELPER_OUT)"; \
+	echo "==================================================================="; \
+	echo "tests/helper: $(words $(HELPER_CASES)) case(s), TEST_ARCH=$(TEST_ARCH)"; \
+	echo "aot patch script      : $(HELPER_AOT_SCRIPT)"; \
+	echo "qemu                  : $(HELPER_QEMU)"; \
+	echo "==================================================================="; \
+	rc=0; pass=0; fail=0; skip=0; \
+	for tir in $(HELPER_CASES); do \
+	name=$$(basename "$$tir" .tir); \
+	exp="$${tir%.tir}.exp"; \
+	expnorm="$(HELPER_OUT)/$$name.exp.norm"; \
+	actnorm="$(HELPER_OUT)/$$name.act.norm"; \
+	diffout="$(HELPER_OUT)/$$name.diff"; \
+	echo "==> $$tir"; \
+	if [ ! -f "$$exp" ]; then \
+	echo "SKIP: $$tir (no $$exp)"; \
+	skip=$$((skip+1)); continue; \
+	fi; \
+	rm -rf "$(HELPER_SCRATCH)"; \
+	mkdir -p "$(HELPER_SCRATCH)"; \
+	if ! cp -f "$$tir" "$(HELPER_SCRATCH)/" 2> "$(HELPER_OUT)/$$name.cp.err"; then \
+	echo "FAIL: $$tir (could not stage .tir into scratch)"; \
+	fail=$$((fail+1)); rc=1; continue; \
+	fi; \
+	if ! $(TCG_MAPPER) "$(HELPER_SCRATCH)/$$name.tir" > "$(HELPER_OUT)/$$name.mapper.out" 2> "$(HELPER_OUT)/$$name.mapper.err"; then \
+	echo "FAIL: $$tir (tcg_mapper - see $(HELPER_OUT)/$$name.mapper.err)"; \
+	tail -n 20 "$(HELPER_OUT)/$$name.mapper.err"; \
+	fail=$$((fail+1)); rc=1; continue; \
+	fi; \
+	if ! $(HELPER_LINK_OBJ) "$(HELPER_SCRATCH)" > "$(HELPER_OUT)/$$name.link.out" 2> "$(HELPER_OUT)/$$name.link.err"; then \
+	echo "FAIL: $$tir (native_link_obj.pl - see $(HELPER_OUT)/$$name.link.err)"; \
+	tail -n 20 "$(HELPER_OUT)/$$name.link.err"; \
+	fail=$$((fail+1)); rc=1; continue; \
+	fi; \
+	if ! cp -f "$(HELPER_EXAMPLE)" "$(HELPER_SCRATCH)/" 2> "$(HELPER_OUT)/$$name.example.err"; then \
+	echo "FAIL: $$tir (could not stage example)"; \
+	fail=$$((fail+1)); rc=1; continue; \
+	fi; \
+	if ! $(HELPER_AOT_SCRIPT) "$(HELPER_SCRATCH)/example.aot" > "$(HELPER_OUT)/$$name.aot.out" 2> "$(HELPER_OUT)/$$name.aot.err"; then \
+	echo "FAIL: $$tir ($(HELPER_AOT_SCRIPT) - see $(HELPER_OUT)/$$name.aot.err)"; \
+	tail -n 20 "$(HELPER_OUT)/$$name.aot.err"; \
+	fail=$$((fail+1)); rc=1; continue; \
+	fi; \
+	log="$(HELPER_SCRATCH)/aot.log"; \
+	qrc=0; \
+	$(HELPER_QEMU) -d aot -D "$$log" "$(HELPER_SCRATCH)/example" > "$(HELPER_OUT)/$$name.qemu.out" 2> "$(HELPER_OUT)/$$name.qemu.err" || qrc=$$?; \
+	echo "$$qrc" > "$(HELPER_OUT)/$$name.qemu.exitcode"; \
+	if [ "$$qrc" -ne 0 ] && [ "$(HELPER_QEMU_STRICT)" = 1 ]; then \
+	echo "FAIL: $$tir (qemu-x86_64 exited $$qrc - see $(HELPER_OUT)/$$name.qemu.err)"; \
+	tail -n 20 "$(HELPER_OUT)/$$name.qemu.err"; \
+	fail=$$((fail+1)); rc=1; continue; \
+	fi; \
+	if [ "$$qrc" -ne 0 ]; then \
+	echo "       note: qemu-x86_64 exited $$qrc (guest status); checking aot.log instead"; \
+	fi; \
+	if [ ! -s "$$log" ]; then \
+	echo "FAIL: $$tir (no aot.log produced; qemu exited $$qrc)"; \
+	tail -n 20 "$(HELPER_OUT)/$$name.qemu.err"; \
+	fail=$$((fail+1)); rc=1; continue; \
+	fi; \
+	cp -f "$$log" "$(HELPER_OUT)/$$name.aot.log"; \
+	dumpline=$$(grep -E 'FUNC=' "$$log" | tail -n 1); \
+	if [ -z "$$dumpline" ]; then \
+	echo "FAIL: $$tir (no register dump line in aot.log; qemu exited $$qrc)"; \
+	echo "       tail of aot.log:"; tail -n 5 "$$log"; \
+	tail -n 20 "$(HELPER_OUT)/$$name.qemu.err"; \
+	fail=$$((fail+1)); rc=1; continue; \
+	fi; \
+	last="$$dumpline"; \
+	: > "$$expnorm"; : > "$$actnorm"; \
+	while IFS= read -r line || [ -n "$$line" ]; do \
+	case "$$line" in \
+	''|\#*) continue ;; \
+	esac; \
+	case "$$line" in \
+	*:*) key=$${line%%:*}; val=$${line#*:} ;; \
+	*=*) key=$${line%%=*}; val=$${line#*=} ;; \
+	*) continue ;; \
+	esac; \
+	key=$$(printf '%s' "$$key" | sed 's/[[:space:]]//g'); \
+	val=$$(printf '%s' "$$val" | sed 's/[[:space:]]//g' | sed 's/^[$$]//'); \
+	case "$$val" in 0[xX]*) val=$${val#??} ;; esac; \
+	case "$$val" in *-*) lo=$${val%%-*}; hi=$${val#*-}; val="$$hi$$lo" ;; esac; \
+	val=$$(printf '%s' "$$val" | tr 'A-Z' 'a-z' | sed 's/^0*//'); \
+	[ -n "$$val" ] || val=0; \
+	av=""; \
+	for tok in $$last; do \
+	case "$$tok" in "$$key"=*) av=$${tok#*=}; break ;; esac; \
+	done; \
+	if [ -n "$$av" ]; then \
+	case "$$av" in *-*) lo=$${av%%-*}; hi=$${av#*-}; av="$$hi$$lo" ;; esac; \
+	av=$$(printf '%s' "$$av" | tr 'A-Z' 'a-z' | sed 's/^0*//'); \
+	[ -n "$$av" ] || av=0; \
+	else \
+	av="<MISSING>"; \
+	fi; \
+	printf '%s=%s\n' "$$key" "$$val" >> "$$expnorm"; \
+	printf '%s=%s\n' "$$key" "$$av" >> "$$actnorm"; \
+	done < "$$exp"; \
+	if diff -u "$$expnorm" "$$actnorm" > "$$diffout"; then \
+	echo "PASS: $$tir"; pass=$$((pass+1)); \
+	else \
+	echo "FAIL: $$tir (register mismatch vs $$exp)"; \
+	cat "$$diffout"; \
+	fail=$$((fail+1)); rc=1; \
+	fi; \
+	done; \
+	echo "-------------------------------------------------------------------"; \
+	echo "tests/helper [$(TEST_ARCH)]: $$pass passed, $$fail failed, $$skip skipped"; \
+	exit $$rc
+
 # ============================================================================
 # Sanitizers
 #
@@ -1370,8 +1613,9 @@ test-san: check-san $(SAN_MAPPER) $(SAN_PRINTER)
 	ONLY='$(ONLY)' TEST_ARCH='$(TEST_ARCH)' REPEAT='$(REPEAT)' \
 	test
 
-# Default: run all three suites against the plain binaries.
-test: test-expand-tcg-ir test-llvm-ir test-asm
+# Default: run all four suites against the plain binaries.
+# Suite 4 skips itself (rc=0) when its external QEMU/AOT tools are absent.
+test: test-expand-tcg-ir test-llvm-ir test-asm test-helper
 
 # ============================================================================
 # Source coverage
@@ -1509,6 +1753,7 @@ coverage-open: coverage-report
 	test-san test-expand-tcg-ir-san test-llvm-ir-san san-build check-san \
 	test-expand-tcg-ir-update \
 	test-asm test-asm-update test-asm-san \
+	test-helper \
 	coverage cov-build cov-run cov-reset coverage-report coverage-open \
 	clean clean-all clean-local clean-qemu-source clean-template \
 	qemu-cpu-sizes check-qemu-cpu-size-build \
