@@ -3188,7 +3188,7 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_mov(s, TCG_TYPE_PTR, TCG_AREG0, tcg_target_call_iarg_regs[0]);
     tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_RA, tcg_target_call_iarg_regs[1]);
     tcg_out_mov(s, TCG_TYPE_PTR, CONTEXT_RIP, tcg_target_call_iarg_regs[2]);
-    tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_TMP1, tcg_target_call_iarg_regs[3]);
+    tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_T2, tcg_target_call_iarg_regs[3]);
 
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RAX, TCG_AREG0, 0);  // rax
     tcg_out_ld(s, TCG_TYPE_I64, CONTEXT_RCX, TCG_AREG0, 1 * 8);   // rcx
@@ -3247,7 +3247,7 @@ static void tcg_target_qemu_aot_prologue(TCGContext *s)
     tcg_out_st(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -56);
     tcg_out_ld(s, TCG_TYPE_I64, TCG_REG_SP, TCG_AREG0, -64);
     tcg_out_st(s, TCG_TYPE_I64, TCG_REG_TP, TCG_AREG0, -80);
-    tcg_out_mov(s, TCG_TYPE_PTR, TCG_AREG0, TCG_REG_TMP1);
+    tcg_out_mov(s, TCG_TYPE_PTR, TCG_AREG0, TCG_REG_T2);
     tcg_out_opc_imm(s, OPC_JALR, TCG_REG_ZERO, TCG_REG_RA, 0);
 
     /* Return path for goto_ptr. Set return value to 0 */
