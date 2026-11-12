@@ -167,7 +167,7 @@ if ($output_aot_name eq "") {
 if ($arch eq "aarch64") {
   `cd $obj_folder && ld --allow-multiple-definition --no-eh-frame-hdr -T custom.ld -pie -o $output_aot_name $total_obj_order $script_folder/../tools/libhelper.so /lib64/libc.so.6 /lib/ld-linux-aarch64.so.1`;
 } else {
-  `cd $obj_folder && ld --allow-multiple-definition --no-eh-frame-hdr -T custom.ld -pie -o $output_aot_name.raw $total_obj_order`;
+  `cd $obj_folder && ld --allow-multiple-definition --no-eh-frame-hdr -T custom.ld -pie -o $output_aot_name.raw $total_obj_order $script_folder/../tools/libhelper.so /lib/riscv64-linux-gnu/libc.so.6 /lib/ld-linux-riscv64-lp64d.so.1`;
   `cd $obj_folder && /usr/bin/llvm-objcopy --remove-section=.riscv.attributes $output_aot_name.raw $output_aot_name`;
   `cd $obj_folder && rm -f $output_aot_name.raw`;
 }
