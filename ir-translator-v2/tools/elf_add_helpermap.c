@@ -209,7 +209,6 @@ static const char *table_string(const uint8_t *tab, size_t tabsz, uint64_t off)
 typedef struct { const char *name; uint32_t id; } HelperEntry;
 
 static const HelperEntry kHelperHash[] = {
-    {"AES_sbox", 720},
     {"helper_aaa", 999},
     {"helper_aad", 203},
     {"helper_aam", 212},

@@ -21,22 +21,6 @@ my $output_aot_name = "";
 if ($#ARGV > 0) {
   $output_aot_name = $ARGV[1];
 }
-# The main linker script
-open OUT, "> $obj_folder/custom.ld" or die "Cannot open $obj_folder/custom.ld for write!\n";
-print OUT <<EOF;
-SECTIONS {
-.text : {
-  *(.text)
-  *(.text.trampoline)
-  *(.text.helper)
-  *(.text.declare_only)
- }
-.rodata : { *(.rodata) }
-.bss : { *(.bss) }
-.comment : { *(.comment) }
-.note.GNU-stack : { *(.note.GNU-stack) }
-}
-EOF
 my $arch = `uname -m`;
 chomp($arch);
 # Get ELF file info
@@ -70,8 +54,10 @@ while (my $file = readdir($dh)) {
   }
   # Generate custom linker script for each file
   my $linker_script = "$obj_folder/$file.custom.ld";
+  my $entry_info = "$obj_folder/$file.custom.ld.entry";
   my $obj_file = "$obj_folder/$file";
   open OUT, "> $linker_script" or die "Cannot open $linker_script for write!\n";
+  open ENTRY, "> $entry_info" or die "Cannot open $entry_info for write!\n";
   print OUT "SECTIONS {\n";
   print OUT "  .text : {\n";
   print OUT "    *(.text)\n";
@@ -93,9 +79,14 @@ while (my $file = readdir($dh)) {
     }
     $hex_prefix{$hex_val}->{$postidx} = $f_name;
   }
+  my $emit_entry_done = 0;
   foreach my $k1 (sort {$a <=> $b} keys %hex_prefix) {
     foreach my $k2 (sort {$a <=> $b} keys %{$hex_prefix{$k1}}) {
       print OUT "    *(.text.$hex_prefix{$k1}->{$k2})\n";
+      if ($emit_entry_done == 0) {
+        $emit_entry_done = 1;
+        print ENTRY "ENTRY($hex_prefix{$k1}->{$k2})\n";
+      }
     }
   }
   print OUT "  }\n";
@@ -110,6 +101,7 @@ while (my $file = readdir($dh)) {
   }
 EOF
   close OUT;
+  close ENTRY;
   print OUT1 "ld --no-eh-frame-hdr -r -o $obj_file.relink -T $linker_script $obj_file\n";
   if ($arch eq "riscv64") {
     print OUT2 "/usr/bin/llvm-objcopy --remove-section=.comment --remove-section=.riscv.attributes $obj_file.relink $obj_file\n";
@@ -142,18 +134,23 @@ while (my $file = readdir($dh)) {
     $obj_name{$num} = 1;
   }
 }
+my $entry_name = "";
 closedir($dh);
 if (keys %obj_name > 0) {
   my @sorted_obj_name = sort {$a <=> $b} keys %obj_name;
   foreach my $e (@sorted_obj_name) {
     $total_obj_order = $total_obj_order." $e.tcg.ir.o";
   }
+  $entry_name = $sorted_obj_name[0].".tcg.ir.o.custom.ld.entry";
 } else {
   opendir($dh, $obj_folder) or die "Cannot open directory: $!";
   while (my $file = readdir($dh)) {
     next if $file =~ /^\.\.?$/;
     if (not $file =~ /\.o$/) {
       next;
+    }
+    if ($entry_name eq "") {
+      $entry_name = "$file.custom.ld.entry";
     }
     $total_obj_order = $total_obj_order." $obj_folder/$file";
   }
@@ -164,10 +161,13 @@ if ($output_aot_name eq "") {
   my $last_elf_name = $fields[$#fields];
   $output_aot_name = "$last_elf_name.aot";
 }
+`rm -f $obj_folder/custom.ld`;
+`cp $obj_folder/$entry_name $obj_folder/custom.ld`;
+`cat $script_folder/custom_fixed_pie.ld >> $obj_folder/custom.ld`;
 if ($arch eq "aarch64") {
-  `cd $obj_folder && ld --allow-multiple-definition --no-eh-frame-hdr -T custom.ld -r -o $output_aot_name $total_obj_order`;
+  `cd $obj_folder && ld --allow-multiple-definition --no-eh-frame-hdr -T custom.ld -pie -o $output_aot_name $total_obj_order $script_folder/../tools/libhelper.so /lib64/libc.so.6 /lib/ld-linux-aarch64.so.1`;
 } else {
-  `cd $obj_folder && ld --allow-multiple-definition --no-eh-frame-hdr -T custom.ld -r -o $output_aot_name.raw $total_obj_order`;
+  `cd $obj_folder && ld --allow-multiple-definition --no-eh-frame-hdr -T custom.ld -pie -o $output_aot_name.raw $total_obj_order`;
   `cd $obj_folder && /usr/bin/llvm-objcopy --remove-section=.riscv.attributes $output_aot_name.raw $output_aot_name`;
   `cd $obj_folder && rm -f $output_aot_name.raw`;
 }
