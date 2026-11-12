@@ -1,56 +1,81 @@
 /*
- * elf_add_helpermap.c -- append a .helpermap section to an AArch64/RISC-V64 ELF.
+ * elf_add_maps.c -- append .funcmap and .helpermap to an AArch64/RISC-V64 ELF.
  *
- * Reproduces the .helpermap payload of aarch64_text_add_funcmap_rbtree.pl
- * (reconstruct_elf(), the block that builds $helpermap_data), but operates on
- * a real binary ELF file instead of a readelf-style text dump.
+ * Upgrade of elf_add_helpermap.c: emits BOTH sections produced by
+ * aarch64_text_add_funcmap_rbtree.pl (reconstruct_elf), operating on a real
+ * binary ELF file instead of a readelf-style text dump.
  *
- * Script semantics, exactly:
- *   foreach symbol in the symbol table, in increasing symbol-index order:
- *       if (symbol name is a key of QEMU's perfect helper hash)
- *           emit pack("VV", sym->index, helper_hash{sym->name});
- *   => array of 8-byte records { uint32 sym_index; uint32 helper_id; }
- *   No filtering on symbol type/binding; duplicates are emitted too.
- *   Section header: name ".helpermap", SHT_PROGBITS, SHF_ALLOC,
- *                   sh_addralign = 8, sh_entsize = 8, sh_link = sh_info = 0.
+ * ============================ .helpermap ============================
+ * Script:  foreach symbol in the symbol table, in increasing index order:
+ *              if (name is a key of QEMU's perfect helper hash)
+ *                  $helpermap_data .= pack("VV", $sym->{index}, $helper_hash{$name});
+ * Layout:  array of 8-byte records { uint32 sym_index; uint32 helper_id; }
+ *          No type/binding filtering; duplicate names are emitted too.
+ * Header:  SHT_PROGBITS, SHF_ALLOC, sh_addralign = 8, sh_entsize = 8.
+ *
+ * ============================= .funcmap =============================
+ * Script:  foreach symbol with type == FUNC(2) && bind == GLOBAL(1)
+ *          whose name matches /Fx([0-9a-f]+)$/i:
+ *              key   = hex($1)
+ *              value = st_value - .text's sh_addr   (skip if negative)
+ *          sort by key, build a balanced BST (mid = int((lo+hi)/2)),
+ *          recolour by depth (level 0 = BLACK, 1 = RED, alternating),
+ *          then assign each node its in-order index (collect_nodes_in_order).
+ * Layout:  header  { uint32 root_index; uint32 node_count; }
+ *          then node_count 32-byte records, in in-order sequence:
+ *              +0  uint32 left_index     (0xFFFFFFFF if none)
+ *              +4  uint32 right_index    (0xFFFFFFFF if none)
+ *              +8  uint8  colour         (0 = black, 1 = red)
+ *              +9  uint8  pad[3]         (zero)
+ *              +12 uint64 key            (NOTE: unaligned, exactly as packed)
+ *              +20 uint64 value
+ *              +28 uint32 zero
+ *          With zero descriptors the section is the 8-byte header
+ *          { 0xFFFFFFFF, 0 } only.
+ * Header:  SHT_PROGBITS, SHF_ALLOC, sh_addralign = 32, sh_entsize = 32.
  *
  * The embedded kHelperHash[] is the exact %helper_hash from the script
  * (QEMU include/tcg/helper_hash.h): 1070 entries, IDs 0..1069.
- * Use --hash to override it with another Perl-style '"name" => ID,' list.
+ * --hash overrides it for a different QEMU version.
  *
- * How the output is built (all original bytes are preserved):
- *   - copy the whole input file,
- *   - append an extended copy of .shstrtab containing ".helpermap\0"
- *     (unless that exact string already exists; then its offset is reused),
- *   - append the .helpermap records (file offset aligned to 8),
- *   - append a fresh section-header table: old headers + the new one
- *     (aligned to 16, as the script does),
- *   - patch only e_shoff / e_shnum / e_shstrndx in the ELF header.
- * Program headers, segments, symbol tables and all existing section data
- * are left untouched. The old section-header table / .shstrtab simply
- * become unreferenced trailing bytes.
+ * ======================== how the output is built ========================
+ * The whole input file is copied unchanged, then these are appended:
+ *   - an extended copy of .shstrtab containing ".funcmap\0" and
+ *     ".helpermap\0" (existing strings are reused, not duplicated),
+ *   - .funcmap data (file offset aligned to 32),
+ *   - .helpermap data (file offset aligned to 8),
+ *   - a fresh section-header table: old headers + the new ones (16-aligned).
+ * Only e_shoff / e_shnum / e_shstrndx are patched in the ELF header.
+ * Program headers, segments, symbol tables and all existing section data are
+ * untouched; the old section-header table / .shstrtab become trailing bytes.
  *
- * ELF64 (ELFCLASS64) is required; both ELFDATA2LSB and ELFDATA2MSB are
- * handled. Extended section numbering (e_shnum == 0 / SHN_XINDEX) is kept.
- * Records are written in the input ELF's byte order by default (little for
- * normal aarch64/riscv64); --le forces little-endian for strict script parity.
+ * sh_addr values are assigned after the last allocated section, 32-aligned
+ * for .funcmap and 8-aligned for .helpermap (the script's intent; the script
+ * itself starts from "last non-zero sh_addr", which is 0 for ET_REL).
+ *
+ * ELF64 (ELFCLASS64) required; ELFDATA2LSB and ELFDATA2MSB both handled;
+ * extended section numbering (e_shnum == 0 / SHN_XINDEX) is preserved.
+ * Record bytes follow the input ELF's byte order by default (little for
+ * normal aarch64/riscv64). --le forces little-endian for strict script parity
+ * (Perl's V / Q< pack templates are always little-endian).
  *
  * Build:
- *   gcc -O2 -Wall -Wextra -std=c11 -o elf_add_helpermap elf_add_helpermap.c
+ *   gcc -O2 -Wall -Wextra -std=c11 -o elf_add_maps elf_add_maps.c
  *
  * Usage:
- *   elf_add_helpermap [options] input.elf
+ *   elf_add_maps [options] input.elf
  *     -o FILE        output (default: <input>.helpermap.elf; may equal input)
- *     -v, --verbose  print every matched symbol: index, name, helper id
+ *     -v, --verbose  list matched helper symbols and func descriptors
  *     --hash FILE    override helper hash ('"name" => ID,' lines)
  *     --no-alloc     clear SHF_ALLOC and sh_addr (useful for ET_EXEC/ET_DYN)
- *     --le           force little-endian records
- *     --force        add .helpermap even if one already exists
+ *     --le           force little-endian record bytes
+ *     --no-funcmap   add only .helpermap (the previous tool's behaviour)
+ *     --force        add sections even if they already exist
  *     -h, --help     show help
  *
  * Example:
- *   ./elf_add_helpermap -v -o tb.helpermap.o tb.o
- *   readelf -S -x .helpermap tb.helpermap.o
+ *   ./elf_add_maps -v -o tb.maps.o tb.o
+ *   readelf -S -x .funcmap -x .helpermap tb.maps.o
  *
  * Public domain / CC0. No external dependencies beyond the C library.
  */
@@ -68,7 +93,6 @@
 #include <string.h>
 #include <sys/stat.h>
 
-/* ---- ELF constants (self-contained; no <elf.h> needed) ---- */
 #define ELFCLASS64      2
 #define ELFDATA2LSB     1
 #define ELFDATA2MSB     2
@@ -83,18 +107,24 @@
 #define SHT_NOBITS      8
 #define SHT_DYNSYM      11
 #define SHF_ALLOC       0x2
+#define STB_GLOBAL      1
+#define STT_FUNC        2
 #define SHN_UNDEF       0
 #define SHN_XINDEX      0xffff
 #define SHN_LORESERVE   0xff00
 #define EHDR64_SIZE     64
 #define SHDR64_SIZE     64
 #define SYM64_SIZE      24
+#define RB_BLACK        0
+#define RB_RED          1
+#define NONE_IDX        0xffffffffu
+#define FUNCMAP_NAME    ".funcmap"
 #define HELPERMAP_NAME  ".helpermap"
 
 static int g_be = 0;       /* input ELF byte order: 1 = big endian */
-static int g_rec_be = 0;   /* byte order used for .helpermap records */
+static int g_rec_be = 0;   /* byte order used for map record bytes */
+static int g_verbose = 0;
 
-/* ---- byte-order aware raw access ---- */
 static uint64_t rdn(const uint8_t *p, int n)
 {
     uint64_t v = 0;
@@ -110,32 +140,24 @@ static void wrn(uint8_t *p, uint64_t v, int n, int be)
 #define rd16(p) ((uint16_t)rdn((p), 2))
 #define rd32(p) ((uint32_t)rdn((p), 4))
 #define rd64(p) ((uint64_t)rdn((p), 8))
-#define wrf(p, v, n) wrn((p), (v), (n), g_be)      /* ELF structures */
-#define wrr(p, v, n) wrn((p), (v), (n), g_rec_be)  /* helpermap records */
+#define wrf(p, v, n) wrn((p), (v), (n), g_be)
+#define wrr(p, v, n) wrn((p), (v), (n), g_rec_be)
 
 static uint64_t align_up(uint64_t v, uint64_t a) { return (v + a - 1) & ~(a - 1); }
 
 static void die(const char *fmt, ...)
 {
-    va_list ap;
-    va_start(ap, fmt);
-    fputs("elf_add_helpermap: ", stderr);
-    vfprintf(stderr, fmt, ap);
-    fputc('\n', stderr);
-    va_end(ap);
-    exit(1);
+    va_list ap; va_start(ap, fmt);
+    fputs("elf_add_maps: ", stderr); vfprintf(stderr, fmt, ap); fputc('\n', stderr);
+    va_end(ap); exit(1);
 }
 static void warn(const char *fmt, ...)
 {
-    va_list ap;
-    va_start(ap, fmt);
-    fputs("elf_add_helpermap: warning: ", stderr);
-    vfprintf(stderr, fmt, ap);
-    fputc('\n', stderr);
+    va_list ap; va_start(ap, fmt);
+    fputs("elf_add_maps: warning: ", stderr); vfprintf(stderr, fmt, ap); fputc('\n', stderr);
     va_end(ap);
 }
 
-/* ---- decoded ELF64 structures ---- */
 typedef struct {
     uint16_t e_type, e_machine, e_ehsize, e_phentsize, e_phnum, e_shentsize;
     uint16_t e_shnum, e_shstrndx;
@@ -150,59 +172,55 @@ typedef struct {
 
 static void parse_ehdr(const uint8_t *b, Ehdr *e)
 {
-    e->e_type      = rd16(b + 0x10);
-    e->e_machine   = rd16(b + 0x12);
-    e->e_version   = rd32(b + 0x14);
-    e->e_entry     = rd64(b + 0x18);
-    e->e_phoff     = rd64(b + 0x20);
-    e->e_shoff     = rd64(b + 0x28);
-    e->e_flags     = rd32(b + 0x30);
-    e->e_ehsize    = rd16(b + 0x34);
-    e->e_phentsize = rd16(b + 0x36);
-    e->e_phnum     = rd16(b + 0x38);
-    e->e_shentsize = rd16(b + 0x3a);
-    e->e_shnum     = rd16(b + 0x3c);
+    e->e_type      = rd16(b + 0x10); e->e_machine   = rd16(b + 0x12);
+    e->e_version   = rd32(b + 0x14); e->e_entry     = rd64(b + 0x18);
+    e->e_phoff     = rd64(b + 0x20); e->e_shoff     = rd64(b + 0x28);
+    e->e_flags     = rd32(b + 0x30); e->e_ehsize    = rd16(b + 0x34);
+    e->e_phentsize = rd16(b + 0x36); e->e_phnum     = rd16(b + 0x38);
+    e->e_shentsize = rd16(b + 0x3a); e->e_shnum     = rd16(b + 0x3c);
     e->e_shstrndx  = rd16(b + 0x3e);
 }
 static void parse_shdr(const uint8_t *p, Shdr *s)
 {
-    s->sh_name      = rd32(p + 0);
-    s->sh_type      = rd32(p + 4);
-    s->sh_flags     = rd64(p + 8);
-    s->sh_addr      = rd64(p + 16);
-    s->sh_offset    = rd64(p + 24);
-    s->sh_size      = rd64(p + 32);
-    s->sh_link      = rd32(p + 40);
-    s->sh_info      = rd32(p + 44);
-    s->sh_addralign = rd64(p + 48);
-    s->sh_entsize   = rd64(p + 56);
+    s->sh_name      = rd32(p + 0);  s->sh_type      = rd32(p + 4);
+    s->sh_flags     = rd64(p + 8);  s->sh_addr      = rd64(p + 16);
+    s->sh_offset    = rd64(p + 24); s->sh_size      = rd64(p + 32);
+    s->sh_link      = rd32(p + 40); s->sh_info      = rd32(p + 44);
+    s->sh_addralign = rd64(p + 48); s->sh_entsize   = rd64(p + 56);
 }
 static void emit_shdr(uint8_t *p, const Shdr *s)
 {
     memset(p, 0, SHDR64_SIZE);
-    wrf(p + 0,  s->sh_name,      4);
-    wrf(p + 4,  s->sh_type,      4);
-    wrf(p + 8,  s->sh_flags,     8);
-    wrf(p + 16, s->sh_addr,      8);
-    wrf(p + 24, s->sh_offset,    8);
-    wrf(p + 32, s->sh_size,      8);
-    wrf(p + 40, s->sh_link,      4);
-    wrf(p + 44, s->sh_info,      4);
-    wrf(p + 48, s->sh_addralign, 8);
-    wrf(p + 56, s->sh_entsize,   8);
+    wrf(p + 0,  s->sh_name,      4); wrf(p + 4,  s->sh_type,      4);
+    wrf(p + 8,  s->sh_flags,     8); wrf(p + 16, s->sh_addr,      8);
+    wrf(p + 24, s->sh_offset,    8); wrf(p + 32, s->sh_size,      8);
+    wrf(p + 40, s->sh_link,      4); wrf(p + 44, s->sh_info,      4);
+    wrf(p + 48, s->sh_addralign, 8); wrf(p + 56, s->sh_entsize,   8);
 }
 
 static int range_ok(uint64_t off, uint64_t len, size_t fsize)
 {
     return off <= (uint64_t)fsize && len <= (uint64_t)fsize - off;
 }
-/* NUL-terminated string inside a string table; "" on any problem */
 static const char *table_string(const uint8_t *tab, size_t tabsz, uint64_t off)
 {
     if (off >= (uint64_t)tabsz) return "";
     const char *s = (const char *)tab + off;
     if (!memchr(s, '\0', tabsz - (size_t)off)) return "";
     return s;
+}
+/* Exact, NUL-delimited lookup in a string table. */
+static uint64_t find_string(const uint8_t *tab, size_t sz, const char *name)
+{
+    size_t n = strlen(name);
+    for (size_t p = 0; p < sz; ) {
+        size_t e = p;
+        while (e < sz && tab[e]) ++e;
+        if (e - p == n && !memcmp(tab + p, name, n)) return p;
+        if (e >= sz) break;
+        p = e + 1;
+    }
+    return UINT64_MAX;
 }
 
 /* ---- QEMU perfect helper hash ---- */
@@ -1296,8 +1314,6 @@ static const HelperEntry *lookup_helper(const char *name)
     return (const HelperEntry *)bsearch(name, g_hash, g_hash_count,
                                         sizeof(HelperEntry), cmp_key_entry);
 }
-
-/* Optional override: parse lines containing  "name" => ID,  */
 static void load_hash_file(const char *path)
 {
     FILE *f = fopen(path, "r");
@@ -1306,18 +1322,15 @@ static void load_hash_file(const char *path)
     size_t n = 0, cap = 0;
     char line[4096];
     while (fgets(line, sizeof line, f)) {
-        char *q1 = strchr(line, '"');
-        if (!q1) continue;
-        char *q2 = strchr(q1 + 1, '"');
-        if (!q2) continue;
+        char *q1 = strchr(line, '"'); if (!q1) continue;
+        char *q2 = strchr(q1 + 1, '"'); if (!q2) continue;
         size_t len = (size_t)(q2 - (q1 + 1));
         char *arrow = strstr(q2 + 1, "=>");
         if (!arrow || len == 0) continue;
         char *p = arrow + 2;
         while (*p && isspace((unsigned char)*p)) ++p;
         if (!isdigit((unsigned char)*p)) continue;
-        errno = 0;
-        char *end = NULL;
+        errno = 0; char *end = NULL;
         unsigned long v = strtoul(p, &end, 10);
         if (end == p || errno || v > 0xffffffffUL) continue;
         if (n == cap) {
@@ -1328,41 +1341,69 @@ static void load_hash_file(const char *path)
         }
         char *name = (char *)malloc(len + 1);
         if (!name) die("out of memory");
-        memcpy(name, q1 + 1, len);
-        name[len] = '\0';
-        arr[n].name = name;
-        arr[n].id = (uint32_t)v;
-        ++n;
+        memcpy(name, q1 + 1, len); name[len] = '\0';
+        arr[n].name = name; arr[n].id = (uint32_t)v; ++n;
     }
     fclose(f);
     if (n == 0) die("hash file '%s' contains no \"name\" => ID entries", path);
     qsort(arr, n, sizeof(*arr), cmp_entry_entry);
-    for (size_t i = 1; i < n; ++i) {
+    for (size_t i = 1; i < n; ++i)
         if (!strcmp(arr[i - 1].name, arr[i].name) && arr[i - 1].id != arr[i].id)
             warn("hash file has conflicting IDs for '%s'", arr[i].name);
-    }
-    g_hash = arr;
-    g_hash_count = n;
+    g_hash = arr; g_hash_count = n;
 }
 
-/* ---- .helpermap records ---- */
-typedef struct { uint32_t sym_index; uint32_t helper_id; const char *name; } Record;
+/* ---- collected data ---- */
+typedef struct { uint32_t sym_index; uint32_t helper_id; } Record;
+typedef struct { uint64_t key, value, seq; const char *name; } FDesc;
+typedef struct {
+    uint64_t key, value;
+    int color, left, right, index;
+} FNode;
 
-static void push_record(Record **recs, size_t *n, size_t *cap, Record r)
+static void *xrealloc(void *p, size_t n)
 {
-    if (*n == *cap) {
-        *cap = *cap ? *cap * 2 : 128;
-        Record *t = (Record *)realloc(*recs, *cap * sizeof(**recs));
-        if (!t) die("out of memory");
-        *recs = t;
-    }
-    (*recs)[(*n)++] = r;
+    void *q = realloc(p, n);
+    if (!q) die("out of memory");
+    return q;
+}
+static void push_record(Record **a, size_t *n, size_t *cap, Record r)
+{
+    if (*n == *cap) { *cap = *cap ? *cap * 2 : 128; *a = xrealloc(*a, *cap * sizeof(**a)); }
+    (*a)[(*n)++] = r;
+}
+static void push_fdesc(FDesc **a, size_t *n, size_t *cap, FDesc d)
+{
+    if (*n == *cap) { *cap = *cap ? *cap * 2 : 64; *a = xrealloc(*a, *cap * sizeof(**a)); }
+    (*a)[(*n)++] = d;
 }
 
-/* Scan symbol tables of the requested type; returns number of tables seen. */
-static uint64_t collect(uint32_t want_type, const uint8_t *buf, size_t fsize,
-                        const Shdr *sh, uint64_t shnum,
-                        Record **recs, size_t *nrec, size_t *cap, int verbose)
+/* Reproduce /Fx([0-9a-f]+)$/i, returning the parsed (wrapping) 64-bit key. */
+static int match_fx(const char *name, uint64_t *key)
+{
+    size_t n = strlen(name);
+    if (n < 3) return 0;
+    size_t s = n;
+    while (s > 0 && isxdigit((unsigned char)name[s - 1])) --s;
+    if (s == n || s < 2) return 0;
+    if (tolower((unsigned char)name[s - 2]) != 'f') return 0;
+    if (tolower((unsigned char)name[s - 1]) != 'x') return 0;
+    uint64_t v = 0;
+    for (size_t i = s; i < n; ++i) {
+        unsigned char c = (unsigned char)name[i];
+        unsigned d = isdigit(c) ? (unsigned)(c - '0')
+                                : (unsigned)(tolower(c) - 'a' + 10);
+        v = v * 16 + d;                       /* wraps like a 64-bit UV */
+    }
+    *key = v;
+    return 1;
+}
+
+/* Scan all symbol tables of one type; fills helper records and func descriptors. */
+static uint64_t scan_symtabs(uint32_t want_type, const uint8_t *buf, size_t fsize,
+                             const Shdr *sh, uint64_t shnum, uint64_t text_addr,
+                             Record **recs, size_t *nrec, size_t *rcap,
+                             FDesc **fdesc, size_t *nfdesc, size_t *fcap)
 {
     uint64_t tables = 0;
     for (uint64_t i = 0; i < shnum; ++i) {
@@ -1370,40 +1411,151 @@ static uint64_t collect(uint32_t want_type, const uint8_t *buf, size_t fsize,
         if (st->sh_type != want_type) continue;
         ++tables;
         if (!range_ok(st->sh_offset, st->sh_size, fsize)) {
-            warn("symbol table at section %" PRIu64 " is out of file bounds", i);
-            continue;
+            warn("symbol table at section %" PRIu64 " is out of file bounds", i); continue;
         }
         if (st->sh_link >= shnum) {
-            warn("symbol table at section %" PRIu64 " has bad sh_link", i);
-            continue;
+            warn("symbol table at section %" PRIu64 " has bad sh_link", i); continue;
         }
         const Shdr *str = &sh[st->sh_link];
         if (!range_ok(str->sh_offset, str->sh_size, fsize)) {
-            warn("string table for section %" PRIu64 " is out of file bounds", i);
-            continue;
+            warn("string table for section %" PRIu64 " is out of file bounds", i); continue;
         }
         uint64_t entsize = st->sh_entsize ? st->sh_entsize : SYM64_SIZE;
         if (entsize < SYM64_SIZE) {
-            warn("symbol table at section %" PRIu64 " has sh_entsize < 24", i);
-            continue;
+            warn("symbol table at section %" PRIu64 " has sh_entsize < 24", i); continue;
         }
         uint64_t nsyms = st->sh_size / entsize;
         const uint8_t *strp = buf + str->sh_offset;
         size_t strsz = (size_t)str->sh_size;
         for (uint64_t j = 0; j < nsyms; ++j) {
             const uint8_t *sym = buf + st->sh_offset + j * entsize;
-            uint32_t st_name = rd32(sym);          /* Elf64_Sym.st_name */
+            uint32_t st_name = rd32(sym);
+            uint8_t  st_info = sym[4];
+            uint64_t st_value = rd64(sym + 8);
             const char *name = table_string(strp, strsz, st_name);
-            if (!*name) continue;                   /* index 0 / bad names */
+            if (!*name) continue;
+
             const HelperEntry *he = lookup_helper(name);
-            if (!he) continue;
-            Record r = { (uint32_t)j, he->id, name };
-            push_record(recs, nrec, cap, r);
-            if (verbose)
-                printf("  [%6" PRIu64 "] %-48s -> helper id %u\n", j, name, he->id);
+            if (he) {
+                Record r = { (uint32_t)j, he->id };
+                push_record(recs, nrec, rcap, r);
+                if (g_verbose)
+                    printf("  helper  [%6" PRIu64 "] %-46s -> id %u\n", j, name, he->id);
+            }
+
+            /* Script: type == FUNC(2) && bind == GLOBAL(1) && /Fx([0-9a-f]+)$/i */
+            if ((st_info >> 4) == STB_GLOBAL && (st_info & 0xf) == STT_FUNC) {
+                uint64_t key;
+                if (match_fx(name, &key) && st_value >= text_addr) {
+                    FDesc d = { key, st_value - text_addr, j, name };
+                    push_fdesc(fdesc, nfdesc, fcap, d);
+                    if (g_verbose)
+                        printf("  funcmap [%6" PRIu64 "] %-46s key=0x%" PRIx64
+                               " value=0x%" PRIx64 "\n", j, name, key, d.value);
+                }
+            }
         }
     }
     return tables;
+}
+
+static int cmp_fdesc(const void *a, const void *b)
+{
+    const FDesc *x = a, *y = b;
+    if (x->key < y->key) return -1;
+    if (x->key > y->key) return 1;
+    if (x->seq < y->seq) return -1;       /* Perl's sort is stable */
+    if (x->seq > y->seq) return 1;
+    return 0;
+}
+
+/* build_balanced_bst(): mid = int((start+end)/2), recurse left/right */
+static int build_balanced(FNode *nd, int lo, int hi)
+{
+    if (lo > hi) return -1;
+    int mid = (lo + hi) / 2;
+    nd[mid].left  = build_balanced(nd, lo, mid - 1);
+    nd[mid].right = build_balanced(nd, mid + 1, hi);
+    return mid;
+}
+/* recolor_by_level(): level % 2 == 0 -> BLACK, else RED */
+static void recolor(FNode *nd, int i, int level)
+{
+    if (i < 0) return;
+    nd[i].color = (level % 2 == 0) ? RB_BLACK : RB_RED;
+    recolor(nd, nd[i].left,  level + 1);
+    recolor(nd, nd[i].right, level + 1);
+}
+/* collect_nodes_in_order(): left, self (index = counter++), right */
+static void inorder(FNode *nd, int i, int *order, size_t *counter)
+{
+    if (i < 0) return;
+    inorder(nd, nd[i].left, order, counter);
+    size_t k = (*counter)++;
+    nd[i].index = (int)k;
+    order[k] = i;
+    inorder(nd, nd[i].right, order, counter);
+}
+
+/* Build the exact .funcmap byte image. */
+static uint8_t *emit_funcmap(FDesc *desc, size_t n, size_t *len)
+{
+    size_t sz = n ? 8 + 32 * n : 8;
+    uint8_t *b = (uint8_t *)calloc(1, sz);
+    if (!b) die("out of memory");
+    if (n == 0) {
+        wrr(b,     NONE_IDX, 4);
+        wrr(b + 4, 0, 4);
+        *len = sz;
+        return b;
+    }
+    qsort(desc, n, sizeof(*desc), cmp_fdesc);
+    FNode *nd = (FNode *)calloc(n, sizeof(*nd));
+    int *order = (int *)calloc(n, sizeof(*order));
+    if (!nd || !order) die("out of memory");
+    for (size_t i = 0; i < n; ++i) {
+        nd[i].key = desc[i].key; nd[i].value = desc[i].value;
+        nd[i].left = nd[i].right = nd[i].index = -1;
+    }
+    int root = build_balanced(nd, 0, (int)n - 1);
+    recolor(nd, root, 0);
+    size_t cnt = 0;
+    inorder(nd, root, order, &cnt);
+
+    wrr(b,     (uint32_t)nd[root].index, 4);
+    wrr(b + 4, (uint32_t)n, 4);
+    for (size_t i = 0; i < n; ++i) {
+        int ni = order[i];
+        uint8_t *p = b + 8 + 32 * i;
+        uint32_t l = nd[ni].left  < 0 ? NONE_IDX : (uint32_t)nd[nd[ni].left].index;
+        uint32_t r = nd[ni].right < 0 ? NONE_IDX : (uint32_t)nd[nd[ni].right].index;
+        wrr(p,      l, 4);
+        wrr(p + 4,  r, 4);
+        p[8] = (uint8_t)nd[ni].color;
+        p[9] = p[10] = p[11] = 0;
+        wrr(p + 12, nd[ni].key,   8);
+        wrr(p + 20, nd[ni].value, 8);
+        wrr(p + 28, 0, 4);
+    }
+    if (g_verbose)
+        printf("  funcmap tree: %zu nodes, root index %d, header { %u, %u }\n",
+               n, nd[root].index, nd[root].index, (unsigned)n);
+    free(order); free(nd);
+    *len = sz;
+    return b;
+}
+
+static uint8_t *emit_helpermap(Record *recs, size_t nrec, size_t *len)
+{
+    size_t sz = nrec * 8;
+    uint8_t *b = (uint8_t *)calloc(1, sz ? sz : 1);
+    if (!b) die("out of memory");
+    for (size_t i = 0; i < nrec; ++i) {
+        wrr(b + 8 * i,     recs[i].sym_index, 4);
+        wrr(b + 8 * i + 4, recs[i].helper_id, 4);
+    }
+    *len = sz;
+    return b;
 }
 
 static uint8_t *read_file(const char *path, size_t *size)
@@ -1416,53 +1568,53 @@ static uint8_t *read_file(const char *path, size_t *size)
     rewind(f);
     uint8_t *b = (uint8_t *)malloc((size_t)sz ? (size_t)sz : 1);
     if (!b) die("out of memory");
-    if (sz > 0 && fread(b, 1, (size_t)sz, f) != (size_t)sz)
-        die("short read on '%s'", path);
-    fclose(f);
-    *size = (size_t)sz;
+    if (sz > 0 && fread(b, 1, (size_t)sz, f) != (size_t)sz) die("short read on '%s'", path);
+    fclose(f); *size = (size_t)sz;
     return b;
 }
+
+/* One new section's recipe. */
+typedef struct {
+    const char *name;
+    uint8_t *data;
+    size_t size;
+    uint64_t file_align, addr_align, entsize, addr, offset;
+    int enabled;
+} NewSec;
 
 static void usage(FILE *f)
 {
     fputs(
-        "Usage: elf_add_helpermap [options] input.elf\n"
+        "Usage: elf_add_maps [options] input.elf\n"
         "  -o FILE        output ELF (default: <input>.helpermap.elf)\n"
-        "  -v, --verbose  list matched symbols\n"
+        "  -v, --verbose  list matched symbols and func descriptors\n"
         "  --hash FILE    override helper hash ('\"name\" => ID,' lines)\n"
         "  --no-alloc     clear SHF_ALLOC and sh_addr\n"
-        "  --le           force little-endian .helpermap records\n"
-        "  --force        add .helpermap even if one already exists\n"
+        "  --le           force little-endian record bytes\n"
+        "  --no-funcmap   add only .helpermap (previous behaviour)\n"
+        "  --force        add sections even if they already exist\n"
         "  -h, --help     show this help\n", f);
 }
 
 int main(int argc, char **argv)
 {
     const char *in_path = NULL, *out_path = NULL, *hash_path = NULL;
-    int verbose = 0, use_alloc = 1, force_le = 0, force = 0;
+    int use_alloc = 1, force_le = 0, want_funcmap = 1, force = 0;
 
     for (int i = 1; i < argc; ++i) {
         const char *a = argv[i];
         if (!strcmp(a, "-h") || !strcmp(a, "--help")) { usage(stdout); return 0; }
-        else if (!strcmp(a, "-o")) {
-            if (i + 1 >= argc) die("-o needs a file name");
-            out_path = argv[++i];
-        }
+        else if (!strcmp(a, "-o")) { if (i + 1 >= argc) die("-o needs a file name"); out_path = argv[++i]; }
         else if (!strncmp(a, "--output=", 9)) out_path = a + 9;
-        else if (!strcmp(a, "-v") || !strcmp(a, "--verbose")) verbose = 1;
+        else if (!strcmp(a, "-v") || !strcmp(a, "--verbose")) g_verbose = 1;
+        else if (!strcmp(a, "--hash")) { if (i + 1 >= argc) die("--hash needs a file name"); hash_path = argv[++i]; }
+        else if (!strncmp(a, "--hash=", 7)) hash_path = a + 7;
         else if (!strcmp(a, "--no-alloc")) use_alloc = 0;
         else if (!strcmp(a, "--le")) force_le = 1;
+        else if (!strcmp(a, "--no-funcmap")) want_funcmap = 0;
         else if (!strcmp(a, "--force")) force = 1;
-        else if (!strcmp(a, "--hash")) {
-            if (i + 1 >= argc) die("--hash needs a file name");
-            hash_path = argv[++i];
-        }
-        else if (!strncmp(a, "--hash=", 7)) hash_path = a + 7;
         else if (a[0] == '-') { fprintf(stderr, "unknown option: %s\n", a); usage(stderr); return 1; }
-        else {
-            if (in_path) die("more than one input file given");
-            in_path = a;
-        }
+        else { if (in_path) die("more than one input file given"); in_path = a; }
     }
     if (!in_path) { usage(stderr); return 1; }
     if (hash_path) load_hash_file(hash_path);
@@ -1470,8 +1622,7 @@ int main(int argc, char **argv)
         size_t l = strlen(in_path);
         char *p = (char *)malloc(l + 16);
         if (!p) die("out of memory");
-        memcpy(p, in_path, l);
-        memcpy(p + l, ".helpermap.elf", 15);
+        memcpy(p, in_path, l); memcpy(p + l, ".helpermap.elf", 15);
         out_path = p;
     }
 
@@ -1487,21 +1638,17 @@ int main(int argc, char **argv)
     g_rec_be = force_le ? 0 : g_be;
     if (buf[6] != EV_CURRENT) die("unsupported ELF ident version %u", buf[6]);
 
-    Ehdr eh;
-    parse_ehdr(buf, &eh);
+    Ehdr eh; parse_ehdr(buf, &eh);
     if (eh.e_machine != EM_AARCH64 && eh.e_machine != EM_RISCV)
         warn("e_machine=%u is neither EM_AARCH64(183) nor EM_RISCV(243); continuing",
              eh.e_machine);
-    if (eh.e_shentsize != SHDR64_SIZE)
-        die("e_shentsize=%u, expected 64", eh.e_shentsize);
+    if (eh.e_shentsize != SHDR64_SIZE) die("e_shentsize=%u, expected 64", eh.e_shentsize);
     if (eh.e_shoff == 0) die("input has no section header table");
-    if (eh.e_shoff > (uint64_t)fsize ||
-        (uint64_t)fsize - eh.e_shoff < SHDR64_SIZE)
+    if (eh.e_shoff > (uint64_t)fsize || (uint64_t)fsize - eh.e_shoff < SHDR64_SIZE)
         die("section header table lies outside the file");
 
     uint64_t shnum = eh.e_shnum;
-    if (shnum == 0)   /* extended: real count in sh_size of section header 0 */
-        shnum = rd64(buf + eh.e_shoff + 32);
+    if (shnum == 0) shnum = rd64(buf + eh.e_shoff + 32);
     if (shnum < 1 || shnum > ((uint64_t)fsize - eh.e_shoff) / SHDR64_SIZE)
         die("implausible section count %" PRIu64, shnum);
 
@@ -1511,10 +1658,9 @@ int main(int argc, char **argv)
         parse_shdr(buf + eh.e_shoff + i * SHDR64_SIZE, &sh[i]);
 
     uint64_t shstrndx = eh.e_shstrndx;
-    if (shstrndx == SHN_XINDEX)              /* extended: sh_link of SHN_UNDEF */
-        shstrndx = rd32(buf + eh.e_shoff + 40);
+    if (shstrndx == SHN_XINDEX) shstrndx = rd32(buf + eh.e_shoff + 40);
     if (shstrndx == SHN_UNDEF)
-        die("input has no .shstrtab (e_shstrndx=0); cannot name the new section");
+        die("input has no .shstrtab (e_shstrndx=0); cannot name the new sections");
     if (shstrndx >= shnum) die("e_shstrndx %" PRIu64 " is out of range", shstrndx);
     if (sh[shstrndx].sh_type != SHT_STRTAB)
         warn("section %" PRIu64 " is used as .shstrtab but has type %u",
@@ -1525,130 +1671,147 @@ int main(int argc, char **argv)
     const uint8_t *shstr = buf + sh[shstrndx].sh_offset;
     size_t shstr_sz = (size_t)sh[shstrndx].sh_size;
 
-    /* Find an existing ".helpermap" string (exact, NUL-delimited). */
-    uint64_t name_off = UINT64_MAX;
-    for (size_t p = 0; p < shstr_sz; ) {
-        size_t e = p;
-        while (e < shstr_sz && shstr[e]) ++e;
-        if (e - p == strlen(HELPERMAP_NAME) &&
-            !memcmp(shstr + p, HELPERMAP_NAME, e - p)) { name_off = p; break; }
-        if (e >= shstr_sz) break;
-        p = e + 1;
-    }
+    /* Refuse to duplicate sections (unless --force). */
     if (!force) {
         for (uint64_t i = 0; i < shnum; ++i) {
             const char *nm = table_string(shstr, shstr_sz, sh[i].sh_name);
-            if (!strcmp(nm, HELPERMAP_NAME))
-                die("input already has a .helpermap section (use --force to add another)");
+            if (!strcmp(nm, FUNCMAP_NAME) || !strcmp(nm, HELPERMAP_NAME))
+                die("input already has a %s section (use --force to add another)", nm);
         }
     }
 
-    /* ---- gather records ---- */
-    Record *recs = NULL;
-    size_t nrec = 0, cap = 0;
-    uint64_t tables = collect(SHT_SYMTAB, buf, fsize, sh, shnum,
-                              &recs, &nrec, &cap, verbose);
+    /* .text's sh_addr, used as the base for func descriptor values. */
+    uint64_t text_addr = 0;
+    for (uint64_t i = 0; i < shnum; ++i) {
+        if (!strcmp(table_string(shstr, shstr_sz, sh[i].sh_name), ".text")) {
+            text_addr = sh[i].sh_addr; break;
+        }
+    }
+
+    /* ---- gather data ---- */
+    Record *recs = NULL;   size_t nrec = 0, rcap = 0;
+    FDesc  *fdesc = NULL;  size_t nfdesc = 0, fcap = 0;
+    uint64_t tables = scan_symtabs(SHT_SYMTAB, buf, fsize, sh, shnum, text_addr,
+                                   &recs, &nrec, &rcap, &fdesc, &nfdesc, &fcap);
     if (tables == 0) {
         warn("no SHT_SYMTAB found; falling back to dynamic symbol tables");
-        tables = collect(SHT_DYNSYM, buf, fsize, sh, shnum,
-                         &recs, &nrec, &cap, verbose);
+        tables = scan_symtabs(SHT_DYNSYM, buf, fsize, sh, shnum, text_addr,
+                              &recs, &nrec, &rcap, &fdesc, &nfdesc, &fcap);
     }
-    if (tables == 0)
-        warn("no symbol table at all; .helpermap will be empty");
+    if (tables == 0) warn("no symbol table at all; both maps will be empty");
 
-    size_t rec_bytes = nrec * 8;
-    printf("matched %zu symbol%s -> %zu bytes of .helpermap data\n",
-           nrec, nrec == 1 ? "" : "s", rec_bytes);
+    /* ---- build the two section images ---- */
+    NewSec news[2];
+    memset(news, 0, sizeof news);
+    news[0].name = FUNCMAP_NAME;   news[0].enabled = want_funcmap;
+    news[0].file_align = 32; news[0].addr_align = 32; news[0].entsize = 32;
+    news[1].name = HELPERMAP_NAME; news[1].enabled = 1;
+    news[1].file_align = 8;  news[1].addr_align = 8;  news[1].entsize = 8;
+    news[0].data = emit_funcmap(fdesc, nfdesc, &news[0].size);
+    news[1].data = emit_helpermap(recs, nrec, &news[1].size);
 
-    /* ---- build the output ---- */
-    int need_shstr = (name_off == UINT64_MAX);
-    size_t new_shstr_sz = shstr_sz + (need_shstr ? strlen(HELPERMAP_NAME) + 1 : 0);
-    if (need_shstr) {
-        if (new_shstr_sz > 0xffffffffULL) die(".shstrtab would exceed 4 GiB");
-        name_off = shstr_sz;
+    if (want_funcmap)
+        printf(".funcmap:   %zu descriptors -> %zu bytes (%zu records)\n",
+               nfdesc, news[0].size, nfdesc ? (news[0].size - 8) / 32 : 0);
+    else
+        printf(".funcmap:   disabled (--no-funcmap)\n");
+    printf(".helpermap: %zu symbols     -> %zu bytes (%zu records)\n",
+           nrec, news[1].size, nrec);
+
+    /* ---- section-name strings ---- */
+    uint64_t name_off[2];
+    size_t extra_shstr = 0;
+    for (int i = 0; i < 2; ++i) {
+        if (!news[i].enabled) { name_off[i] = 0; continue; }
+        name_off[i] = find_string(shstr, shstr_sz, news[i].name);
+        if (name_off[i] == UINT64_MAX) {
+            name_off[i] = shstr_sz + extra_shstr;
+            extra_shstr += strlen(news[i].name) + 1;
+        }
     }
-    size_t extra = (need_shstr ? new_shstr_sz : 0) + 8 + rec_bytes
-                 + 16 + (size_t)((shnum + 1) * SHDR64_SIZE) + 64;
-    if ((uint64_t)fsize + extra > (uint64_t)SIZE_MAX)
-        die("output would be too large");
+    if (shstr_sz + extra_shstr > 0xffffffffULL) die(".shstrtab would exceed 4 GiB");
+
+    /* ---- sh_addr assignment (the script's ordering, aligned) ---- */
+    uint64_t max_end = 0;
+    if (use_alloc) {
+        for (uint64_t i = 0; i < shnum; ++i)
+            if ((sh[i].sh_flags & SHF_ALLOC) && sh[i].sh_addr != 0) {
+                uint64_t end = sh[i].sh_addr + sh[i].sh_size;
+                if (end > max_end) max_end = end;
+            }
+    }
+    uint64_t cursor = max_end;
+    for (int i = 0; i < 2; ++i) {
+        if (!news[i].enabled) continue;
+        cursor = align_up(cursor, news[i].addr_align);
+        news[i].addr = use_alloc ? cursor : 0;
+        cursor += news[i].size;
+    }
+
+    /* ---- build output ---- */
+    size_t extra = (extra_shstr ? shstr_sz + extra_shstr : 0) + 64;
+    for (int i = 0; i < 2; ++i)
+        if (news[i].enabled) extra += news[i].file_align + news[i].size;
+    extra += 16 + (size_t)((shnum + 2) * SHDR64_SIZE) + 64;
+    if ((uint64_t)fsize + extra > (uint64_t)SIZE_MAX) die("output would be too large");
     uint8_t *out = (uint8_t *)malloc((size_t)fsize + extra);
     if (!out) die("out of memory");
     memcpy(out, buf, fsize);
     size_t off = fsize;
 
-    if (need_shstr) {
+    if (extra_shstr) {
         size_t base = off;
-        memcpy(out + off, shstr, shstr_sz);
-        off += shstr_sz;
-        memcpy(out + off, HELPERMAP_NAME, strlen(HELPERMAP_NAME) + 1);
-        off += strlen(HELPERMAP_NAME) + 1;
-        sh[shstrndx].sh_offset = base;
-        sh[shstrndx].sh_size = new_shstr_sz;
-    }
-
-    size_t sec_off = (size_t)align_up(off, 8);
-    if (sec_off > off) { memset(out + off, 0, sec_off - off); off = sec_off; }
-    for (size_t i = 0; i < nrec; ++i) {
-        wrr(out + off,     recs[i].sym_index, 4);
-        wrr(out + off + 4, recs[i].helper_id, 4);
-        off += 8;
-    }
-
-    /* sh_addr: just past the last allocated section, as the script intends. */
-    uint64_t sh_addr = 0, max_end = 0;
-    if (use_alloc) {
-        for (uint64_t i = 0; i < shnum; ++i) {
-            if ((sh[i].sh_flags & SHF_ALLOC) && sh[i].sh_addr != 0) {
-                uint64_t end = sh[i].sh_addr + sh[i].sh_size;
-                if (end > max_end) max_end = end;
-            }
+        memcpy(out + off, shstr, shstr_sz); off += shstr_sz;
+        for (int i = 0; i < 2; ++i) {
+            if (!news[i].enabled || name_off[i] < shstr_sz) continue;
+            size_t l = strlen(news[i].name) + 1;
+            memcpy(out + off, news[i].name, l); off += l;
         }
-        sh_addr = align_up(max_end, 8);
+        sh[shstrndx].sh_offset = base;
+        sh[shstrndx].sh_size = shstr_sz + extra_shstr;
     }
 
-    Shdr ns;
-    memset(&ns, 0, sizeof ns);
-    ns.sh_name      = (uint32_t)name_off;
-    ns.sh_type      = SHT_PROGBITS;
-    ns.sh_flags     = use_alloc ? SHF_ALLOC : 0;
-    ns.sh_addr      = sh_addr;
-    ns.sh_offset    = sec_off;
-    ns.sh_size      = rec_bytes;
-    ns.sh_link      = 0;
-    ns.sh_info      = 0;
-    ns.sh_addralign = 8;
-    ns.sh_entsize   = 8;
+    for (int i = 0; i < 2; ++i) {
+        if (!news[i].enabled) continue;
+        size_t so = (size_t)align_up(off, news[i].file_align);
+        if (so > off) { memset(out + off, 0, so - off); off = so; }
+        if (news[i].size) memcpy(out + off, news[i].data, news[i].size);
+        news[i].offset = so;
+        off += news[i].size;
+    }
 
     size_t shoff = (size_t)align_up(off, 16);
     if (shoff > off) { memset(out + off, 0, shoff - off); off = shoff; }
 
-    uint64_t new_shnum = shnum + 1;
-    if (new_shnum >= SHN_LORESERVE) {
-        eh.e_shnum = 0;
-        sh[0].sh_size = new_shnum;          /* extended section count */
-    } else {
-        eh.e_shnum = (uint16_t)new_shnum;
-        sh[0].sh_size = 0;
-    }
-    if (shstrndx >= SHN_LORESERVE) {
-        eh.e_shstrndx = SHN_XINDEX;
-        sh[0].sh_link = (uint32_t)shstrndx;
-    } else {
-        eh.e_shstrndx = (uint16_t)shstrndx;
-        sh[0].sh_link = 0;
-    }
+    uint64_t nnew = 0;
+    for (int i = 0; i < 2; ++i) if (news[i].enabled) ++nnew;
+    uint64_t new_shnum = shnum + nnew;
+    if (new_shnum >= SHN_LORESERVE) { eh.e_shnum = 0; sh[0].sh_size = new_shnum; }
+    else                            { eh.e_shnum = (uint16_t)new_shnum; sh[0].sh_size = 0; }
+    if (shstrndx >= SHN_LORESERVE) { eh.e_shstrndx = SHN_XINDEX; sh[0].sh_link = (uint32_t)shstrndx; }
+    else                           { eh.e_shstrndx = (uint16_t)shstrndx; sh[0].sh_link = 0; }
 
-    for (uint64_t i = 0; i < shnum; ++i) {
-        emit_shdr(out + off, &sh[i]);
+    for (uint64_t i = 0; i < shnum; ++i) { emit_shdr(out + off, &sh[i]); off += SHDR64_SIZE; }
+    for (int i = 0; i < 2; ++i) {
+        if (!news[i].enabled) continue;
+        Shdr ns; memset(&ns, 0, sizeof ns);
+        ns.sh_name      = (uint32_t)name_off[i];
+        ns.sh_type      = SHT_PROGBITS;
+        ns.sh_flags     = use_alloc ? SHF_ALLOC : 0;
+        ns.sh_addr      = news[i].addr;
+        ns.sh_offset    = news[i].offset;
+        ns.sh_size      = news[i].size;
+        ns.sh_link      = 0;
+        ns.sh_info      = 0;
+        ns.sh_addralign = news[i].file_align;
+        ns.sh_entsize   = news[i].entsize;
+        emit_shdr(out + off, &ns);
         off += SHDR64_SIZE;
     }
-    emit_shdr(out + off, &ns);
-    off += SHDR64_SIZE;
 
-    /* Patch only three ELF header fields. */
-    wrf(out + 0x28, shoff,            8);   /* e_shoff   */
-    wrf(out + 0x3c, eh.e_shnum,       2);   /* e_shnum   */
-    wrf(out + 0x3e, eh.e_shstrndx,    2);   /* e_shstrndx */
+    wrf(out + 0x28, shoff,         8);
+    wrf(out + 0x3c, eh.e_shnum,    2);
+    wrf(out + 0x3e, eh.e_shstrndx, 2);
 
     FILE *of = fopen(out_path, "wb");
     if (!of) die("cannot write '%s': %s", out_path, strerror(errno));
@@ -1657,11 +1820,18 @@ int main(int argc, char **argv)
     struct stat st;
     if (stat(in_path, &st) == 0) chmod(out_path, st.st_mode & 07777);
 
-    printf("wrote '%s': .helpermap is section %" PRIu64
-           ", offset 0x%zx, size %zu, %zu entries\n",
-           out_path, shnum, sec_off, rec_bytes, nrec);
-    printf("verify with: readelf -S -x .helpermap '%s'\n", out_path);
+    uint64_t idx = shnum;
+    for (int i = 0; i < 2; ++i) {
+        if (!news[i].enabled) continue;
+        printf("wrote %-11s section %" PRIu64 ", offset 0x%" PRIx64
+               ", size %zu, align %" PRIu64 ", entsize %" PRIu64 "\n",
+               news[i].name, idx++, news[i].offset, news[i].size,
+               news[i].file_align, news[i].entsize);
+    }
+    printf("output: '%s'\n", out_path);
+    printf("verify: readelf -S -x .funcmap -x .helpermap '%s'\n", out_path);
 
-    free(recs); free(sh); free(buf); free(out);
+    for (int i = 0; i < 2; ++i) free(news[i].data);
+    free(recs); free(fdesc); free(sh); free(buf); free(out);
     return 0;
 }
