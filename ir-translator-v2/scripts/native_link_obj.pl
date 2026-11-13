@@ -12,7 +12,8 @@ if ($#ARGV < 0) {
   exit 1;
 }
 my $script_file = basename($0);
-my $script_folder = $0;
+my $script_folder = `realpath $0`;
+chomp($script_folder);
 $script_folder =~ s/$script_file$//;
 
 my $obj_folder = `realpath $ARGV[0]`;
@@ -159,7 +160,7 @@ if (keys %obj_name > 0) {
 if ($output_aot_name eq "") {
   @fields = split(/\//, $last_elf);
   my $last_elf_name = $fields[$#fields];
-  $output_aot_name = "$last_elf_name.aot";
+  $output_aot_name = "$last_elf_name.aot.pre";
 }
 `rm -f $obj_folder/custom.ld`;
 `cp $obj_folder/$entry_name $obj_folder/custom.ld`;
@@ -171,6 +172,5 @@ if ($arch eq "aarch64") {
   `cd $obj_folder && /usr/bin/llvm-objcopy --remove-section=.riscv.attributes $output_aot_name.raw $output_aot_name`;
   `cd $obj_folder && rm -f $output_aot_name.raw`;
 }
-`chmod +x $obj_folder/$output_aot_name`;
 print "Finished $obj_folder\n";
 select()->flush();

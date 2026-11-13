@@ -1228,9 +1228,15 @@ test-asm-update: $(TCG_MAPPER)
 #     ./tcg_mapper tests/helper/out/scratch/<name>.tir
 #     ./scripts/native_link_obj.pl tests/helper/out/scratch
 #     cp     tests/helper/example tests/helper/out/scratch
-#     <aot-patch-script> tests/helper/out/scratch/example.aot
+#     ./tools/elf_add_maps tests/helper/out/scratch/example.aot.pre \
+#         -o tests/helper/out/scratch/example.aot
 #     qemu-x86_64 -d aot -D tests/helper/out/scratch/aot.log \
 #                          tests/helper/out/scratch/example
+#
+# The AOT image is built in two stages: native_link_obj.pl leaves
+# example.aot.pre in scratch, then elf_add_maps reads that .pre file and writes
+# example.aot (the -o argument).  Both architectures now use the SAME command;
+# there is no longer any aarch64/riscv64-specific script in this suite.
 #
 # NOTES:
 #   * tcg_mapper is invoked WITHOUT -d here (unlike suites 2 and 3).
@@ -1265,17 +1271,17 @@ test-asm-update: $(TCG_MAPPER)
 # written out as <REG>=<value> files and diff -u'd, so a mismatch shows a
 # readable register-by-register diff rather than a wall of QEMU output.
 #
-# Only the AOT patch script is architecture dependent:
-#   aarch64 -> aarch64_update_aot.pl
-#   riscv64 -> riscv64_update_aot.pl
-# Everything else (tcg_mapper, linking, example, qemu-x86_64, .exp) is shared.
+# This suite is architecture INDEPENDENT: aarch64 and riscv64 run the exact
+# same commands.  TEST_ARCH is only printed for information (the other suites
+# still use it to pick their goldens).
 # Override any of the paths on the command line if your layout differs.
 #
 # Handy invocations:
 #   make test-helper                       # this suite only
 #   make test-helper ONLY=punpckhbw        # subset (substring of case name)
-#   make test-helper TEST_ARCH=riscv64     # pick the riscv64 patch script
+#   make test-helper TEST_ARCH=riscv64     # same steps, just for the record
 #   make test-helper HELPER_QEMU=/path/to/qemu-x86_64
+#   make test-helper HELPER_ELF_ADD_MAPS=/path/to/elf_add_maps
 #   make test-helper HELPER_QEMU_STRICT=1  # fail on non-zero qemu exit code
 #
 # Artifacts (kept for inspection, cleaned by `make clean`):
@@ -1283,7 +1289,7 @@ test-asm-update: $(TCG_MAPPER)
 #   tests/helper/out/<name>.aot.log              <- copy of that case's dump
 #   tests/helper/out/<name>.{exp,act}.norm       <- normalised, diffed
 #   tests/helper/out/<name>.diff
-#   tests/helper/out/<name>.{mapper,link,aot,qemu}.{out,err}
+#   tests/helper/out/<name>.{mapper,link,maps,qemu}.{out,err}
 #   tests/helper/out/<name>.qemu.exitcode     <- qemu's (guest) exit status
 # ----------------------------------------------------------------------------
 
@@ -1292,10 +1298,14 @@ HELPER_TIR_FILES := $(sort $(wildcard $(HELPER_DIR)/*.tir))
 HELPER_OUT       := $(HELPER_DIR)/out
 HELPER_SCRATCH   := $(HELPER_OUT)/scratch
 
-HELPER_EXAMPLE   ?= $(HELPER_DIR)/example
-HELPER_LINK_OBJ  ?= ./scripts/native_link_obj.pl
-HELPER_QEMU      ?= /home/felix/Build/qemu/qemu-x86_64
-HELPER_AOT_DIR   ?= /home/felix/Github/script-barn/ir-translator
+HELPER_EXAMPLE       ?= $(HELPER_DIR)/example
+HELPER_LINK_OBJ      ?= ./scripts/native_link_obj.pl
+HELPER_ELF_ADD_MAPS  ?= ./tools/elf_add_maps
+HELPER_QEMU          ?= /home/felix/Build/qemu/qemu-x86_64
+
+# Input/output of the AOT image step, relative to the scratch directory.
+HELPER_AOT_PRE       ?= example.aot.pre
+HELPER_AOT_IMAGE     ?= example.aot
 
 # qemu-user propagates the GUEST's exit status, and these AOT harness guests
 # routinely exit non-zero on purpose (the AOT block ends the run).  An empty
@@ -1304,13 +1314,6 @@ HELPER_AOT_DIR   ?= /home/felix/Github/script-barn/ir-translator
 # Set HELPER_QEMU_STRICT=1 to restore strict exit-code checking (useful when
 # debugging a QEMU build that crashes before writing the dump).
 HELPER_QEMU_STRICT ?= 0
-
-# riscv64 is the ONLY difference: a different AOT patch script.
-ifeq ($(TEST_ARCH),riscv64)
-HELPER_AOT_SCRIPT ?= $(HELPER_AOT_DIR)/riscv64_update_aot.pl
-else
-HELPER_AOT_SCRIPT ?= $(HELPER_AOT_DIR)/aarch64_update_aot.pl
-endif
 
 # Optional subset filter: make test-helper ONLY=punpckhbw
 ifeq ($(ONLY),)
@@ -1333,18 +1336,19 @@ test-helper: $(TCG_MAPPER)
 		exit 0; \
 	fi; \
 	missing=""; \
-	for p in "$(HELPER_EXAMPLE)" "$(HELPER_LINK_OBJ)" "$(HELPER_AOT_SCRIPT)" "$(HELPER_QEMU)"; do \
+	for p in "$(HELPER_EXAMPLE)" "$(HELPER_LINK_OBJ)" "$(HELPER_ELF_ADD_MAPS)" "$(HELPER_QEMU)"; do \
 		[ -e "$$p" ] || missing="$$missing $$p"; \
 	done; \
 	if [ -n "$$missing" ]; then \
 		echo "SKIP: tests/helper - missing prerequisite(s):$$missing"; \
-		echo "      override with HELPER_EXAMPLE= HELPER_LINK_OBJ= HELPER_AOT_SCRIPT= HELPER_QEMU="; \
+		echo "      override with HELPER_EXAMPLE= HELPER_LINK_OBJ= HELPER_ELF_ADD_MAPS= HELPER_QEMU="; \
 		exit 0; \
 	fi; \
 	mkdir -p "$(HELPER_OUT)"; \
 	echo "==================================================================="; \
 	echo "tests/helper: $(words $(HELPER_CASES)) case(s), TEST_ARCH=$(TEST_ARCH)"; \
-	echo "aot patch script      : $(HELPER_AOT_SCRIPT)"; \
+	echo "elf_add_maps          : $(HELPER_ELF_ADD_MAPS)"; \
+	echo "aot image             : $(HELPER_AOT_PRE) -> $(HELPER_AOT_IMAGE)"; \
 	echo "qemu                  : $(HELPER_QEMU)"; \
 	echo "==================================================================="; \
 	rc=0; pass=0; fail=0; skip=0; \
@@ -1379,9 +1383,21 @@ test-helper: $(TCG_MAPPER)
 	echo "FAIL: $$tir (could not stage example)"; \
 	fail=$$((fail+1)); rc=1; continue; \
 	fi; \
-	if ! $(HELPER_AOT_SCRIPT) "$(HELPER_SCRATCH)/example.aot" > "$(HELPER_OUT)/$$name.aot.out" 2> "$(HELPER_OUT)/$$name.aot.err"; then \
-	echo "FAIL: $$tir ($(HELPER_AOT_SCRIPT) - see $(HELPER_OUT)/$$name.aot.err)"; \
-	tail -n 20 "$(HELPER_OUT)/$$name.aot.err"; \
+	pre="$(HELPER_SCRATCH)/$(HELPER_AOT_PRE)"; \
+	if [ ! -f "$$pre" ]; then \
+	echo "FAIL: $$tir (native_link_obj.pl did not produce $$pre)"; \
+	echo "       files in scratch:"; ls -l "$(HELPER_SCRATCH)"; \
+	tail -n 20 "$(HELPER_OUT)/$$name.link.err"; \
+	fail=$$((fail+1)); rc=1; continue; \
+	fi; \
+	if ! $(HELPER_ELF_ADD_MAPS) "$$pre" -o "$(HELPER_SCRATCH)/$(HELPER_AOT_IMAGE)" > "$(HELPER_OUT)/$$name.maps.out" 2> "$(HELPER_OUT)/$$name.maps.err"; then \
+	echo "FAIL: $$tir (elf_add_maps - see $(HELPER_OUT)/$$name.maps.err)"; \
+	tail -n 20 "$(HELPER_OUT)/$$name.maps.err"; \
+	fail=$$((fail+1)); rc=1; continue; \
+	fi; \
+	if [ ! -f "$(HELPER_SCRATCH)/$(HELPER_AOT_IMAGE)" ]; then \
+	echo "FAIL: $$tir (elf_add_maps did not produce $(HELPER_AOT_IMAGE))"; \
+	tail -n 20 "$(HELPER_OUT)/$$name.maps.err"; \
 	fail=$$((fail+1)); rc=1; continue; \
 	fi; \
 	log="$(HELPER_SCRATCH)/aot.log"; \
