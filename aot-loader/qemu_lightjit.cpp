@@ -10,8 +10,6 @@
 #include <fcntl.h>
 #include <assert.h>
 
-//#define DEBUG
-
 #include <regex>
 #include <fstream>
 #include <sstream>
@@ -141,7 +139,6 @@ uint64_t invoke_lightlink(const char *AotFile,
     jit_memory_region* regions = nullptr;
     size_t region_count = 0;
 
-#ifndef DEBUG
     if (jit_link_aot(ctx, file_data, st.st_size, 0, &regions, &region_count, StartCode, log_message, AotFile, g_malloc0, aot_code_base_ptr, funcmap_rbtree_root_ptr, HelperFuncs, HelperFuncsCnt) == 0) {
         if (log_message) {
             log_message("ERROR: Failed to link AOT file");
@@ -152,18 +149,6 @@ uint64_t invoke_lightlink(const char *AotFile,
         jit_free_regions(regions, region_count);
         return 1;
     }
-#else
-    if (jit_link_aot(ctx, file_data, st.st_size, 0, &regions, &region_count, StartCode, log_message, AotFile, g_malloc0, aot_code_base_ptr, funcmap_rbtree_root_ptr, HelperFuncs, HelperFuncsCnt) == 0) {
-        if (log_message) {
-            log_message("ERROR: Failed to link AOT file");
-        }
-        jit_context_destroy(ctx);
-        munmap(file_data, st.st_size);
-        close(fd);
-        jit_free_regions(regions, region_count);
-        return 1;
-    }
-#endif
 
     munmap(file_data, st.st_size);
     close(fd);
