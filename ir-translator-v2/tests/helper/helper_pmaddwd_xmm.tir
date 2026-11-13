@@ -33,7 +33,7 @@ jmp_direct $0x7b2
 EXTERNAL:$0x7b2:
 add_i64 loc1,env,$0x3a0
 add_i64 loc2,env,$0x3e0
-add_i64 loc3,env,$0x420
+add_i64 loc3,env,$0x3a0
 call pmaddwd_xmm,$0x0,$0,env,loc3,loc1,loc2
 call dump_registers,$0x0,$0,env,$0x0
 mov_i64 rdi,$0x7f
