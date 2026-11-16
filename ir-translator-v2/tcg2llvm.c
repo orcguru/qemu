@@ -935,7 +935,7 @@ void translate_call_qemuaot(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     }
 }
 
-void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, bool is_tail) {
+void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, FuncInstrList *f, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, bool is_tail) {
     char var_name[32] = {0};
     assert(u->operands[0].kind == OP_SYMBOL);
     HelperType h = u->operands[0].symbol;
@@ -953,7 +953,12 @@ void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
                 call_args[arg_cnt++] = LLVMGetParam(F, (LLVMCountParams(F) - 1));
             } else {
                 assert((XREG_MAX + 2 * XMM_COUNT + 1 + u->operands[i].argidx) < LLVMCountParams(F));
-                call_args[arg_cnt++] = LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT + 1 + u->operands[i].argidx));
+                assert(f->added_param_type[u->operands[i].argidx] <= LLVMInt64);
+                LLVMValueRef param = LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT + 1 + u->operands[i].argidx));
+                if (f->added_param_type[u->operands[i].argidx] < LLVMInt64) {
+                    param = LLVMBuildZExt(builder, param, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "param_zext"));
+                }
+                call_args[arg_cnt++] = param;
             }
         } else {
             call_args[arg_cnt++] = get_input_val_for_operand(&u->operands[i], stack, prefix);
@@ -1405,10 +1410,10 @@ int translate_batch(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef F
                 translate_call_qemuaot(builder, F, stack, u, &prefix[0], false);
                 break;
             case tail_call_default:
-                translate_call_default(builder, F, stack, u, &prefix[0], true);
+                translate_call_default(builder, F, f, stack, u, &prefix[0], true);
                 break;
             case call_default:
-                translate_call_default(builder, F, stack, u, &prefix[0], false);
+                translate_call_default(builder, F, f, stack, u, &prefix[0], false);
                 break;
             CASE(discard, translate_discard);
             default: assert(0);
