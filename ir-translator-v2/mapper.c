@@ -744,7 +744,11 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
         sbuf_init(&bm, &dump_macro_buf[0], sizeof(dump_macro_buf));
         for (int i = 2; i < u->operand_count; ++i) {
             assert(u->operands[i].kind == OP_VEC);
-            sbuf_printf(&bm, " -DVEC%d=%s", (i - 2), qemuaot_default_param_name[XREG_MAX + u->operands[i].vec.idx]);
+            if (h < ABOVE_HELPER_IS_YMM) {
+                sbuf_printf(&bm, " -DVEC%d=%s", (i - 2), qemuaot_default_param_name[XREG_MAX + u->operands[i].vec.idx]);
+            } else {
+                sbuf_printf(&bm, " -DVEC%d%s=%s", ((i - 2) / 2), ((i - 2) % 2) == 0 ? "X" : "Y" , qemuaot_default_param_name[XREG_MAX + u->operands[i].vec.idx]);
+            }
         }
         const char *clang_cmd_head = (g_target_arch == TARGET_ARCH_RISCV64)
             ? "clang -Wno-incompatible-function-pointer-types -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -c --target=riscv64-unknown-linux-gnu -march=rv64imafdv -fPIC -O2 -emit-llvm"
