@@ -109,7 +109,9 @@ int g_vector_kind = VECTOR_KIND_DEFAULT;
 
 /* Per-target default for the vector kind. */
 static int default_scalable_for_arch(int arch) {
-    return (arch == TARGET_ARCH_RISCV64) ? 1 : 0;
+    //return (arch == TARGET_ARCH_RISCV64) ? 1 : 0;
+    // On riscv64, tests/helper/helper_vpmaskmovd_st_xmm crashes on scalable vector
+    return 0;
 }
 
 /*
