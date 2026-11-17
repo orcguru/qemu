@@ -1,3 +1,6 @@
+#include <stdint.h>
+uintptr_t guest_base;
+unsigned cpuinfo;
 void helper_aaa() {}
 void helper_aad() {}
 void helper_aam() {}
