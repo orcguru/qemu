@@ -64,23 +64,45 @@
  *   * ET_REL (or any image without PT_DYNAMIC): section-based SHT_RELA /
  *     SHT_REL / SHT_RELR tables are applied against their sh_info target.
  *   * Symbol lookup order for a relocation's symbol:
- *       1. .helpermap record for that symbol index -> HelperFuncs[id].addr
- *       2. .helpermap-derived name -> HelperFuncs[id].addr
- *       3. symbol defined inside the image (bias + st_value, or
+ *       1. COPY-relocation copy registered for this (symtab, symidx)
+ *       2. .helpermap record for that symbol index -> HelperFuncs[id].addr
+ *       3. .helpermap-derived name / HelperFuncs[].name
+ *       4. symbol defined inside the image (bias + st_value, or
  *          bias + section-base + st_value for ET_REL)
- *       4. name matched against HelperFuncs[].name
- *       5. weak undefined -> 0; otherwise the load fails
+ *       5. process globals guest_base / cpuinfo (weak externs, optionally
+ *          dlsym(RTLD_DEFAULT, name))
+ *       6. weak undefined -> 0; otherwise the load fails
+ *
+ *   * Process globals (no API change). The two QEMU host globals
+ *       uintptr_t guest_base;
+ *       unsigned  cpuinfo;
+ *     are assumed to exist in the current process. When the loader is linked
+ *     into the same binary, weak extern declarations bind to them directly.
+ *     When they are only visible in the dynamic symbol table (dlopen'ed
+ *     module, -rdynamic executable), compile with -DAOT_USE_DLSYM=1 and link
+ *     the hosting program with -rdynamic (and -ldl on glibc < 2.34).
+ *     Alternatively pass them explicitly as two extra HelperFuncs entries:
+ *       { "guest_base", (uint64_t)&guest_base },
+ *       { "cpuinfo",    (uint64_t)&cpuinfo    }
+ *     Define AOT_NO_PROCESS_GLOBALS=1 to disable the built-in weak/dlsym
+ *     lookup and rely only on HelperFuncs for these names.
+ *
+ *   * COPY relocations are supported. A pre-pass registers the copy address
+ *     for each (symtab, symidx); the initial value is copied from the process
+ *     global into the loaded image, and later references to that symbol
+ *     resolve to the copy rather than to the original variable.
+ *
  *   * AArch64: ABS64/32/16, PREL64/32/16, GLOB_DAT, JUMP_SLOT, RELATIVE,
- *     IRELATIVE, ADR_PREL_LO21, ADR_PREL_PG_HI21(_NC), ADD_ABS_LO12_NC,
+ *     IRELATIVE, COPY, ADR_PREL_LO21, ADR_PREL_PG_HI21(_NC), ADD_ABS_LO12_NC,
  *     LDST{8,16,32,64,128}_ABS_LO12_NC, JUMP26/CALL26 (with an out-of-range
  *     veneer), ADR_GOT_PAGE / LD64_GOT_LO12_NC (with generated GOT slots).
- *   * RISC-V64: 32, 64, RELATIVE, JUMP_SLOT, IRELATIVE, COPY(noop+warn),
- *     32_PCREL, BRANCH, JAL, CALL/CALL_PLT/PLT32, GOT_HI20,
+ *   * RISC-V64: 32, 64, RELATIVE, JUMP_SLOT, IRELATIVE, COPY, 32_PCREL,
+ *     BRANCH, JAL, CALL/CALL_PLT/PLT32, GOT_HI20,
  *     PCREL_HI20/LO12_I/LO12_S (with a HI20 cache), HI20/LO12_I/LO12_S,
  *     RVC_BRANCH, RVC_JUMP, RELAX(noop). Far JAL/CALL targets are redirected
  *     through a generated stub that tail-jumps to the real target.
- *   * COPY / TLS-only relocation types are reported as unsupported rather than
- *     being silently ignored.
+ *   * TLS-only relocation types are reported as unsupported rather than being
+ *     silently ignored.
  *
  * ---------------------------------------------------------------------------
  * Notes / limits
@@ -95,16 +117,19 @@
  *   * A far JAL/BRANCH needs a stub within the instruction's branch range.
  *     Stubs live at the end of the single contiguous mapping, so this only
  *     matters for images larger than 1 MiB (JAL) or with very large text.
- *   * Build (no external dependencies beyond libc / libm is not needed):
+ *   * Build (libc only by default):
  *       gcc -O2 -Wall -Wextra -std=c11 -c load_aot_elf.c
- *     Define AOT_HELPERMAP_FORCE_LE=1 if the maps were produced with --le on
- *     a big-endian input, and AOT_STRICT_HELPER_NAMES=1 to reject a
- *     .helpermap id whose HelperFuncs[].name differs from the symbol name.
+ *     -DAOT_USE_DLSYM=1 adds a dlfcn.h / dlsym lookup (and may require -ldl).
+ *     -DAOT_FORCE_DLSYM=1 (with AOT_USE_DLSYM=1) skips the weak-extern path
+ *       and uses dlsym only; useful when the loader is a separate .so.
+ *     -DAOT_HELPERMAP_FORCE_LE=1 forces little-endian .helpermap records.
+ *     -DAOT_STRICT_HELPER_NAMES=1 rejects a .helpermap id whose
+ *     HelperFuncs[].name differs from the ELF symbol name.
  *
  * Public domain / CC0.
  * ---------------------------------------------------------------------------
  */
-#ifdef AOT
+
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #endif
@@ -124,6 +149,29 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#if defined(AOT_USE_DLSYM) && !defined(AOT_NO_PROCESS_GLOBALS)
+#include <dlfcn.h>
+#ifndef RTLD_DEFAULT
+#define RTLD_DEFAULT ((void *)0)
+#endif
+#endif
+
+/*
+ * QEMU host globals that AOT code commonly references. They are declared
+ * weak: if the loader is linked into a process that defines them, the
+ * address is taken directly; otherwise the address is NULL and we fall back
+ * to dlsym (when enabled) or to HelperFuncs entries with the same names.
+ * A prior non-weak extern declaration from a project header is compatible.
+ */
+#if !defined(AOT_NO_PROCESS_GLOBALS) && !defined(AOT_FORCE_DLSYM)
+extern uintptr_t guest_base;
+extern unsigned cpuinfo;
+#if defined(__GNUC__) || defined(__clang__)
+#pragma weak guest_base
+#pragma weak cpuinfo
+#endif
+#endif
 
 #ifndef MAP_ANONYMOUS
 #define MAP_ANONYMOUS MAP_ANON
@@ -250,6 +298,14 @@ typedef struct {
     uint64_t addr;                  /* address of the generated GOT slot     */
 } GotSlot;
 
+/* A COPY relocation gives a symbol a private copy inside this image. */
+typedef struct {
+    const SymTab *st;               /* symbol table the index belongs to     */
+    uint32_t symidx;
+    uint64_t addr;                  /* P, the copy inside the loaded image   */
+    size_t size;                    /* bytes copied from the source object   */
+} CopyReloc;
+
 typedef struct {
     void (*log)(const char *);
     char  *path;
@@ -278,11 +334,12 @@ typedef struct {
     uint64_t veneer_cur, veneer_end;
     HiCache *hicache; size_t nhicache, caphicache;
     GotSlot *gots; size_t ngots, capgots;
+    CopyReloc *copies; size_t ncopies, capcopies;
 
     size_t funcsec, helper_sec, textsec;
     uint64_t func_addr, code_addr;
     int textrel;
-    size_t nreloc, nhelper_hits, nstubs;
+    size_t nreloc, nhelper_hits, nprocess_hits, nstubs;
 
     helper_func_t *helpers; size_t nhelpers;
 } Aot;
@@ -545,6 +602,11 @@ static const char *sym_name(Aot *a, const SymTab *t, uint32_t idx)
     if (!s) return "";
     return str_at(t->str, t->strsz, u32(a, s));
 }
+static uint64_t sym_size(Aot *a, const SymTab *t, uint32_t idx)
+{
+    const uint8_t *s = sym_at(t, idx);
+    return s ? u64(a, s + 16) : 0;
+}
 static int sym_defined(Aot *a, const SymTab *t, uint32_t idx, uint64_t *out)
 {
     const uint8_t *s = sym_at(t, idx);
@@ -584,6 +646,106 @@ static uint64_t name_addr(Aot *a, const char *name)
     for (size_t i = 0; i < a->nnames; ++i)
         if (!strcmp(a->names[i].name, name)) return a->names[i].addr;
     return 0;
+}
+
+/*
+ * Resolve the two QEMU host globals that live in the current process.
+ * Weak externs cover the normal "loader linked into QEMU" case; dlsym is an
+ * optional fallback for -rdynamic / dlopen'ed hosts. An explicit
+ * HelperFuncs[] entry with the same name is checked earlier and wins.
+ */
+static uint64_t process_global_addr(Aot *a, const char *nm)
+{
+    if (!nm || !*nm) return 0;
+#if !defined(AOT_NO_PROCESS_GLOBALS)
+#if !defined(AOT_FORCE_DLSYM)
+    if (!strcmp(nm, "guest_base")) {
+        uintptr_t p = (uintptr_t)&guest_base;
+        if (p) return (uint64_t)p;
+    }
+    if (!strcmp(nm, "cpuinfo")) {
+        uintptr_t p = (uintptr_t)&cpuinfo;
+        if (p) return (uint64_t)p;
+    }
+#endif
+#if defined(AOT_USE_DLSYM)
+    {
+        int allowed = (!strcmp(nm, "guest_base") || !strcmp(nm, "cpuinfo"));
+#ifdef AOT_DLSYM_ANY_SYMBOL
+        allowed = 1;
+#endif
+        if (allowed) {
+            void *p = dlsym(RTLD_DEFAULT, nm);
+            if (p) return (uint64_t)(uintptr_t)p;
+        }
+    }
+#endif
+#endif
+    (void)a;
+    return 0;
+}
+
+/* ---- COPY relocation bookkeeping ---- */
+
+static const CopyReloc *find_copy(Aot *a, const SymTab *st, uint32_t symidx)
+{
+    for (size_t i = 0; i < a->ncopies; ++i)
+        if (a->copies[i].st == st && a->copies[i].symidx == symidx)
+            return &a->copies[i];
+    return NULL;
+}
+static uint64_t copy_addr_for(Aot *a, const SymTab *st, uint32_t symidx)
+{
+    const CopyReloc *c = find_copy(a, st, symidx);
+    return c ? c->addr : 0;
+}
+static size_t copy_size_for(Aot *a, const SymTab *st, uint32_t symidx)
+{
+    const CopyReloc *c = find_copy(a, st, symidx);
+    return c ? c->size : 0;
+}
+static int register_copy(Aot *a, const SymTab *st, uint32_t symidx,
+                         uint64_t addr, size_t size)
+{
+    if (!st) return 0;
+    const CopyReloc *c = find_copy(a, st, symidx);
+    if (c) {
+        if (c->addr != addr || c->size != size)
+            alog(a, "warning: duplicate COPY relocation for symidx %u "
+                    "(0x%" PRIx64 "/%zu vs 0x%" PRIx64 "/%zu)",
+                 symidx, c->addr, c->size, addr, size);
+        return 0;
+    }
+    if (a->ncopies == a->capcopies) {
+        size_t nc = a->capcopies ? a->capcopies * 2 : 16;
+        CopyReloc *p = (CopyReloc *)realloc(a->copies, nc * sizeof *p);
+        if (!p) { alog(a, "error: out of memory registering COPY relocation"); return -1; }
+        a->copies = p; a->capcopies = nc;
+    }
+    a->copies[a->ncopies].st = st;
+    a->copies[a->ncopies].symidx = symidx;
+    a->copies[a->ncopies].addr = addr;
+    a->copies[a->ncopies].size = size;
+    ++a->ncopies;
+    return 0;
+}
+
+/* Byte count for a COPY relocation: prefer st_size, then known types. */
+static size_t copy_reloc_size(Aot *a, const SymTab *st, uint32_t symidx)
+{
+    if (!st) return 0;
+    const char *nm = sym_name(a, st, symidx);
+    uint64_t sz = sym_size(a, st, symidx);
+    if (!sz) {
+        if (!strcmp(nm, "guest_base")) sz = sizeof(uintptr_t);
+        else if (!strcmp(nm, "cpuinfo")) sz = sizeof(unsigned);
+    }
+    if (sz > (uint64_t)SIZE_MAX || sz > (1ULL << 20)) {
+        alog(a, "error: COPY relocation for '%s' has implausible size %" PRIu64,
+             nm, sz);
+        return 0;
+    }
+    return (size_t)sz;
 }
 
 /* Parse .helpermap, auto-detecting the byte order of its 8-byte records. */
@@ -695,8 +857,9 @@ fail:
     return -1;
 }
 
-static int resolve(Aot *a, const SymTab *st, uint32_t symidx, uint64_t *S,
-                   int *is_weak)
+/* Resolve a symbol to the object that provides it (ignoring any COPY copy). */
+static int resolve_source(Aot *a, const SymTab *st, uint32_t symidx,
+                          uint64_t *S, int *is_weak)
 {
     *is_weak = 0;
     *S = 0;
@@ -711,19 +874,37 @@ static int resolve(Aot *a, const SymTab *st, uint32_t symidx, uint64_t *S,
         return 0;
     }
     if (*nm) {
-        uint64_t v = name_addr(a, nm);
+        uint64_t v = name_addr(a, nm);   /* HelperFuncs + helpermap-derived */
         if (v) { *S = v; ++a->nhelper_hits; return 0; }
     }
     if (sym_defined(a, st, symidx, S)) return 0;
     if (*nm) {
-        uint64_t v = name_addr(a, nm);
-        if (v) { *S = v; return 0; }
+        uint64_t pg = process_global_addr(a, nm);
+        if (pg) {
+            *S = pg;
+            ++a->nprocess_hits;
+            alog(a, "process global '%s' -> 0x%" PRIx64, nm, pg);
+            return 0;
+        }
     }
     if (*is_weak) { alog(a, "warning: weak symbol '%s' is unresolved, using 0", nm); return 0; }
     alog(a, "error: unresolved symbol %u ('%s'): no .helpermap record, no "
-            "definition, no HelperFuncs name match",
+            "definition, no HelperFuncs name match, no process global",
          symidx, *nm ? nm : "<noname>");
     return -1;
+}
+
+/* Normal relocations use the COPY copy if the symbol has one. */
+static int resolve(Aot *a, const SymTab *st, uint32_t symidx, uint64_t *S,
+                   int *is_weak)
+{
+    uint64_t cp = copy_addr_for(a, st, symidx);
+    if (cp) {
+        *S = cp;
+        *is_weak = 0;
+        return 0;
+    }
+    return resolve_source(a, st, symidx, S, is_weak);
 }
 
 /* ------------------------------------------------------------- stubs/GOT -- */
@@ -966,6 +1147,21 @@ static int apply_reloc(Aot *a, uint64_t P, uint64_t r_off, uint32_t type,
         }
     }
 
+    /* PCREL_LO12_* carries the r_offset of its matching HI20 in the addend;
+       it does not reference a symbol, so handle it before resolve(). */
+    if (type == RV_PCREL_LO12_I || type == RV_PCREL_LO12_S) {
+        int64_t v;
+        if (!hicache_get(a, (uint64_t)A, &v)) {
+            alog(a, "error: PCREL_LO12 at 0x%" PRIx64 " has no matching HI20 "
+                    "(addend %" PRId64 ")", P, A);
+            return -1;
+        }
+        uint32_t lo = (uint32_t)v & 0xfffu;
+        if (type == RV_PCREL_LO12_I) w32(a, m, rv_i_set(u32(a, m), lo));
+        else                        w32(a, m, rv_s_set(u32(a, m), lo));
+        return 0;
+    }
+
     /* Types that never reference a symbol. */
     if (type == A64_NONE || type == RV_NONE || type == RV_RELAX) return 0;
     if (type == A64_RELATIVE || type == RV_RELATIVE) {
@@ -973,7 +1169,34 @@ static int apply_reloc(Aot *a, uint64_t P, uint64_t r_off, uint32_t type,
         return 0;
     }
     if (type == A64_COPY || type == RV_COPY) {
-        alog(a, "warning: COPY relocation at 0x%" PRIx64 " ignored (no source object)", P);
+        const char *nm = sym_name(a, st, symidx);
+        uint64_t src = 0;
+        int weak = 0;
+        if (resolve_source(a, st, symidx, &src, &weak) != 0) return -1;
+        if (!src) {
+            alog(a, "error: COPY relocation for '%s' has no source address", nm);
+            return -1;
+        }
+        src += (uint64_t)A;
+        size_t sz = copy_size_for(a, st, symidx);
+        if (!sz) sz = copy_reloc_size(a, st, symidx);
+        uint8_t *dst = mptr(a, P, sz ? sz : 1);
+        if (!dst) {
+            alog(a, "error: COPY destination 0x%" PRIx64 " (%zu bytes) is outside the image",
+                 P, sz);
+            return -1;
+        }
+        if (!sz) {
+            alog(a, "warning: COPY relocation for '%s' has st_size=0; no bytes copied", nm);
+            return 0;
+        }
+        if (src > UINT64_MAX - sz) {
+            alog(a, "error: COPY source for '%s' wraps the address space", nm);
+            return -1;
+        }
+        memcpy(dst, (const void *)(uintptr_t)src, sz);
+        alog(a, "COPY '%s': %zu bytes 0x%" PRIx64 " -> 0x%" PRIx64,
+             nm, sz, src, P);
         return 0;
     }
     if (type == A64_IRELATIVE || type == RV_IRELATIVE) {
@@ -1070,18 +1293,6 @@ static int apply_reloc(Aot *a, uint64_t P, uint64_t r_off, uint32_t type,
             if (type != RV_HI20) hicache_put(a, r_off, v);
             return 0;
         }
-        case RV_PCREL_LO12_I: case RV_PCREL_LO12_S: {
-            int64_t v;
-            if (!hicache_get(a, (uint64_t)A, &v)) {
-                alog(a, "error: PCREL_LO12 at 0x%" PRIx64 " has no matching HI20 (addend %" PRId64 ")",
-                     P, A);
-                return -1;
-            }
-            uint32_t lo = (uint32_t)v & 0xfffu;
-            if (type == RV_PCREL_LO12_I) w32(a, m, rv_i_set(u32(a, m), lo));
-            else                        w32(a, m, rv_s_set(u32(a, m), lo));
-            return 0;
-        }
         case RV_LO12_I:
             w32(a, m, rv_i_set(u32(a, m), (uint32_t)T & 0xfffu)); return 0;
         case RV_LO12_S:
@@ -1146,7 +1357,7 @@ overflow:
 
 static int apply_table(Aot *a, const uint8_t *tab, size_t count, size_t entsize,
                        int is_rela, uint64_t addr_base, int off_is_vaddr,
-                       const SymTab *st)
+                       const SymTab *st, int prepass)
 {
     for (size_t i = 0; i < count; ++i) {
         const uint8_t *r = tab + i * entsize;
@@ -1156,6 +1367,15 @@ static int apply_table(Aot *a, const uint8_t *tab, size_t count, size_t entsize,
         uint32_t type = (uint32_t)(r_info & 0xffffffffu);
         uint32_t symidx = (uint32_t)(r_info >> 32);
         uint64_t P = off_is_vaddr ? (a->bias + r_off) : (addr_base + r_off);
+        if (prepass) {
+            /* Register COPY copies before any normal relocation can resolve
+               the symbol, so GOT/ABS64 entries point at the copy. */
+            if (type == A64_COPY || type == RV_COPY) {
+                size_t sz = copy_reloc_size(a, st, symidx);
+                if (register_copy(a, st, symidx, P, sz) != 0) return -1;
+            }
+            continue;
+        }
         if (apply_reloc(a, P, r_off, type, symidx, add, is_rela, st) != 0) return -1;
         ++a->nreloc;
     }
@@ -1202,7 +1422,7 @@ static const SymTab *dynsym_for(Aot *a, uint64_t symtab_vaddr)
     return best;
 }
 
-static int relocate_dynamic(Aot *a)
+static int relocate_dynamic(Aot *a, int prepass)
 {
     const Phdr *dyn = NULL;
     for (size_t i = 0; i < a->phnum; ++i)
@@ -1240,26 +1460,27 @@ static int relocate_dynamic(Aot *a)
         default: break;
         }
     }
-    if (dt_syment != AOT_SYM_SIZE)
+    if (dt_syment != AOT_SYM_SIZE && !prepass)
         alog(a, "warning: DT_SYMENT=%" PRIu64 " (expected 24)", dt_syment);
     const SymTab *st = dynsym_for(a, dt_symtab);
     if (!st) { alog(a, "error: DT_SYMTAB present but no symbol table found"); return -1; }
-    alog(a, "PT_DYNAMIC: symtab 0x%" PRIx64 " (section %zu, %zu syms), textrel=%d",
-         dt_symtab, st->secidx, st->nsyms, a->textrel);
+    if (!prepass)
+        alog(a, "PT_DYNAMIC: symtab 0x%" PRIx64 " (section %zu, %zu syms), textrel=%d",
+             dt_symtab, st->secidx, st->nsyms, a->textrel);
 
     if (dt_rela && dt_relasz) {
         if (dt_relaent != AOT_RELA_SIZE) { alog(a, "error: bad DT_RELAENT"); return -1; }
         uint8_t *t = mptr(a, a->bias + dt_rela, (size_t)dt_relasz);
         if (!t) { alog(a, "error: DT_RELA outside the mapping"); return -1; }
         if (apply_table(a, t, (size_t)(dt_relasz / dt_relaent), dt_relaent, 1,
-                        a->bias, 1, st) != 0) return -1;
+                        a->bias, 1, st, prepass) != 0) return -1;
     }
     if (dt_rel && dt_relsz) {
         if (dt_relent != AOT_REL_SIZE) { alog(a, "error: bad DT_RELENT"); return -1; }
         uint8_t *t = mptr(a, a->bias + dt_rel, (size_t)dt_relsz);
         if (!t) { alog(a, "error: DT_REL outside the mapping"); return -1; }
         if (apply_table(a, t, (size_t)(dt_relsz / dt_relent), dt_relent, 0,
-                        a->bias, 1, st) != 0) return -1;
+                        a->bias, 1, st, prepass) != 0) return -1;
     }
     if (dt_jmprel && dt_pltrelsz) {
         int rela = (dt_pltrel == AOT_DT_RELA) ||
@@ -1269,9 +1490,9 @@ static int relocate_dynamic(Aot *a)
         uint8_t *t = mptr(a, a->bias + dt_jmprel, (size_t)dt_pltrelsz);
         if (!t) { alog(a, "error: DT_JMPREL outside the mapping"); return -1; }
         if (apply_table(a, t, (size_t)(dt_pltrelsz / ent), ent, rela,
-                        a->bias, 1, st) != 0) return -1;
+                        a->bias, 1, st, prepass) != 0) return -1;
     }
-    if (dt_relr && dt_relrsz) {
+    if (dt_relr && dt_relrsz && !prepass) {
         uint8_t *t = mptr(a, a->bias + dt_relr, (size_t)dt_relrsz);
         if (!t) { alog(a, "error: DT_RELR outside the mapping"); return -1; }
         if (apply_relr(a, t, (size_t)(dt_relrsz / 8)) != 0) return -1;
@@ -1279,7 +1500,7 @@ static int relocate_dynamic(Aot *a)
     return 0;
 }
 
-static int relocate_sections(Aot *a)
+static int relocate_sections(Aot *a, int prepass)
 {
     for (size_t i = 0; i < a->shnum; ++i) {
         const Shdr *s = &a->sh[i];
@@ -1307,17 +1528,18 @@ static int relocate_sections(Aot *a)
         int off_is_vaddr = (a->eh.type != AOT_ET_REL);
         uint64_t base = a->sec_abs[tgt];
         if (s->type == AOT_SHT_RELR) {
-            if (apply_relr(a, tab, (size_t)(s->size / 8)) != 0) return -1;
+            if (!prepass && apply_relr(a, tab, (size_t)(s->size / 8)) != 0) return -1;
         } else {
             int rela = (s->type == AOT_SHT_RELA);
             size_t ent = rela ? AOT_RELA_SIZE : AOT_REL_SIZE;
             if (apply_table(a, tab, (size_t)(s->size / ent), ent, rela,
-                            base, off_is_vaddr, st) != 0) return -1;
+                            base, off_is_vaddr, st, prepass) != 0) return -1;
         }
-        alog(a, "section %zu (%s): %" PRIu64 " relocation entries -> %s",
-             i, sec_name(a, i), s->size / (s->type == AOT_SHT_RELR ? 8 :
-                                          (s->type == AOT_SHT_RELA ? 24 : 16)),
-             sec_name(a, tgt));
+        if (!prepass)
+            alog(a, "section %zu (%s): %" PRIu64 " relocation entries -> %s",
+                 i, sec_name(a, i), s->size / (s->type == AOT_SHT_RELR ? 8 :
+                                              (s->type == AOT_SHT_RELA ? 24 : 16)),
+                 sec_name(a, tgt));
     }
     return 0;
 }
@@ -1553,7 +1775,7 @@ static void free_aot(Aot *a)
     free(a->ph); free(a->sh); free(a->sec_vaddr); free(a->sec_abs);
     free(a->sec_placed); free(a->symtabs);
     free(a->helper_idx_addr); free(a->helper_idx_set);
-    free(a->names); free(a->hicache); free(a->gots);
+    free(a->names); free(a->hicache); free(a->gots); free(a->copies);
     if (a->hrecs) {
         for (size_t i = 0; i < a->nhrecs; ++i) free(a->hrecs[i].name);
         free(a->hrecs);
@@ -1595,18 +1817,29 @@ int load_aot_elf(const char *AotFile, void (*AotLog)(const char *),
     if (build_helpermap(&a) != 0) goto fail;
     if (build_layout(&a) != 0) goto fail;
 
+    /* COPY relocations must be registered before any normal relocation can
+       resolve the symbol, so do a pre-pass over the tables we will apply. */
+    int dpre = 1, dpost = 1;
+    int use_sections = (a.eh.type == AOT_ET_REL);
     if (a.eh.type != AOT_ET_REL) {
-        int dr = relocate_dynamic(&a);
-        if (dr == 0) {
+        dpre = relocate_dynamic(&a, 1);
+        if (dpre < 0) goto fail;
+        if (dpre == 1) use_sections = 1;
+    }
+    if (use_sections && relocate_sections(&a, 1) != 0) goto fail;
+
+    if (a.eh.type != AOT_ET_REL) {
+        dpost = relocate_dynamic(&a, 0);
+        if (dpost < 0 || dpost != dpre)
+            AOT_ERR(&a, "inconsistent PT_DYNAMIC state between relocation passes");
+        if (dpost == 0) {
             alog(&a, "dynamic relocations: %zu entries applied", a.nreloc);
-        } else if (dr == 1) {
-            alog(&a, "no usable PT_DYNAMIC; falling back to section relocations");
-            if (relocate_sections(&a) != 0) goto fail;
         } else {
-            goto fail;
+            alog(&a, "no usable PT_DYNAMIC; falling back to section relocations");
+            if (relocate_sections(&a, 0) != 0) goto fail;
         }
     } else {
-        if (relocate_sections(&a) != 0) goto fail;
+        if (relocate_sections(&a, 0) != 0) goto fail;
     }
     if (a.nreloc == 0)
         alog(&a, "warning: no relocation entries were applied");
@@ -1624,8 +1857,9 @@ int load_aot_elf(const char *AotFile, void (*AotLog)(const char *),
                  root, cnt, a.func_addr);
         }
     }
-    alog(&a, "entry point 0x%" PRIx64 ", helpers bound %zu, stubs %zu, done",
-         a.bias + a.eh.entry, a.nhelper_hits, a.nstubs);
+    alog(&a, "entry point 0x%" PRIx64 ", helpers bound %zu, process globals %zu, "
+            "copies %zu, stubs %zu, done",
+         a.bias + a.eh.entry, a.nhelper_hits, a.nprocess_hits, a.ncopies, a.nstubs);
 
     *AotCodeBasePtr = a.code_addr;
     *FuncmapRbtreeRootPtr = a.func_addr;
@@ -1639,4 +1873,3 @@ done:
     free(a.path);
     return rc;
 }
-#endif
