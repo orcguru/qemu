@@ -1358,7 +1358,7 @@ typedef unsigned char __attribute__((__vector_size__(32))) v32uchar;
 typedef unsigned int __attribute__((__vector_size__(32))) v8uint;
 typedef unsigned long __attribute__((__vector_size__(32))) v4ulong;
 
-static inline CPUArchState *cpu_env(CPUState *cpu)
+static __attribute__((qemuaot)) inline CPUArchState *cpu_env(CPUState *cpu)
 {
 
     return (CPUArchState *)(cpu + 1);
