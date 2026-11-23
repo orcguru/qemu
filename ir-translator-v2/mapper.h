@@ -44,6 +44,7 @@ typedef enum {
 
 LLVMTypeRef get_llvm_type(LLVMType type);
 LLVMTypeRef get_llvm_fixed_vector_type(LLVMType type);
+LLVMTypeRef get_llvm_scalable_vector_type(LLVMType type);
 LLVMValueRef create_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef ret_ty, LLVMTypeRef *arg_types, int cnt);
 LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *intrinsic_types, int cnt);
 LLVMValueRef get_const_vector(unsigned long c, LLVMType ty, const char *prefix);
@@ -63,6 +64,7 @@ LLVMValueRef insert_into_scalable_vector(LLVMValueRef val, LLVMType ty, const ch
 LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix);
 int get_target_arch(void);
 int mapper_use_scalable_vector(void);
+int clang_use_scalable_vector_for_arch(void);
 
 #define GET_ALIGNMENT_FROM_TYPE(type)       (type <= LLVMInt64 ? 8 : 16)
 

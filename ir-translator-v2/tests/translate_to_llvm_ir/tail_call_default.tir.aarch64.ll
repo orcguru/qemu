@@ -49,8 +49,8 @@ entry:
 
 bb_false:                                         ; preds = %entry
 ; ======== TCG [7] tail_call_qemuaot t1 VEC_ARGS: ========
-  %T7.rip.stack = load i64, ptr %rip.stack, align 8, !tbaa !4, !tcg.op !18
   %T7.loaded_fn = load ptr, ptr %tmp1.stack, align 8, !tcg.op !18
+  %T7.rip.stack = load i64, ptr %rip.stack, align 8, !tbaa !4, !tcg.op !18
   tail call qemuaot void %T7.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %T7.rip.stack, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, ptr %cpu), !tcg.op !18
   ret void, !tcg.op !18
 
@@ -62,12 +62,12 @@ bb_L0:                                            ; preds = %entry
 ; ======== TCG [11] func_addr t5,0x55aa,0x1 ========
   store ptr @trampoline_helper_jit, ptr %tmp5.stack, align 8, !tbaa !4, !tcg.op !21
 ; ======== TCG [12] tail_call_qemuaot t3,env,rip,t5,t4 VEC_ARGS: ========
+  %T12.loaded_fn = load ptr, ptr %tmp3.stack, align 8, !tcg.op !22
   %T12.rip.stack = load i64, ptr %rip.stack, align 8, !tbaa !4, !tcg.op !22
   %T12.env = ptrtoint ptr %env to i64, !tcg.op !22
   %T12.rip = load i64, ptr %rip.stack, align 8, !tbaa !4, !tcg.op !22
   %T12.tmp5 = load i64, ptr %tmp5.stack, align 8, !tbaa !4, !tcg.op !22
   %T12.tmp4 = load i64, ptr %tmp4.stack, align 8, !tbaa !4, !tcg.op !22
-  %T12.loaded_fn = load ptr, ptr %tmp3.stack, align 8, !tcg.op !22
   tail call qemuaot void %T12.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %cc_dst, i32 %cc_op, i64 %T12.rip.stack, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, ptr %cpu, i64 %T12.env, i64 %T12.rip, i64 %T12.tmp5, i64 %T12.tmp4), !tcg.op !22
   ret void, !tcg.op !22
 }

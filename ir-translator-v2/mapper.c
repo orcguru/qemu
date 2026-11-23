@@ -107,9 +107,13 @@ typedef enum {
 /* Non-static so other translation units may consult it directly as well. */
 int g_vector_kind = VECTOR_KIND_DEFAULT;
 
-/* Per-target default for the vector kind. */
+/* FIXME:clang/llvm configuration? */
+int clang_use_scalable_vector_for_arch(void) {
+    return (g_target_arch == TARGET_ARCH_RISCV64) ? 1 : 0;
+}
+
+/* Always use fixed-vector to generate LLVM IR. */
 static int default_scalable_for_arch(int arch) {
-    //return (arch == TARGET_ARCH_RISCV64) ? 1 : 0;
     // On riscv64, tests/helper/helper_vpmaskmovd_st_xmm crashes on scalable vector
     return 0;
 }
@@ -231,6 +235,26 @@ LLVMTypeRef get_llvm_fixed_vector_type(LLVMType type) {
     return ty;
 }
 
+LLVMTypeRef get_llvm_scalable_vector_type(LLVMType type) {
+    LLVMTypeRef ty = NULL;
+    switch (type) {
+        case LLVMVector16xi8:
+            ty = LLVMScalableVectorType(LLVMInt8Type(), 8);
+            break;
+        case LLVMVector8xi16:
+            ty = LLVMScalableVectorType(LLVMInt16Type(), 4);
+            break;
+        case LLVMVector4xi32:
+            ty = LLVMScalableVectorType(LLVMInt32Type(), 2);
+            break;
+        case LLVMVector2xi64:
+            ty = LLVMScalableVectorType(LLVMInt64Type(), 1);
+            break;
+        default: assert(0);
+    }
+    return ty;
+}
+
 LLVMValueRef create_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef ret_ty, LLVMTypeRef *arg_types, int cnt) {
     LLVMValueRef func = LLVMGetNamedFunction(g_module, intrinsic_name);
     if (!func) {
@@ -249,7 +273,7 @@ LLVMValueRef get_intrinsic_declaration(const char *intrinsic_name, LLVMTypeRef *
 LLVMValueRef insert_into_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix) {
     char var_name[32] = {0};
     LLVMType elem_ty = OPC_VECTOR_TO_INT(ty);
-    LLVMTypeRef scalable_vec_type = get_llvm_type(ty);
+    LLVMTypeRef scalable_vec_type = get_llvm_scalable_vector_type(ty);
     LLVMTypeRef fixed_vec_type = LLVMVectorType(get_llvm_type(elem_ty), llvm_vector_elem_bit_counts[ty * 2]);
     LLVMTypeRef intrinsic_types[] = {scalable_vec_type, fixed_vec_type, get_llvm_type(LLVMInt64)};
     char intrinsic_func_name[128] = {0};
@@ -265,7 +289,7 @@ LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const c
     char var_name[32] = {0};
     //printf("ty:%s\n", LLVMPrintTypeToString(LLVMTypeOf(val)));
     LLVMType elem_ty = OPC_VECTOR_TO_INT(ty);
-    LLVMTypeRef scalable_vec_type = get_llvm_type(ty);
+    LLVMTypeRef scalable_vec_type = get_llvm_scalable_vector_type(ty);
     LLVMTypeRef fixed_vec_type = LLVMVectorType(get_llvm_type(elem_ty), llvm_vector_elem_bit_counts[ty * 2]);
     LLVMTypeRef intrinsic_lookup_types[] = {fixed_vec_type, scalable_vec_type, get_llvm_type(LLVMInt64)};
     LLVMTypeRef intrinsic_types[] = {scalable_vec_type, get_llvm_type(LLVMInt64)};
@@ -729,8 +753,13 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
             // helper_jmp_ind is defined in QEMU-runtime
             LLVMTypeRef arg_types[XREG_MAX + 2 * XMM_COUNT + 1/*CPU*/ + MAX_ADDED_ARGS] = {NULL};
             int arg_cnt = 0;
-            for (int i = 0; i < (XREG_MAX + 2 * XMM_COUNT); ++i) {
+            for (int i = 0; i < XREG_MAX; ++i) {
                 arg_types[arg_cnt++] = get_llvm_type(qemuaot_default_param_type[i]);
+            }
+            for (int i = XREG_MAX; i < (XREG_MAX + 2 * XMM_COUNT); ++i) {
+                arg_types[arg_cnt++] = clang_use_scalable_vector_for_arch() ?
+                  get_llvm_scalable_vector_type(qemuaot_default_param_type[i]) :
+                  get_llvm_fixed_vector_type(qemuaot_default_param_type[i]);
             }
             arg_types[arg_cnt++] = LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0);
             arg_cnt = setup_helper_template_arg_type(arg_types, arg_cnt, h);
@@ -896,8 +925,19 @@ static StackAlloca *setup_stack(TcgContext *ctx, LLVMValueRef F, FuncInstrList *
             }
             LLVMTypeRef arg_types[XREG_MAX + 2 * XMM_COUNT + 1/*CPU*/ + MAX_ADDED_ARGS] = {NULL};
             int arg_cnt = 0;
-            for (int j = 0; j < (XREG_MAX + 2 * XMM_COUNT); ++j) {
+            for (int j = 0; j < XREG_MAX; ++j) {
                 arg_types[arg_cnt++] = get_llvm_type(qemuaot_default_param_type[j]);
+            }
+            bool callee_scalable = false;
+            if (u->operand_count >= 2) {
+                if (u->operands[1].kind == OP_SYMBOL && clang_use_scalable_vector_for_arch()) {
+                    callee_scalable = true;
+                }
+            }
+            for (int j = XREG_MAX; j < (XREG_MAX + 2 * XMM_COUNT); ++j) {
+                arg_types[arg_cnt++] = callee_scalable ?
+                  get_llvm_scalable_vector_type(qemuaot_default_param_type[j]) :
+                  get_llvm_fixed_vector_type(qemuaot_default_param_type[j]);
             }
             arg_types[arg_cnt++] = LLVMPointerTypeInContext(LLVMGetModuleContext(g_module), 0);
             LLVMTypeRef f_type = NULL;

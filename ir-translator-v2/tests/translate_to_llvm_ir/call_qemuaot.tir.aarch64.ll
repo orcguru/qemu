@@ -25,6 +25,7 @@ entry:
 ; ======== TCG [1] func_addr t3,helper_cc_compute_c ========
   store ptr @helper_cc_compute_c, ptr %tmp3.stack, align 8, !tbaa !4, !tcg.op !8
 ; ======== TCG [2] call_qemuaot t3,[t0],cc_dst,cc_src,cc_src2(env),cc_op VEC_ARGS: ========
+  %T2.loaded_fn = load ptr, ptr %tmp3.stack, align 8, !tcg.op !9
   %T2.cc_src.stack = load i64, ptr %cc_src.stack, align 8, !tbaa !4, !tcg.op !9
   %T2.cc_dst.stack = load i64, ptr %cc_dst.stack, align 8, !tbaa !4, !tcg.op !9
   %T2.cc_op.stack = load i32, ptr %cc_op.stack, align 8, !tbaa !4, !tcg.op !9
@@ -34,7 +35,6 @@ entry:
   %T2.envptr = getelementptr i8, ptr %env, i64 160, !tcg.op !9
   %T2.cc_src2 = load i64, ptr %T2.envptr, align 16, !tbaa !10, !tcg.op !9
   %T2.cc_op = load i32, ptr %cc_op.stack, align 8, !tbaa !4, !tcg.op !9
-  %T2.loaded_fn = load ptr, ptr %tmp3.stack, align 8, !tcg.op !9
   %T2.cr = call qemuaot i64 %T2.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %T2.cc_src.stack, i64 %T2.cc_dst.stack, i32 %T2.cc_op.stack, i64 %rip, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %T2.v10.stack, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, ptr %cpu, i64 %T2.cc_dst, i64 %T2.cc_src, i64 %T2.cc_src2, i32 %T2.cc_op), !tcg.op !9
   store i64 %T2.cr, ptr %tmp0.stack, align 16, !tbaa !4, !tcg.op !9
 ; ======== TCG [3] mov_i64 [t1],t0 ========
@@ -43,11 +43,11 @@ entry:
 ; ======== TCG [4] func_addr t2,0x55aa,0x0 ========
   store ptr @Fx55aa, ptr %tmp2.stack, align 8, !tbaa !4, !tcg.op !13
 ; ======== TCG [5] tail_call_qemuaot t2 VEC_ARGS: ========
+  %T5.loaded_fn = load ptr, ptr %tmp2.stack, align 8, !tcg.op !14
   %T5.cc_src.stack = load i64, ptr %cc_src.stack, align 8, !tbaa !4, !tcg.op !14
   %T5.cc_dst.stack = load i64, ptr %cc_dst.stack, align 8, !tbaa !4, !tcg.op !14
   %T5.cc_op.stack = load i32, ptr %cc_op.stack, align 8, !tbaa !4, !tcg.op !14
   %T5.v10.stack = load <2 x i64>, ptr %v10.stack, align 16, !tbaa !4, !tcg.op !14
-  %T5.loaded_fn = load ptr, ptr %tmp2.stack, align 8, !tcg.op !14
   tail call qemuaot void %T5.loaded_fn(i64 %rax, i64 %rcx, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %T5.cc_src.stack, i64 %T5.cc_dst.stack, i32 %T5.cc_op.stack, i64 %rip, <2 x i64> %xmm0, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %xmm2, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %T5.v10.stack, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %xmm10, <2 x i64> %ymm10_h, <2 x i64> %xmm11, <2 x i64> %ymm11_h, <2 x i64> %xmm12, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, ptr %cpu), !tcg.op !14
   ret void, !tcg.op !14
 }

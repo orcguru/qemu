@@ -387,6 +387,7 @@ bb_L0:                                            ; preds = %bb_false405, %divs2
 ; ======== TCG [264] func_addr t25,0x0,0x1 ========
   store ptr @trampoline_helper_raise_exception, ptr %tmp25.stack, align 8, !tbaa !0, !tcg.op !54
 ; ======== TCG [265] tail_call_qemuaot t25,env,0x0 VEC_ARGS: ========
+  %T265.loaded_fn = load ptr, ptr %tmp25.stack, align 8, !tcg.op !55
   %T265.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !55
   %T265.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !55
   %T265.cc_dst.stack = load i64, ptr %cc_dst.stack, align 8, !tbaa !0, !tcg.op !55
@@ -396,7 +397,6 @@ bb_L0:                                            ; preds = %bb_false405, %divs2
   %T265.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !55
   %T265.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !55
   %T265.env = ptrtoint ptr %env to i64, !tcg.op !55
-  %T265.loaded_fn = load ptr, ptr %tmp25.stack, align 8, !tcg.op !55
   tail call qemuaot void %T265.loaded_fn(i64 %T265.rax.stack, i64 %T265.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %T265.cc_dst.stack, i32 %cc_op, i64 %rip, <2 x i64> %T265.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T265.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T265.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T265.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T265.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, ptr %cpu, i64 %T265.env, i64 0), !tcg.op !55
   ret void, !tcg.op !55
 
@@ -2112,6 +2112,7 @@ divs2.done406:                                    ; preds = %bb_false405
 ; ======== TCG [261] func_addr t24,0x55aa,0x0 ========
   store ptr @Fx55aa, ptr %tmp24.stack, align 8, !tbaa !0, !tcg.op !266
 ; ======== TCG [262] tail_call_qemuaot t24 VEC_ARGS: ========
+  %T262.loaded_fn = load ptr, ptr %tmp24.stack, align 8, !tcg.op !267
   %T262.rax.stack = load i64, ptr %rax.stack, align 8, !tbaa !0, !tcg.op !267
   %T262.rcx.stack = load i64, ptr %rcx.stack, align 8, !tbaa !0, !tcg.op !267
   %T262.cc_dst.stack = load i64, ptr %cc_dst.stack, align 8, !tbaa !0, !tcg.op !267
@@ -2120,7 +2121,6 @@ divs2.done406:                                    ; preds = %bb_false405
   %T262.v20.stack = load <2 x i64>, ptr %v20.stack, align 16, !tbaa !0, !tcg.op !267
   %T262.v22.stack = load <2 x i64>, ptr %v22.stack, align 16, !tbaa !0, !tcg.op !267
   %T262.v24.stack = load <2 x i64>, ptr %v24.stack, align 16, !tbaa !0, !tcg.op !267
-  %T262.loaded_fn = load ptr, ptr %tmp24.stack, align 8, !tcg.op !267
   tail call qemuaot void %T262.loaded_fn(i64 %T262.rax.stack, i64 %T262.rcx.stack, i64 %rdx, i64 %rbx, i64 %rsp, i64 %rbp, i64 %rsi, i64 %rdi, i64 %r8, i64 %r9, i64 %r10, i64 %r11, i64 %r12, i64 %r13, i64 %r14, i64 %r15, i64 %cc_src, i64 %T262.cc_dst.stack, i32 %cc_op, i64 %rip, <2 x i64> %T262.v0.stack, <2 x i64> %ymm0_h, <2 x i64> %xmm1, <2 x i64> %ymm1_h, <2 x i64> %T262.v4.stack, <2 x i64> %ymm2_h, <2 x i64> %xmm3, <2 x i64> %ymm3_h, <2 x i64> %xmm4, <2 x i64> %ymm4_h, <2 x i64> %xmm5, <2 x i64> %ymm5_h, <2 x i64> %xmm6, <2 x i64> %ymm6_h, <2 x i64> %xmm7, <2 x i64> %ymm7_h, <2 x i64> %xmm8, <2 x i64> %ymm8_h, <2 x i64> %xmm9, <2 x i64> %ymm9_h, <2 x i64> %T262.v20.stack, <2 x i64> %ymm10_h, <2 x i64> %T262.v22.stack, <2 x i64> %ymm11_h, <2 x i64> %T262.v24.stack, <2 x i64> %ymm12_h, <2 x i64> %xmm13, <2 x i64> %ymm13_h, ptr %cpu), !tcg.op !267
   ret void, !tcg.op !267
 }

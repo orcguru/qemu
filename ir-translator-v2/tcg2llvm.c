@@ -10,6 +10,7 @@
 #include "tcg_llvm_tag.h"
 #include "operand_static_types.h"
 #include "i386_cpu.h"
+#include "mapper_call_debug.h"
 
 typedef LLVMValueRef (*LLVM_BIN_API)(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS, const char *Name);
 typedef LLVMValueRef (*LLVM_EXT_API)(LLVMBuilderRef B, LLVMValueRef Val, LLVMTypeRef DestTy, const char *Name);
@@ -58,7 +59,7 @@ void translate_addco_subbo(LLVMBuilderRef builder, StackAlloca *stack, const Uni
     LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
     LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
     LLVMValueRef intrinsic_call1_args[] = {in1, in2};
-    LLVMValueRef call1 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call1_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r1"));
+    LLVMValueRef call1 = BUILD_CALL2(builder, fn_type, fn, intrinsic_call1_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r1"));
     LLVMValueRef s1 = LLVMBuildExtractValue(builder, call1, 0, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "s1"));
     LLVMValueRef c1 = LLVMBuildExtractValue(builder, call1, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "c1"));
     do_store(&u->operands[0], s1, stack, prefix, false);
@@ -94,7 +95,7 @@ void translate_addcio_subbio(LLVMBuilderRef builder, StackAlloca *stack, const U
     LLVMValueRef in1 = get_input_val_for_operand(&u->operands[1], stack, prefix);
     LLVMValueRef in2 = get_input_val_for_operand(&u->operands[2], stack, prefix);
     LLVMValueRef intrinsic_call1_args[] = {in1, in2};
-    LLVMValueRef call1 = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call1_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r1"));
+    LLVMValueRef call1 = BUILD_CALL2(builder, fn_type, fn, intrinsic_call1_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "r1"));
     LLVMValueRef s1 = LLVMBuildExtractValue(builder, call1, 0, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "s1"));
     LLVMValueRef c1 = LLVMBuildExtractValue(builder, call1, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "c1"));
     LLVMValueRef ci = (u->opc == addc1o_i32 || u->opc == addc1o_i64 ||
@@ -121,7 +122,7 @@ void translate_abs_vec(LLVMBuilderRef builder, StackAlloca *stack, const Unified
     LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
     LLVMValueRef is_int_min_poison = LLVMConstInt(LLVMInt1Type(), 0, 0);
     LLVMValueRef intrinsic_call_args[] = {in, is_int_min_poison};
-    LLVMValueRef abs = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "abs"));
+    LLVMValueRef abs = BUILD_CALL2(builder, fn_type, fn, intrinsic_call_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "abs"));
     do_store(&u->operands[0], abs, stack, prefix, false);
 }
 
@@ -193,7 +194,7 @@ void translate_ctpop(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedIn
     LLVMTypeRef fn_type  = LLVMFunctionType(llvm_ty, intrinsic_types, 1, 0);
     LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
     LLVMValueRef intrinsic_call_args[] = {in};
-    LLVMValueRef pop = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call_args, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "pop"));
+    LLVMValueRef pop = BUILD_CALL2(builder, fn_type, fn, intrinsic_call_args, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "pop"));
     do_store(&u->operands[0], pop, stack, prefix, false);
 }
 
@@ -227,7 +228,7 @@ void translate_ct_intrinsic(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
     //LLVMValueRef false_val = LLVMConstInt(LLVMInt1Type(), 0, 0);
     //LLVMValueRef call_args[] = {in1, false_val};
     LLVMValueRef call_args[] = {in1};
-    LLVMValueRef call_result = LLVMBuildCall2(builder, fn_type, fn, call_args, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ct_result"));
+    LLVMValueRef call_result = BUILD_CALL2(builder, fn_type, fn, call_args, 1, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "ct_result"));
     LLVMBuildBr(builder, bb_ctz_merge);
 
     LLVMPositionBuilderAtEnd(builder, bb_ctz_merge);
@@ -257,7 +258,7 @@ void translate_binary_intrinsic(LLVMBuilderRef builder, StackAlloca *stack, cons
         in2 = extract_from_scalable_vector(in2, tcg_ty, prefix);
     }
     LLVMValueRef intrinsic_call_args[] = {in1, in2};
-    LLVMValueRef out = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    LLVMValueRef out = BUILD_CALL2(builder, fn_type, fn, intrinsic_call_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
     if (mapper_use_scalable_vector() && tcg_ty >= LLVMVector16xi8) {
         out = insert_into_scalable_vector(out, tcg_ty, prefix);
     }
@@ -296,7 +297,7 @@ void translate_rotate(LLVMBuilderRef builder, StackAlloca *stack, const UnifiedI
     LLVMTypeRef fn_type  = LLVMFunctionType(llvm_ty, intrinsic_types, 3, 0);
     LLVMValueRef in = get_input_val_for_operand(&u->operands[1], stack, prefix);
     LLVMValueRef intrinsic_call_args[] = {in, in, shift_amount};
-    LLVMValueRef out = LLVMBuildCall2(builder, fn_type, fn, intrinsic_call_args, 3, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
+    LLVMValueRef out = BUILD_CALL2(builder, fn_type, fn, intrinsic_call_args, 3, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "out"));
     do_store(&u->operands[0], out, stack, prefix, false);
 }
 
@@ -618,7 +619,7 @@ static void setup_env_for_stack_switch(LLVMBuilderRef builder, StackAlloca *stac
     }
     LLVMValueRef inline_asm = LLVMConstInlineAsm(asm_function_type, asm_string, constraint_string, /* has_side_effects */ 0, /* is_align_stack */ 0);
     LLVMValueRef asm_param_list[] = {LLVMBuildPtrToInt(builder, stack->env, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "env"))};
-    LLVMBuildCall2(builder, asm_function_type, inline_asm, asm_param_list, 1, "");
+    BUILD_CALL2(builder, asm_function_type, inline_asm, asm_param_list, 1, "");
 }
 
 void translate_div2(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, LLVM_EXT_API ext_api, LLVM_BIN_API div_api, LLVM_BIN_API rem_api) {
@@ -855,40 +856,9 @@ int translate_func_addr(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *sta
 
 void translate_call_qemuaot(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix, bool is_tail) {
     char var_name[32] = {0};
-    LLVMValueRef call_args[XREG_MAX + 2 * XMM_COUNT + 1/*CPU*/ + MAX_ADDED_ARGS] = {NULL};
-    int arg_cnt = 0;
-    for (int i = 0; i < XREG_MAX; ++i) {
-        if (stack->xreg.alloca[i]) {
-            call_args[arg_cnt++] = load_from_stack_as_type(&stack->xreg, i, stack->xreg.tcg_ty[i], prefix, qemuaot_default_stack_alloca_name[i]);
-        } else {
-            call_args[arg_cnt++] = LLVMGetParam(F, i);
-        }
-    }
-    for (int i = 0; i < (2 * XMM_COUNT); ++i) {
-        if (stack->vector.alloca[i]) {
-            call_args[arg_cnt++] = load_from_stack_as_type(&stack->vector, i, stack->vector.tcg_ty[i], prefix, qemuaot_default_stack_alloca_name[XREG_MAX + i]);
-        } else {
-            call_args[arg_cnt++] = LLVMGetParam(F, (XREG_MAX + i));
-        }
-    }
-    call_args[arg_cnt++] = LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT));
-    assert(u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
-    for (int i = (u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? (TCG_CALL_PREFIX_COUNT + 1) : TCG_CALL_PREFIX_COUNT);
-         i < u->operand_count; ++i) {
-        if (u->operands[i].kind == OP_ENV && u->operands[i].env.offset == 0) {
-            call_args[arg_cnt++] = LLVMBuildPtrToInt(builder, stack->env, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "env"));
-        } else if (u->operands[i].kind == OP_ARG) {
-            if (u->operands[i].argidx == -1) {
-                call_args[arg_cnt++] = LLVMGetParam(F, (LLVMCountParams(F) - 1));
-            } else {
-                call_args[arg_cnt++] = LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT + 1 + u->operands[i].argidx));
-            }
-        } else if (u->operands[i].kind != OP_VEC) {
-            call_args[arg_cnt++] = get_input_val_for_operand(&u->operands[i], stack, prefix);
-        }
-    }
     LLVMTypeRef f_type = NULL;
     LLVMValueRef loaded_fn = NULL;
+    bool callee_scalable = false;
     if (u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_TMP) {
         int func_slot = u->operands[0].slot.idx;
         assert(stack->tmp.alloca[func_slot] != NULL);
@@ -900,8 +870,15 @@ void translate_call_qemuaot(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
                 arg_types[arg_cnt++] = get_llvm_type(qemuaot_default_param_type[i]);
             }
             arg_types[arg_cnt++] = LLVMPointerType(get_llvm_type(LLVMInt64), 0);
-            // This is the shadow stack slot
             f_type = LLVMFunctionType(LLVMVoidType(), arg_types, arg_cnt, 0);
+        } else {
+            unsigned N = LLVMCountParamTypes(f_type);
+            LLVMTypeRef *P = malloc((N ? N : 1) * sizeof(LLVMTypeRef));
+            LLVMGetParamTypes(f_type, P);
+            if (LLVMGetTypeKind(P[XREG_MAX]) == LLVMScalableVectorTypeKind) {
+                callee_scalable = true;
+            }
+            free(P);
         }
         loaded_fn = LLVMBuildLoad2(builder, LLVMPointerType(f_type, 0), stack->tmp.alloca[func_slot], assemble_name_2(&var_name[0], sizeof(var_name), prefix, "loaded_fn"));
     } else {
@@ -921,7 +898,45 @@ void translate_call_qemuaot(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca 
         f_type = LLVMFunctionType(LLVMVoidType(), arg_types, arg_cnt, 0);
         loaded_fn = LLVMBuildIntToPtr(builder, LLVMGetParam(F, (LLVMCountParams(F) - 1)), LLVMPointerType(f_type, 0), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "loaded_fn"));
     }
-    LLVMValueRef call_inst = LLVMBuildCall2(builder, f_type, loaded_fn, call_args, arg_cnt, u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? assemble_name_2(&var_name[0], sizeof(var_name), prefix, "cr") : "");
+
+    LLVMValueRef call_args[XREG_MAX + 2 * XMM_COUNT + 1/*CPU*/ + MAX_ADDED_ARGS] = {NULL};
+    int arg_cnt = 0;
+    for (int i = 0; i < XREG_MAX; ++i) {
+        if (stack->xreg.alloca[i]) {
+            call_args[arg_cnt++] = load_from_stack_as_type(&stack->xreg, i, stack->xreg.tcg_ty[i], prefix, qemuaot_default_stack_alloca_name[i]);
+        } else {
+            call_args[arg_cnt++] = LLVMGetParam(F, i);
+        }
+    }
+    for (int i = 0; i < (2 * XMM_COUNT); ++i) {
+        LLVMValueRef param = NULL;
+        if (stack->vector.alloca[i]) {
+            param = load_from_stack_as_type(&stack->vector, i, stack->vector.tcg_ty[i], prefix, qemuaot_default_stack_alloca_name[XREG_MAX + i]);
+        } else {
+            param = LLVMGetParam(F, (XREG_MAX + i));
+        }
+        if (callee_scalable) {
+            param = insert_into_scalable_vector(param, qemuaot_default_param_type[XREG_MAX + i], prefix);
+        }
+        call_args[arg_cnt++] = param;
+    }
+    call_args[arg_cnt++] = LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT));
+    assert(u->operands[TCG_CALL_OUT_FLAG_IDX].kind == OP_IMM);
+    for (int i = (u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? (TCG_CALL_PREFIX_COUNT + 1) : TCG_CALL_PREFIX_COUNT);
+         i < u->operand_count; ++i) {
+        if (u->operands[i].kind == OP_ENV && u->operands[i].env.offset == 0) {
+            call_args[arg_cnt++] = LLVMBuildPtrToInt(builder, stack->env, get_llvm_type(LLVMInt64), assemble_name_2(&var_name[0], sizeof(var_name), prefix, "env"));
+        } else if (u->operands[i].kind == OP_ARG) {
+            if (u->operands[i].argidx == -1) {
+                call_args[arg_cnt++] = LLVMGetParam(F, (LLVMCountParams(F) - 1));
+            } else {
+                call_args[arg_cnt++] = LLVMGetParam(F, (XREG_MAX + 2 * XMM_COUNT + 1 + u->operands[i].argidx));
+            }
+        } else if (u->operands[i].kind != OP_VEC) {
+            call_args[arg_cnt++] = get_input_val_for_operand(&u->operands[i], stack, prefix);
+        }
+    }
+    LLVMValueRef call_inst = BUILD_CALL2(builder, f_type, loaded_fn, call_args, arg_cnt, u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? assemble_name_2(&var_name[0], sizeof(var_name), prefix, "cr") : "");
     if (is_tail) {
         LLVMSetTailCall(call_inst, 1);
     }
@@ -965,7 +980,7 @@ void translate_call_default(LLVMBuilderRef builder, LLVMValueRef F, FuncInstrLis
         }
     }
     setup_env_for_stack_switch(builder, stack, prefix);
-    LLVMValueRef call_inst = LLVMBuildCall2(builder, LLVMGlobalGetValueType(TF), TF, call_args, arg_cnt, u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? assemble_name_2(&var_name[0], sizeof(var_name), prefix, "cr") : "");
+    LLVMValueRef call_inst = BUILD_CALL2(builder, LLVMGlobalGetValueType(TF), TF, call_args, arg_cnt, u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val ? assemble_name_2(&var_name[0], sizeof(var_name), prefix, "cr") : "");
     if (is_tail) {
         LLVMSetTailCall(call_inst, 1);
         LLVMBuildRetVoid(builder);
