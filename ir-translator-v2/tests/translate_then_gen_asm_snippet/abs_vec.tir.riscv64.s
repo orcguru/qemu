@@ -7,10 +7,9 @@
 	.globl	Fx0                             # -- Begin function Fx0
 	.p2align	2
 	.type	Fx0,@function
-	.variant_cc	Fx0
 Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
-	vsetvli	a1, zero, e8, m1, ta, ma
+	vsetivli	zero, 16, e8, m1, ta, ma
 	vrsub.vi	v28, v12, 0
 	vmax.vv	v12, v12, v28
 	tail	Fx55aa

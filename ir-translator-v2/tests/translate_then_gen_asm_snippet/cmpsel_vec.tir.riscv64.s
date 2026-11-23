@@ -7,20 +7,12 @@
 	.globl	Fx0                             # -- Begin function Fx0
 	.p2align	2
 	.type	Fx0,@function
-	.variant_cc	Fx0
 Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
-	vsetvli	a1, zero, e8, m1, ta, ma
+	vsetivli	zero, 16, e8, m1, ta, ma
 	vmv1r.v	v28, v0
 	vmslt.vv	v0, v12, v14
-	vsetivli	zero, 16, e8, m1, ta, ma
-	vmv.v.i	v12, 0
-	vsetvli	a1, zero, e8, m1, ta, ma
-	vmerge.vim	v12, v12, -1, v0
-	vand.vv	v29, v12, v16
-	vnot.v	v12, v12
-	vand.vv	v12, v18, v12
-	vor.vv	v12, v29, v12
+	vmerge.vvm	v12, v18, v16, v0
 	vmv1r.v	v0, v28
 	tail	Fx55aa
 .Lfunc_end0:

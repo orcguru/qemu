@@ -10,7 +10,6 @@
 	.globl	Fx0
 	.p2align	2
 	.type	Fx0,@function
-	.variant_cc	Fx0
 Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
 	sext.w	a3, a6

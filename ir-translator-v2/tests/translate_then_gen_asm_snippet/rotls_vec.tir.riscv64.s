@@ -7,45 +7,10 @@
 	.globl	Fx0                             # -- Begin function Fx0
 	.p2align	2
 	.type	Fx0,@function
-	.variant_cc	Fx0
 Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
 	vsetivli	zero, 16, e8, m1, ta, ma
-	vmv.v.i	v28, 0
-	vmv.s.x	v29, a6
-	vsetvli	zero, zero, e8, m1, tu, ma
-	vmv.s.x	v28, a6
-	vsetivli	zero, 2, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 1
-	vsetivli	zero, 3, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 2
-	vsetivli	zero, 4, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 3
-	vsetivli	zero, 5, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 4
-	vsetivli	zero, 6, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 5
-	vsetivli	zero, 7, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 6
-	vsetivli	zero, 8, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 7
-	vsetivli	zero, 9, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 8
-	vsetivli	zero, 10, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 9
-	vsetivli	zero, 11, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 10
-	vsetivli	zero, 12, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 11
-	vsetivli	zero, 13, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 12
-	vsetivli	zero, 14, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 13
-	vsetivli	zero, 15, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 14
-	vsetivli	zero, 16, e8, m1, tu, ma
-	vslideup.vi	v28, v29, 15
-	vsetvli	a1, zero, e8, m1, ta, ma
+	vmv.v.x	v28, a6
 	vand.vi	v29, v28, 7
 	vrsub.vi	v28, v28, 0
 	vsll.vv	v29, v12, v29

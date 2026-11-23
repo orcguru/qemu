@@ -7,17 +7,13 @@
 	.globl	Fx0                             # -- Begin function Fx0
 	.p2align	2
 	.type	Fx0,@function
-	.variant_cc	Fx0
 Fx0:                                    # @Fx0
 # %bb.0:                                # %entry
-	addi	a1, sp, 16
-	vsetivli	zero, 2, e64, m1, ta, ma
-	vse64.v	v12, (a1)
 	vsetivli	zero, 8, e8, mf2, ta, ma
-	vsadd.vv	v12, v12, v14
-	vse8.v	v12, (a1)
-	vsetivli	zero, 2, e64, m1, ta, ma
-	vle64.v	v12, (a1)
+	vsadd.vv	v28, v12, v14
+	vsetvli	zero, zero, e64, m4, tu, ma
+	vmv.x.s	a1, v28
+	vmv.s.x	v12, a1
 	tail	Fx55aa
 .Lfunc_end0:
 	.size	Fx0, .Lfunc_end0-Fx0
