@@ -2557,20 +2557,23 @@ sub get_func_body
 {
   my ($func_ptr, $pi, $md, $exception_exit, $fc) = @_;
 
-  my $prolog = "";
-  my $epilog = "";
+  # Build the 256-bit pack/unpack candidates for *_ymm helpers.  They are only
+  # emitted when the helper context actually references the 256-bit units
+  # (d/v/s as v4ulong); see the reference check just before body generation.
+  my $ymm_prolog = "";
+  my $ymm_epilog = "";
   if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
     foreach my $vec_idx (0..$#{$func_ptr->{'VECTOR_ARGS'}}) {
       my $arg_entry = $func_ptr->{'VECTOR_ARGS'}->[$vec_idx];
-      $prolog = $prolog."v4ulong $arg_entry->{'VAR_NAME'};\n";
-      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[0] = $arg_entry->{'VAR_NAME'}x[0];\n";
-      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[1] = $arg_entry->{'VAR_NAME'}x[1];\n";
-      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[2] = $arg_entry->{'VAR_NAME'}y[0];\n";
-      $prolog = $prolog."$arg_entry->{'VAR_NAME'}"."[3] = $arg_entry->{'VAR_NAME'}y[1];\n";
-      $epilog = "$arg_entry->{'VAR_NAME'}x[0] = $arg_entry->{'VAR_NAME'}"."[0];\n".$epilog;
-      $epilog = "$arg_entry->{'VAR_NAME'}x[1] = $arg_entry->{'VAR_NAME'}"."[1];\n".$epilog;
-      $epilog = "$arg_entry->{'VAR_NAME'}y[0] = $arg_entry->{'VAR_NAME'}"."[2];\n".$epilog;
-      $epilog = "$arg_entry->{'VAR_NAME'}y[1] = $arg_entry->{'VAR_NAME'}"."[3];\n".$epilog;
+      $ymm_prolog = $ymm_prolog."v4ulong $arg_entry->{'VAR_NAME'};\n";
+      $ymm_prolog = $ymm_prolog."$arg_entry->{'VAR_NAME'}"."[0] = $arg_entry->{'VAR_NAME'}x[0];\n";
+      $ymm_prolog = $ymm_prolog."$arg_entry->{'VAR_NAME'}"."[1] = $arg_entry->{'VAR_NAME'}x[1];\n";
+      $ymm_prolog = $ymm_prolog."$arg_entry->{'VAR_NAME'}"."[2] = $arg_entry->{'VAR_NAME'}y[0];\n";
+      $ymm_prolog = $ymm_prolog."$arg_entry->{'VAR_NAME'}"."[3] = $arg_entry->{'VAR_NAME'}y[1];\n";
+      $ymm_epilog = "$arg_entry->{'VAR_NAME'}x[0] = $arg_entry->{'VAR_NAME'}"."[0];\n".$ymm_epilog;
+      $ymm_epilog = "$arg_entry->{'VAR_NAME'}x[1] = $arg_entry->{'VAR_NAME'}"."[1];\n".$ymm_epilog;
+      $ymm_epilog = "$arg_entry->{'VAR_NAME'}y[0] = $arg_entry->{'VAR_NAME'}"."[2];\n".$ymm_epilog;
+      $ymm_epilog = "$arg_entry->{'VAR_NAME'}y[1] = $arg_entry->{'VAR_NAME'}"."[3];\n".$ymm_epilog;
     }
   }
 
@@ -2628,7 +2631,41 @@ END
       $body = $body.$counter_def;
     }
   }
-  my $new_content = &get_statements($func_ptr, $func_ptr->{'BODY_START'} + 1, $func_ptr->{'BODY_STOP'}, $epilog, $pi, $md, $exception_exit, $fc);
+  # Peephole for *_ymm helpers: the 256-bit units (d/v/s as v4ulong) are only
+  # an emulation layer for helpers that operate on the whole 256-bit vector.
+  # Helpers that work directly on 128-bit halves (dx/dy, vx/vy, sx/sy) never
+  # mention d/v/s, so the pack at entry and the unpack at exit are dead code.
+  #
+  # Generate a probe body WITHOUT the epilog: the epilog itself mentions
+  # d/v/s, so it must be excluded from the check.  Also include the fixed
+  # prolog prefix (HELPER_COUNTERS block, etc.) in the scan.  A hit on any
+  # vector argument name as a whole C identifier keeps the pack/unpack.
+  my $prolog = "";
+  my $epilog = "";
+  my $probe_content;
+  if ($ymm_prolog ne "") {
+    $probe_content = &get_statements($func_ptr, $func_ptr->{'BODY_START'} + 1, $func_ptr->{'BODY_STOP'}, "", $pi, $md, $exception_exit, $fc);
+    my $scan = $body.$probe_content;
+    my $referenced = 0;
+    foreach my $arg_entry (@{$func_ptr->{'VECTOR_ARGS'}}) {
+      my $unit = $arg_entry->{'VAR_NAME'};
+      if ($scan =~ /(?<![A-Za-z_0-9])\Q$unit\E(?![A-Za-z_0-9])/) {
+        $referenced = 1;
+        last;
+      }
+    }
+    if ($referenced) {
+      $prolog = $ymm_prolog;
+      $epilog = $ymm_epilog;
+    }
+  }
+  my $new_content;
+  if (defined $probe_content and $epilog eq "") {
+    # No pack/unpack needed: reuse the probe body verbatim.
+    $new_content = $probe_content;
+  } else {
+    $new_content = &get_statements($func_ptr, $func_ptr->{'BODY_START'} + 1, $func_ptr->{'BODY_STOP'}, $epilog, $pi, $md, $exception_exit, $fc);
+  }
   $body = $body.$new_content;
   if ((not exists $nosplit_helpers{$func_ptr->{'NAME'}}) and $func_ptr->{'HELPER_INTERFACE'} and $func_ptr->{'FUNC_TYPE'} eq "void") {
     my $exp_logic = "";
