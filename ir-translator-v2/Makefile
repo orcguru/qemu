@@ -31,6 +31,9 @@ endif
 #   QEMU_BUILD - build directory (default: $(QEMU_TOP)/build)
 #   QEMU_CC    - C compiler to use (default: clang)
 #   QEMU_TARGET_LIST - target list (default: x86_64-linux-user)
+#   QEMU_FPU_AES_SRC - AES source appended to fpu_helper.c before the fpu
+#                      preprocessed file is collected
+#                      (default: $(QEMU_TOP)/crypto/aes.c)
 #
 # Examples:
 #   make qemu-preprocess QEMU_TOP=/home/felix/Github/qemu          # fpu_helper.c
@@ -53,8 +56,19 @@ define COPIED_INCS
 $(foreach f,$(notdir $(wildcard $(QEMU_FPU_DIR)/*.inc)),$(QEMU_TCG_DIR)/$f)
 endef
 
-# Marker file recording that fpu_helper.c was prepended (for clean restoration)
+# Marker file recording that fpu_helper.c was assembled (for clean restoration)
 SOFTFLOAT_MARKER := $(QEMU_TCG_DIR)/.softfloat_prepended
+
+# crypto/aes.c is APPENDED to fpu_helper.c so its helper bodies show up in the
+# -E output collected for PREPROCESSED_OBJ_FPU.  Override if your QEMU tree
+# keeps AES somewhere else.
+QEMU_FPU_AES_SRC ?= $(QEMU_TOP)/crypto/aes.c
+
+# The appended block is bracketed by this sentinel.  Idempotence is therefore
+# checked on the file content, not on a second marker file: a tree already
+# preprocessed by an older Makefile still has .softfloat_prepended but does
+# NOT yet contain aes.c, and this is exactly the case we need to catch.
+FPU_AES_SENTINEL := IR-TRANSLATOR-V2-AES-APPENDED
 
 # Per-target object paths (relative to QEMU_BUILD)
 PREPROCESSED_OBJ_FPU       := libqemu-$(QEMU_TARGET_LIST).a.p/target_i386_tcg_fpu_helper.c.o
@@ -147,7 +161,9 @@ check-qemu-cpu-size-build:
 HELPER_TMPL_DIR  := collect_helper_templates
 
 # Convenience entry point: fpu_helper.c
-qemu-preprocess: check-qemu-top $(QEMU_BUILD)/Makefile copy-fpu-files prepend-softfloat capture-command-fpu preprocess-extract-fpu
+#   user-exec.c + softfloat.c are prepended and crypto/aes.c is APPENDED to
+#   fpu_helper.c before its -E preprocessed file is collected.
+qemu-preprocess: check-qemu-top $(QEMU_BUILD)/Makefile copy-fpu-files prepare-fpu-helper capture-command-fpu preprocess-extract-fpu
 	@echo "==================================================================="
 	@echo "Preprocessed file ready: $(QEMU_BUILD)/$(PREPROCESSED_OBJ_FPU).E"
 	cp $(QEMU_BUILD)/$(PREPROCESSED_OBJ_FPU).E $(HELPER_TMPL_DIR)/
@@ -233,19 +249,59 @@ copy-fpu-files:
 		echo "copied: $(QEMU_FPU_DIR)/$$base -> $$inc"; \
 	done
 
-# --- 3. prepend fpu/softfloat.c to fpu_helper.c ------------------------------
-# (Only used by the fpu_helper.c target.)
-
-prepend-softfloat:
-	@if [ -f "$(SOFTFLOAT_MARKER)" ]; then \
+# --- 3. assemble fpu_helper.c -------------------------------------------------
+# (Only used by the fpu_helper.c target / PREPROCESSED_OBJ_FPU.)
+#
+# One guarded step builds the file that is later passed through clang -E and
+# collected into collect_helper_templates/:
+#   1. prepend accel/tcg/user-exec.c + fpu/softfloat.c   (existing behaviour)
+#   2. APPEND $(QEMU_TOP)/crypto/aes.c                   (requested change)
+#
+# Both operations are idempotent and reversible:
+#   * the prepend is guarded by $(SOFTFLOAT_MARKER),
+#   * the append is guarded by the FPU_AES_SENTINEL comment inside the file,
+#   * clean-qemu-source restores fpu_helper.c.orig and removes the marker,
+#     which drops the appended aes.c block along with the prepend.
+#
+# The append is built in a temp file and added with ONE `cat >>`, so an
+# interruption can never leave a half-written (but sentinel-tagged) block.
+prepare-fpu-helper:
+	@set -e; \
+	if ! grep -qF '$(FPU_AES_SENTINEL)' "$(QEMU_FPU_HELPER)" 2>/dev/null; then \
+		if [ ! -f "$(QEMU_FPU_AES_SRC)" ]; then \
+			echo "ERROR: $(QEMU_FPU_AES_SRC) not found."; \
+			echo "       QEMU_TOP=$(QEMU_TOP)"; \
+			echo "       Override with QEMU_FPU_AES_SRC=/path/to/aes.c"; \
+			exit 1; \
+		fi; \
+	fi; \
+	if [ -f "$(SOFTFLOAT_MARKER)" ]; then \
 		echo "softfloat.c already prepended (marker exists): $(SOFTFLOAT_MARKER)"; \
 	else \
 		echo "Prepending $(QEMU_FPU_DIR)/softfloat.c to $(QEMU_FPU_HELPER) ..."; \
-		cp -f $(QEMU_FPU_HELPER) $(QEMU_FPU_HELPER).orig; \
-		cat $(QEMU_TOP)/accel/tcg/user-exec.c $(QEMU_FPU_DIR)/softfloat.c $(QEMU_FPU_HELPER).orig > $(QEMU_FPU_HELPER); \
-		touch $(SOFTFLOAT_MARKER); \
+		cp -f "$(QEMU_FPU_HELPER)" "$(QEMU_FPU_HELPER).orig"; \
+		cat "$(QEMU_TOP)/accel/tcg/user-exec.c" "$(QEMU_FPU_DIR)/softfloat.c" "$(QEMU_FPU_HELPER).orig" > "$(QEMU_FPU_HELPER)"; \
+		touch "$(SOFTFLOAT_MARKER)"; \
 		echo "done (original saved as fpu_helper.c.orig)."; \
+	fi; \
+	if grep -qF '$(FPU_AES_SENTINEL)' "$(QEMU_FPU_HELPER)" 2>/dev/null; then \
+		echo "crypto/aes.c already appended to $(QEMU_FPU_HELPER) (sentinel present)"; \
+	else \
+		echo "Appending $(QEMU_FPU_AES_SRC) to $(QEMU_FPU_HELPER) ..."; \
+		tmp="$$(mktemp)"; \
+		trap 'rm -f "$$tmp"' EXIT; \
+		printf '\n/* BEGIN %s: %s */\n' '$(FPU_AES_SENTINEL)' "$(QEMU_FPU_AES_SRC)" > "$$tmp"; \
+		cat "$(QEMU_FPU_AES_SRC)" >> "$$tmp"; \
+		printf '\n/* END %s */\n' '$(FPU_AES_SENTINEL)' >> "$$tmp"; \
+		cat "$$tmp" >> "$(QEMU_FPU_HELPER)"; \
+		rm -f "$$tmp"; \
+		trap - EXIT; \
+		echo "done (aes.c appended before preprocessing)."; \
 	fi
+
+# Backward-compatible name: `make prepend-softfloat` still works and now also
+# performs the append.
+prepend-softfloat: prepare-fpu-helper
 
 # --- 4. configure (shared) --------------------------------------------------
 
@@ -355,7 +411,7 @@ fi
 endef
 
 # fpu_helper.c
-preprocess-extract-fpu: capture-command-fpu
+preprocess-extract-fpu: capture-command-fpu prepare-fpu-helper
 	@cd $(QEMU_BUILD) && \
 		_PP_LOG='$(BUILD_LOG_FPU)' _PP_OBJ='$(PREPROCESSED_OBJ_FPU)' \
 		QEMU_TOP='$(QEMU_TOP)' QEMU_BUILD='$(QEMU_BUILD)' \
@@ -492,6 +548,8 @@ clean: clean-qemu-source clean-local
 # Remove everything we added to the QEMU source tree.
 # IMPORTANT: only remove the .inc files that *we* copied (COPIED_INCS), never
 # QEMU's own .inc files that happen to live in the same directory.
+# Restores fpu_helper.c.orig (dropping BOTH the prepend and the appended
+# crypto/aes.c block) and removes the marker.
 clean-qemu-source:
 	@if [ -n "$(QEMU_TOP)" ] && [ -d "$(QEMU_TOP)" ]; then \
 		echo "Undoing QEMU source modifications in $(QEMU_TOP) ..."; \
@@ -1777,7 +1835,7 @@ coverage-open: coverage-report
 	qemu-preprocess-cc-helper qemu-preprocess-int-helper \
 	qemu-preprocess-user-exec \
 	templates \
-	check-qemu-top copy-fpu-files prepend-softfloat \
+	check-qemu-top copy-fpu-files prepare-fpu-helper prepend-softfloat \
 	capture-command capture-command-fpu capture-command-tcg-runtime \
 	capture-command-cc-helper capture-command-int-helper \
 	capture-command-user-exec \
