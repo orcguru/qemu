@@ -1152,7 +1152,7 @@ int init_llvm() {
         features = "+m,+a,+f,+d,+v";
     } else {
         default_triple = "aarch64-unknown-linux-gnu";
-        features = "+neon";
+        features = "+neon,+crypto";
     }
     if (LLVMGetTargetFromTriple(default_triple, &target, &error_msg)) {
         fprintf(stderr, "Failed to get target from triple %s\n", error_msg);
@@ -1180,7 +1180,7 @@ int init_llvm() {
     g_attr_alwaysinline = LLVMCreateEnumAttribute(context, LLVMAlwaysInlineAttribute, 0);
     g_attr_nounwind = LLVMCreateEnumAttribute(context, LLVMGetEnumAttributeKindForName("nounwind", strlen("nounwind")), 0);
     const char *attr_key = "target-features";
-    const char *attr_value = (g_target_arch == TARGET_ARCH_RISCV64) ? "+m,+a,+f,+d,+v" : "+neon";
+    const char *attr_value = (g_target_arch == TARGET_ARCH_RISCV64) ? "+m,+a,+f,+d,+v" : "+neon,+crypto";
     size_t attr_key_len = strlen(attr_key);
     size_t attr_value_len = strlen(attr_value);
     g_attr_target_features = LLVMCreateStringAttribute(context, attr_key, attr_key_len, attr_value, attr_value_len);
