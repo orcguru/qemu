@@ -1084,6 +1084,93 @@ while (<FD>) {
 }
 close FD;
 
+# ===== Peephole: precompute the function-pointer typedef rewrite =====
+# $blank_info is frozen after filter_blank_info(), and the call graph
+# (SCALAR_ARGS / CALLS / CALL_ARGUMENTS) is not modified after this point.
+# Resolving "typedef -> concrete generated function" used to re-scan every
+# function and every callsite for every typedef for EVERY helper.  Do it once
+# here with inverted indices.  IS_FOREIGN is still refined inside the helper
+# loop, so only the (tiny) ABI-tail decision stays at render time.
+my %funcptr_calls_by_callee = ();   # callee -> [ [caller, \@args], ... ]
+my %funcptr_param_idx = ();         # func -> { param var -> arg index }
+my %funcptr_params_by_type = ();    # param type -> [ [callee, idx], ... ]
+my %funcptr_targets_cache = ();     # typedef name -> \@concrete funcs
+my %funcptr_typedef_rec = ();       # typedef name -> its parse record
+my @blank_chunks = ();              # verbatim strings | typedef records
+{
+  # Split the background text into verbatim runs and typedef statements.
+  my $verbatim = "";
+  my $pending = "";
+  foreach my $line (split(/\n/, $blank_info)) {
+    if ($pending ne "") {
+      $pending = $pending."\n".$line;
+      if ($line =~ /;/) {
+        my $stmt = $pending;
+        $pending = "";
+        if ($verbatim ne "") { push @blank_chunks, $verbatim; $verbatim = ""; }
+        push @blank_chunks, &parse_funcptr_typedef_stmt($stmt);
+      }
+      next;
+    }
+    if ($line =~ /typedef/ and $line =~ /\(\s*\*/ and not $line =~ /;/) {
+      if ($verbatim ne "") { push @blank_chunks, $verbatim; $verbatim = ""; }
+      $pending = $line;
+      next;
+    }
+    my $rec = &parse_funcptr_typedef_stmt($line);
+    if (ref $rec) {
+      if ($verbatim ne "") { push @blank_chunks, $verbatim; $verbatim = ""; }
+      push @blank_chunks, $rec;
+    } else {
+      $verbatim = $verbatim.$rec;
+    }
+  }
+  $verbatim = $verbatim.$pending."\n" if $pending ne "";
+  push @blank_chunks, $verbatim if $verbatim ne "";
+
+  # Build inverted indices over the frozen call graph, once.
+  my %needed = ();
+  foreach my $c (@blank_chunks) {
+    $needed{$c->{'NAME'}} = 1 if ref $c;
+  }
+  foreach my $fn (keys %funcs) {
+    if (exists $funcs{$fn}->{'SCALAR_ARGS'}) {
+      foreach my $a (@{$funcs{$fn}->{'SCALAR_ARGS'}}) {
+        my $t = defined $a->{'TYPE'} ? $a->{'TYPE'} : "";
+        $t =~ s/^\s+//;
+        $t =~ s/\s+$//;
+        my $idx = $a->{'IDX'};
+        $funcptr_param_idx{$fn}->{$a->{'VAR_NAME'}} = $idx;
+        push @{$funcptr_params_by_type{$t}}, [$fn, $idx] if exists $needed{$t};
+      }
+    }
+    if (exists $funcs{$fn}->{'CALLS'}) {
+      foreach my $loc (keys %{$funcs{$fn}->{'CALLS'}}) {
+        my $call = $funcs{$fn}->{'CALLS'}->{$loc};
+        push @{$funcptr_calls_by_callee{$call->{'CALL_TARGET'}}},
+             [$fn, $call->{'CALL_ARGUMENTS'}];
+      }
+    }
+  }
+
+  # Resolve each typedef once; records with no generated target stay verbatim.
+  # Keep a name -> record index so indirect calls (calls through a function
+  # pointer parameter) can look up the very same ABI tail at emission time.
+  foreach my $c (@blank_chunks) {
+    next if not ref $c;
+    $funcptr_typedef_rec{$c->{'NAME'}} = $c;
+    my @targets = &funcptr_typedef_targets($c->{'NAME'});
+    if (@targets == 0) {
+      $c->{'VERBATIM'} = $c->{'STMT'}."\n";
+    } else {
+      $c->{'TARGETS'} = \@targets;
+      $c->{'PREFIX'} = $c->{'INDENT'}."typedef __attribute__((qemuaot)) ".
+                       $c->{'RET'}." (*".$c->{'NAME'}.")(";
+    }
+  }
+}
+# ===== end peephole precompute =====
+
 foreach my $f (keys %funcs) {
   if (not exists $template_helpers{$f}) {
     next;
@@ -1344,7 +1431,12 @@ foreach my $f (keys %funcs) {
 
   # Generate function
   open OUT, "> $path/$f.c" or die "Cannot open $path/$f.c for write!\n";
-  print OUT "$blank_info\n\n";
+  # Peephole: function pointer typedefs are carried over from the input in
+  # $blank_info, so they have not gone through the qemuaot ABI rewrite that
+  # collect_func_args() applies to every generated function.  The background
+  # text and the typedef -> concrete function mapping were precomputed once
+  # above; only the IS_FOREIGN-dependent ABI tail is decided here.
+  print OUT &render_patched_blank()."\n\n";
   print OUT<<EOF;
 
 // QEMU_HELPER_BEGIN
@@ -2176,11 +2268,9 @@ sub get_statements
             }
           }
           if ($is_param) {
-            # Emit the original call text unchanged
-            $body = $body . &GetText(
-                $func_ptr->{'CALLS'}->{$e}->{'NAME_START'},
-                $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'}
-            );
+            # The function pointer typedef was rewritten with the qemuaot ABI
+            # tail, so the call must pass those extra arguments too.
+            $body = $body . &patch_indirect_call($func_ptr, $func_ptr->{'CALLS'}->{$e});
             $current_pos = $func_ptr->{'CALLS'}->{$e}->{'PAREN_STOP'} + 1;
           } else {
             die "$call_target" if not exists $fc->{$call_target};
@@ -2281,8 +2371,8 @@ sub get_statements
                 }
             }
             if ($is_param) {
-                # Emit the original call text unchanged
-                $body = $body.&GetText($func_ptr->{'CALLS'}->{$sub_current}->{'NAME_START'}, $func_ptr->{'CALLS'}->{$sub_current}->{'PAREN_STOP'});
+                # Same ABI tail fix as the main get_statements() branch.
+                $body = $body.&patch_indirect_call($func_ptr, $func_ptr->{'CALLS'}->{$sub_current});
             } else {
                 die "" if not exists $fc->{$foreign_call};
                 if ($func_ptr->{'HELPER_INTERFACE'}) {
@@ -2747,6 +2837,181 @@ sub collect_func_args
   }
   $args =~ s/^,\s+//;
   return $args;
+}
+
+# Resolve the concrete (script-generated) functions whose addresses flow into a
+# function pointer typedef.  Uses the inverted indices built once before the
+# helper loop (%funcptr_params_by_type / %funcptr_calls_by_callee /
+# %funcptr_param_idx) instead of scanning every function and callsite.  Results
+# are cached: the mapping depends only on the frozen call graph, not on the
+# helper currently being emitted.
+sub funcptr_typedef_targets
+{
+  my ($typedef_name) = @_;
+  return @{$funcptr_targets_cache{$typedef_name}}
+      if exists $funcptr_targets_cache{$typedef_name};
+  my %targets = ();
+  my %seen = ();
+  my @work = ();
+
+  foreach my $e (@{$funcptr_params_by_type{$typedef_name} || []}) {
+    my ($callee, $idx) = @$e;
+    foreach my $c (@{$funcptr_calls_by_callee{$callee} || []}) {
+      my ($caller, $args) = @$c;
+      my $actual = $args->[$idx];
+      push @work, [$caller, $actual] if defined $actual;
+    }
+  }
+
+  # A value may be forwarded through a function pointer parameter of an
+  # intermediate function (float64_sub -> float64_addsub -> float64_gen2),
+  # so walk up the call chain until a real function name is reached.
+  while (@work > 0) {
+    my ($caller, $expr) = @{pop @work};
+    $expr =~ s/^\s*&?\s*//;
+    $expr =~ s/\s+$//;
+    next if $seen{"$caller\0$expr"}++;
+    if (exists $funcs{$expr}) {
+      $targets{$expr} = 1;
+      next;
+    }
+    next if not $expr =~ /^\w+$/;
+    my $idx;
+    $idx = $funcptr_param_idx{$caller}->{$expr}
+        if exists $funcptr_param_idx{$caller};
+    next if not defined $idx;
+    foreach my $c (@{$funcptr_calls_by_callee{$caller} || []}) {
+      my ($p, $args) = @$c;
+      my $actual = $args->[$idx];
+      push @work, [$p, $actual] if defined $actual;
+    }
+  }
+  my @t = keys %targets;
+  $funcptr_targets_cache{$typedef_name} = \@t;
+  return @t;
+}
+
+# Parse one "typedef RET (*NAME)(PARAMS);" statement (single- or multi-line).
+# Returns a record hashref, or the verbatim statement text when it is not a
+# function pointer typedef.  Called once per statement at precompute time.
+sub parse_funcptr_typedef_stmt
+{
+  my ($stmt) = @_;
+  return $stmt."\n"
+      if not $stmt =~ /^(\s*)typedef\s+(.*?)\s*\(\s*\*\s*(\w+)\s*\)\s*\((.*)\)\s*;\s*$/s;
+  my ($indent, $ret, $name, $params) = ($1, $2, $3, $4);
+  # "(void)" means "no parameters"; when the ABI tail replaces it, drop the
+  # "void" token as well, otherwise it would glue into "voidCPUState * ...".
+  my $empty = 0;
+  if ($params =~ /^\s*void\s*$/) {
+    $params = "";
+    $empty = 1;
+  } elsif ($params =~ /^\s*$/) {
+    $empty = 1;
+  }
+  my %rec = (
+    'INDENT' => $indent,
+    'RET' => $ret,
+    'NAME' => $name,
+    'PARAMS' => $params,
+    'STMT' => $stmt,
+    'EMPTY_PARAMS' => $empty,
+  );
+  return \%rec;
+}
+
+# Render the precomputed background chunks.  The ABI tail mirrors
+# collect_func_args(): every rewritten function gains "CPUState * cpu_param",
+# and functions that may raise a QEMU exception (IS_FOREIGN) additionally gain
+# "int *trigger_exception_ptr".  This is the only part that must be evaluated
+# per helper, since IS_FOREIGN is refined inside the helper loop.
+sub render_patched_blank
+{
+  my $out = "";
+  foreach my $c (@blank_chunks) {
+    if (not ref $c) {
+      $out = $out.$c;
+      next;
+    }
+    if (exists $c->{'VERBATIM'}) {
+      $out = $out.$c->{'VERBATIM'};
+      next;
+    }
+    my $extra = ", CPUState * cpu_param";
+    $extra = $extra.", int *trigger_exception_ptr"
+        if &funcptr_typedef_is_foreign($c);
+    $extra =~ s/^,\s*// if $c->{'EMPTY_PARAMS'};
+    $out = $out.$c->{'PREFIX'}.$c->{'PARAMS'}.$extra.");\n";
+  }
+  return $out;
+}
+
+# A rewritten function-pointer typedef needs the exception pointer iff any
+# concrete function that flows into it may raise a QEMU exception.  Used both
+# by render_patched_blank() (the declaration) and by patch_indirect_call()
+# (every call through a parameter of this type), so the two can never diverge.
+sub funcptr_typedef_is_foreign
+{
+  my ($rec) = @_;
+  return 0 if exists $rec->{'VERBATIM'};
+  foreach my $t (@{$rec->{'TARGETS'}}) {
+    return 1 if exists $funcs{$t}->{'IS_FOREIGN'};
+  }
+  return 0;
+}
+
+# Return the extra arguments a call through a function pointer parameter must
+# pass to agree with the rewritten typedef.  The exception argument is spelled
+# differently at the top-level helper (a local int, so pass its address) than
+# in replicated helpers (an int * parameter), exactly like update_func_call().
+sub funcptr_call_extra
+{
+  my ($func_ptr, $typedef_name) = @_;
+  $typedef_name = "" if not defined $typedef_name;
+  $typedef_name =~ s/^\s+//;
+  $typedef_name =~ s/\s+$//;
+  my $rec = $funcptr_typedef_rec{$typedef_name};
+  # Not a function pointer typedef that we rewrote -> leave the call alone.
+  return "" if not defined $rec or exists $rec->{'VERBATIM'};
+  my $extra = "cpu_param";
+  if (&funcptr_typedef_is_foreign($rec)) {
+    die "Indirect call through $typedef_name in $func_ptr->{'NAME'}: "
+       ."needs trigger_exception but the function is not marked IS_FOREIGN\n"
+        if not exists $func_ptr->{'IS_FOREIGN'};
+    if ($func_ptr->{'HELPER_INTERFACE'}) {
+      $extra = $extra.", &trigger_exception";
+    } else {
+      $extra = $extra.", trigger_exception_ptr";
+    }
+  }
+  return $extra;
+}
+
+# Emit an indirect call (call target is a function pointer parameter).  The
+# original script emitted the call text verbatim; once the typedefs gained the
+# qemuaot ABI tail, those calls had too few arguments.  Insert the tail just
+# before the closing parenthesis, preserving the original argument text.
+sub patch_indirect_call
+{
+  my ($func_ptr, $call_info) = @_;
+  my $extra = "";
+  foreach my $arg (@{$func_ptr->{'SCALAR_ARGS'}}) {
+    if ($arg->{'VAR_NAME'} eq $call_info->{'CALL_TARGET'}) {
+      $extra = &funcptr_call_extra($func_ptr, $arg->{'TYPE'});
+      last;
+    }
+  }
+  return &GetText($call_info->{'NAME_START'}, $call_info->{'PAREN_STOP'})
+      if $extra eq "";
+  my $call_txt = &GetText($call_info->{'NAME_START'},
+                          $call_info->{'PAREN_STOP'} - 1);
+  # No leading comma for a zero-argument call.
+  if ($call_txt =~ /\(\s*$/) {
+    $call_txt = $call_txt.$extra;
+  } else {
+    $call_txt = $call_txt.", ".$extra;
+  }
+  return $call_txt.")";
 }
 
 sub IsValidSymbolStart
