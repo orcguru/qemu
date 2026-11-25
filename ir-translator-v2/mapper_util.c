@@ -582,6 +582,17 @@ const int helper_require_exception_path[HELPER_MAX] = {
     [helper_idivw_AX] = 1,
     [helper_divsd] = 1,
     [helper_jmp_ind] = 1,
+#if (defined(__riscv) && __riscv_xlen == 64)
+    [helper_aesdec_xmm] = 1,
+    [helper_aesenc_xmm] = 1,
+    [helper_aesdeclast_xmm] = 1,
+    [helper_aesimc_xmm] = 1,
+    [helper_aesenclast_xmm] = 1,
+    [helper_aesdeclast_ymm] = 1,
+    [helper_aesdec_ymm] = 1,
+    [helper_aesenclast_ymm] = 1,
+    [helper_aesenc_ymm] = 1,
+#endif
 };
 
 const bool helper_runtime_does_not_return[HELPER_MAX] = {
