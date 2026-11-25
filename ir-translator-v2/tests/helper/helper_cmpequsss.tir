@@ -1,0 +1,54 @@
+XMM0:$0x360
+XMM1:$0x3a0
+XMM2:$0x3e0
+XMM3:$0x420
+XMM4:$0x460
+XMM5:$0x4a0
+XMM6:$0x4e0
+XMM7:$0x520
+XMM8:$0x560
+XMM9:$0x5a0
+XMM10:$0x5e0
+XMM11:$0x620
+XMM12:$0x660
+XMM13:$0x6a0
+XMM14:$0x6e0
+XMM15:$0x720
+XMM_t0:$0xb60
+
+EXTERNAL:$0x7b0:
+mov_i64 loc2,$0xaabbccdd3f800000
+st_i64 loc2,env,$0x5a0
+mov_i64 loc3,$0x5566778811223344
+st_i64 loc3,env,$0x5a8
+mov_i64 loc4,$0xb0a09080f0e0d0c
+st_i64 loc4,env,$0x5b0
+mov_i64 loc5,$0x5b6a79881f2e3d4c
+st_i64 loc5,env,$0x5b8
+mov_i64 loc6,$0x99aabbcc3f800000
+st_i64 loc6,env,$0x5e0
+mov_i64 loc7,$0x13579bdfddeeff00
+st_i64 loc7,env,$0x5e8
+mov_i64 loc8,$0x4444444433333333
+st_i64 loc8,env,$0x5f0
+mov_i64 loc9,$0x6666666655555555
+st_i64 loc9,env,$0x5f8
+mov_i64 loc10,$0xfedcba982468ace0
+st_i64 loc10,env,$0x620
+mov_i64 loc11,$0x89abcdef76543210
+st_i64 loc11,env,$0x628
+mov_i64 loc12,$0xccccccccbbbbbbbb
+st_i64 loc12,env,$0x630
+mov_i64 loc13,$0xeeeeeeeedddddddd
+st_i64 loc13,env,$0x638
+jmp_direct $0x7b2
+
+EXTERNAL:$0x7b2:
+add_i64 loc14,env,$0x5a0
+add_i64 loc15,env,$0x5e0
+add_i64 loc16,env,$0x620
+call cmpequsss,$0x0,$0,env,loc16,loc14,loc15
+call dump_registers,$0x0,$0,env,$0x0
+mov_i64 rdi,$0x7f
+mov_i64 rax,$0xe7
+call syscall,$0x0,$0,env,$0x2
