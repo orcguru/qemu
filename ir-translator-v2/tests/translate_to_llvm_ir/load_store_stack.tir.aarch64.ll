@@ -69,7 +69,7 @@ entry:
   store i32 %T8.out, ptr %tmp3.stack, align 16, !tbaa !0, !tcg.op !13
 }
 
-attributes #0 = { noinline nounwind "target-features"="+neon" }
+attributes #0 = { noinline nounwind "target-features"="+neon,+crypto" }
 
 !0 = !{!1, !1, i64 0}
 !1 = !{!"SpillSlo", !2}

@@ -742,7 +742,7 @@ LLVMValueRef get_or_add_helper_with_qemuaot_cc(HelperType h, const UnifiedInstr 
     SBuf bh;
     char dump_helper_buf[128] = {0};
     sbuf_init(&bh, &dump_helper_buf[0], sizeof(dump_helper_buf));
-    sbuf_printf(&bh, "%s", helper_str[h]);
+    sbuf_printf(&bh, "%s_qemuaot", helper_str[h]);
     for (int i = 2; i < u->operand_count; ++i) {
         assert(u->operands[i].kind == OP_VEC);
         sbuf_printf(&bh, "_V%d", u->operands[i].vec.idx);

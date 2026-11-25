@@ -2442,9 +2442,9 @@ entry:
 
 declare void @helper_raise_exception(i64, i64)
 
-attributes #0 = { noinline nounwind "target-features"="+neon" }
+attributes #0 = { noinline nounwind "target-features"="+neon,+crypto" }
 attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
-attributes #2 = { nounwind "target-features"="+neon" }
+attributes #2 = { nounwind "target-features"="+neon,+crypto" }
 
 !0 = !{!1, !1, i64 0}
 !1 = !{!"SpillSlo", !2}

@@ -708,7 +708,7 @@ entry:
   store i64 %T111.tmp11, ptr %T111.addr_high_val.ptr, align 8, !tbaa !24, !tcg.op !118
 }
 
-attributes #0 = { noinline nounwind "target-features"="+neon" }
+attributes #0 = { noinline nounwind "target-features"="+neon,+crypto" }
 
 !0 = !{!1, !1, i64 0}
 !1 = !{!"SpillSlo", !2}

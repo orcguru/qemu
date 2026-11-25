@@ -23,7 +23,7 @@ entry:
   %T0.v10 = load <16 x i8>, ptr %v10.stack, align 16, !tbaa !4, !tcg.op !7
   store <16 x i8> %T0.v10, ptr %tmp0.stack, align 16, !tbaa !4, !tcg.op !7
 ; ======== TCG [1] func_addr t3,helper_cc_compute_c ========
-  store ptr @helper_cc_compute_c, ptr %tmp3.stack, align 8, !tbaa !4, !tcg.op !8
+  store ptr @helper_cc_compute_c_qemuaot, ptr %tmp3.stack, align 8, !tbaa !4, !tcg.op !8
 ; ======== TCG [2] call_qemuaot t3,[t0],cc_dst,cc_src,cc_src2(env),cc_op VEC_ARGS: ========
   %T2.loaded_fn = load ptr, ptr %tmp3.stack, align 8, !tcg.op !9
   %T2.cc_src.stack = load i64, ptr %cc_src.stack, align 8, !tbaa !4, !tcg.op !9
@@ -318,7 +318,7 @@ entry:
 }
 
 ; Function Attrs: alwaysinline nounwind
-define weak qemuaot i64 @helper_cc_compute_c(i64 noundef %rax, i64 noundef %rcx, i64 noundef %rdx, i64 noundef %rbx, i64 noundef %rsp, i64 noundef %rbp, i64 noundef %rsi, i64 noundef %rdi, i64 noundef %r8, i64 noundef %r9, i64 noundef %r10, i64 noundef %r11, i64 noundef %r12, i64 noundef %r13, i64 noundef %r14, i64 noundef %r15, i64 noundef %qemuaot_src1, i64 noundef %qemuaot_dst, i32 noundef %qemuaot_op, i64 noundef %rip, <2 x i64> noundef %xmm0, <2 x i64> noundef %ymm0_h, <2 x i64> noundef %xmm1, <2 x i64> noundef %ymm1_h, <2 x i64> noundef %xmm2, <2 x i64> noundef %ymm2_h, <2 x i64> noundef %xmm3, <2 x i64> noundef %ymm3_h, <2 x i64> noundef %xmm4, <2 x i64> noundef %ymm4_h, <2 x i64> noundef %xmm5, <2 x i64> noundef %ymm5_h, <2 x i64> noundef %xmm6, <2 x i64> noundef %ymm6_h, <2 x i64> noundef %xmm7, <2 x i64> noundef %ymm7_h, <2 x i64> noundef %xmm8, <2 x i64> noundef %ymm8_h, <2 x i64> noundef %xmm9, <2 x i64> noundef %ymm9_h, <2 x i64> noundef %xmm10, <2 x i64> noundef %ymm10_h, <2 x i64> noundef %xmm11, <2 x i64> noundef %ymm11_h, <2 x i64> noundef %xmm12, <2 x i64> noundef %ymm12_h, <2 x i64> noundef %xmm13, <2 x i64> noundef %ymm13_h, ptr noundef %cpu_param, i64 noundef %dst, i64 noundef %src1, i64 noundef %src2, i32 noundef %op, i64 noundef %normal_return) local_unnamed_addr #1 {
+define weak qemuaot i64 @helper_cc_compute_c_qemuaot(i64 noundef %rax, i64 noundef %rcx, i64 noundef %rdx, i64 noundef %rbx, i64 noundef %rsp, i64 noundef %rbp, i64 noundef %rsi, i64 noundef %rdi, i64 noundef %r8, i64 noundef %r9, i64 noundef %r10, i64 noundef %r11, i64 noundef %r12, i64 noundef %r13, i64 noundef %r14, i64 noundef %r15, i64 noundef %qemuaot_src1, i64 noundef %qemuaot_dst, i32 noundef %qemuaot_op, i64 noundef %rip, <2 x i64> noundef %xmm0, <2 x i64> noundef %ymm0_h, <2 x i64> noundef %xmm1, <2 x i64> noundef %ymm1_h, <2 x i64> noundef %xmm2, <2 x i64> noundef %ymm2_h, <2 x i64> noundef %xmm3, <2 x i64> noundef %ymm3_h, <2 x i64> noundef %xmm4, <2 x i64> noundef %ymm4_h, <2 x i64> noundef %xmm5, <2 x i64> noundef %ymm5_h, <2 x i64> noundef %xmm6, <2 x i64> noundef %ymm6_h, <2 x i64> noundef %xmm7, <2 x i64> noundef %ymm7_h, <2 x i64> noundef %xmm8, <2 x i64> noundef %ymm8_h, <2 x i64> noundef %xmm9, <2 x i64> noundef %ymm9_h, <2 x i64> noundef %xmm10, <2 x i64> noundef %ymm10_h, <2 x i64> noundef %xmm11, <2 x i64> noundef %ymm11_h, <2 x i64> noundef %xmm12, <2 x i64> noundef %ymm12_h, <2 x i64> noundef %xmm13, <2 x i64> noundef %ymm13_h, ptr noundef %cpu_param, i64 noundef %dst, i64 noundef %src1, i64 noundef %src2, i32 noundef %op, i64 noundef %normal_return) local_unnamed_addr #1 {
 entry:
   switch i32 %op, label %cleanup [
     i32 51, label %sw.bb134
@@ -602,9 +602,9 @@ cleanup:                                          ; preds = %entry, %sw.bb134, %
 ; Function Attrs: nounwind
 declare qemuaot void @Fx55aa(i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32, i64, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, ptr align 8 dereferenceable(26528)) #2 section ".text.Fx55aa"
 
-attributes #0 = { noinline nounwind "target-features"="+neon" }
+attributes #0 = { noinline nounwind "target-features"="+neon,+crypto" }
 attributes #1 = { alwaysinline nounwind "frame-pointer"="non-leaf" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="apple-a15" "target-features"="+aes,+bf16,+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fpac,+fullfp16,+i8mm,+jsconv,+lse,+neon,+pauth,+perfmon,+predres,+ras,+rcpc,+rdm,+sb,+sha2,+sha3,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8.6a,+v8a,-fmv,-outline-atomics" }
-attributes #2 = { nounwind "target-features"="+neon" }
+attributes #2 = { nounwind "target-features"="+neon,+crypto" }
 
 !llvm.ident = !{!0}
 !llvm.module.flags = !{!1, !2, !3}

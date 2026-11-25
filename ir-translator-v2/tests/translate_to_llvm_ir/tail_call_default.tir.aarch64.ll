@@ -58,7 +58,7 @@ bb_L0:                                            ; preds = %entry
 ; ======== TCG [9] func_addr t3,helper_jmp_ind ========
   store ptr @helper_jmp_ind, ptr %tmp3.stack, align 8, !tbaa !4, !tcg.op !19
 ; ======== TCG [10] func_addr t4,jmp_ind_callback ========
-  store ptr @jmp_ind_callback, ptr %tmp4.stack, align 8, !tbaa !4, !tcg.op !20
+  store ptr @jmp_ind_callback_qemuaot, ptr %tmp4.stack, align 8, !tbaa !4, !tcg.op !20
 ; ======== TCG [11] func_addr t5,0x55aa,0x1 ========
   store ptr @trampoline_helper_jit, ptr %tmp5.stack, align 8, !tbaa !4, !tcg.op !21
 ; ======== TCG [12] tail_call_qemuaot t3,env,rip,t5,t4 VEC_ARGS: ========
@@ -76,7 +76,7 @@ bb_L0:                                            ; preds = %entry
 declare qemuaot void @helper_jmp_ind(i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32, i64, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, <2 x i64>, ptr, i64, i64, i64, i64) #1
 
 ; Function Attrs: nounwind
-define weak qemuaot void @jmp_ind_callback(i64 noundef %rax, i64 noundef %rcx, i64 noundef %rdx, i64 noundef %rbx, i64 noundef %rsp, i64 noundef %rbp, i64 noundef %rsi, i64 noundef %rdi, i64 noundef %r8, i64 noundef %r9, i64 noundef %r10, i64 noundef %r11, i64 noundef %r12, i64 noundef %r13, i64 noundef %r14, i64 noundef %r15, i64 noundef %src, i64 noundef %dst, i32 noundef %op, i64 noundef %rip, <2 x i64> noundef %xmm0, <2 x i64> noundef %ymm0_h, <2 x i64> noundef %xmm1, <2 x i64> noundef %ymm1_h, <2 x i64> noundef %xmm2, <2 x i64> noundef %ymm2_h, <2 x i64> noundef %xmm3, <2 x i64> noundef %ymm3_h, <2 x i64> noundef %xmm4, <2 x i64> noundef %ymm4_h, <2 x i64> noundef %xmm5, <2 x i64> noundef %ymm5_h, <2 x i64> noundef %xmm6, <2 x i64> noundef %ymm6_h, <2 x i64> noundef %xmm7, <2 x i64> noundef %ymm7_h, <2 x i64> noundef %xmm8, <2 x i64> noundef %ymm8_h, <2 x i64> noundef %xmm9, <2 x i64> noundef %ymm9_h, <2 x i64> noundef %xmm10, <2 x i64> noundef %ymm10_h, <2 x i64> noundef %xmm11, <2 x i64> noundef %ymm11_h, <2 x i64> noundef %xmm12, <2 x i64> noundef %ymm12_h, <2 x i64> noundef %xmm13, <2 x i64> noundef %ymm13_h, i64 noundef %cpu_param, i64 noundef %host_addr, i64 noundef %trampoline_helper_jit) local_unnamed_addr #2 {
+define weak qemuaot void @jmp_ind_callback_qemuaot(i64 noundef %rax, i64 noundef %rcx, i64 noundef %rdx, i64 noundef %rbx, i64 noundef %rsp, i64 noundef %rbp, i64 noundef %rsi, i64 noundef %rdi, i64 noundef %r8, i64 noundef %r9, i64 noundef %r10, i64 noundef %r11, i64 noundef %r12, i64 noundef %r13, i64 noundef %r14, i64 noundef %r15, i64 noundef %src, i64 noundef %dst, i32 noundef %op, i64 noundef %rip, <2 x i64> noundef %xmm0, <2 x i64> noundef %ymm0_h, <2 x i64> noundef %xmm1, <2 x i64> noundef %ymm1_h, <2 x i64> noundef %xmm2, <2 x i64> noundef %ymm2_h, <2 x i64> noundef %xmm3, <2 x i64> noundef %ymm3_h, <2 x i64> noundef %xmm4, <2 x i64> noundef %ymm4_h, <2 x i64> noundef %xmm5, <2 x i64> noundef %ymm5_h, <2 x i64> noundef %xmm6, <2 x i64> noundef %ymm6_h, <2 x i64> noundef %xmm7, <2 x i64> noundef %ymm7_h, <2 x i64> noundef %xmm8, <2 x i64> noundef %ymm8_h, <2 x i64> noundef %xmm9, <2 x i64> noundef %ymm9_h, <2 x i64> noundef %xmm10, <2 x i64> noundef %ymm10_h, <2 x i64> noundef %xmm11, <2 x i64> noundef %ymm11_h, <2 x i64> noundef %xmm12, <2 x i64> noundef %ymm12_h, <2 x i64> noundef %xmm13, <2 x i64> noundef %ymm13_h, i64 noundef %cpu_param, i64 noundef %host_addr, i64 noundef %trampoline_helper_jit) local_unnamed_addr #2 {
 entry:
   %tobool.not = icmp eq i64 %host_addr, 0
   br i1 %tobool.not, label %if.else, label %if.then
@@ -259,8 +259,8 @@ entry:
 
 declare void @helper_jit(i64, i64)
 
-attributes #0 = { noinline nounwind "target-features"="+neon" }
-attributes #1 = { nounwind "target-features"="+neon" }
+attributes #0 = { noinline nounwind "target-features"="+neon,+crypto" }
+attributes #1 = { nounwind "target-features"="+neon,+crypto" }
 attributes #2 = { nounwind "frame-pointer"="non-leaf" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="apple-a15" "target-features"="+aes,+bf16,+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fpac,+fullfp16,+i8mm,+jsconv,+lse,+neon,+pauth,+perfmon,+predres,+ras,+rcpc,+rdm,+sb,+sha2,+sha3,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8.6a,+v8a,-fmv,-outline-atomics" }
 attributes #3 = { nounwind }
 
