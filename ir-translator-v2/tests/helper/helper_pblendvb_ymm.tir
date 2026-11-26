@@ -1,0 +1,63 @@
+XMM0:$0x360
+XMM1:$0x3a0
+XMM2:$0x3e0
+XMM3:$0x420
+XMM4:$0x460
+XMM5:$0x4a0
+XMM6:$0x4e0
+XMM7:$0x520
+XMM8:$0x560
+XMM9:$0x5a0
+XMM10:$0x5e0
+XMM11:$0x620
+XMM12:$0x660
+XMM13:$0x6a0
+XMM14:$0x6e0
+XMM15:$0x720
+XMM_t0:$0xb60
+
+EXTERNAL:$0x7b0:
+mov_i64 loc2,$0x1716151413121110
+st_i64 loc2,env,$0x5a0
+mov_i64 loc3,$0x1f1e1d1c1b1a1918
+st_i64 loc3,env,$0x5a8
+mov_i64 loc4,$0x2726252423222120
+st_i64 loc4,env,$0x5b0
+mov_i64 loc5,$0x2f2e2d2c2b2a2928
+st_i64 loc5,env,$0x5b8
+mov_i64 loc6,$0x2726252423222120
+st_i64 loc6,env,$0x5e0
+mov_i64 loc7,$0x2f2e2d2c2b2a2928
+st_i64 loc7,env,$0x5e8
+mov_i64 loc8,$0x3736353433323130
+st_i64 loc8,env,$0x5f0
+mov_i64 loc9,$0x3f3e3d3c3b3a3938
+st_i64 loc9,env,$0x5f8
+mov_i64 loc10,$0x7777777788888888
+st_i64 loc10,env,$0x620
+mov_i64 loc11,$0x7676767689898989
+st_i64 loc11,env,$0x628
+mov_i64 loc12,$0x757575758a8a8a8a
+st_i64 loc12,env,$0x630
+mov_i64 loc13,$0x747474748b8b8b8b
+st_i64 loc13,env,$0x638
+mov_i64 loc14,$0xc746c54443c241c0
+st_i64 loc14,env,$0x660
+mov_i64 loc15,$0xcf4ecd4c4b4a49c8
+st_i64 loc15,env,$0x668
+mov_i64 loc16,$0x5756d554d35251d0
+st_i64 loc16,env,$0x670
+mov_i64 loc17,$0xdf5edd5c5bda59d8
+st_i64 loc17,env,$0x678
+jmp_direct $0x7b2
+
+EXTERNAL:$0x7b2:
+add_i64 loc30,env,$0x620
+add_i64 loc31,env,$0x5a0
+add_i64 loc32,env,$0x5e0
+add_i64 loc33,env,$0x660
+call pblendvb_ymm,$0x0,$0,env,loc30,loc31,loc32,loc33
+call dump_registers,$0x0,$0,env,$0x0
+mov_i64 rdi,$0x7f
+mov_i64 rax,$0xe7
+call syscall,$0x0,$0,env,$0x2

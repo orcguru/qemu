@@ -1569,6 +1569,14 @@ EOF
 sub lookup
 {
   my ($loc, $lookup_info) = @_;
+  # An empty lookup table (e.g. %env_lookup when the only <ENV> token sits in
+  # the function declarator, outside every function body) must fail fast.
+  # Otherwise $high_idx becomes -1 and the binary search below dereferences
+  # SORTED_ADDR->[-1] -> MAP->{undef} -> undefined LOOKUP_START/STOP, which
+  # emits a burst of "uninitialized value" warnings for every caller.  All
+  # callers already treat -1 as "not found", so an early -1 is behaviour-safe.
+  return -1 if not exists $lookup_info->{'SORTED_ADDR'}
+              or @{$lookup_info->{'SORTED_ADDR'}} == 0;
   my $low_idx = 0;
   my $high_idx = $#{$lookup_info->{'SORTED_ADDR'}};
   if ($lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_START'} <= $loc and $lookup_info->{'MAP'}->{$lookup_info->{'SORTED_ADDR'}->[$high_idx]}->{'LOOKUP_STOP'} > $loc) {
@@ -2557,23 +2565,26 @@ sub get_func_body
 {
   my ($func_ptr, $pi, $md, $exception_exit, $fc) = @_;
 
-  # Build the 256-bit pack/unpack candidates for *_ymm helpers.  They are only
-  # emitted when the helper context actually references the 256-bit units
-  # (d/v/s as v4ulong); see the reference check just before body generation.
-  my $ymm_prolog = "";
-  my $ymm_epilog = "";
+  # Build the 256-bit pack/unpack candidates for *_ymm helpers, one snippet per
+  # vector argument.  A snippet is emitted only when its own 256-bit unit is
+  # referenced in the helper context; see the per-unit check below.
+  my %ymm_prolog_for = ();
+  my %ymm_epilog_for = ();
   if ($func_ptr->{'YMM_FLAG'} eq "_YMM") {
     foreach my $vec_idx (0..$#{$func_ptr->{'VECTOR_ARGS'}}) {
-      my $arg_entry = $func_ptr->{'VECTOR_ARGS'}->[$vec_idx];
-      $ymm_prolog = $ymm_prolog."v4ulong $arg_entry->{'VAR_NAME'};\n";
-      $ymm_prolog = $ymm_prolog."$arg_entry->{'VAR_NAME'}"."[0] = $arg_entry->{'VAR_NAME'}x[0];\n";
-      $ymm_prolog = $ymm_prolog."$arg_entry->{'VAR_NAME'}"."[1] = $arg_entry->{'VAR_NAME'}x[1];\n";
-      $ymm_prolog = $ymm_prolog."$arg_entry->{'VAR_NAME'}"."[2] = $arg_entry->{'VAR_NAME'}y[0];\n";
-      $ymm_prolog = $ymm_prolog."$arg_entry->{'VAR_NAME'}"."[3] = $arg_entry->{'VAR_NAME'}y[1];\n";
-      $ymm_epilog = "$arg_entry->{'VAR_NAME'}x[0] = $arg_entry->{'VAR_NAME'}"."[0];\n".$ymm_epilog;
-      $ymm_epilog = "$arg_entry->{'VAR_NAME'}x[1] = $arg_entry->{'VAR_NAME'}"."[1];\n".$ymm_epilog;
-      $ymm_epilog = "$arg_entry->{'VAR_NAME'}y[0] = $arg_entry->{'VAR_NAME'}"."[2];\n".$ymm_epilog;
-      $ymm_epilog = "$arg_entry->{'VAR_NAME'}y[1] = $arg_entry->{'VAR_NAME'}"."[3];\n".$ymm_epilog;
+      my $unit = $func_ptr->{'VECTOR_ARGS'}->[$vec_idx]->{'VAR_NAME'};
+      my $p = "v4ulong $unit;\n";
+      $p = $p."$unit"."[0] = $unit"."x[0];\n";
+      $p = $p."$unit"."[1] = $unit"."x[1];\n";
+      $p = $p."$unit"."[2] = $unit"."y[0];\n";
+      $p = $p."$unit"."[3] = $unit"."y[1];\n";
+      my $e = "";
+      $e = "$unit"."x[0] = $unit"."[0];\n".$e;
+      $e = "$unit"."x[1] = $unit"."[1];\n".$e;
+      $e = "$unit"."y[0] = $unit"."[2];\n".$e;
+      $e = "$unit"."y[1] = $unit"."[3];\n".$e;
+      $ymm_prolog_for{$unit} = $p;
+      $ymm_epilog_for{$unit} = $e;
     }
   }
 
@@ -2631,37 +2642,35 @@ END
       $body = $body.$counter_def;
     }
   }
-  # Peephole for *_ymm helpers: the 256-bit units (d/v/s as v4ulong) are only
-  # an emulation layer for helpers that operate on the whole 256-bit vector.
-  # Helpers that work directly on 128-bit halves (dx/dy, vx/vy, sx/sy) never
-  # mention d/v/s, so the pack at entry and the unpack at exit are dead code.
+  # Peephole for *_ymm helpers: a 256-bit unit (d/v/s as v4ulong) is only an
+  # emulation layer for helpers that operate on the whole 256-bit vector.
+  # Decide per unit, not all-or-nothing: a helper may read v/s as 256-bit
+  # vectors while writing its result straight through 128-bit halves dx/dy.
+  # Keeping the pack/unpack for the unused d would then write a stale entry
+  # copy of d back over the result at exit.
   #
-  # Generate a probe body WITHOUT the epilog: the epilog itself mentions
-  # d/v/s, so it must be excluded from the check.  Also include the fixed
-  # prolog prefix (HELPER_COUNTERS block, etc.) in the scan.  A hit on any
-  # vector argument name as a whole C identifier keeps the pack/unpack.
+  # Generate a probe body WITHOUT the epilog: the epilog itself mentions the
+  # units, so it must be excluded from the check.  Also include the fixed
+  # prolog prefix (HELPER_COUNTERS block, etc.) in the scan.  Whole-C-
+  # identifier matching keeps "dx"/"vx"/"sx" from counting as "d"/"v"/"s".
   my $prolog = "";
   my $epilog = "";
   my $probe_content;
-  if ($ymm_prolog ne "") {
+  if (keys %ymm_prolog_for > 0) {
     $probe_content = &get_statements($func_ptr, $func_ptr->{'BODY_START'} + 1, $func_ptr->{'BODY_STOP'}, "", $pi, $md, $exception_exit, $fc);
     my $scan = $body.$probe_content;
-    my $referenced = 0;
     foreach my $arg_entry (@{$func_ptr->{'VECTOR_ARGS'}}) {
       my $unit = $arg_entry->{'VAR_NAME'};
+      next if not exists $ymm_prolog_for{$unit};
       if ($scan =~ /(?<![A-Za-z_0-9])\Q$unit\E(?![A-Za-z_0-9])/) {
-        $referenced = 1;
-        last;
+        $prolog = $prolog.$ymm_prolog_for{$unit};
+        $epilog = $ymm_epilog_for{$unit}.$epilog;
       }
-    }
-    if ($referenced) {
-      $prolog = $ymm_prolog;
-      $epilog = $ymm_epilog;
     }
   }
   my $new_content;
   if (defined $probe_content and $epilog eq "") {
-    # No pack/unpack needed: reuse the probe body verbatim.
+    # No pack/unpack needed at all: reuse the probe body verbatim.
     $new_content = $probe_content;
   } else {
     $new_content = &get_statements($func_ptr, $func_ptr->{'BODY_START'} + 1, $func_ptr->{'BODY_STOP'}, $epilog, $pi, $md, $exception_exit, $fc);
