@@ -577,6 +577,7 @@ const int helper_require_exception_path[HELPER_MAX] = {
     [helper_subss] = 1,
     [helper_ucomiss] = 1,
     [helper_divw_AX] = 1,
+    [helper_divb_AL] = 1,
     [helper_idivb_AL] = 1,
     [helper_idivl_EAX] = 1,
     [helper_idivw_AX] = 1,
