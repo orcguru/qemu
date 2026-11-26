@@ -100,6 +100,44 @@ PREPROCESSED_OUT := $(QEMU_BUILD)/$(PREPROCESSED_OBJ).E
 # Build-log captured from V=1 (contains the full clang command line)
 BUILD_LOG := $(QEMU_BUILD)/fpu_helper_build.log
 
+# ----------------------------------------------------------------------------
+# Makefile name to pass to recursive $(MAKE) calls (test-san, cov-run, ...).
+# MAKEFILE_LIST also contains every -include'd .d file, so $(lastword ...) is
+# NOT safe here: it would resolve to a dependency file instead of this
+# Makefile.  The top-level makefile is always the FIRST entry.
+# ----------------------------------------------------------------------------
+TOP_MAKEFILE := $(firstword $(MAKEFILE_LIST))
+
+# ----------------------------------------------------------------------------
+# Automatic header dependencies
+#
+# Every compile asks the compiler to record the headers that translation unit
+# really includes, into a <name>.d file sitting next to the <name>.o.  Those
+# .d files are -include'd at the bottom of this Makefile, which is what makes
+# a change to ANY header (tcg_ast.h, qemu_cpu_sizes.h, lexer.yy.h,
+# parser.tab.h, ...) rebuild exactly the objects that include it and relink
+# the affected binaries.  Hand-maintained "foo.o: foo.h" lines always rot, so
+# there are none.
+#
+#   -MMD  generate dependencies for user headers only (not system headers)
+#   -MP   emit a phony rule for each header, so deleting/renaming a header
+#         does NOT break the build with "No rule to make target 'xxx.h'"
+#   -MF   explicit .d path (works for .san/<san>/ and .cov/ objects too)
+#   -MT   the exact object name as the target of the generated rule
+#
+# This is a recursively-expanded variable, so $@ is resolved per recipe.
+# Override with DEPFLAGS= (empty) to disable dep generation entirely.
+#
+# qemu_cpu_sizes.h is generated on demand (see the rule below) and must exist
+# BEFORE any .c that #includes it is compiled - including on the very first
+# build, when no .d files exist yet, and under `make -j`.  It is therefore an
+# order-only prerequisite of every compile rule: make builds it first, but its
+# timestamp alone does not force a rebuild.  Actual content changes do force
+# one, via the .d files.  (`tcg_mapper` already lists it as a normal prereq.)
+# ----------------------------------------------------------------------------
+DEPFLAGS ?= -MMD -MP -MF $(@:.o=.d) -MT $@
+QEMU_CPU_SIZE_HDR := qemu_cpu_sizes.h
+
 # Object lists are shared by the native build and the sanitizer build.
 COMMON_OBJS  := parser.tab.o lexer.yy.o mapper_util.o helper_lookup.o \
 	util.o expander.o operand_static_types.o i386_cpu.o
@@ -117,14 +155,22 @@ tcg_printer: $(PRINTER_OBJS)
 parser.tab.o: parser.tab.c lexer.yy.h
 lexer.yy.o: lexer.yy.c lexer.yy.h
 
-%.o: %.c
-	gcc $(CFLAGS) -c $< -o $@
+%.o: %.c | $(QEMU_CPU_SIZE_HDR)
+	gcc $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 lexer.yy.c lexer.yy.h: lexer.l
 	$(LEX) -o lexer.yy.c --header-file=lexer.yy.h $^
 
 parser.tab.c: parser.y
 	$(BISON) -d $^
+
+# `bison -d` writes parser.tab.c AND parser.tab.h together.  The .d files
+# will list parser.tab.h as a prerequisite of any object that includes it, so
+# make needs an explicit rule for the header too.  The test keeps this cheap:
+# when bison has already produced both files, do nothing; if only the .c is
+# present, regenerate from parser.y (also safe under parallel make).
+parser.tab.h: parser.tab.c
+	@test -f "$@" || $(BISON) -d parser.y
 
 helper_lookup.c: helpers.gperf
 	gperf -t -L ANSI-C -N lookup_helper $^ > helper_lookup.c
@@ -593,7 +639,9 @@ clean-qemu-source:
 		echo "QEMU_TOP not set or not a directory; skipping QEMU cleanup."; \
 	fi
 
-# Remove local build artifacts (original Makefile clean)
+# Remove local build artifacts (original Makefile clean).
+# *.d are the auto-generated header dependency files; the ones under .san/
+# and .cov/ disappear with those directories on the previous line.
 clean-local:
 	rm -f *.o parser.tab.* lexer.yy.* tcg_mapper tcg_printer helper_lookup.c tests/expand_tcg_ir/*.out collect_helper_templates/*.E collect_helper_templates/*.E.out collect_helper_templates/*.E.err
 	rm -rf collect_helper_templates/*.o.E.helper_templates
@@ -601,7 +649,7 @@ clean-local:
 	rm -rf tests/translate_then_gen_asm_snippet/out
 	rm -rf tests/helper/out
 	rm -rf .san .cov coverage
-	rm -f *.gcda *.gcno *.gcov
+	rm -f *.gcda *.gcno *.gcov *.d
 	rm -f tests/expand_tcg_ir/*.err tests/expand_tcg_ir/*.exp.tmp
 	rm -f tests/translate_to_llvm_ir/*.ll.tmp
 	rm -f qemu_cpu_sizes.h
@@ -1649,8 +1697,8 @@ endif
 $(SAN_OBJDIR):
 	@mkdir -p "$(SAN_OBJDIR)"
 
-$(SAN_OBJDIR)/%.o: %.c | $(SAN_OBJDIR)
-	$(SAN_CC) $(SAN_CFLAGS) -c $< -o $@
+$(SAN_OBJDIR)/%.o: %.c | $(SAN_OBJDIR) $(QEMU_CPU_SIZE_HDR)
+	$(SAN_CC) $(SAN_CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 $(SAN_OBJDIR)/parser.tab.o: parser.tab.c lexer.yy.h
 $(SAN_OBJDIR)/lexer.yy.o: lexer.yy.c lexer.yy.h
@@ -1689,19 +1737,19 @@ check-san:
 # These just re-run the normal targets with the instrumented binaries, so
 # ONLY=, TEST_ARCH= and REPEAT= keep working.
 test-expand-tcg-ir-san: check-san $(SAN_PRINTER)
-	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) \
+	@$(MAKE) --no-print-directory -f $(TOP_MAKEFILE) \
 	TCG_PRINTER='$(SAN_PRINTER)' EXPAND_STDERR=separate \
 	ONLY='$(ONLY)' REPEAT='$(REPEAT)' \
 	test-expand-tcg-ir
 
 test-llvm-ir-san: check-san $(SAN_MAPPER)
-	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) \
+	@$(MAKE) --no-print-directory -f $(TOP_MAKEFILE) \
 	TCG_MAPPER='$(SAN_MAPPER)' \
 	ONLY='$(ONLY)' TEST_ARCH='$(TEST_ARCH)' REPEAT='$(REPEAT)' \
 	test-llvm-ir
 
 test-asm-san: check-san $(SAN_MAPPER)
-	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) \
+	@$(MAKE) --no-print-directory -f $(TOP_MAKEFILE) \
 	TCG_MAPPER='$(SAN_MAPPER)' \
 	ONLY='$(ONLY)' TEST_ARCH='$(TEST_ARCH)' REPEAT='$(REPEAT)' \
 	test-asm
@@ -1709,7 +1757,7 @@ test-asm-san: check-san $(SAN_MAPPER)
 # All three suites under the sanitizer; -k keeps the remaining suites running
 # if one of them fails.
 test-san: check-san $(SAN_MAPPER) $(SAN_PRINTER)
-	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) -k \
+	@$(MAKE) --no-print-directory -f $(TOP_MAKEFILE) -k \
 	TCG_MAPPER='$(SAN_MAPPER)' TCG_PRINTER='$(SAN_PRINTER)' \
 	EXPAND_STDERR=separate \
 	ONLY='$(ONLY)' TEST_ARCH='$(TEST_ARCH)' REPEAT='$(REPEAT)' \
@@ -1777,8 +1825,8 @@ GENHTML := $(shell command -v genhtml 2>/dev/null)
 $(COV_DIR):
 	@mkdir -p "$(COV_DIR)"
 
-$(COV_DIR)/%.o: %.c | $(COV_DIR)
-	$(CC) $(COV_CFLAGS) -c $< -o $@
+$(COV_DIR)/%.o: %.c | $(COV_DIR) $(QEMU_CPU_SIZE_HDR)
+	$(CC) $(COV_CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 $(COV_DIR)/parser.tab.o: parser.tab.c lexer.yy.h
 $(COV_DIR)/lexer.yy.o: lexer.yy.c lexer.yy.h
@@ -1795,7 +1843,7 @@ cov-build: $(COV_MAPPER) $(COV_PRINTER)
 # -k so one failing suite does not stop the other; failures are expected and
 # tolerated here, we want the counts either way.
 cov-run: $(COV_MAPPER) $(COV_PRINTER)
-	-@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) -k \
+	-@$(MAKE) --no-print-directory -f $(TOP_MAKEFILE) -k \
 	TCG_MAPPER='$(COV_MAPPER)' TCG_PRINTER='$(COV_PRINTER)' \
 	TEST_ARCH='$(TEST_ARCH)' ONLY='$(ONLY)' \
 	test
@@ -1835,11 +1883,11 @@ coverage-report:
 # --- one-shot ---------------------------------------------------------------
 coverage:
 	@if [ "$(COV_RUN)" = 1 ]; then \
-	$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) cov-run; \
+	$(MAKE) --no-print-directory -f $(TOP_MAKEFILE) cov-run; \
 	else \
 	echo "COV_RUN=0: reusing existing counters in $(COV_DIR)/"; \
 	fi
-	@$(MAKE) --no-print-directory -f $(lastword $(MAKEFILE_LIST)) coverage-report
+	@$(MAKE) --no-print-directory -f $(TOP_MAKEFILE) coverage-report
 
 # Convenience: try to open the HTML report in a browser.
 coverage-open: coverage-report
@@ -1870,3 +1918,16 @@ coverage-open: coverage-report
 	preprocess-extract preprocess-extract-fpu preprocess-extract-tcg-runtime \
 	preprocess-extract-cc-helper preprocess-extract-int-helper \
 	preprocess-extract-user-exec
+
+# ----------------------------------------------------------------------------
+# Pull in the compiler-generated header dependency files (see DEPFLAGS above).
+# -include rather than include: on a fresh checkout no .d exists yet, which is
+# fine - the first build creates them and this make reads them next time.
+# Targets in a .d file are the exact object paths, so prerequisites merge with
+# the pattern rules above regardless of where in the file they are included.
+# ----------------------------------------------------------------------------
+ALL_DEPS := $(sort \
+	$(COMMON_OBJS:.o=.d) $(MAPPER_OBJS:.o=.d) $(PRINTER_OBJS:.o=.d) \
+	$(SAN_MAPPER_OBJS:.o=.d) $(SAN_PRINTER_OBJS:.o=.d) \
+	$(COV_MAPPER_OBJS:.o=.d) $(COV_PRINTER_OBJS:.o=.d))
+-include $(ALL_DEPS)
