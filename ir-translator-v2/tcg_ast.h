@@ -8,7 +8,7 @@
 #define XMM_TMP_IDX                 16
 #define MAX_INLINE_VEC_ARG_CNT      4
 
-#define MAX_ADDED_ARGS              6
+#define MAX_ADDED_ARGS              7
 #define STACK_INDEX_SHIFT           10
 #define TCG_CALL_OUT_FLAG_IDX       2
 #define TCG_CALL_PREFIX_COUNT       3

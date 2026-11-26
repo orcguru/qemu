@@ -829,6 +829,7 @@ LLVMValueRef get_or_add_func_with_default_cc(HelperType h, const UnifiedInstr *u
              i < u->operand_count; ++i) {
             arg_types[arg_cnt++] = get_llvm_type(LLVMInt64);
         }
+        assert(arg_cnt <= MAX_ADDED_ARGS);
         assert(u->operands[TCG_CALL_OUT_FLAG_IDX].imm.val == 0 || u->operands[TCG_CALL_PREFIX_COUNT].slot.op_type == helper_return_type[h]);
         LLVMTypeRef f_type = LLVMFunctionType((helper_return_type[h] ? get_llvm_type(helper_return_type[h]) : LLVMVoidType()), arg_types, arg_cnt, 0);
         TF = LLVMAddFunction(g_module, helper_str[h], f_type);
