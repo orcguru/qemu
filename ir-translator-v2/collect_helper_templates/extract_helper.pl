@@ -2423,9 +2423,7 @@ sub get_statements
         die "" if $func_ptr->{'HELPER_INTERFACE'};
         my $sub_str = &GetText($e, $ret_info->{'EXPR_START'}-1);
         $body = $body.$sub_str."(v2ulong)(__uint128_t)";
-        my $expr = &GetText($ret_info->{'EXPR_START'}, $ret_info->{'EXPR_STOP'});
-        $body = $body."(".$expr.")";
-        $current_pos = $ret_info->{'EXPR_STOP'} + 1;
+        $current_pos = $ret_info->{'EXPR_START'};
       } elsif ($func_ptr->{'HELPER_INTERFACE'}) {
         if (exists $func_ptr->{'IS_FOREIGN'}) {
           $body = $body."{\n";
