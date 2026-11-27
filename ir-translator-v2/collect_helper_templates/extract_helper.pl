@@ -2909,9 +2909,18 @@ sub collect_func_args
   #  print "\n";
   #}
   if ($func_ptr->{'HELPER_INTERFACE'}) {
+    # Helpers listed between NOSPLIT_BEGIN / NOSPLIT_END return directly
+    # rather than tail-calling the normal-return trampoline (see the NOSPLIT
+    # guards in get_statements()/get_func_body(), and the return-type rewrite
+    # exemption earlier in the file).  Their ABI therefore must not carry
+    # "unsigned long normal_return".  Keep exception_return when applicable:
+    # it is a separate slot and dropping it would change the caller ABI for
+    # helpers that may raise an exception.
+    my $nosplit = exists $nosplit_helpers{$func_ptr->{'NAME'}};
     if (exists $func_ptr->{'IS_FOREIGN'}) {
-      $args = $args.", unsigned long exception_return, unsigned long normal_return";
-    } else {
+      $args = $args.", unsigned long exception_return";
+      $args = $args.", unsigned long normal_return" if not $nosplit;
+    } elsif (not $nosplit) {
       $args = $args.", unsigned long normal_return";
     }
   } elsif (exists $func_ptr->{'IS_FOREIGN'}) {

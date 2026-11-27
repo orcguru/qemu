@@ -838,6 +838,9 @@ void translate_st2_with_attr(LLVMBuilderRef builder, StackAlloca *stack, const U
 int translate_func_addr(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *stack, const UnifiedInstr *u, const char *prefix) {
     char fname[32] = {0};
     LLVMValueRef TF = NULL;
+    assert(u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_TMP);
+    int tmp_slot = u->operands[0].slot.idx;
+    assert(stack->tmp.tcg_ty[tmp_slot] == LLVMFuncPtr);
     if (u->operands[1].kind == OP_IMM) {
         assert(u->operands[2].kind == OP_IMM);
         TF = get_or_add_func_with_qemuaot_cc(get_func_name(u->operands[1].imm.val, (int)u->operands[2].imm.val, &fname[0], sizeof(fname)), u->operands[1].imm.val, (int)u->operands[2].imm.val);
@@ -847,9 +850,8 @@ int translate_func_addr(LLVMBuilderRef builder, LLVMValueRef F, StackAlloca *sta
         if (!TF) {
             return 1;
         }
+        assert(LLVMCountParamTypes(LLVMGlobalGetValueType(TF)) == LLVMCountParamTypes(stack->tmp.llvm_ty[tmp_slot]));
     }
-    assert(u->operands[0].kind == OP_SLOT && u->operands[0].slot.type == SUB_SLOT_TMP);
-    int tmp_slot = u->operands[0].slot.idx;
     build_store_with_alignment(builder, TF, stack->tmp.alloca[tmp_slot], stack->tmp.align[tmp_slot], SPILL_TAG);
     return 0;
 }

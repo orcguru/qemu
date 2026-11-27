@@ -28,6 +28,7 @@
 #include "i386_cpu.h"
 #include "xymm_def.h"
 #include "qemu_cpu_sizes.h"
+#include "mapper_call_debug.h"
 
 #define LLVMNoInlineAttribute       32
 #define LLVMAlwaysInlineAttribute   3
@@ -282,7 +283,7 @@ LLVMValueRef insert_into_scalable_vector(LLVMValueRef val, LLVMType ty, const ch
     LLVMValueRef index_0 = LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0);
     LLVMValueRef intrinsic_call_args[] = {LLVMGetPoison(scalable_vec_type), val, index_0};
     LLVMTypeRef fn_type = LLVMFunctionType(scalable_vec_type, intrinsic_types, 3, 0);
-    return LLVMBuildCall2(g_builder, fn_type, fn, intrinsic_call_args, 3, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "vector_insert"));
+    return BUILD_CALL2(g_builder, fn_type, fn, intrinsic_call_args, 3, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "vector_insert"));
 }
 
 LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const char *prefix) {
@@ -299,7 +300,7 @@ LLVMValueRef extract_from_scalable_vector(LLVMValueRef val, LLVMType ty, const c
     LLVMValueRef index_0 = LLVMConstInt(get_llvm_type(LLVMInt64), 0, 0);
     LLVMValueRef intrinsic_call_args[] = {val, index_0};
     LLVMTypeRef fn_type = LLVMFunctionType(fixed_vec_type, intrinsic_types, 2, 0);
-    return LLVMBuildCall2(g_builder, fn_type, fn, intrinsic_call_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "vector_extract"));
+    return BUILD_CALL2(g_builder, fn_type, fn, intrinsic_call_args, 2, assemble_name_2(&var_name[0], sizeof(var_name), prefix, "vector_extract"));
 }
 
 LLVMValueRef get_const_vector(unsigned long c, LLVMType ty, const char *prefix) {
