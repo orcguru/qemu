@@ -2249,8 +2249,36 @@ sub get_statements
   my @sorted_events = sort {$a <=> $b} keys %events;
   my $current_pos = $begin;
   my $body = "";
+
+  # A function whose return type contains "128" is rewritten to return
+  # v2ulong.  get_statements() inserts "(v2ulong)(__uint128_t)" before the
+  # return expression; that cast must apply to the WHOLE expression, so it
+  # is emitted as "(v2ulong)(__uint128_t)( ... )".  $pending_128_close is
+  # the source offset just after the expression where the closing ")" goes.
+  # Without it, C precedence binds the cast to the first operand only:
+  #   (v2ulong)(__uint128_t)(__uint128_t)hi << 64 | lo   (wrong)
+  my $pending_128_close;
+  my $flush_128_close = sub {
+    return if not defined $pending_128_close;
+    my $close_at = $pending_128_close;
+    die "128-bit return expression overrun: "
+       ."current_pos=$current_pos close_at=$close_at\n"
+        if $current_pos > $close_at;
+    if ($current_pos < $close_at) {
+      $body = $body.&GetText($current_pos, $close_at - 1);
+    }
+    $body = $body.")";
+    $current_pos = $close_at;
+    undef $pending_128_close;
+  };
+
   foreach my $e_idx (0 .. $#sorted_events) {
     my $e = $sorted_events[$e_idx];
+    # If the next event starts after a pending 128-bit return expression,
+    # close that expression's parentheses before emitting any further text.
+    if (defined $pending_128_close and $e > $pending_128_close) {
+      $flush_128_close->();
+    }
     if ($e < $current_pos) {
       next;
     }
@@ -2421,8 +2449,12 @@ sub get_statements
       my $ret_info = $func_ptr->{'RETURNS'}->{$e};
       if ($func_ptr->{'128'}->{'RETURN128'} ne "") {
         die "" if $func_ptr->{'HELPER_INTERFACE'};
+        # A previous return's expression must already be closed (the loop
+        # start flush handles that); guard anyway for clarity.
+        $flush_128_close->() if defined $pending_128_close;
         my $sub_str = &GetText($e, $ret_info->{'EXPR_START'}-1);
-        $body = $body.$sub_str."(v2ulong)(__uint128_t)";
+        $body = $body.$sub_str."(v2ulong)(__uint128_t)(";
+        $pending_128_close = $ret_info->{'EXPR_STOP'} + 1;
         $current_pos = $ret_info->{'EXPR_START'};
       } elsif ($func_ptr->{'HELPER_INTERFACE'}) {
         if (exists $func_ptr->{'IS_FOREIGN'}) {
@@ -2555,7 +2587,13 @@ sub get_statements
     } else {
       die "";
     }
+    # If this event consumed the rest of a 128-bit return expression, close
+    # it now; otherwise the final flush below will do it with the tail text.
+    if (defined $pending_128_close and $current_pos >= $pending_128_close) {
+      $flush_128_close->();
+    }
   }
+  $flush_128_close->();
   my $txt = &GetText($current_pos, $end);
   $body = $body.$txt;
   return $body;

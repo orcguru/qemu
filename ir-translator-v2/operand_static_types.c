@@ -349,6 +349,7 @@ const LLVMType helper_template_arg_type[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_extrq_i] = {LLVMInt32, LLVMInt32},
     [helper_insertq_i] = {LLVMInt32, LLVMInt32},
     [helper_jmp_ind] = {LLVMInt64, LLVMInt64},
+    [helper_atomic_add_fetchb] = {LLVMInt64, LLVMInt32, LLVMInt32},
 };
 
 const char *helper_template_arg_name[HELPER_MAX][MAX_ADDED_ARGS] = {
@@ -458,6 +459,8 @@ const char *helper_template_arg_name[HELPER_MAX][MAX_ADDED_ARGS] = {
     [helper_crc32] = {"crc1", "msg", "len"},
     [helper_extrq_i] = {"index", "length"},
     [helper_insertq_i] = {"index", "length"},
+    [helper_jmp_ind] = {"env", "target_addr"},
+    [helper_atomic_add_fetchb] = {"addr", "val", "oi"},
 };
 
 const char *helper_runtime_arg_name[MAX_ADDED_ARGS] = {
